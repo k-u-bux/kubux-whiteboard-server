@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Drawing PoC</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      gap: 10px;
+    }
+    #controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    #page-controls {
+      display: flex;
+      gap: 10px;
+    }
+    canvas {
+      border: 1px solid black;
+    }
+    button {
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Whiteboard <span id="page-info"></span></h1>
+  <div id="controls">
+    <button id="pen-tool">Pen</button>
+    <button id="eraser-tool">Eraser</button>
+  </div>
+  <canvas id="whiteboard" width="800" height="600"></canvas>
+  <div id="page-controls">
+    <button id="prev-page">Previous Page</button>
+    <button id="next-page">Next Page</button>
+    <button id="delete-page">Delete Page</button>
+    <button id="insert-page">Insert Page</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('whiteboard');
+    const ctx = canvas.getContext('2d');
+    const pageInfo = document.getElementById('page-info');
+    const penTool = document.getElementById('pen-tool');
+    const eraserTool = document.getElementById('eraser-tool');
+    const prevPageBtn = document.getElementById('prev-page');
+    const nextPageBtn = document.getElementById('next-page');
+    const deletePageBtn = document.getElementById('delete-page');
+    const insertPageBtn = document.getElementById('insert-page');
+
+    const ws = new WebSocket('ws://gauss:3001');
+
+    let isDrawing = false;
+    let currentStroke = [];
+    let tool = 'pen';
+    let currentState = [];
+
+    // Helper to render the entire canvas state
+    function renderCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      currentState.forEach(stroke => {
+        if (stroke.points.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = 'black';
+          stroke.points.forEach(point => ctx.lineTo(point.x, point.y));
+          ctx.stroke();
+        }
+      });
+    }
+
+    // Set drawing mode
+    penTool.addEventListener('click', () => tool = 'pen');
+    eraserTool.addEventListener('click', () => tool = 'eraser');
+
+    // Drawing and erasing logic
+    canvas.addEventListener('mousedown', e => {
+      if (tool === 'pen') {
+        isDrawing = true;
+        const rect = canvas.getBoundingClientRect();
+        currentStroke.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      } else if (tool === 'eraser') {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const erasedStroke = findStrokeAt(x, y);
+        if (erasedStroke) {
+          ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id }));
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (tool === 'pen' && isDrawing) {
+        const rect = canvas.getBoundingClientRect();
+        currentStroke.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        renderCanvas();
+        ctx.beginPath();
+        ctx.moveTo(currentStroke[0].x, currentStroke[0].y);
+        currentStroke.forEach(point => ctx.lineTo(point.x, point.y));
+        ctx.stroke();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      if (tool === 'pen' && isDrawing) {
+        ws.send(JSON.stringify({ type: 'draw', points: currentStroke }));
+        currentStroke = [];
+      }
+      isDrawing = false;
+    });
+
+    // Helper for eraser to find a stroke to delete
+    function findStrokeAt(x, y) {
+      for (const stroke of currentState) {
+        for (const point of stroke.points) {
+          if (Math.abs(point.x - x) < 5 && Math.abs(point.y - y) < 5) {
+            return stroke;
+          }
+        }
+      }
+      return null;
+    }
+
+    // Page management buttons
+    prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage' })));
+    nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage' })));
+    deletePageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'deletePage' })));
+    insertPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'insertPage' })));
+
+    // Handle messages from the server
+    ws.onmessage = event => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'fullState') {
+        currentState = data.state;
+        renderCanvas();
+        pageInfo.textContent = `Page ${data.page} of ${data.pageOrder.length}`;
+      } else if (data.type === 'newStroke') {
+        currentState.push(data.stroke);
+        renderCanvas();
+      } else if (data.type === 'stateUpdate') {
+        currentState = data.state;
+        renderCanvas();
+      }
+    };
+  </script>
+</body>
+</html>

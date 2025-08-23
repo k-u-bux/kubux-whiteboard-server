@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Proof of Concept</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      gap: 20px;
+    }
+    .box {
+      width: 200px;
+      height: 200px;
+      border: 2px solid black;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="box1" class="box" style="background-color: blue;"></div>
+  <div id="box2" class="box" style="background-color: red;"></div>
+
+  <script>
+    const box1 = document.getElementById('box1');
+    const box2 = document.getElementById('box2');
+
+    // Make sure to replace "localhost" with your desktop's local IP address
+    // For example: "ws://192.168.1.10:3000"
+    const ws = new WebSocket('ws://192.168.178.28:3001');
+
+    // Function to generate a random hex color
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    // Event listeners to send messages to the server
+    box1.addEventListener('click', () => {
+      const newColor = getRandomColor();
+      ws.send(JSON.stringify({ boxId: 'box1', color: newColor }));
+    });
+
+    box2.addEventListener('click', () => {
+      const newColor = getRandomColor();
+      ws.send(JSON.stringify({ boxId: 'box2', color: newColor }));
+    });
+
+    // Handle messages from the server
+    ws.onmessage = event => {
+      const state = JSON.parse(event.data);
+      box1.style.backgroundColor = state.box1;
+      box2.style.backgroundColor = state.box2;
+    };
+  </script>
+</body>
+</html>
