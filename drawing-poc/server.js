@@ -7,16 +7,13 @@ const url = require('url');
 
 const boards = {};
 
-// We use the HTTP server to serve the single-page application
 const httpServer = http.createServer((req, res) => {
-  // All HTTP request handling is now done within this single callback
   const parsedUrl = url.parse(req.url, true);
 
-  // Handle the API endpoint for creating new boards
   if (parsedUrl.pathname === '/create-board' && req.method === 'POST') {
     createBoard(req, res);
-  } else {
-    // Serve the index.html file for all other paths, including the root
+  } else if (parsedUrl.pathname === '/') {
+    // Serve the landing page
     const filePath = path.join(__dirname, 'index.html');
     fs.readFile(filePath, (err, data) => {
       if (err) {
@@ -27,6 +24,25 @@ const httpServer = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(data);
     });
+  } else {
+    // For all other paths, check if it's a valid board hash
+    const hash = parsedUrl.pathname.split('/').filter(p => p)[0];
+    const boardData = getBoardByHash(hash);
+    if (boardData) {
+      const filePath = path.join(__dirname, 'index.html');
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          res.writeHead(404);
+          res.end('File not found!');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(data);
+      });
+    } else {
+      res.writeHead(404);
+      res.end('Board not found!');
+    }
   }
 });
 
@@ -76,7 +92,8 @@ function broadcastState(pageId, board, boardId) {
   const message = JSON.stringify({
     type: 'stateUpdate',
     page: pageId,
-    state: board.pageState[pageId]
+    state: board.pageState[pageId],
+    pageOrder: board.pageOrder // Pass page order to update all clients
   });
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN && client.pageId === pageId && client.boardId === boardId) {
@@ -124,7 +141,7 @@ wss.on('connection', (ws, req) => {
       const currentBoard = boards[ws.boardId];
       if (!currentBoard) return;
 
-      if (ws.role === 'spectator' && (data.type === 'draw' || data.type === 'erase' || data.type === 'deletePage' || data.type === 'insertPage')) {
+      if (ws.role === 'spectator' && ['draw', 'erase', 'deletePage', 'insertPage'].includes(data.type)) {
         console.log('Spectator attempted to change board state, request denied.');
         return;
       }

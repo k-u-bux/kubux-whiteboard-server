@@ -11,6 +11,15 @@
       margin: 0;
       gap: 10px;
     }
+    #landing-page, #board-app {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    #landing-page.active, #board-app.active {
+      display: flex;
+    }
     #controls {
       display: flex;
       gap: 10px;
@@ -36,20 +45,34 @@
   </style>
 </head>
 <body>
-  <h1>Whiteboard <span id="page-info"></span></h1>
-  <div id="controls">
-    <button id="pen-tool">Pen</button>
-    <button id="eraser-tool">Eraser</button>
+
+  <div id="landing-page" class="active">
+    <h1>Create a New Board</h1>
+    <button id="create-board-btn">Create Board</button>
+    <div id="links-container" style="margin-top: 20px;"></div>
   </div>
-  <canvas id="whiteboard" width="800" height="600"></canvas>
-  <div id="page-controls">
-    <button id="prev-page">Previous Page</button>
-    <button id="next-page">Next Page</button>
-    <button id="delete-page">Delete Page</button>
-    <button id="insert-page">Insert Page</button>
+
+  <div id="board-app">
+    <h1>Whiteboard <span id="page-info"></span></h1>
+    <div id="controls">
+      <button id="pen-tool">Pen</button>
+      <button id="eraser-tool">Eraser</button>
+    </div>
+    <canvas id="whiteboard" width="800" height="600"></canvas>
+    <div id="page-controls">
+      <button id="prev-page">Previous Page</button>
+      <button id="next-page">Next Page</button>
+      <button id="delete-page">Delete Page</button>
+      <button id="insert-page">Insert Page</button>
+    </div>
   </div>
 
   <script>
+    const landingPage = document.getElementById('landing-page');
+    const boardApp = document.getElementById('board-app');
+    const createBoardBtn = document.getElementById('create-board-btn');
+    const linksContainer = document.getElementById('links-container');
+
     const canvas = document.getElementById('whiteboard');
     const ctx = canvas.getContext('2d');
     const pageInfo = document.getElementById('page-info');
@@ -69,15 +92,18 @@
     let pageOrder = [];
     let currentPage = '';
     let role = '';
+    let ws;
 
-    // Extract the board hash from the URL path
-    const path = window.location.pathname.split('/');
-    const hash = path[path.length - 1];
+    const path = window.location.pathname.split('/').filter(p => p);
+    const hash = path[0];
 
     if (!hash) {
-      document.body.innerHTML = '<h1>Please navigate to a valid board URL.</h1>';
+      // Show landing page if no hash is in the URL
+      landingPage.classList.add('active');
     } else {
-      const ws = new WebSocket(`ws://gauss:3001/${hash}`);
+      // Show board application if there's a hash
+      boardApp.classList.add('active');
+      ws = new WebSocket(`ws://gauss:3001/${hash}`);
 
       function drawStroke(stroke) {
         if (stroke.points.length > 1) {
@@ -174,12 +200,11 @@
       ws.onmessage = event => {
         const data = JSON.parse(event.data);
         if (data.type === 'initialRole') {
-            role = data.role;
-            if (role === 'spectator') {
-                controls.classList.add('spectator-mode');
-                canvas.style.cursor = 'default';
-                console.log('Running in spectator mode.');
-            }
+          role = data.role;
+          if (role === 'spectator') {
+            controls.classList.add('spectator-mode');
+            canvas.style.cursor = 'default';
+          }
         } else if (data.type === 'fullState') {
           currentState = data.state;
           pageOrder = data.pageOrder;
@@ -191,10 +216,23 @@
           drawStroke(data.stroke);
         } else if (data.type === 'stateUpdate') {
           currentState = data.state;
+          pageOrder = data.pageOrder;
+          pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
           renderCanvas();
         }
       };
     }
+
+    createBoardBtn.addEventListener('click', () => {
+      fetch('http://gauss:8080/create-board', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+          linksContainer.innerHTML = `
+            <p>Creator URL: <a href="${data.creatorLink}">${data.creatorLink}</a></p>
+            <p>Spectator URL: <a href="${data.spectatorLink}">${data.spectatorLink}</a></p>
+          `;
+        });
+    });
   </script>
 </body>
 </html>
