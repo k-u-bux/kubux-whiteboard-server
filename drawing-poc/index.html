@@ -52,14 +52,14 @@
     const penTool = document.getElementById('pen-tool');
     const eraserTool = document.getElementById('eraser-tool');
     const prevPageBtn = document.getElementById('prev-page');
-    const nextPageBtn = document.getElementById('next-page');
+    const nextPageBtn = document = document.getElementById('next-page');
     const deletePageBtn = document.getElementById('delete-page');
-    const insertPageBtn = document = document.getElementById('insert-page');
+    const insertPageBtn = document.getElementById('insert-page');
 
     let isDrawing = false;
     let currentStrokePoints = [];
     let tool = 'pen';
-    let currentPageState = []; // The state for the current page only
+    let currentPageState = [];
     let pageOrder = [];
     let currentPageId = '';
     
@@ -165,7 +165,6 @@
         // This message signals that the page order has changed on the server
         pageOrder = data.pageOrder;
         pageInfo.textContent = `${pageOrder.indexOf(currentPageId) + 1} of ${pageOrder.length}`;
-        renderCanvas();
       }
     };
   </script>
