@@ -98,10 +98,8 @@
     const hash = path[0];
 
     if (!hash) {
-      // Show landing page if no hash is in the URL
       landingPage.classList.add('active');
     } else {
-      // Show board application if there's a hash
       boardApp.classList.add('active');
       ws = new WebSocket(`ws://gauss:3001/${hash}`);
 
@@ -184,8 +182,10 @@
         return null;
       }
 
+      // Bug fix: The client no longer assumes the next/prev page ID
       prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage' })));
       nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage' })));
+
       deletePageBtn.addEventListener('click', () => {
         if (role === 'creator') {
           ws.send(JSON.stringify({ type: 'deletePage' }));
@@ -203,6 +203,7 @@
           role = data.role;
           if (role === 'spectator') {
             controls.classList.add('spectator-mode');
+            pageControls.classList.add('spectator-mode');
             canvas.style.cursor = 'default';
           }
         } else if (data.type === 'fullState') {
@@ -217,6 +218,7 @@
         } else if (data.type === 'stateUpdate') {
           currentState = data.state;
           pageOrder = data.pageOrder;
+          currentPage = data.page;
           pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
           renderCanvas();
         }

@@ -13,7 +13,6 @@ const httpServer = http.createServer((req, res) => {
   if (parsedUrl.pathname === '/create-board' && req.method === 'POST') {
     createBoard(req, res);
   } else if (parsedUrl.pathname === '/') {
-    // Serve the landing page
     const filePath = path.join(__dirname, 'index.html');
     fs.readFile(filePath, (err, data) => {
       if (err) {
@@ -25,7 +24,6 @@ const httpServer = http.createServer((req, res) => {
       res.end(data);
     });
   } else {
-    // For all other paths, check if it's a valid board hash
     const hash = parsedUrl.pathname.split('/').filter(p => p)[0];
     const boardData = getBoardByHash(hash);
     if (boardData) {
@@ -93,7 +91,7 @@ function broadcastState(pageId, board, boardId) {
     type: 'stateUpdate',
     page: pageId,
     state: board.pageState[pageId],
-    pageOrder: board.pageOrder // Pass page order to update all clients
+    pageOrder: board.pageOrder
   });
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN && client.pageId === pageId && client.boardId === boardId) {
@@ -187,14 +185,16 @@ wss.on('connection', (ws, req) => {
       } else if (data.type === 'nextPage') {
         const index = currentBoard.pageOrder.indexOf(ws.pageId);
         if (index < currentBoard.pageOrder.length - 1) {
-          ws.pageId = currentBoard.pageOrder[index + 1];
-          sendFullState(ws, currentBoard, ws.pageId);
+          const newPageId = currentBoard.pageOrder[index + 1];
+          ws.pageId = newPageId;
+          sendFullState(ws, currentBoard, newPageId);
         }
       } else if (data.type === 'prevPage') {
         const index = currentBoard.pageOrder.indexOf(ws.pageId);
         if (index > 0) {
-          ws.pageId = currentBoard.pageOrder[index - 1];
-          sendFullState(ws, currentBoard, ws.pageId);
+          const newPageId = currentBoard.pageOrder[index - 1];
+          ws.pageId = newPageId;
+          sendFullState(ws, currentBoard, newPageId);
         }
       }
     } catch (e) {
