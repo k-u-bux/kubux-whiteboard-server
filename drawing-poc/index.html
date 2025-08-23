@@ -52,11 +52,12 @@
     const penTool = document.getElementById('pen-tool');
     const eraserTool = document.getElementById('eraser-tool');
     const prevPageBtn = document.getElementById('prev-page');
-    const nextPageBtn = document = document.getElementById('next-page');
+    const nextPageBtn = document.getElementById('next-page');
     const deletePageBtn = document.getElementById('delete-page');
     const insertPageBtn = document.getElementById('insert-page');
 
-    const ws = new WebSocket('ws://localhost:3001');
+    // **CHANGE MADE HERE:** Use the hostname 'gauss' instead of localhost or an IP address
+    const ws = new WebSocket('ws://gauss:3001');
 
     let isDrawing = false;
     let currentStrokePoints = [];
@@ -133,7 +134,7 @@
       isDrawing = false;
     });
 
-    // Bug fix: Helper for eraser to find a stroke to delete with a larger hit area
+    // Helper for eraser to find a stroke to delete with a larger hit area
     function findStrokeAt(x, y) {
       for (const stroke of currentState) {
         for (const point of stroke.points) {
@@ -161,7 +162,6 @@
         pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
         renderCanvas();
       } else if (data.type === 'newStroke') {
-        // Bug fix: This is how the remote client receives and renders
         currentState.push(data.stroke);
         drawStroke(data.stroke);
       } else if (data.type === 'stateUpdate') {
