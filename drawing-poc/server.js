@@ -72,13 +72,13 @@ wss.on('connection', ws => {
       } else if (data.type === 'draw') {
         const stroke = {
           id: uuidv4(),
-          points: data.points
+          points: data.points,
+          timestamp: Date.now()
         };
         pageState[ws.pageId].push(stroke);
-        // Broadcast the new stroke to clients on the same page
         const message = JSON.stringify({ type: 'newStroke', page: ws.pageId, stroke: stroke });
         wss.clients.forEach(client => {
-          if (client !== ws && client.readyState === WebSocket.OPEN && client.pageId === ws.pageId) {
+          if (client.readyState === WebSocket.OPEN && client.pageId === ws.pageId) {
             client.send(message);
           }
         });
@@ -95,7 +95,6 @@ wss.on('connection', ws => {
           sendFullState(ws, newPageId);
           broadcastState(newPageId);
         } else {
-          // If it's the last page, clear it
           pageState[ws.pageId] = [];
           sendFullState(ws, ws.pageId);
           broadcastState(ws.pageId);

@@ -22,6 +22,7 @@
     }
     canvas {
       border: 1px solid black;
+      cursor: crosshair;
     }
     button {
       padding: 10px;
@@ -51,47 +52,60 @@
     const penTool = document.getElementById('pen-tool');
     const eraserTool = document.getElementById('eraser-tool');
     const prevPageBtn = document.getElementById('prev-page');
-    const nextPageBtn = document.getElementById('next-page');
+    const nextPageBtn = document = document.getElementById('next-page');
     const deletePageBtn = document.getElementById('delete-page');
     const insertPageBtn = document.getElementById('insert-page');
 
-    const ws = new WebSocket('ws://gauss:3001');
+    const ws = new WebSocket('ws://localhost:3001');
 
     let isDrawing = false;
-    let currentStroke = [];
+    let currentStrokePoints = [];
     let tool = 'pen';
     let currentState = [];
+    let pageOrder = [];
+    let currentPage = '';
+
+    // Helper to render a single stroke
+    function drawStroke(stroke) {
+      if (stroke.points.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'black';
+        stroke.points.forEach(point => ctx.lineTo(point.x, point.y));
+        ctx.stroke();
+      }
+    }
 
     // Helper to render the entire canvas state
     function renderCanvas() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      currentState.forEach(stroke => {
-        if (stroke.points.length > 1) {
-          ctx.beginPath();
-          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-          ctx.lineWidth = 2;
-          ctx.lineCap = 'round';
-          ctx.strokeStyle = 'black';
-          stroke.points.forEach(point => ctx.lineTo(point.x, point.y));
-          ctx.stroke();
-        }
-      });
+      currentState.forEach(drawStroke);
     }
 
     // Set drawing mode
-    penTool.addEventListener('click', () => tool = 'pen');
-    eraserTool.addEventListener('click', () => tool = 'eraser');
+    penTool.addEventListener('click', () => {
+      tool = 'pen';
+      canvas.style.cursor = 'crosshair';
+    });
+    eraserTool.addEventListener('click', () => {
+      tool = 'eraser';
+      canvas.style.cursor = 'cell';
+    });
 
     // Drawing and erasing logic
     canvas.addEventListener('mousedown', e => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
       if (tool === 'pen') {
         isDrawing = true;
-        const rect = canvas.getBoundingClientRect();
-        currentStroke.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        currentStrokePoints.push({ x, y });
+        ctx.beginPath();
+        ctx.moveTo(x, y);
       } else if (tool === 'eraser') {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
         const erasedStroke = findStrokeAt(x, y);
         if (erasedStroke) {
           ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id }));
@@ -102,28 +116,28 @@
     canvas.addEventListener('mousemove', e => {
       if (tool === 'pen' && isDrawing) {
         const rect = canvas.getBoundingClientRect();
-        currentStroke.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-        renderCanvas();
-        ctx.beginPath();
-        ctx.moveTo(currentStroke[0].x, currentStroke[0].y);
-        currentStroke.forEach(point => ctx.lineTo(point.x, point.y));
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        currentStrokePoints.push({ x, y });
+        ctx.lineTo(x, y);
         ctx.stroke();
       }
     });
 
     canvas.addEventListener('mouseup', () => {
       if (tool === 'pen' && isDrawing) {
-        ws.send(JSON.stringify({ type: 'draw', points: currentStroke }));
-        currentStroke = [];
+        ws.send(JSON.stringify({ type: 'draw', points: currentStrokePoints }));
+        currentStrokePoints = [];
+        ctx.beginPath(); // Reset the path for the next stroke
       }
       isDrawing = false;
     });
 
-    // Helper for eraser to find a stroke to delete
+    // Bug fix: Helper for eraser to find a stroke to delete with a larger hit area
     function findStrokeAt(x, y) {
       for (const stroke of currentState) {
         for (const point of stroke.points) {
-          if (Math.abs(point.x - x) < 5 && Math.abs(point.y - y) < 5) {
+          if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
             return stroke;
           }
         }
@@ -142,11 +156,14 @@
       const data = JSON.parse(event.data);
       if (data.type === 'fullState') {
         currentState = data.state;
+        pageOrder = data.pageOrder;
+        currentPage = data.page;
+        pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
         renderCanvas();
-        pageInfo.textContent = `Page ${data.page} of ${data.pageOrder.length}`;
       } else if (data.type === 'newStroke') {
+        // Bug fix: This is how the remote client receives and renders
         currentState.push(data.stroke);
-        renderCanvas();
+        drawStroke(data.stroke);
       } else if (data.type === 'stateUpdate') {
         currentState = data.state;
         renderCanvas();
