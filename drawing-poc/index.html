@@ -29,6 +29,10 @@
       font-size: 14px;
       cursor: pointer;
     }
+    .spectator-mode {
+      opacity: 0.5;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -51,13 +55,12 @@
     const pageInfo = document.getElementById('page-info');
     const penTool = document.getElementById('pen-tool');
     const eraserTool = document.getElementById('eraser-tool');
+    const controls = document.getElementById('controls');
+    const pageControls = document.getElementById('page-controls');
     const prevPageBtn = document.getElementById('prev-page');
     const nextPageBtn = document.getElementById('next-page');
     const deletePageBtn = document.getElementById('delete-page');
     const insertPageBtn = document.getElementById('insert-page');
-
-    // **CHANGE MADE HERE:** Use the hostname 'gauss' instead of localhost or an IP address
-    const ws = new WebSocket('ws://gauss:3001');
 
     let isDrawing = false;
     let currentStrokePoints = [];
@@ -65,110 +68,133 @@
     let currentState = [];
     let pageOrder = [];
     let currentPage = '';
+    let role = '';
 
-    // Helper to render a single stroke
-    function drawStroke(stroke) {
-      if (stroke.points.length > 1) {
-        ctx.beginPath();
-        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = 'black';
-        stroke.points.forEach(point => ctx.lineTo(point.x, point.y));
-        ctx.stroke();
-      }
-    }
+    // Extract the board hash from the URL path
+    const path = window.location.pathname.split('/');
+    const hash = path[path.length - 1];
 
-    // Helper to render the entire canvas state
-    function renderCanvas() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      currentState.forEach(drawStroke);
-    }
+    if (!hash) {
+      document.body.innerHTML = '<h1>Please navigate to a valid board URL.</h1>';
+    } else {
+      const ws = new WebSocket(`ws://gauss:3001/${hash}`);
 
-    // Set drawing mode
-    penTool.addEventListener('click', () => {
-      tool = 'pen';
-      canvas.style.cursor = 'crosshair';
-    });
-    eraserTool.addEventListener('click', () => {
-      tool = 'eraser';
-      canvas.style.cursor = 'cell';
-    });
-
-    // Drawing and erasing logic
-    canvas.addEventListener('mousedown', e => {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      if (tool === 'pen') {
-        isDrawing = true;
-        currentStrokePoints.push({ x, y });
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-      } else if (tool === 'eraser') {
-        const erasedStroke = findStrokeAt(x, y);
-        if (erasedStroke) {
-          ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id }));
+      function drawStroke(stroke) {
+        if (stroke.points.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = 'black';
+          stroke.points.forEach(point => ctx.lineTo(point.x, point.y));
+          ctx.stroke();
         }
       }
-    });
 
-    canvas.addEventListener('mousemove', e => {
-      if (tool === 'pen' && isDrawing) {
+      function renderCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        currentState.forEach(drawStroke);
+      }
+
+      penTool.addEventListener('click', () => {
+        tool = 'pen';
+        canvas.style.cursor = 'crosshair';
+      });
+      eraserTool.addEventListener('click', () => {
+        tool = 'eraser';
+        canvas.style.cursor = 'cell';
+      });
+
+      canvas.addEventListener('mousedown', e => {
+        if (role === 'spectator') return;
+
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        currentStrokePoints.push({ x, y });
-        ctx.lineTo(x, y);
-        ctx.stroke();
-      }
-    });
 
-    canvas.addEventListener('mouseup', () => {
-      if (tool === 'pen' && isDrawing) {
-        ws.send(JSON.stringify({ type: 'draw', points: currentStrokePoints }));
-        currentStrokePoints = [];
-        ctx.beginPath(); // Reset the path for the next stroke
-      }
-      isDrawing = false;
-    });
-
-    // Helper for eraser to find a stroke to delete with a larger hit area
-    function findStrokeAt(x, y) {
-      for (const stroke of currentState) {
-        for (const point of stroke.points) {
-          if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
-            return stroke;
+        if (tool === 'pen') {
+          isDrawing = true;
+          currentStrokePoints.push({ x, y });
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+        } else if (tool === 'eraser') {
+          const erasedStroke = findStrokeAt(x, y);
+          if (erasedStroke) {
+            ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id }));
           }
         }
+      });
+
+      canvas.addEventListener('mousemove', e => {
+        if (role === 'spectator') return;
+        if (tool === 'pen' && isDrawing) {
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          currentStrokePoints.push({ x, y });
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+      });
+
+      canvas.addEventListener('mouseup', () => {
+        if (role === 'spectator') return;
+        if (tool === 'pen' && isDrawing) {
+          ws.send(JSON.stringify({ type: 'draw', points: currentStrokePoints }));
+          currentStrokePoints = [];
+          ctx.beginPath();
+        }
+        isDrawing = false;
+      });
+
+      function findStrokeAt(x, y) {
+        for (const stroke of currentState) {
+          for (const point of stroke.points) {
+            if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
+              return stroke;
+            }
+          }
+        }
+        return null;
       }
-      return null;
+
+      prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage' })));
+      nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage' })));
+      deletePageBtn.addEventListener('click', () => {
+        if (role === 'creator') {
+          ws.send(JSON.stringify({ type: 'deletePage' }));
+        }
+      });
+      insertPageBtn.addEventListener('click', () => {
+        if (role === 'creator') {
+          ws.send(JSON.stringify({ type: 'insertPage' }));
+        }
+      });
+
+      ws.onmessage = event => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'initialRole') {
+            role = data.role;
+            if (role === 'spectator') {
+                controls.classList.add('spectator-mode');
+                canvas.style.cursor = 'default';
+                console.log('Running in spectator mode.');
+            }
+        } else if (data.type === 'fullState') {
+          currentState = data.state;
+          pageOrder = data.pageOrder;
+          currentPage = data.page;
+          pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
+          renderCanvas();
+        } else if (data.type === 'newStroke') {
+          currentState.push(data.stroke);
+          drawStroke(data.stroke);
+        } else if (data.type === 'stateUpdate') {
+          currentState = data.state;
+          renderCanvas();
+        }
+      };
     }
-
-    // Page management buttons
-    prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage' })));
-    nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage' })));
-    deletePageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'deletePage' })));
-    insertPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'insertPage' })));
-
-    // Handle messages from the server
-    ws.onmessage = event => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'fullState') {
-        currentState = data.state;
-        pageOrder = data.pageOrder;
-        currentPage = data.page;
-        pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
-        renderCanvas();
-      } else if (data.type === 'newStroke') {
-        currentState.push(data.stroke);
-        drawStroke(data.stroke);
-      } else if (data.type === 'stateUpdate') {
-        currentState = data.state;
-        renderCanvas();
-      }
-    };
   </script>
 </body>
 </html>
