@@ -48,7 +48,8 @@ const wss = new WebSocket.Server({ server: httpServer });
 
 console.log('WebSocket server is running on port 3001');
 
-httpServer.listen(8080, () => {
+// FIX: Explicitly bind to '0.0.0.0' to accept external connections
+httpServer.listen(8080, '0.0.0.0', () => {
   console.log('HTTP server is running on port 8080');
 });
 
@@ -76,6 +77,7 @@ function createBoard(req, res) {
     pageOrder: ['1']
   };
 
+  // Note: The client must be able to resolve 'gauss' or use a direct IP
   const creatorLink = `http://gauss:8080/${creatorUrl}`;
   const spectatorLink = `http://gauss:8080/${spectatorUrl}`;
 
