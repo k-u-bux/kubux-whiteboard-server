@@ -11,15 +11,6 @@
       margin: 0;
       gap: 10px;
     }
-    #landing-page, #board-app {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-    }
-    #landing-page.active, #board-app.active {
-      display: flex;
-    }
     #controls {
       display: flex;
       gap: 10px;
@@ -38,52 +29,34 @@
       font-size: 14px;
       cursor: pointer;
     }
-    .spectator-mode {
-      opacity: 0.5;
-      pointer-events: none;
-    }
   </style>
 </head>
 <body>
-
-  <div id="landing-page" class="active">
-    <h1>Create a New Board</h1>
-    <button id="create-board-btn">Create Board</button>
-    <div id="links-container" style="margin-top: 20px;"></div>
+  <h1>Whiteboard <span id="page-info"></span></h1>
+  <div id="controls">
+    <button id="pen-tool">Pen</button>
+    <button id="eraser-tool">Eraser</button>
   </div>
-
-  <div id="board-app">
-    <h1>Whiteboard <span id="page-info"></span></h1>
-    <div id="controls">
-      <button id="pen-tool">Pen</button>
-      <button id="eraser-tool">Eraser</button>
-    </div>
-    <canvas id="whiteboard" width="800" height="600"></canvas>
-    <div id="page-controls">
-      <button id="prev-page">Previous Page</button>
-      <button id="next-page">Next Page</button>
-      <button id="delete-page">Delete Page</button>
-      <button id="insert-page">Insert Page</button>
-    </div>
+  <canvas id="whiteboard" width="800" height="600"></canvas>
+  <div id="page-controls">
+    <button id="prev-page">Previous Page</button>
+    <button id="next-page">Next Page</button>
+    <button id="delete-page">Delete Page</button>
+    <button id="insert-page">Insert Page</button>
   </div>
 
   <script>
-    const landingPage = document.getElementById('landing-page');
-    const boardApp = document.getElementById('board-app');
-    const createBoardBtn = document.getElementById('create-board-btn');
-    const linksContainer = document.getElementById('links-container');
-
     const canvas = document.getElementById('whiteboard');
     const ctx = canvas.getContext('2d');
     const pageInfo = document.getElementById('page-info');
     const penTool = document.getElementById('pen-tool');
     const eraserTool = document.getElementById('eraser-tool');
-    const controls = document.getElementById('controls');
-    const pageControls = document.getElementById('page-controls');
     const prevPageBtn = document.getElementById('prev-page');
     const nextPageBtn = document.getElementById('next-page');
     const deletePageBtn = document.getElementById('delete-page');
     const insertPageBtn = document.getElementById('insert-page');
+
+    const ws = new WebSocket('ws://gauss:3001');
 
     let isDrawing = false;
     let currentStrokePoints = [];
@@ -91,150 +64,103 @@
     let currentState = [];
     let pageOrder = [];
     let currentPage = '';
-    let role = '';
-    let ws;
 
-    const path = window.location.pathname.split('/').filter(p => p);
-    const hash = path[0];
+    function drawStroke(stroke) {
+      if (stroke.points.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'black';
+        stroke.points.forEach(point => ctx.lineTo(point.x, point.y));
+        ctx.stroke();
+      }
+    }
 
-    if (!hash) {
-      landingPage.classList.add('active');
-    } else {
-      boardApp.classList.add('active');
-      ws = new WebSocket(`ws://gauss:3001/${hash}`);
+    function renderCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      currentState.forEach(drawStroke);
+    }
 
-      function drawStroke(stroke) {
-        if (stroke.points.length > 1) {
-          ctx.beginPath();
-          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-          ctx.lineWidth = 2;
-          ctx.lineCap = 'round';
-          ctx.strokeStyle = 'black';
-          stroke.points.forEach(point => ctx.lineTo(point.x, point.y));
-          ctx.stroke();
+    penTool.addEventListener('click', () => {
+      tool = 'pen';
+      canvas.style.cursor = 'crosshair';
+    });
+    eraserTool.addEventListener('click', () => {
+      tool = 'eraser';
+      canvas.style.cursor = 'cell';
+    });
+
+    canvas.addEventListener('mousedown', e => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (tool === 'pen') {
+        isDrawing = true;
+        currentStrokePoints.push({ x, y });
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      } else if (tool === 'eraser') {
+        const erasedStroke = findStrokeAt(x, y);
+        if (erasedStroke) {
+          ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id }));
         }
       }
+    });
 
-      function renderCanvas() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        currentState.forEach(drawStroke);
-      }
-
-      penTool.addEventListener('click', () => {
-        tool = 'pen';
-        canvas.style.cursor = 'crosshair';
-      });
-      eraserTool.addEventListener('click', () => {
-        tool = 'eraser';
-        canvas.style.cursor = 'cell';
-      });
-
-      canvas.addEventListener('mousedown', e => {
-        if (role === 'spectator') return;
-
+    canvas.addEventListener('mousemove', e => {
+      if (tool === 'pen' && isDrawing) {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
-        if (tool === 'pen') {
-          isDrawing = true;
-          currentStrokePoints.push({ x, y });
-          ctx.beginPath();
-          ctx.moveTo(x, y);
-        } else if (tool === 'eraser') {
-          const erasedStroke = findStrokeAt(x, y);
-          if (erasedStroke) {
-            ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id }));
-          }
-        }
-      });
-
-      canvas.addEventListener('mousemove', e => {
-        if (role === 'spectator') return;
-        if (tool === 'pen' && isDrawing) {
-          const rect = canvas.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          currentStrokePoints.push({ x, y });
-          ctx.lineTo(x, y);
-          ctx.stroke();
-        }
-      });
-
-      canvas.addEventListener('mouseup', () => {
-        if (role === 'spectator') return;
-        if (tool === 'pen' && isDrawing) {
-          ws.send(JSON.stringify({ type: 'draw', points: currentStrokePoints }));
-          currentStrokePoints = [];
-          ctx.beginPath();
-        }
-        isDrawing = false;
-      });
-
-      function findStrokeAt(x, y) {
-        for (const stroke of currentState) {
-          for (const point of stroke.points) {
-            if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
-              return stroke;
-            }
-          }
-        }
-        return null;
+        currentStrokePoints.push({ x, y });
+        ctx.lineTo(x, y);
+        ctx.stroke();
       }
+    });
 
-      // Bug fix: The client no longer assumes the next/prev page ID
-      prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage' })));
-      nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage' })));
+    canvas.addEventListener('mouseup', () => {
+      if (tool === 'pen' && isDrawing) {
+        ws.send(JSON.stringify({ type: 'draw', points: currentStrokePoints }));
+        currentStrokePoints = [];
+        ctx.beginPath();
+      }
+      isDrawing = false;
+    });
 
-      deletePageBtn.addEventListener('click', () => {
-        if (role === 'creator') {
-          ws.send(JSON.stringify({ type: 'deletePage' }));
-        }
-      });
-      insertPageBtn.addEventListener('click', () => {
-        if (role === 'creator') {
-          ws.send(JSON.stringify({ type: 'insertPage' }));
-        }
-      });
-
-      ws.onmessage = event => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'initialRole') {
-          role = data.role;
-          if (role === 'spectator') {
-            controls.classList.add('spectator-mode');
-            pageControls.classList.add('spectator-mode');
-            canvas.style.cursor = 'default';
+    function findStrokeAt(x, y) {
+      for (const stroke of currentState) {
+        for (const point of stroke.points) {
+          if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
+            return stroke;
           }
-        } else if (data.type === 'fullState') {
-          currentState = data.state;
-          pageOrder = data.pageOrder;
-          currentPage = data.page;
-          pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
-          renderCanvas();
-        } else if (data.type === 'newStroke') {
-          currentState.push(data.stroke);
-          drawStroke(data.stroke);
-        } else if (data.type === 'stateUpdate') {
-          currentState = data.state;
-          pageOrder = data.pageOrder;
-          currentPage = data.page;
-          pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
-          renderCanvas();
         }
-      };
+      }
+      return null;
     }
 
-    createBoardBtn.addEventListener('click', () => {
-      fetch('http://gauss:8080/create-board', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-          linksContainer.innerHTML = `
-            <p>Creator URL: <a href="${data.creatorLink}">${data.creatorLink}</a></p>
-            <p>Spectator URL: <a href="${data.spectatorLink}">${data.spectatorLink}</a></p>
-          `;
-        });
-    });
+    prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage' })));
+    nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage' })));
+    deletePageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'deletePage' })));
+    insertPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'insertPage' })));
+
+    ws.onmessage = event => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'fullState') {
+        currentState = data.state;
+        pageOrder = data.pageOrder;
+        currentPage = data.page;
+        pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
+        renderCanvas();
+      } else if (data.type === 'newStroke') {
+        currentState.push(data.stroke);
+        drawStroke(data.stroke);
+      } else if (data.type === 'stateUpdate') {
+        currentState = data.state;
+        renderCanvas();
+      }
+    };
   </script>
 </body>
 </html>

@@ -3,200 +3,122 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const url = require('url');
 
-const boards = {};
+const wss = new WebSocket.Server({ port: 3001 });
 
-const httpServer = http.createServer((req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-
-  if (parsedUrl.pathname === '/create-board' && req.method === 'POST') {
-    createBoard(req, res);
-  } else if (parsedUrl.pathname === '/') {
-    const filePath = path.join(__dirname, 'index.html');
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end('File not found!');
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(data);
-    });
-  } else {
-    const hash = parsedUrl.pathname.split('/').filter(p => p)[0];
-    const boardData = getBoardByHash(hash);
-    if (boardData) {
-      const filePath = path.join(__dirname, 'index.html');
-      fs.readFile(filePath, (err, data) => {
-        if (err) {
-          res.writeHead(404);
-          res.end('File not found!');
-          return;
-        }
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(data);
-      });
-    } else {
-      res.writeHead(404);
-      res.end('Board not found!');
-    }
-  }
-});
-
-const wss = new WebSocket.Server({ server: httpServer });
+// The shared state of the pages. Each page has an array of strokes.
+const initialPageId = uuidv4();
+let pageState = {
+  [initialPageId]: []
+};
+let pageOrder = [ initialPageId ];
 
 console.log('WebSocket server is running on port 3001');
 
-// FIX: Explicitly bind to '0.0.0.0' to accept external connections
-httpServer.listen(8080, '0.0.0.0', () => {
+// Serve the HTML file
+const httpServer = http.createServer((req, res) => {
+  const filePath = path.join(__dirname, 'index.html');
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end('File not found!');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(data);
+  });
+});
+
+httpServer.listen(8080, () => {
   console.log('HTTP server is running on port 8080');
 });
 
-function getBoardByHash(hash) {
-  for (const boardId in boards) {
-    if (boards[boardId].creatorUrl === hash) {
-      return { board: boards[boardId], role: 'creator', id: boardId };
-    }
-    if (boards[boardId].spectatorUrl === hash) {
-      return { board: boards[boardId], role: 'spectator', id: boardId };
-    }
-  }
-  return null;
-}
-
-function createBoard(req, res) {
-  const boardId = uuidv4();
-  const creatorUrl = uuidv4();
-  const spectatorUrl = uuidv4();
-
-  boards[boardId] = {
-    creatorUrl,
-    spectatorUrl,
-    pageState: { '1': [] },
-    pageOrder: ['1']
-  };
-
-  // Note: The client must be able to resolve 'gauss' or use a direct IP
-  const creatorLink = `http://gauss:8080/${creatorUrl}`;
-  const spectatorLink = `http://gauss:8080/${spectatorUrl}`;
-
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({
-    creatorLink,
-    spectatorLink
-  }));
-}
-
-function broadcastState(pageId, board, boardId) {
+function broadcastState(pageId) {
   const message = JSON.stringify({
     type: 'stateUpdate',
     page: pageId,
-    state: board.pageState[pageId],
-    pageOrder: board.pageOrder
+    state: pageState[pageId]
   });
   wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN && client.pageId === pageId && client.boardId === boardId) {
+    if (client.readyState === WebSocket.OPEN && client.pageId === pageId) {
       client.send(message);
     }
   });
 }
 
-function sendFullState(ws, board, pageId) {
+function sendFullState(ws, pageId) {
   const message = JSON.stringify({
     type: 'fullState',
     page: pageId,
-    state: board.pageState[pageId],
-    pageOrder: board.pageOrder
+    state: pageState[pageId],
+    pageOrder: pageOrder
   });
   ws.send(message);
 }
 
-wss.on('connection', (ws, req) => {
-  const parsedUrl = url.parse(req.url, true);
-  const pathParts = parsedUrl.pathname.split('/').filter(p => p);
-  const hash = pathParts[0];
-
-  const boardData = getBoardByHash(hash);
-
-  if (!boardData) {
-    console.error('Invalid board URL, closing connection.');
-    ws.close();
-    return;
-  }
-
-  const { board, role, id } = boardData;
-  ws.boardId = id;
-  ws.role = role;
-  ws.pageId = board.pageOrder[0];
-
-  console.log(`Client connected to board ${ws.boardId} with role: ${ws.role}`);
-
-  ws.send(JSON.stringify({ type: 'initialRole', role: ws.role }));
-  sendFullState(ws, board, ws.pageId);
+wss.on('connection', ws => {
+  console.log('Client connected');
+  ws.pageId = pageOrder[0]; // Assign to the first page in the order
+  sendFullState(ws, ws.pageId);
 
   ws.on('message', message => {
     try {
       const data = JSON.parse(message);
-      const currentBoard = boards[ws.boardId];
-      if (!currentBoard) return;
-
-      if (ws.role === 'spectator' && ['draw', 'erase', 'deletePage', 'insertPage'].includes(data.type)) {
-        console.log('Spectator attempted to change board state, request denied.');
-        return;
-      }
-      
-      if (data.type === 'draw') {
+      if (data.type === 'changePage') {
+        const newPage = data.page;
+        if (pageState[newPage]) {
+          ws.pageId = newPage;
+          sendFullState(ws, newPage);
+        }
+      } else if (data.type === 'draw') {
         const stroke = {
           id: uuidv4(),
           points: data.points,
           timestamp: Date.now()
         };
-        currentBoard.pageState[ws.pageId].push(stroke);
+        pageState[ws.pageId].push(stroke);
         const message = JSON.stringify({ type: 'newStroke', page: ws.pageId, stroke: stroke });
         wss.clients.forEach(client => {
-          if (client.readyState === WebSocket.OPEN && client.pageId === ws.pageId && client.boardId === ws.boardId) {
+          if (client.readyState === WebSocket.OPEN && client.pageId === ws.pageId) {
             client.send(message);
           }
         });
       } else if (data.type === 'erase') {
-        currentBoard.pageState[ws.pageId] = currentBoard.pageState[ws.pageId].filter(stroke => stroke.id !== data.strokeId);
-        broadcastState(ws.pageId, currentBoard, ws.boardId);
+        pageState[ws.pageId] = pageState[ws.pageId].filter(stroke => stroke.id !== data.strokeId);
+        broadcastState(ws.pageId);
       } else if (data.type === 'deletePage') {
-        if (currentBoard.pageOrder.length > 1) {
-          const index = currentBoard.pageOrder.indexOf(ws.pageId);
-          currentBoard.pageOrder.splice(index, 1);
-          delete currentBoard.pageState[ws.pageId];
-          const newPageId = currentBoard.pageOrder[Math.min(index, currentBoard.pageOrder.length - 1)];
+        if (pageOrder.length > 1) {
+          const index = pageOrder.indexOf(ws.pageId);
+          pageOrder.splice(index, 1);
+          delete pageState[ws.pageId];
+          const newPageId = pageOrder[Math.min(index, pageOrder.length - 1)];
           ws.pageId = newPageId;
-          sendFullState(ws, currentBoard, newPageId);
-          broadcastState(newPageId, currentBoard, ws.boardId);
+          sendFullState(ws, newPageId);
+          broadcastState(newPageId);
         } else {
-          currentBoard.pageState[ws.pageId] = [];
-          sendFullState(ws, currentBoard, ws.pageId);
-          broadcastState(ws.pageId, currentBoard, ws.boardId);
+          pageState[ws.pageId] = [];
+          sendFullState(ws, ws.pageId);
+          broadcastState(ws.pageId);
         }
       } else if (data.type === 'insertPage') {
         const newPageId = uuidv4();
-        const index = currentBoard.pageOrder.indexOf(ws.pageId);
-        currentBoard.pageOrder.splice(index + 1, 0, newPageId);
-        currentBoard.pageState[newPageId] = [];
+        const index = pageOrder.indexOf(ws.pageId);
+        pageOrder.splice(index + 1, 0, newPageId);
+        pageState[newPageId] = [];
         ws.pageId = newPageId;
-        sendFullState(ws, currentBoard, newPageId);
-        broadcastState(newPageId, currentBoard, ws.boardId);
+        sendFullState(ws, newPageId);
+        broadcastState(newPageId);
       } else if (data.type === 'nextPage') {
-        const index = currentBoard.pageOrder.indexOf(ws.pageId);
-        if (index < currentBoard.pageOrder.length - 1) {
-          const newPageId = currentBoard.pageOrder[index + 1];
-          ws.pageId = newPageId;
-          sendFullState(ws, currentBoard, newPageId);
+        const index = pageOrder.indexOf(ws.pageId);
+        if (index < pageOrder.length - 1) {
+          ws.pageId = pageOrder[index + 1];
+          sendFullState(ws, ws.pageId);
         }
       } else if (data.type === 'prevPage') {
-        const index = currentBoard.pageOrder.indexOf(ws.pageId);
+        const index = pageOrder.indexOf(ws.pageId);
         if (index > 0) {
-          const newPageId = currentBoard.pageOrder[index - 1];
-          ws.pageId = newPageId;
-          sendFullState(ws, currentBoard, newPageId);
+          ws.pageId = pageOrder[index - 1];
+          sendFullState(ws, ws.pageId);
         }
       }
     } catch (e) {
