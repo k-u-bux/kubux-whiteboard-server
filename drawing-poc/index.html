@@ -54,16 +54,18 @@
     const prevPageBtn = document.getElementById('prev-page');
     const nextPageBtn = document.getElementById('next-page');
     const deletePageBtn = document.getElementById('delete-page');
-    const insertPageBtn = document.getElementById('insert-page');
-
-    const ws = new WebSocket('ws://gauss:3001');
+    const insertPageBtn = document = document.getElementById('insert-page');
 
     let isDrawing = false;
     let currentStrokePoints = [];
     let tool = 'pen';
-    let currentState = [];
+    let currentPageState = []; // The state for the current page only
     let pageOrder = [];
-    let currentPage = '';
+    let currentPageId = '';
+    
+    // Connect to the WebSocket using the same path as the HTTP request
+    const path = window.location.pathname;
+    const ws = new WebSocket(`ws://${window.location.host}${path}`);
 
     function drawStroke(stroke) {
       if (stroke.points.length > 1) {
@@ -79,7 +81,7 @@
 
     function renderCanvas() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      currentState.forEach(drawStroke);
+      currentPageState.forEach(drawStroke);
     }
 
     penTool.addEventListener('click', () => {
@@ -130,7 +132,7 @@
     });
 
     function findStrokeAt(x, y) {
-      for (const stroke of currentState) {
+      for (const stroke of currentPageState) {
         for (const point of stroke.points) {
           if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
             return stroke;
@@ -148,16 +150,21 @@
     ws.onmessage = event => {
       const data = JSON.parse(event.data);
       if (data.type === 'fullState') {
-        currentState = data.state;
+        currentPageState = data.state;
         pageOrder = data.pageOrder;
-        currentPage = data.page;
-        pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
+        currentPageId = data.page;
+        pageInfo.textContent = `${pageOrder.indexOf(currentPageId) + 1} of ${pageOrder.length}`;
         renderCanvas();
       } else if (data.type === 'newStroke') {
-        currentState.push(data.stroke);
-        drawStroke(data.stroke);
+        // Only add the stroke if it's for the current page
+        if (data.page === currentPageId) {
+          currentPageState.push(data.stroke);
+          drawStroke(data.stroke);
+        }
       } else if (data.type === 'stateUpdate') {
-        currentState = data.state;
+        // This message signals that the page order has changed on the server
+        pageOrder = data.pageOrder;
+        pageInfo.textContent = `${pageOrder.indexOf(currentPageId) + 1} of ${pageOrder.length}`;
         renderCanvas();
       }
     };
