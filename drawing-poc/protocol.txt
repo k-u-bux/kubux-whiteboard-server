@@ -9,6 +9,11 @@ map: page-uuid -> page-uuid
 * use: if a client message shows that the client is on a deleted page, this history can be used
   (A -> A' -> A'' -> ...) to find the page the client should be showing instead. Then a fullPage
   message is sent to the client.
+The server state has to also contain a dict
+{ client (aka connection) -> [ board-id, page-uuid ] }
+where the server keeps track of the board and page that a client is currently showing.
+It needs that info to tailor its broadcasts.
+
 
 state on the client:
 board-id (never changes)
