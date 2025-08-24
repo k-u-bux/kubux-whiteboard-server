@@ -29,12 +29,17 @@
       font-size: 14px;
       cursor: pointer;
     }
+    button.active {
+      background-color: #ddd;
+      border: 2px solid #333;
+    }
   </style>
 </head>
 <body>
   <h1>Whiteboard <span id="page-info"></span></h1>
   <div id="controls">
-    <button id="pen-tool">Pen</button>
+    <button id="pen-tool" class="active">Pen</button>
+    <button id="highlighter-tool">Highlighter</button>
     <button id="eraser-tool">Eraser</button>
   </div>
   <canvas id="whiteboard" width="800" height="600"></canvas>
@@ -51,6 +56,7 @@
     const ctx = canvas.getContext('2d');
     const pageInfo = document.getElementById('page-info');
     const penTool = document.getElementById('pen-tool');
+    const highlighterTool = document.getElementById('highlighter-tool');
     const eraserTool = document.getElementById('eraser-tool');
     const prevPageBtn = document.getElementById('prev-page');
     const nextPageBtn = document.getElementById('next-page');
@@ -61,8 +67,9 @@
     const ws = new WebSocket(`ws://${window.location.hostname}:3001${path}`);
 
     let isDrawing = false;
-    let currentStrokePoints = [];
+    let currentStroke = null;
     let tool = shared.MOD_ACTIONS.DRAW.TYPE;
+    let activeStrokeStyle = shared.STROKE_STYLES.PEN;
     let isInitialized = false;
     
     let verifiedModActions = [];
@@ -84,6 +91,7 @@
       logEvent('Setting controls enabled state', enabled);
       canvas.style.pointerEvents = enabled ? 'auto' : 'none';
       penTool.disabled = !enabled;
+      highlighterTool.disabled = !enabled;
       eraserTool.disabled = !enabled;
       prevPageBtn.disabled = !enabled || pageNr <= 1;
       nextPageBtn.disabled = !enabled || pageNr >= totalPages;
@@ -93,15 +101,77 @@
     setControlsEnabled(false);
 
     function drawStroke(stroke) {
-      if (stroke.points.length > 1) {
-        ctx.beginPath();
-        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = 'black';
-        stroke.points.forEach(point => ctx.lineTo(point.x, point.y));
-        ctx.stroke();
+      if (!stroke || stroke.points.length < 2) return;
+      
+      const points = stroke.points;
+      const style = stroke.style;
+      
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      
+      // Set basic styles
+      ctx.lineCap = style.capStyle;
+      ctx.lineJoin = style.joinStyle;
+      ctx.strokeStyle = style.color;
+      ctx.globalAlpha = style.opacity;
+      
+      // Apply dash pattern if any
+      if (style.dashPattern.length > 1) {
+        ctx.setLineDash(style.dashPattern);
+      } else {
+        ctx.setLineDash([]);
       }
+      
+      // Handle different pen types
+      switch(style.penType) {
+        case shared.PEN_TYPES.HIGHLIGHTER:
+          // Highlighter specific rendering
+          ctx.globalCompositeOperation = 'multiply';
+          drawStrokeWithPressure(stroke);
+          ctx.globalCompositeOperation = 'source-over';
+          break;
+        case shared.PEN_TYPES.PENCIL:
+          // Pencil specific rendering (simplified)
+          drawStrokeWithPressure(stroke);
+          break;
+        default: // Default marker/pen
+          drawStrokeWithPressure(stroke);
+      }
+      
+      ctx.globalAlpha = 1.0; // Reset opacity
+    }
+
+    function drawStrokeWithPressure(stroke) {
+      const points = stroke.points;
+      const style = stroke.style;
+      
+      // For very short strokes, just draw a simple line
+      if (points.length < 3) {
+        ctx.lineWidth = style.width;
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.stroke();
+        return;
+      }
+      
+      // For longer strokes, handle pressure and smooth rendering
+      for (let i = 1; i < points.length; i++) {
+        const p1 = points[i-1];
+        const p2 = points[i];
+        
+        // Calculate width based on pressure if pressure sensitivity is enabled
+        let lineWidth = style.width;
+        if (style.pressureSensitivity > 0 && p2.pressure !== undefined) {
+          lineWidth = style.width * (1 + (p2.pressure - 0.5) * style.pressureSensitivity);
+        }
+        
+        ctx.lineWidth = Math.max(0.5, lineWidth); // Ensure minimum width
+        
+        ctx.lineTo(p2.x, p2.y);
+      }
+      
+      ctx.stroke();
     }
     
     function renderCanvas() {
@@ -110,7 +180,7 @@
       const allActions = [...verifiedModActions, ...optimisticUpdates];
       allActions.forEach(action => {
         if (action.payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          drawStroke(action.payload);
+          drawStroke(action.payload.stroke);
         }
       });
       updateUI();
@@ -125,10 +195,12 @@
     }
 
     function findStrokeAt(x, y) {
-      const allStrokes = [...verifiedModActions, ...optimisticUpdates];
-      for (const action of allStrokes) {
+      const allActions = [...verifiedModActions, ...optimisticUpdates];
+      for (const action of allActions) {
         if (action.payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          const points = action.payload.points;
+          const stroke = action.payload.stroke;
+          const points = stroke.points;
+          
           for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i];
             const p2 = points[i+1];
@@ -151,8 +223,10 @@
               closestY = p1.y + t * dy;
             }
             
+            // Consider stroke width in hit detection
+            const strokeWidth = stroke.style.width;
             const dist = Math.sqrt((x - closestX) ** 2 + (y - closestY) ** 2);
-            if (dist < 10) {
+            if (dist < strokeWidth + 5) { // Adding a small buffer for easier selection
               return action;
             }
           }
@@ -207,15 +281,43 @@
       }
     }
 
+    // Set active tool and update UI
+    function setActiveTool(toolType, strokeStyle) {
+      // Remove active class from all tool buttons
+      document.querySelectorAll('#controls button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      if (toolType === shared.MOD_ACTIONS.DRAW.TYPE) {
+        activeStrokeStyle = strokeStyle;
+        if (strokeStyle === shared.STROKE_STYLES.PEN) {
+          penTool.classList.add('active');
+          canvas.style.cursor = 'crosshair';
+        } else if (strokeStyle === shared.STROKE_STYLES.HIGHLIGHTER) {
+          highlighterTool.classList.add('active');
+          canvas.style.cursor = 'crosshair';
+        }
+      } else if (toolType === shared.MOD_ACTIONS.ERASE.TYPE) {
+        eraserTool.classList.add('active');
+        canvas.style.cursor = 'cell';
+      }
+      
+      tool = toolType;
+    }
+
     penTool.addEventListener('click', () => {
       logEvent('Pen tool clicked.');
-      tool = shared.MOD_ACTIONS.DRAW.TYPE;
-      canvas.style.cursor = 'crosshair';
+      setActiveTool(shared.MOD_ACTIONS.DRAW.TYPE, shared.STROKE_STYLES.PEN);
     });
+    
+    highlighterTool.addEventListener('click', () => {
+      logEvent('Highlighter tool clicked.');
+      setActiveTool(shared.MOD_ACTIONS.DRAW.TYPE, shared.STROKE_STYLES.HIGHLIGHTER);
+    });
+    
     eraserTool.addEventListener('click', () => {
       logEvent('Eraser tool clicked.');
-      tool = shared.MOD_ACTIONS.ERASE.TYPE;
-      canvas.style.cursor = 'cell';
+      setActiveTool(shared.MOD_ACTIONS.ERASE.TYPE);
     });
 
     canvas.addEventListener('mousedown', e => {
@@ -227,9 +329,28 @@
 
       if (tool === shared.MOD_ACTIONS.DRAW.TYPE) {
         isDrawing = true;
-        currentStrokePoints.push({ x, y });
+        currentStroke = shared.createStroke(activeStrokeStyle);
+        
+        // Get pressure if available (for devices with pressure sensitivity)
+        const pressure = e.pressure !== undefined ? e.pressure : 0.5;
+        // Get tilt if available
+        const tiltX = e.tiltX !== undefined ? e.tiltX / 90 : 0; // Normalize to -1 to 1
+        const tiltY = e.tiltY !== undefined ? e.tiltY / 90 : 0; // Normalize to -1 to 1
+        
+        shared.addPointToStroke(currentStroke, x, y, pressure, tiltX, tiltY);
+        
+        // Start drawing immediately
         ctx.beginPath();
         ctx.moveTo(x, y);
+        ctx.lineCap = currentStroke.style.capStyle;
+        ctx.lineJoin = currentStroke.style.joinStyle;
+        ctx.strokeStyle = currentStroke.style.color;
+        ctx.globalAlpha = currentStroke.style.opacity;
+        ctx.lineWidth = currentStroke.style.width;
+        
+        if (currentStroke.style.penType === shared.PEN_TYPES.HIGHLIGHTER) {
+          ctx.globalCompositeOperation = 'multiply';
+        }
       } else if (tool === shared.MOD_ACTIONS.ERASE.TYPE) {
         const erasedAction = findStrokeAt(x, y);
         if (erasedAction) {
@@ -239,25 +360,40 @@
     });
 
     canvas.addEventListener('mousemove', e => {
-      if (!isInitialized) return;
-      if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        currentStrokePoints.push({ x, y });
-        ctx.lineTo(x, y);
-        ctx.stroke();
+      if (!isInitialized || !isDrawing || tool !== shared.MOD_ACTIONS.DRAW.TYPE) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      // Get pressure and tilt if available
+      const pressure = e.pressure !== undefined ? e.pressure : 0.5;
+      const tiltX = e.tiltX !== undefined ? e.tiltX / 90 : 0;
+      const tiltY = e.tiltY !== undefined ? e.tiltY / 90 : 0;
+      
+      shared.addPointToStroke(currentStroke, x, y, pressure, tiltX, tiltY);
+      
+      // Draw the current segment
+      let lineWidth = currentStroke.style.width;
+      if (currentStroke.style.pressureSensitivity > 0) {
+        lineWidth = currentStroke.style.width * (1 + (pressure - 0.5) * currentStroke.style.pressureSensitivity);
       }
+      
+      ctx.lineWidth = lineWidth;
+      ctx.lineTo(x, y);
+      ctx.stroke();
     });
     
     window.addEventListener('mouseup', () => {
       if (!isInitialized) return;
       logEvent('Mouse up event.');
       if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
-        if (currentStrokePoints.length > 1) {
-          sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { points: currentStrokePoints });
+        if (currentStroke && currentStroke.points.length > 1) {
+          sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { stroke: currentStroke });
         }
-        currentStrokePoints = [];
+        currentStroke = null;
+        ctx.globalCompositeOperation = 'source-over'; // Reset composite operation
+        ctx.globalAlpha = 1.0; // Reset opacity
       }
       isDrawing = false;
     });
@@ -266,10 +402,12 @@
         if (!isInitialized) return;
         logEvent('Mouse left canvas.');
         if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
-            if (currentStrokePoints.length > 1) {
-                sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { points: currentStrokePoints });
+            if (currentStroke && currentStroke.points.length > 1) {
+                sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { stroke: currentStroke });
             }
-            currentStrokePoints = [];
+            currentStroke = null;
+            ctx.globalCompositeOperation = 'source-over'; // Reset composite operation
+            ctx.globalAlpha = 1.0; // Reset opacity
             isDrawing = false;
         }
     });
@@ -337,26 +475,34 @@
       } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE) {
         logEvent('Received an ACCEPT_MESSAGE. Processing update.');
         const acceptedAction = optimisticUpdates.find(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]);
+        
         if (acceptedAction) {
           logEvent('Found accepted action in optimistic updates. Moving to verified.');
+          // Update the hash values to match what the server used
+          acceptedAction.hashes = {
+            [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH],
+            [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]
+          };
+          
           verifiedModActions.push(acceptedAction);
           optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]);
+          
+          // Always update to the server's latest hash
           verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
           renderCanvas();
-        } else if (data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH] !== verifiedHash) {
-          logEvent('Hash mismatch detected after receiving accept message. Requesting replay.');
+        } else {
+          // Action wasn't in our optimistic updates - request a replay to ensure consistency
+          logEvent('Server accepted an action we don\'t have locally. Requesting replay.');
           const replayMessage = { 
-              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageId, 
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid() 
+            type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageId, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid() 
           };
           ws.send(JSON.stringify(replayMessage));
           logMessage('CLIENT -> SERVER', replayMessage.type, replayMessage);
-        } else {
-          logEvent('Accepted message matches current state. Updating verified hash.');
-          verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
         }
+        
         pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR];
         totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES];
         updateUI();

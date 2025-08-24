@@ -26,6 +26,74 @@ function hashNext(previousHash, newData) {
 const calculateHash = hashAny;
 const calculateChainHash = hashNext;
 
+// Stroke style definitions
+const PEN_TYPES = {
+  MARKER: "marker",
+  PENCIL: "pencil",
+  HIGHLIGHTER: "highlighter",
+  BRUSH: "brush"
+};
+
+const CAP_STYLES = {
+  ROUND: "round",
+  BUTT: "butt",
+  SQUARE: "square"
+};
+
+const JOIN_STYLES = {
+  ROUND: "round",
+  BEVEL: "bevel",
+  MITER: "miter"
+};
+
+// Default stroke styles
+const STROKE_STYLES = {
+  PEN: {
+    penType: PEN_TYPES.MARKER,
+    color: "#000000",
+    opacity: 1.0,
+    width: 2.0,
+    capStyle: CAP_STYLES.ROUND,
+    joinStyle: JOIN_STYLES.ROUND,
+    dashPattern: [0], // Solid line
+    pressureSensitivity: 1.0,
+    tiltSensitivity: 0.0
+  },
+  HIGHLIGHTER: {
+    penType: PEN_TYPES.HIGHLIGHTER,
+    color: "#FFFF00",
+    opacity: 0.5,
+    width: 12.0,
+    capStyle: CAP_STYLES.SQUARE,
+    joinStyle: JOIN_STYLES.ROUND,
+    dashPattern: [0], // Solid line
+    pressureSensitivity: 0.3,
+    tiltSensitivity: 0.0
+  }
+};
+
+// Function to create a new stroke with specific style
+function createStroke(style = STROKE_STYLES.PEN) {
+  return {
+    points: [],
+    style: { ...style } // Clone the style object
+  };
+}
+
+// Function to add a point to a stroke with pressure and tilt
+function addPointToStroke(stroke, x, y, pressure = 0.5, tiltX = 0, tiltY = 0) {
+  const point = {
+    x: x,
+    y: y,
+    pressure: pressure,
+    tilt: { x: tiltX, y: tiltY },
+    timestamp: Date.now()
+  };
+  
+  stroke.points.push(point);
+  return stroke;
+}
+
 const MESSAGES = {
   CLIENT_TO_SERVER: {
     FULL_PAGE_REQUESTS: {
@@ -94,7 +162,7 @@ const MESSAGES = {
 const MOD_ACTIONS = {
     DRAW: {
         TYPE: 'draw',
-        POINTS: 'points'
+        STROKE: 'stroke'
     },
     ERASE: {
         TYPE: 'erase',
@@ -116,6 +184,12 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateChainHash,
     hashAny,
     hashNext,
+    PEN_TYPES,
+    CAP_STYLES,
+    JOIN_STYLES,
+    STROKE_STYLES,
+    createStroke,
+    addPointToStroke,
     MESSAGES,
     MOD_ACTIONS
   };
@@ -128,6 +202,12 @@ else if (typeof window !== 'undefined') {
     calculateChainHash,
     hashAny,
     hashNext,
+    PEN_TYPES,
+    CAP_STYLES,
+    JOIN_STYLES,
+    STROKE_STYLES,
+    createStroke,
+    addPointToStroke,
     MESSAGES,
     MOD_ACTIONS
   };

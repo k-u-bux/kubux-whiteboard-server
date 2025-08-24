@@ -198,9 +198,9 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
   const payload = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
   const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH];
   const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-
   const board = boards[ws.boardId];
   
+  // Only check if the page exists
   if (!board.pages[pageUuid]) {
     sendFullPage(ws, ws.boardId, pageUuid, requestId);
     return;
@@ -209,24 +209,15 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
   const currentPage = board.pages[pageUuid];
   const serverHash = currentPage.currentHash;
 
-  if (beforeHash !== serverHash) {
-    const declineMessage = {
-      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
-      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
-      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
-    };
-    ws.send(JSON.stringify(declineMessage));
-    logSentMessage(declineMessage.type, declineMessage, requestId);
-    return;
-  }
-
+  // No hash verification - just accept the stroke
+  // Calculate new hash by adding this action to the current state
   const afterHash = hashNext(serverHash, payload);
   
   const modAction = {
     [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
     [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: payload,
     hashes: {
-      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: beforeHash,
+      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: serverHash, // Use server's current hash
       [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
     }
   };
@@ -238,11 +229,12 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
     type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
-    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: beforeHash,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash, // Server's hash, not client's
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
   };
+  
   broadcastMessageToBoard(acceptMessage, ws.boardId);
   logSentMessage(acceptMessage.type, acceptMessage, requestId);
 };
@@ -254,6 +246,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
   const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
   const board = boards[ws.boardId];
   
+  // Check if the page exists
   if (!board.pages[pageUuid]) {
     sendFullPage(ws, ws.boardId, pageUuid, requestId);
     return;
@@ -261,8 +254,15 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
   
   const currentPage = board.pages[pageUuid];
   const serverHash = currentPage.currentHash;
-
-  if (beforeHash !== serverHash) {
+  
+  // Check if the stroke to be erased exists
+  const erasedStrokeActionUuid = payload[MOD_ACTIONS.ERASE.ACTION_UUID];
+  const strokeExists = currentPage.modActions.some(action => 
+    action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === erasedStrokeActionUuid
+  );
+  
+  if (!strokeExists) {
+    // The stroke doesn't exist or was already erased
     const declineMessage = {
       type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
@@ -273,13 +273,12 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
     return;
   }
   
-  const erasedStrokeActionUuid = payload[MOD_ACTIONS.ERASE.ACTION_UUID];
+  // Remove the stroke
   const newModActions = currentPage.modActions.filter(action => 
     action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== erasedStrokeActionUuid
   );
   
-  // Calculate new hash after erasing the stroke
-  // Rather than rehashing everything, we're using our chain hash approach
+  // Calculate new hash
   const afterHash = hashNext(serverHash, payload);
   
   currentPage.modActions = newModActions;
@@ -289,7 +288,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
     type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
-    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: beforeHash,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash, // Server's hash, not client's
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
