@@ -162,10 +162,8 @@
       const data = JSON.parse(event.data);
       if (data.type === 'fullState') {
         currentState = data.state;
-        pageOrder = data.pageOrder;
         currentPage = data.page;
         currentHash = data.hash;
-        pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
         renderCanvas();
       } else if (data.type === 'newStroke') {
         if (data.page === currentPage) {
@@ -173,9 +171,15 @@
           currentHash = data.hash;
           drawStroke(data.stroke);
         }
+      } else if (data.type === 'eraseConfirm') {
+        if (data.page === currentPage) {
+          currentState = currentState.filter(s => s.id !== data.strokeId);
+          currentHash = data.hash;
+          renderCanvas();
+        }
       } else if (data.type === 'pageOrderUpdate') {
         pageOrder = data.pageOrder;
-        pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
+        pageInfo.textContent = `${pageOrder.indexOf(data.currentPage) + 1} of ${pageOrder.length}`;
       }
     };
   </script>

@@ -25,7 +25,7 @@ function getOrCreateBoard(boardId) {
     pages[initialPageId] = [];
     boards[boardId] = {
       pageOrder: [initialPageId],
-      pageHashes: { [initialPageId]: calculateHash( pages[initialPageId] = [] ) }
+      pageHashes: { [initialPageId]: calculateHash(pages[initialPageId]) }
     };
     console.log(`[SERVER] Created new board: ${boardId} with initial page: ${initialPageId}`);
   }
@@ -63,11 +63,16 @@ function broadcastMessageToBoard(message, boardId) {
 function sendFullPageState(ws, boardId, pageId) {
   const currentBoard = boards[boardId];
   if (!currentBoard) return;
+
+  const pageNr = currentBoard.pageOrder.indexOf(pageId) + 1;
+  const totalPages = currentBoard.pageOrder.length;
+  const pageInfo = [ pageNr, totalPages ]
+
   const message = {
     type: 'fullState',
     page: pageId,
     state: pages[pageId] || [],
-    pageOrder: currentBoard.pageOrder,
+    pageInfo: pageInfo,
     hash: currentBoard.pageHashes[pageId]
   };
   console.log(`[SERVER > CLIENT] Sending full state for page '${pageId}' on board '${boardId}' to single client`);
@@ -84,6 +89,7 @@ wss.on('connection', (ws, req) => {
 
   console.log(`[SERVER] Client connected to board: ${ws.boardId}`);
   sendFullPageState(ws, ws.boardId, ws.pageId);
+  broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: board.pageOrder, currentPage: ws.pageId }, ws.boardId);
 
   ws.on('message', message => {
     try {
@@ -97,19 +103,20 @@ wss.on('connection', (ws, req) => {
       }
       
       const currentPageId = data.page;
+      const currentPage = pages[currentPageId];
 
       if (data.type === 'draw') {
-        const stroke = {
-          id: uuidv4(),
-          points: data.points,
-          timestamp: Date.now()
-        };
         if (data.hash !== currentBoard.pageHashes[currentPageId]) {
           console.log('[SERVER] Hash mismatch on draw, sending full state to client.');
           sendFullPageState(ws, ws.boardId, currentPageId);
           return;
         }
-        if (!pages[currentPageId]) {
+        const stroke = {
+          id: uuidv4(),
+          points: data.points,
+          timestamp: Date.now()
+        };
+        if (!currentPage) {
           pages[currentPageId] = [];
         }
         pages[currentPageId].push(stroke);
@@ -127,15 +134,14 @@ wss.on('connection', (ws, req) => {
           sendFullPageState(ws, ws.boardId, currentPageId);
           return;
         }
-        if (pages[currentPageId]) {
-          pages[currentPageId] = pages[currentPageId].filter(stroke => stroke.id !== data.strokeId);
+        if (currentPage) {
+          pages[currentPageId] = currentPage.filter(stroke => stroke.id !== data.strokeId);
         }
         currentBoard.pageHashes[currentPageId] = calculateHash(pages[currentPageId]);
         broadcastMessageToBoard({
-          type: 'fullState',
+          type: 'eraseConfirm',
           page: currentPageId,
-          state: pages[currentPageId],
-          pageOrder: currentBoard.pageOrder,
+          strokeId: data.strokeId,
           hash: currentBoard.pageHashes[currentPageId]
         }, ws.boardId);
       } else if (data.type === 'deletePage') {
@@ -146,18 +152,13 @@ wss.on('connection', (ws, req) => {
           delete currentBoard.pageHashes[currentPageId];
           const newPageId = currentBoard.pageOrder[Math.min(index, currentBoard.pageOrder.length - 1)];
           ws.pageId = newPageId;
-          broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: currentBoard.pageOrder }, ws.boardId);
+          broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: currentBoard.pageOrder, currentPage: newPageId }, ws.boardId);
           sendFullPageState(ws, ws.boardId, newPageId);
         } else {
           pages[currentPageId] = [];
           currentBoard.pageHashes[currentPageId] = calculateHash(pages[currentPageId]);
-          broadcastMessageToBoard({
-            type: 'fullState',
-            page: currentPageId,
-            state: pages[currentPageId],
-            pageOrder: currentBoard.pageOrder,
-            hash: currentBoard.pageHashes[currentPageId]
-          }, ws.boardId);
+          sendFullPageState(ws, ws.boardId, currentPageId);
+          broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: currentBoard.pageOrder, currentPage: currentPageId }, ws.boardId);
         }
       } else if (data.type === 'insertPage') {
         const newPageId = uuidv4();
@@ -166,7 +167,7 @@ wss.on('connection', (ws, req) => {
         pages[newPageId] = [];
         currentBoard.pageHashes[newPageId] = calculateHash([]);
         ws.pageId = newPageId;
-        broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: currentBoard.pageOrder }, ws.boardId);
+        broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: currentBoard.pageOrder, currentPage: newPageId }, ws.boardId);
         sendFullPageState(ws, ws.boardId, newPageId);
       } else if (data.type === 'nextPage') {
         const index = currentBoard.pageOrder.indexOf(currentPageId);
