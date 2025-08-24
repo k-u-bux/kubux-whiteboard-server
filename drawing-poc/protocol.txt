@@ -1,0 +1,82 @@
+state on the server:
+board = collection of pages
+page = uuid, sequence of mod-actions
+mod-action = action-uuid, payload (i.e., stroke data, erase data)
+*  computable from here is a hash-before and hash-after for each mod-action. Those shall be cached.
+map: page-uuid -> page-uuid
+* keeps track of page deletions if page A is deleted, there always is a replacement page A'
+* the map tracks A -> A'
+* use: if a client message shows that the client is on a deleted page, this history can be used
+  (A -> A' -> A'' -> ...) to find the page the client should be showing instead. Then a fullPage
+  message is sent to the client.
+
+state on the client:
+board-id (never changes)
+page-uuid
+sequence of mod-actions (initialized by a fullPage message)
+has of the most recent verified page state 
+  verified means:
+  - the client knows a history of mod-actions for this hash
+  - and has seen it as a result hash in a server message
+current page pos in its board
+current number of pages for the board
+
+
+server to client messages:
+* fullPage message: (page, hash of page state,  current page-nr in its board, current #pages of the board)
+* replay-message (page-uuid, before-hash, after-hash, sequence of mod-actions,
+                  current page-nr in its board, current #pages of the board)
+* accept-message (page-uuid, action-uuid, current page-nr in its board, current #pages of the board)
+  broadcast when the server accepts a mod-action proposal from the client. The before-hash says at which stage
+  in the page history the server decided to put the action.
+  This is sent when the server state is updated, i.e., the action is appended to the page.
+* decline-message (page-uuid, action-uuid)
+  sent to the proposer when the server decided not to apply a proposed mod-action.
+
+client to server messages:
+* mod-action proposals (page-uuid, action-uuid, payload, before-hash that the client thinks, the action applies to)
+  - draw stroke
+    * answer: accept or decline
+  - erase stroke (stroke referenced by its action-uuid)
+    * answer: accept or decline
+  - new page (when proposal is accepted, the new page is inserted behind page-uuid)
+    * the answer to a new page proposal is either a decline or a fullPage message for the new page
+  - delete page
+    * the answer to a delete page proposal is either a decline or a fullPage message for the replacement page
+* replay-requests (page-uuid, before-hash)
+  The client sends the hash of its most recent verified page-state.
+* fullPage-requests (board-uuid, page number)
+* fullPage-requests (board-uuid, page-uuid, Delta)
+  Delta: page number relative to page-uuid
+
+
+Message Handling Implementation Plan
+
+To ensure the server-side code remains scalable and easily extensible, message handling
+should be implemented using a modular, router-based approach.
+
+- Create a Message Router: A main function (handleMessage) will serve as a central point
+  of entry for all incoming client messages.
+
+- Define a Handler Map: A data structure (e.g., a map or object) will be created to
+  link each message type string to its corresponding handler function.
+
+        Example: { 'draw': handleDraw, 'erase': handleErase, 'insertPage': handleInsertPage }
+
+- Implement Dedicated Handler Functions: Each mod-action or message type will have its
+  own dedicated function. This function will contain all the specific logic for that action.
+
+  * Each handler function should be independent and responsible only for its specific task.
+
+  * The two special mod-actions (insertPage and deletePage) will have their own
+    handlers to manage board-level changes.
+
+- Route the Message: The handleMessage router will receive an incoming message, use its
+  type property to look up the correct function in the Handler Map, and then execute that 
+  function. A fallback for unhandled types should be included.
+
+This plan ensures that adding a new mod-action (like "highlighter") only requires writing
+a new handler function and adding one line to the Handler Map, with no changes to the main
+message router.
+
+
