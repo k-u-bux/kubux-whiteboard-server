@@ -107,8 +107,8 @@ function sendFullPage(ws, boardId, pageId, requestId) {
   ws.boardId = boardId;
   ws.pageId = finalPageId;
   
-  const pageState = currentBoard.pages[finalPageId].modActions.map(action => action.payload);
-  const pageHash = calculateHash(pageState);
+  const pageState = currentBoard.pages[finalPageId].modActions;
+  const pageHash = calculateHash(pageState.map(action => action.payload));
   const pageNr = currentBoard.pageOrder.indexOf(finalPageId) + 1;
   const totalPages = currentBoard.pageOrder.length;
   
