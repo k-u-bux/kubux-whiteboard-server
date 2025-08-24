@@ -80,3 +80,5 @@ a new handler function and adding one line to the Handler Map, with no changes t
 message router.
 
 
+To help debugging, the server shall do comprehensive logging on all messages it receives
+and sends. The log for a sent message should reference the message it responds to.

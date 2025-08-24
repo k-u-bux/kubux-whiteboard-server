@@ -45,6 +45,7 @@
     <button id="insert-page">Insert Page</button>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuid.min.js"></script>
   <script>
     const canvas = document.getElementById('whiteboard');
     const ctx = canvas.getContext('2d');
@@ -62,11 +63,13 @@
     let isDrawing = false;
     let currentStrokePoints = [];
     let tool = 'pen';
-    let currentState = [];
-    let pageOrder = [];
-    let currentPage = '';
+    
+    let localModActions = new Map();
+    let currentPageId = '';
     let currentHash = '';
-
+    let pageNr = 0;
+    let totalPages = 0;
+    
     function calculateHash(state) {
       const data = JSON.stringify(state);
       let hash = 0;
@@ -89,10 +92,52 @@
         ctx.stroke();
       }
     }
-
+    
     function renderCanvas() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      currentState.forEach(drawStroke);
+      localModActions.forEach(action => {
+        if (action.type === 'draw') {
+          drawStroke(action.payload);
+        }
+      });
+      updateUI();
+    }
+    
+    function updateUI() {
+        pageInfo.textContent = `page ${pageNr} of ${totalPages}`;
+        prevPageBtn.disabled = pageNr <= 1;
+        nextPageBtn.disabled = pageNr >= totalPages;
+        deletePageBtn.disabled = totalPages <= 1;
+    }
+
+    function findStrokeAt(x, y) {
+      const allStrokes = Array.from(localModActions.values());
+      for (const action of allStrokes) {
+        if (action.type === 'draw') {
+          for (const point of action.payload.points) {
+            if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
+              return action;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    function sendModActionProposal(type, payload) {
+      const actionUuid = uuid.v4();
+      const proposal = {
+        'action-uuid': actionUuid,
+        payload: { type: type, ...payload },
+        'before-hash': currentHash
+      };
+      
+      ws.send(JSON.stringify({
+        type: 'mod-action-proposals',
+        'pageUuid': currentPageId,
+        'action-uuid': actionUuid,
+        ...proposal
+      }));
     }
 
     penTool.addEventListener('click', () => {
@@ -115,9 +160,9 @@
         ctx.beginPath();
         ctx.moveTo(x, y);
       } else if (tool === 'eraser') {
-        const erasedStroke = findStrokeAt(x, y);
-        if (erasedStroke) {
-          ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id, hash: currentHash, page: currentPage }));
+        const erasedAction = findStrokeAt(x, y);
+        if (erasedAction) {
+          sendModActionProposal('erase', { actionUuid: erasedAction['action-uuid'] });
         }
       }
     });
@@ -135,51 +180,53 @@
 
     canvas.addEventListener('mouseup', () => {
       if (tool === 'pen' && isDrawing) {
-        ws.send(JSON.stringify({ type: 'draw', points: currentStrokePoints, hash: currentHash, page: currentPage }));
+        if (currentStrokePoints.length > 1) {
+          sendModActionProposal('draw', { points: currentStrokePoints });
+        }
         currentStrokePoints = [];
         ctx.beginPath();
       }
       isDrawing = false;
     });
 
-    function findStrokeAt(x, y) {
-      for (const stroke of currentState) {
-        for (const point of stroke.points) {
-          if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
-            return stroke;
-          }
-        }
-      }
-      return null;
-    }
-
-    prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage', page: currentPage })));
-    nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage', page: currentPage })));
-    deletePageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'deletePage', page: currentPage })));
-    insertPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'insertPage', page: currentPage })));
+    prevPageBtn.addEventListener('click', () => {
+        ws.send(JSON.stringify({ type: 'fullPage-requests', 'board-uuid': '1', 'page-uuid': currentPageId, 'Delta': -1, requestId: uuid.v4() }));
+    });
+    nextPageBtn.addEventListener('click', () => {
+        ws.send(JSON.stringify({ type: 'fullPage-requests', 'board-uuid': '1', 'page-uuid': currentPageId, 'Delta': 1, requestId: uuid.v4() }));
+    });
+    deletePageBtn.addEventListener('click', () => sendModActionProposal('delete page', {}));
+    insertPageBtn.addEventListener('click', () => sendModActionProposal('new page', {}));
 
     ws.onmessage = event => {
       const data = JSON.parse(event.data);
-      if (data.type === 'fullState') {
-        currentState = data.state;
-        currentPage = data.page;
+      if (data.type === 'fullPage') {
+        localModActions = new Map();
+        data.state.forEach(stroke => localModActions.set(stroke.id, { type: 'draw', payload: stroke }));
+        currentPageId = data.page;
         currentHash = data.hash;
+        pageNr = data.pageNr;
+        totalPages = data.totalPages;
         renderCanvas();
-      } else if (data.type === 'newStroke') {
-        if (data.page === currentPage) {
-          currentState.push(data.stroke);
-          currentHash = data.hash;
-          drawStroke(data.stroke);
-        }
-      } else if (data.type === 'eraseConfirm') {
-        if (data.page === currentPage) {
-          currentState = currentState.filter(s => s.id !== data.strokeId);
-          currentHash = data.hash;
-          renderCanvas();
-        }
-      } else if (data.type === 'pageOrderUpdate') {
-        pageOrder = data.pageOrder;
-        pageInfo.textContent = `${pageOrder.indexOf(data.currentPage) + 1} of ${pageOrder.length}`;
+      } else if (data.type === 'accept-message') {
+        console.log(`Action ${data['action-uuid']} accepted.`);
+      } else if (data.type === 'decline-message') {
+        console.warn(`Action ${data['action-uuid']} was declined. Re-syncing...`);
+        ws.send(JSON.stringify({ type: 'replay-requests', 'page-uuid': currentPageId, 'before-hash': currentHash, requestId: uuid.v4() }));
+      } else if (data.type === 'replay-message') {
+        console.log('Replaying missing actions...');
+        localModActions.clear();
+        data['sequence of mod-actions'].forEach(action => {
+          if (action.payload.type === 'draw') {
+            localModActions.set(action.payload.id, action);
+          } else if (action.payload.type === 'erase') {
+            localModActions.delete(action.payload.actionUuid);
+          }
+        });
+        currentPageId = data['page-uuid'];
+        pageNr = data['current page-nr in its board'];
+        totalPages = data['current #pages of the board'];
+        renderCanvas();
       }
     };
   </script>

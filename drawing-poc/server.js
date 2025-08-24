@@ -5,8 +5,9 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const url = require('url');
 
-const pages = {};
+[cite_start]// Server state structures [cite: 1]
 const boards = {};
+const deletionMap = {}; [cite_start]// Tracks page deletions and their replacements [cite: 2]
 
 function calculateHash(state) {
   const data = JSON.stringify(state);
@@ -22,10 +23,9 @@ function calculateHash(state) {
 function getOrCreateBoard(boardId) {
   if (!boards[boardId]) {
     const initialPageId = uuidv4();
-    pages[initialPageId] = [];
     boards[boardId] = {
       pageOrder: [initialPageId],
-      pageHashes: { [initialPageId]: calculateHash(pages[initialPageId]) }
+      pages: { [initialPageId]: { modActions: [], hashes: {} } }
     };
     console.log(`[SERVER] Created new board: ${boardId} with initial page: ${initialPageId}`);
   }
@@ -51,33 +51,231 @@ httpServer.listen(8080, '0.0.0.0', () => {
   console.log('[SERVER] HTTP server is running on port 8080');
 });
 
-function broadcastMessageToBoard(message, boardId) {
+function logSentMessage(type, payload, requestId = 'N/A') {
+  console.log(`[SERVER > CLIENT] Sending message of type '${type}' in response to '${requestId}' with payload:`, payload);
+}
+
+function broadcastMessageToBoard(message, boardId, excludeWs = null) {
   wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN && client.boardId === boardId) {
-      console.log(`[SERVER > CLIENT] Broadcasting message of type '${message.type}' to board '${boardId}'`);
+    if (client.readyState === WebSocket.OPEN && client.boardId === boardId && client !== excludeWs) {
       client.send(JSON.stringify(message));
     }
   });
 }
 
-function sendFullPageState(ws, boardId, pageId) {
+function sendFullPage(ws, boardId, pageId, requestId) {
+  let finalPageId = pageId;
+  while (deletionMap[finalPageId] && !boards[boardId].pages[finalPageId]) {
+      finalPageId = deletionMap[finalPageId];
+  }
+  
   const currentBoard = boards[boardId];
-  if (!currentBoard) return;
-
-  const pageNr = currentBoard.pageOrder.indexOf(pageId) + 1;
+  if (!currentBoard || !currentBoard.pages[finalPageId]) {
+      console.error(`[SERVER] Page not found: ${finalPageId} on board: ${boardId}`);
+      return;
+  }
+  
+  const pageState = currentBoard.pages[finalPageId].modActions.map(action => action.payload);
+  const pageHash = calculateHash(pageState);
+  const pageNr = currentBoard.pageOrder.indexOf(finalPageId) + 1;
   const totalPages = currentBoard.pageOrder.length;
-  const pageInfo = [ pageNr, totalPages ]
-
+  
   const message = {
-    type: 'fullState',
-    page: pageId,
-    state: pages[pageId] || [],
-    pageInfo: pageInfo,
-    hash: currentBoard.pageHashes[pageId]
+    type: 'fullPage',
+    page: finalPageId,
+    state: pageState,
+    hash: pageHash,
+    pageNr: pageNr,
+    totalPages: totalPages
   };
-  console.log(`[SERVER > CLIENT] Sending full state for page '${pageId}' on board '${boardId}' to single client`);
   ws.send(JSON.stringify(message));
+  logSentMessage('fullPage', message, requestId);
 }
+
+const messageHandlers = {};
+
+[cite_start]// Message router [cite: 12]
+function routeMessage(ws, message) {
+  try {
+    const data = JSON.parse(message);
+    const requestId = data.requestId || data['action-uuid'] || 'N/A';
+    console.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client on board '${ws.boardId}':`, data); [cite_start]// Comprehensive logging [cite: 20]
+
+    const handler = messageHandlers[data.type];
+    if (handler) {
+      handler(ws, data, requestId);
+    } else {
+      console.warn(`[SERVER] Unhandled message type: ${data.type}`);
+    }
+  } catch (e) {
+    console.error('[SERVER] Invalid message received:', message, e);
+  }
+}
+
+[cite_start]// Full page requests [cite: 11]
+messageHandlers['fullPage-requests'] = (ws, data, requestId) => {
+  const board = boards[data.boardId];
+  if (!board) return;
+
+  let pageId;
+  if (data.pageNumber) {
+    pageId = board.pageOrder[data.pageNumber - 1];
+  } else if (data.pageId && data.delta !== undefined) {
+    const index = board.pageOrder.indexOf(data.pageId);
+    if (index !== -1) {
+      const newIndex = index + data.delta;
+      if (newIndex >= 0 && newIndex < board.pageOrder.length) {
+        pageId = board.pageOrder[newIndex];
+      }
+    }
+  }
+  
+  if (pageId) {
+    ws.pageId = pageId;
+    sendFullPage(ws, ws.boardId, pageId, requestId);
+  }
+};
+
+[cite_start]// Mod-action proposals [cite: 9]
+const modActionHandlers = {};
+
+modActionHandlers['draw'] = (ws, data, requestId) => {
+  const { pageUuid, payload, 'before-hash': beforeHash, 'action-uuid': actionUuid } = data;
+  const board = boards[ws.boardId];
+  const currentPage = board.pages[pageUuid];
+  const pageState = currentPage.modActions.map(action => action.payload);
+  const serverHash = calculateHash(pageState);
+
+  if (beforeHash !== serverHash) {
+    const acceptMessage = {
+      type: 'decline-message',
+      'page-uuid': pageUuid,
+      'action-uuid': actionUuid,
+    };
+    ws.send(JSON.stringify(acceptMessage));
+    logSentMessage(acceptMessage.type, acceptMessage, requestId);
+    return;
+  }
+
+  const modAction = {
+    'action-uuid': actionUuid,
+    payload: { type: 'draw', ...payload },
+    hashes: {
+      'before': beforeHash,
+      'after': calculateHash([...pageState, payload])
+    }
+  };
+  currentPage.modActions.push(modAction);
+  
+  const acceptMessage = {
+    type: 'accept-message',
+    'page-uuid': pageUuid,
+    'action-uuid': actionUuid,
+    'current page-nr in its board': board.pageOrder.indexOf(pageUuid) + 1,
+    'current #pages of the board': board.pageOrder.length
+  };
+  broadcastMessageToBoard(acceptMessage, ws.boardId);
+  logSentMessage(acceptMessage.type, acceptMessage, requestId);
+};
+
+modActionHandlers['erase'] = (ws, data, requestId) => {
+  const { pageUuid, payload, 'before-hash': beforeHash, 'action-uuid': actionUuid } = data;
+  const board = boards[ws.boardId];
+  const currentPage = board.pages[pageUuid];
+  const pageState = currentPage.modActions.map(action => action.payload);
+  const serverHash = calculateHash(pageState);
+
+  if (beforeHash !== serverHash) {
+    const declineMessage = {
+      type: 'decline-message',
+      'page-uuid': pageUuid,
+      'action-uuid': actionUuid,
+    };
+    ws.send(JSON.stringify(declineMessage));
+    logSentMessage(declineMessage.type, declineMessage, requestId);
+    return;
+  }
+  
+  const erasedStrokeActionUuid = payload.actionUuid;
+  const newModActions = currentPage.modActions.filter(action => action['action-uuid'] !== erasedStrokeActionUuid);
+  
+  currentPage.modActions = newModActions;
+
+  const acceptMessage = {
+    type: 'accept-message',
+    'page-uuid': pageUuid,
+    'action-uuid': actionUuid,
+    'current page-nr in its board': board.pageOrder.indexOf(pageUuid) + 1,
+    'current #pages of the board': board.pageOrder.length
+  };
+  broadcastMessageToBoard(acceptMessage, ws.boardId);
+  logSentMessage(acceptMessage.type, acceptMessage, requestId);
+};
+
+modActionHandlers['new page'] = (ws, data, requestId) => {
+  const { pageUuid, 'action-uuid': actionUuid } = data;
+  const board = boards[ws.boardId];
+  const newPageId = uuidv4();
+  const index = board.pageOrder.indexOf(pageUuid);
+  board.pageOrder.splice(index + 1, 0, newPageId);
+  board.pages[newPageId] = { modActions: [], hashes: {} };
+  ws.pageId = newPageId;
+  sendFullPage(ws, ws.boardId, newPageId, requestId);
+};
+
+modActionHandlers['delete page'] = (ws, data, requestId) => {
+  const { pageUuid, 'action-uuid': actionUuid } = data;
+  const board = boards[ws.boardId];
+  if (board.pageOrder.length <= 1) {
+    const declineMessage = { type: 'decline-message', 'page-uuid': pageUuid, 'action-uuid': actionUuid };
+    ws.send(JSON.stringify(declineMessage));
+    logSentMessage(declineMessage.type, declineMessage, requestId);
+    return;
+  }
+  
+  const index = board.pageOrder.indexOf(pageUuid);
+  const replacementPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 2)];
+  deletionMap[pageUuid] = replacementPageId;
+  board.pageOrder.splice(index, 1);
+  delete board.pages[pageUuid];
+  ws.pageId = replacementPageId;
+  sendFullPage(ws, ws.boardId, replacementPageId, requestId);
+};
+
+messageHandlers['mod-action-proposals'] = (ws, data, requestId) => {
+  const handler = modActionHandlers[data.payload.type];
+  if (handler) {
+    handler(ws, data, requestId);
+  }
+};
+
+messageHandlers['replay-requests'] = (ws, data, requestId) => {
+  const { pageUuid, 'before-hash': beforeHash } = data;
+  const board = boards[ws.boardId];
+  const page = board.pages[pageUuid];
+  if (!page) return;
+  
+  const replayActions = [];
+  let found = false;
+  for (const action of page.modActions) {
+    if (action.hashes.before === beforeHash) {
+      found = true;
+    }
+    if (found) {
+      replayActions.push(action);
+    }
+  }
+  
+  const replayMessage = {
+    type: 'replay-message',
+    'page-uuid': pageUuid,
+    'sequence of mod-actions': replayActions,
+    'current page-nr in its board': board.pageOrder.indexOf(pageUuid) + 1,
+    'current #pages of the board': board.pageOrder.length
+  };
+  ws.send(JSON.stringify(replayMessage));
+  logSentMessage(replayMessage.type, replayMessage, requestId);
+};
 
 wss.on('connection', (ws, req) => {
   const parsedUrl = url.parse(req.url, true);
@@ -88,107 +286,10 @@ wss.on('connection', (ws, req) => {
   ws.pageId = board.pageOrder[0];
 
   console.log(`[SERVER] Client connected to board: ${ws.boardId}`);
-  sendFullPageState(ws, ws.boardId, ws.pageId);
-  broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: board.pageOrder, currentPage: ws.pageId }, ws.boardId);
+  sendFullPage(ws, ws.boardId, ws.pageId, 'initial-connection');
 
-  ws.on('message', message => {
-    try {
-      const data = JSON.parse(message);
-      console.log(`[CLIENT > SERVER] Received message of type '${data.type}' from client on board '${ws.boardId}'`);
-      
-      const currentBoard = boards[ws.boardId];
-      if (!currentBoard) {
-        console.error('[SERVER] Board not found for this connection.');
-        return;
-      }
-      
-      const currentPageId = data.page;
-      const currentPage = pages[currentPageId];
-
-      if (data.type === 'draw') {
-        if (data.hash !== currentBoard.pageHashes[currentPageId]) {
-          console.log('[SERVER] Hash mismatch on draw, sending full state to client.');
-          sendFullPageState(ws, ws.boardId, currentPageId);
-          return;
-        }
-        const stroke = {
-          id: uuidv4(),
-          points: data.points,
-          timestamp: Date.now()
-        };
-        if (!currentPage) {
-          pages[currentPageId] = [];
-        }
-        pages[currentPageId].push(stroke);
-        currentBoard.pageHashes[currentPageId] = calculateHash(pages[currentPageId]);
-        const modMessage = {
-          type: 'newStroke',
-          page: currentPageId,
-          stroke: stroke,
-          hash: currentBoard.pageHashes[currentPageId]
-        };
-        broadcastMessageToBoard(modMessage, ws.boardId);
-      } else if (data.type === 'erase') {
-        if (data.hash !== currentBoard.pageHashes[currentPageId]) {
-          console.log('[SERVER] Hash mismatch on erase, sending full state to client.');
-          sendFullPageState(ws, ws.boardId, currentPageId);
-          return;
-        }
-        if (currentPage) {
-          pages[currentPageId] = currentPage.filter(stroke => stroke.id !== data.strokeId);
-        }
-        currentBoard.pageHashes[currentPageId] = calculateHash(pages[currentPageId]);
-        broadcastMessageToBoard({
-          type: 'eraseConfirm',
-          page: currentPageId,
-          strokeId: data.strokeId,
-          hash: currentBoard.pageHashes[currentPageId]
-        }, ws.boardId);
-      } else if (data.type === 'deletePage') {
-        if (currentBoard.pageOrder.length > 1) {
-          const index = currentBoard.pageOrder.indexOf(currentPageId);
-          currentBoard.pageOrder.splice(index, 1);
-          delete pages[currentPageId];
-          delete currentBoard.pageHashes[currentPageId];
-          const newPageId = currentBoard.pageOrder[Math.min(index, currentBoard.pageOrder.length - 1)];
-          ws.pageId = newPageId;
-          broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: currentBoard.pageOrder, currentPage: newPageId }, ws.boardId);
-          sendFullPageState(ws, ws.boardId, newPageId);
-        } else {
-          pages[currentPageId] = [];
-          currentBoard.pageHashes[currentPageId] = calculateHash(pages[currentPageId]);
-          sendFullPageState(ws, ws.boardId, currentPageId);
-          broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: currentBoard.pageOrder, currentPage: currentPageId }, ws.boardId);
-        }
-      } else if (data.type === 'insertPage') {
-        const newPageId = uuidv4();
-        const index = currentBoard.pageOrder.indexOf(currentPageId);
-        currentBoard.pageOrder.splice(index + 1, 0, newPageId);
-        pages[newPageId] = [];
-        currentBoard.pageHashes[newPageId] = calculateHash([]);
-        ws.pageId = newPageId;
-        broadcastMessageToBoard({ type: 'pageOrderUpdate', pageOrder: currentBoard.pageOrder, currentPage: newPageId }, ws.boardId);
-        sendFullPageState(ws, ws.boardId, newPageId);
-      } else if (data.type === 'nextPage') {
-        const index = currentBoard.pageOrder.indexOf(currentPageId);
-        if (index < currentBoard.pageOrder.length - 1) {
-          const newPageId = currentBoard.pageOrder[index + 1];
-          ws.pageId = newPageId;
-          sendFullPageState(ws, ws.boardId, newPageId);
-        }
-      } else if (data.type === 'prevPage') {
-        const index = currentBoard.pageOrder.indexOf(currentPageId);
-        if (index > 0) {
-          const newPageId = currentBoard.pageOrder[index - 1];
-          ws.pageId = newPageId;
-          sendFullPageState(ws, ws.boardId, newPageId);
-        }
-      }
-    } catch (e) {
-      console.error('[SERVER] Invalid message received:', message, e);
-    }
-  });
-
+  ws.on('message', message => routeMessage(ws, message));
+  
   ws.on('close', () => {
     console.log(`[SERVER] Client disconnected from board: ${ws.boardId}`);
   });
