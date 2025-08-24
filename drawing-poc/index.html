@@ -166,8 +166,8 @@
       logEvent(`Sending mod action proposal for type: ${type}`);
       const actionUuid = shared.generateUuid();
       
-      const combinedActions = [...verifiedModActions.map(a => a.payload), ...optimisticUpdates.map(a => a.payload)];
-      const beforeHash = shared.calculateHash(combinedActions);
+      // Use the current verified hash and update it with optimistic actions if any
+      let beforeHash = verifiedHash;
       
       const proposal = {
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
@@ -400,7 +400,7 @@
             };
             ws.send(JSON.stringify(fullPageRequest));
             logMessage('CLIENT -> SERVER', fullPageRequest.type, fullPageRequest);
-        } else if (verifiedHash !== data.hash) {
+        } else if (verifiedHash !== data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH]) {
             logEvent(`Ping received, hash mismatch. Requesting replay...`);
             const replayMessage = { 
                 type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
