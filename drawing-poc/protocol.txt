@@ -18,12 +18,15 @@ has of the most recent verified page state
   verified means:
   - the client knows a history of mod-actions for this hash
   - and has seen it as a result hash in a server message
+the sequence of mod-actions may extend past the verified state due to optimistic updates
+* visual representation on the client machine corresponds to the full sequence
+* verified state is used as the starting point for replay updates
 current page pos in its board
 current number of pages for the board
 
 
 server to client messages:
-* fullPage message: (page, hash of page state,  current page-nr in its board, current #pages of the board)
+* fullPage message: (page, hash of page state, current page-nr in its board, current #pages of the board)
 * replay-message (page-uuid, before-hash, after-hash, sequence of mod-actions,
                   current page-nr in its board, current #pages of the board)
 * accept-message (page-uuid, action-uuid, before-hash, after-hash,
@@ -33,6 +36,9 @@ server to client messages:
   This is sent when the server state is updated, i.e., the action is appended to the page.
 * decline-message (page-uuid, action-uuid)
   sent to the proposer when the server decided not to apply a proposed mod-action.
+* ping message (page-uuid, hash of page state, current page-nr in its board, current #pages of the board)
+  sent periodically to all clients of the board
+  they can use this to check whether they need to request a replay
 
 client to server messages:
 * mod-action proposals (page-uuid, action-uuid, payload, before-hash that the client thinks, the action applies to)
@@ -83,3 +89,36 @@ message router.
 
 To help debugging, the server shall do comprehensive logging on all messages it receives
 and sends. The log for a sent message should reference the message it responds to.
+
+
+----
+
+Client side handling of messages should not make assumptions on the strategy employed by
+the server. E.g., if the client sees an accept-message, it may not assume that the before-hash
+of that accept-message is identicial to the before-hash it had put into the proposal.
+
+
+----
+
+To improve maintainability and ensure consistency, a shared codebase between the client
+and server should include any logic they both need to agree on.
+
+file: shared.js
+
+The shared code should cover in particular:
+
+* Hash Computation: The function for calculating the hash of the page state is
+  critical to the protocol's concurrency strategy. Putting this logic in a shared
+  library guarantees that both the client and server will always use the same algorithm.
+
+* UUID Generation: Unique identifiers for actions (action-uuid) are essential for
+  tracking proposals and replies. The uuidv4 function used to create these UUIDs should
+  be in a shared file to prevent inconsistencies.
+
+* Message Types and Schemas: Defining a common structure for all messages (e.g.,
+  mod-action proposals, accept-message, replay-message) in a shared library helps
+  avoid issues caused by typos or mismatched fields. This ensures both sides of
+  the application can send and receive messages correctly.
+
+
+
