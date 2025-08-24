@@ -1,564 +1,79 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Drawing PoC</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin: 0;
-      gap: 10px;
-    }
-    #controls {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    #page-controls {
-      display: flex;
-      gap: 10px;
-    }
-    canvas {
-      border: 1px solid black;
-      cursor: crosshair;
-    }
-    button {
-      padding: 10px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    button.active {
-      background-color: #ddd;
-      border: 2px solid #333;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xournal++ Clone</title>
+  <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-  <h1>Whiteboard <span id="page-info"></span></h1>
-  <div id="controls">
-    <button id="pen-tool" class="active">Pen</button>
-    <button id="highlighter-tool">Highlighter</button>
-    <button id="eraser-tool">Eraser</button>
+  <div class="app-container">
+    <!-- Top Toolbar -->
+    <div class="toolbar top-toolbar">
+      <div class="tool-group">
+        <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
+        <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
+        <button class="tool-btn" id="highlighter-tool" title="Highlighter">🖌️</button>
+      </div>
+      
+      <div class="color-picker">
+        <div class="color-swatch active" style="background-color: #000000;" data-color="#000000"></div>
+        <div class="color-swatch" style="background-color: #ff0000;" data-color="#ff0000"></div>
+        <div class="color-swatch" style="background-color: #00ff00;" data-color="#00ff00"></div>
+        <div class="color-swatch" style="background-color: #0000ff;" data-color="#0000ff"></div>
+        <div class="color-swatch" style="background-color: #ffff00;" data-color="#ffff00"></div>
+      </div>
+      
+      <div class="stroke-width">
+        <div class="width-option" data-width="1">
+          <div class="width-preview" style="width: 16px; height: 1px;"></div>
+        </div>
+        <div class="width-option active" data-width="2">
+          <div class="width-preview" style="width: 16px; height: 2px;"></div>
+        </div>
+        <div class="width-option" data-width="4">
+          <div class="width-preview" style="width: 16px; height: 4px;"></div>
+        </div>
+        <div class="width-option" data-width="6">
+          <div class="width-preview" style="width: 16px; height: 6px;"></div>
+        </div>
+      </div>
+      
+      <div class="zoom-controls">
+        <button class="tool-btn" id="zoom-out">➖</button>
+        <input type="range" min="50" max="200" value="100" class="zoom-slider" id="zoom-slider">
+        <span id="zoom-level">100%</span>
+        <button class="tool-btn" id="zoom-in">➕</button>
+      </div>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="main-content">
+      <div class="sidebar">
+        <!-- Will be expanded in later phases -->
+      </div>
+      
+      <div class="canvas-container" id="canvas-container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+      </div>
+    </div>
+    
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span id="page-info">Page 1 of 1</span>
+      <span style="flex: 1;"></span>
+      <span id="cursor-position"></span>
+    </div>
   </div>
-  <canvas id="whiteboard" width="800" height="600"></canvas>
-  <div id="page-controls">
-    <button id="prev-page">Previous Page</button>
-    <button id="next-page">Next Page</button>
-    <button id="delete-page">Delete Page</button>
-    <button id="insert-page">Insert Page</button>
-  </div>
+
+  <!-- Load shared.js first -->
+  <script src="shared.js"></script>
   
-  <script src="./shared.js"></script>
-  <script>
-    const canvas = document.getElementById('whiteboard');
-    const ctx = canvas.getContext('2d');
-    const pageInfo = document.getElementById('page-info');
-    const penTool = document.getElementById('pen-tool');
-    const highlighterTool = document.getElementById('highlighter-tool');
-    const eraserTool = document.getElementById('eraser-tool');
-    const prevPageBtn = document.getElementById('prev-page');
-    const nextPageBtn = document.getElementById('next-page');
-    const deletePageBtn = document.getElementById('delete-page');
-    const insertPageBtn = document.getElementById('insert-page');
-
-    const path = window.location.pathname;
-    const ws = new WebSocket(`ws://${window.location.hostname}:3001${path}`);
-
-    let isDrawing = false;
-    let currentStroke = null;
-    let tool = shared.MOD_ACTIONS.DRAW.TYPE;
-    let activeStrokeStyle = shared.STROKE_STYLES.PEN;
-    let isInitialized = false;
-    
-    let verifiedModActions = [];
-    let optimisticUpdates = [];
-    let currentPageId = '';
-    let verifiedHash = '';
-    let pageNr = 0;
-    let totalPages = 0;
-    
-    function logEvent(message, data) {
-      console.log(`[EVENT] ${message}`, data);
-    }
-    
-    function logMessage(direction, type, data) {
-      console.log(`[MESSAGE ${direction}] Type: ${type}, Data:`, data);
-    }
-
-    function setControlsEnabled(enabled) {
-      logEvent('Setting controls enabled state', enabled);
-      canvas.style.pointerEvents = enabled ? 'auto' : 'none';
-      penTool.disabled = !enabled;
-      highlighterTool.disabled = !enabled;
-      eraserTool.disabled = !enabled;
-      prevPageBtn.disabled = !enabled || pageNr <= 1;
-      nextPageBtn.disabled = !enabled || pageNr >= totalPages;
-      deletePageBtn.disabled = !enabled || totalPages <= 1;
-      insertPageBtn.disabled = !enabled;
-    }
-    setControlsEnabled(false);
-
-    function drawStroke(stroke) {
-      if (!stroke || stroke.points.length < 2) return;
-      
-      const points = stroke.points;
-      const style = stroke.style;
-      
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      
-      // Set basic styles
-      ctx.lineCap = style.capStyle;
-      ctx.lineJoin = style.joinStyle;
-      ctx.strokeStyle = style.color;
-      ctx.globalAlpha = style.opacity;
-      
-      // Apply dash pattern if any
-      if (style.dashPattern.length > 1) {
-        ctx.setLineDash(style.dashPattern);
-      } else {
-        ctx.setLineDash([]);
-      }
-      
-      // Handle different pen types
-      switch(style.penType) {
-        case shared.PEN_TYPES.HIGHLIGHTER:
-          // Highlighter specific rendering
-          ctx.globalCompositeOperation = 'multiply';
-          drawStrokeWithPressure(stroke);
-          ctx.globalCompositeOperation = 'source-over';
-          break;
-        case shared.PEN_TYPES.PENCIL:
-          // Pencil specific rendering (simplified)
-          drawStrokeWithPressure(stroke);
-          break;
-        default: // Default marker/pen
-          drawStrokeWithPressure(stroke);
-      }
-      
-      ctx.globalAlpha = 1.0; // Reset opacity
-    }
-
-    function drawStrokeWithPressure(stroke) {
-      const points = stroke.points;
-      const style = stroke.style;
-      
-      // For very short strokes, just draw a simple line
-      if (points.length < 3) {
-        ctx.lineWidth = style.width;
-        for (let i = 1; i < points.length; i++) {
-          ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.stroke();
-        return;
-      }
-      
-      // For longer strokes, handle pressure and smooth rendering
-      for (let i = 1; i < points.length; i++) {
-        const p1 = points[i-1];
-        const p2 = points[i];
-        
-        // Calculate width based on pressure if pressure sensitivity is enabled
-        let lineWidth = style.width;
-        if (style.pressureSensitivity > 0 && p2.pressure !== undefined) {
-          lineWidth = style.width * (1 + (p2.pressure - 0.5) * style.pressureSensitivity);
-        }
-        
-        ctx.lineWidth = Math.max(0.5, lineWidth); // Ensure minimum width
-        
-        ctx.lineTo(p2.x, p2.y);
-      }
-      
-      ctx.stroke();
-    }
-    
-    function renderCanvas() {
-      logEvent('Rendering canvas');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const allActions = [...verifiedModActions, ...optimisticUpdates];
-      allActions.forEach(action => {
-        if (action.payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          drawStroke(action.payload.stroke);
-        }
-      });
-      updateUI();
-    }
-    
-    function updateUI() {
-        logEvent('Updating UI with new page information');
-        pageInfo.textContent = `page ${pageNr} of ${totalPages}`;
-        prevPageBtn.disabled = pageNr <= 1;
-        nextPageBtn.disabled = pageNr >= totalPages;
-        deletePageBtn.disabled = totalPages <= 1;
-    }
-
-    function findStrokeAt(x, y) {
-      const allActions = [...verifiedModActions, ...optimisticUpdates];
-      for (const action of allActions) {
-        if (action.payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          const stroke = action.payload.stroke;
-          const points = stroke.points;
-          
-          for (let i = 0; i < points.length - 1; i++) {
-            const p1 = points[i];
-            const p2 = points[i+1];
-            
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            
-            const t = ((x - p1.x) * dx + (y - p1.y) * dy) / (length * length);
-            
-            let closestX, closestY;
-            if (t < 0) {
-              closestX = p1.x;
-              closestY = p1.y;
-            } else if (t > 1) {
-              closestX = p2.x;
-              closestY = p2.y;
-            } else {
-              closestX = p1.x + t * dx;
-              closestY = p1.y + t * dy;
-            }
-            
-            // Consider stroke width in hit detection
-            const strokeWidth = stroke.style.width;
-            const dist = Math.sqrt((x - closestX) ** 2 + (y - closestY) ** 2);
-            if (dist < strokeWidth + 5) { // Adding a small buffer for easier selection
-              return action;
-            }
-          }
-        }
-      }
-      return null;
-    }
-
-    function sendModActionProposal(type, payload) {
-      if (!isInitialized) return;
-      logEvent(`Sending mod action proposal for type: ${type}`);
-      const actionUuid = shared.generateUuid();
-      
-      // Use the current verified hash and update it with optimistic actions if any
-      let beforeHash = verifiedHash;
-      
-      const proposal = {
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: { type: type, ...payload },
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: beforeHash
-      };
-      
-      if (type === shared.MOD_ACTIONS.DRAW.TYPE) {
-        optimisticUpdates.push(proposal);
-      } else if (type === shared.MOD_ACTIONS.ERASE.TYPE) {
-        const erasedActionUuid = payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID];
-        const verifiedAction = verifiedModActions.find(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === erasedActionUuid);
-        if (verifiedAction) {
-          logEvent('Optimistically removing verified action from client state.');
-          verifiedModActions = verifiedModActions.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== erasedActionUuid);
-        } else {
-          logEvent('Optimistically removing optimistic action from client state.');
-          optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== erasedActionUuid);
-        }
-      }
-      
-      renderCanvas();
-
-      const message = {
-          type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageId,
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: proposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID],
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: proposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: proposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH],
-      };
-      
-      try {
-        ws.send(JSON.stringify(message));
-        logMessage('CLIENT -> SERVER', message.type, message);
-      } catch (e) {
-          console.error('Failed to send message to server:', e);
-      }
-    }
-
-    // Set active tool and update UI
-    function setActiveTool(toolType, strokeStyle) {
-      // Remove active class from all tool buttons
-      document.querySelectorAll('#controls button').forEach(btn => {
-        btn.classList.remove('active');
-      });
-      
-      if (toolType === shared.MOD_ACTIONS.DRAW.TYPE) {
-        activeStrokeStyle = strokeStyle;
-        if (strokeStyle === shared.STROKE_STYLES.PEN) {
-          penTool.classList.add('active');
-          canvas.style.cursor = 'crosshair';
-        } else if (strokeStyle === shared.STROKE_STYLES.HIGHLIGHTER) {
-          highlighterTool.classList.add('active');
-          canvas.style.cursor = 'crosshair';
-        }
-      } else if (toolType === shared.MOD_ACTIONS.ERASE.TYPE) {
-        eraserTool.classList.add('active');
-        canvas.style.cursor = 'cell';
-      }
-      
-      tool = toolType;
-    }
-
-    penTool.addEventListener('click', () => {
-      logEvent('Pen tool clicked.');
-      setActiveTool(shared.MOD_ACTIONS.DRAW.TYPE, shared.STROKE_STYLES.PEN);
-    });
-    
-    highlighterTool.addEventListener('click', () => {
-      logEvent('Highlighter tool clicked.');
-      setActiveTool(shared.MOD_ACTIONS.DRAW.TYPE, shared.STROKE_STYLES.HIGHLIGHTER);
-    });
-    
-    eraserTool.addEventListener('click', () => {
-      logEvent('Eraser tool clicked.');
-      setActiveTool(shared.MOD_ACTIONS.ERASE.TYPE);
-    });
-
-    canvas.addEventListener('mousedown', e => {
-      if (!isInitialized) return;
-      logEvent('Mouse down on canvas');
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      if (tool === shared.MOD_ACTIONS.DRAW.TYPE) {
-        isDrawing = true;
-        currentStroke = shared.createStroke(activeStrokeStyle);
-        
-        // Get pressure if available (for devices with pressure sensitivity)
-        const pressure = e.pressure !== undefined ? e.pressure : 0.5;
-        // Get tilt if available
-        const tiltX = e.tiltX !== undefined ? e.tiltX / 90 : 0; // Normalize to -1 to 1
-        const tiltY = e.tiltY !== undefined ? e.tiltY / 90 : 0; // Normalize to -1 to 1
-        
-        shared.addPointToStroke(currentStroke, x, y, pressure, tiltX, tiltY);
-        
-        // Start drawing immediately
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineCap = currentStroke.style.capStyle;
-        ctx.lineJoin = currentStroke.style.joinStyle;
-        ctx.strokeStyle = currentStroke.style.color;
-        ctx.globalAlpha = currentStroke.style.opacity;
-        ctx.lineWidth = currentStroke.style.width;
-        
-        if (currentStroke.style.penType === shared.PEN_TYPES.HIGHLIGHTER) {
-          ctx.globalCompositeOperation = 'multiply';
-        }
-      } else if (tool === shared.MOD_ACTIONS.ERASE.TYPE) {
-        const erasedAction = findStrokeAt(x, y);
-        if (erasedAction) {
-          sendModActionProposal(shared.MOD_ACTIONS.ERASE.TYPE, { [shared.MOD_ACTIONS.ERASE.ACTION_UUID]: erasedAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] });
-        }
-      }
-    });
-
-    canvas.addEventListener('mousemove', e => {
-      if (!isInitialized || !isDrawing || tool !== shared.MOD_ACTIONS.DRAW.TYPE) return;
-      
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      // Get pressure and tilt if available
-      const pressure = e.pressure !== undefined ? e.pressure : 0.5;
-      const tiltX = e.tiltX !== undefined ? e.tiltX / 90 : 0;
-      const tiltY = e.tiltY !== undefined ? e.tiltY / 90 : 0;
-      
-      shared.addPointToStroke(currentStroke, x, y, pressure, tiltX, tiltY);
-      
-      // Draw the current segment
-      let lineWidth = currentStroke.style.width;
-      if (currentStroke.style.pressureSensitivity > 0) {
-        lineWidth = currentStroke.style.width * (1 + (pressure - 0.5) * currentStroke.style.pressureSensitivity);
-      }
-      
-      ctx.lineWidth = lineWidth;
-      ctx.lineTo(x, y);
-      ctx.stroke();
-    });
-    
-    window.addEventListener('mouseup', () => {
-      if (!isInitialized) return;
-      logEvent('Mouse up event.');
-      if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
-        if (currentStroke && currentStroke.points.length > 1) {
-          sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { stroke: currentStroke });
-        }
-        currentStroke = null;
-        ctx.globalCompositeOperation = 'source-over'; // Reset composite operation
-        ctx.globalAlpha = 1.0; // Reset opacity
-      }
-      isDrawing = false;
-    });
-
-    canvas.addEventListener('mouseleave', () => {
-        if (!isInitialized) return;
-        logEvent('Mouse left canvas.');
-        if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
-            if (currentStroke && currentStroke.points.length > 1) {
-                sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { stroke: currentStroke });
-            }
-            currentStroke = null;
-            ctx.globalCompositeOperation = 'source-over'; // Reset composite operation
-            ctx.globalAlpha = 1.0; // Reset opacity
-            isDrawing = false;
-        }
-    });
-
-    prevPageBtn.addEventListener('click', () => {
-        if (!isInitialized) return;
-        logEvent('Previous page button clicked.');
-        const message = { 
-            type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
-            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: -1, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-        };
-        try {
-            ws.send(JSON.stringify(message));
-            logMessage('CLIENT -> SERVER', message.type, message);
-        } catch (e) {
-            console.error('Failed to send previous page request:', e);
-        }
-    });
-    nextPageBtn.addEventListener('click', () => {
-        if (!isInitialized) return;
-        logEvent('Next page button clicked.');
-        const message = { 
-            type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
-            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: 1, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-        };
-        try {
-            ws.send(JSON.stringify(message));
-            logMessage('CLIENT -> SERVER', message.type, message);
-        } catch (e) {
-            console.error('Failed to send next page request:', e);
-        }
-    });
-    deletePageBtn.addEventListener('click', () => {
-        if (!isInitialized) return;
-        logEvent('Delete page button clicked.');
-        sendModActionProposal(shared.MOD_ACTIONS.DELETE_PAGE.TYPE, {});
-    });
-    insertPageBtn.addEventListener('click', () => {
-        if (!isInitialized) return;
-        logEvent('Insert page button clicked.');
-        sendModActionProposal(shared.MOD_ACTIONS.NEW_PAGE.TYPE, {});
-    });
-
-    ws.onmessage = event => {
-      const data = JSON.parse(event.data);
-      logMessage('SERVER -> CLIENT', data.type, data);
-      
-      if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE) {
-        logEvent('Received a FULL_PAGE message. Initializing/re-syncing state.');
-        verifiedModActions = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.STATE];
-        optimisticUpdates = [];
-        currentPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
-        verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH];
-        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
-        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
-        isInitialized = true;
-        setControlsEnabled(true);
-        renderCanvas();
-      } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE) {
-        logEvent('Received an ACCEPT_MESSAGE. Processing update.');
-        const acceptedAction = optimisticUpdates.find(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]);
-        
-        if (acceptedAction) {
-          logEvent('Found accepted action in optimistic updates. Moving to verified.');
-          // Update the hash values to match what the server used
-          acceptedAction.hashes = {
-            [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH],
-            [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]
-          };
-          
-          verifiedModActions.push(acceptedAction);
-          optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]);
-          
-          // Always update to the server's latest hash
-          verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
-          renderCanvas();
-        } else {
-          // Action wasn't in our optimistic updates - request a replay to ensure consistency
-          logEvent('Server accepted an action we don\'t have locally. Requesting replay.');
-          const replayMessage = { 
-            type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageId, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-          };
-          ws.send(JSON.stringify(replayMessage));
-          logMessage('CLIENT -> SERVER', replayMessage.type, replayMessage);
-        }
-        
-        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR];
-        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES];
-        updateUI();
-      } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE) {
-        logEvent('Received a DECLINE_MESSAGE. Re-syncing and requesting replay.');
-        optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]);
-        const replayMessage = { 
-            type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageId, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
-            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-        };
-        ws.send(JSON.stringify(replayMessage));
-        logMessage('CLIENT -> SERVER', replayMessage.type, replayMessage);
-      } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE) {
-        logEvent('Received a REPLAY_MESSAGE. Replaying missing actions.');
-        
-        const replayActions = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE];
-        const lastAction = replayActions[replayActions.length - 1];
-
-        verifiedModActions = [...verifiedModActions, ...replayActions];
-        
-        optimisticUpdates = optimisticUpdates.filter(o => {
-            return !replayActions.some(r => r[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === o[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]);
-        });
-
-        verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH];
-        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR];
-        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES];
-        renderCanvas();
-      } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE) {
-        logEvent('Received a PING message.');
-        if (data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID] !== currentPageId) {
-            logEvent(`Ping received for a different page. Requesting full page.`);
-            const fullPageRequest = { 
-                type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: 0, 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-            };
-            ws.send(JSON.stringify(fullPageRequest));
-            logMessage('CLIENT -> SERVER', fullPageRequest.type, fullPageRequest);
-        } else if (verifiedHash !== data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH]) {
-            logEvent(`Ping received, hash mismatch. Requesting replay...`);
-            const replayMessage = { 
-                type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID], 
-                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
-                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid()
-            };
-            ws.send(JSON.stringify(replayMessage));
-            logMessage('CLIENT -> SERVER', replayMessage.type, replayMessage);
-        }
-      }
-    };
-  </script>
+  <!-- Load our modular JS files -->
+  <script src="js/utils.js"></script>
+  <script src="js/drawing.js"></script>
+  <script src="js/network.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
