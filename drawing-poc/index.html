@@ -4,66 +4,735 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Xournal++ Clone</title>
-  <link rel="stylesheet" href="css/main.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
+    
+    .toolbar {
+      display: flex;
+      background-color: #f0f0f0;
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+    }
+    
+    .tool-section {
+      display: flex;
+      margin-right: 10px;
+      padding-right: 10px;
+      border-right: 1px solid #ddd;
+    }
+    
+    .tool-btn {
+      width: 30px;
+      height: 30px;
+      margin: 0 2px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      background-color: transparent;
+      border-radius: 4px;
+    }
+    
+    .tool-btn:hover {
+      background-color: #e0e0e0;
+    }
+    
+    .tool-btn.active {
+      border-color: #3498db;
+      background-color: #ebf5fb;
+    }
+    
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      margin: 3px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+    }
+    
+    .color-swatch.active {
+      border-color: #333;
+      border-width: 2px;
+    }
+    
+    #canvas-container {
+      position: relative;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+    
+    canvas {
+      position: absolute;
+      background-color: white;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .main-content {
+      display: flex;
+      height: calc(100vh - 42px);
+    }
+    
+    #width-selector {
+      width: 100px;
+      margin: 0 10px;
+    }
+    
+    .page-controls {
+      display: flex;
+      align-items: center;
+    }
+    
+    #page-info {
+      margin: 0 10px;
+    }
+  </style>
 </head>
 <body>
-  <div class="app-container">
-    <!-- Top Toolbar -->
-    <div class="toolbar top-toolbar">
-      <div class="tool-group">
-        <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
-        <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
-        <button class="tool-btn" id="highlighter-tool" title="Highlighter">🖌️</button>
-      </div>
-      
-      <div class="color-picker">
-        <!-- Color swatches (unchanged) -->
-      </div>
-      
-      <div class="stroke-width">
-        <!-- Width options (unchanged) -->
-      </div>
-      
-      <!-- Add page navigation -->
-      <div class="page-navigation">
-        <button class="tool-btn" id="prev-page" title="Previous Page">◀️</button>
-        <button class="tool-btn" id="add-page" title="Add Page">➕</button>
-        <button class="tool-btn" id="delete-page" title="Delete Page">➖</button>
-        <button class="tool-btn" id="next-page" title="Next Page">▶️</button>
-      </div>
-      
-      <div class="zoom-controls">
-        <!-- Zoom controls (unchanged) -->
-      </div>
+  <div class="toolbar">
+    <!-- Tools Section -->
+    <div class="tool-section">
+      <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
+      <button class="tool-btn" id="highlighter-tool" title="Highlighter">🖌️</button>
+      <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
     </div>
     
-    <!-- Main Content Area -->
-    <div class="main-content">
-      <div class="sidebar">
-        <!-- Will be expanded in later phases -->
-      </div>
-      
-      <div class="canvas-container" id="canvas-container">
-        <canvas id="canvas" width="800" height="600"></canvas>
-      </div>
+    <!-- Colors Section -->
+    <div class="tool-section">
+      <div class="color-swatch active" style="background-color: black;" data-color="#000000"></div>
+      <div class="color-swatch" style="background-color: red;" data-color="#ff0000"></div>
+      <div class="color-swatch" style="background-color: green;" data-color="#00ff00"></div>
+      <div class="color-swatch" style="background-color: blue;" data-color="#0000ff"></div>
+      <div class="color-swatch" style="background-color: yellow;" data-color="#ffff00"></div>
     </div>
     
-    <!-- Status Bar -->
-    <div class="status-bar">
+    <!-- Width Section -->
+    <div class="tool-section">
+      <label for="width-selector">Width:</label>
+      <input type="range" id="width-selector" min="1" max="10" value="2">
+      <span id="width-value">2</span>
+    </div>
+    
+    <!-- Page Controls -->
+    <div class="tool-section page-controls">
+      <button class="tool-btn" id="prev-page">◀️</button>
       <span id="page-info">Page 1 of 1</span>
-      <span style="flex: 1;"></span>
-      <span id="cursor-position"></span>
+      <button class="tool-btn" id="next-page">▶️</button>
+      <button class="tool-btn" id="add-page">➕</button>
+      <button class="tool-btn" id="delete-page">➖</button>
+    </div>
+    
+    <!-- Zoom Controls -->
+    <div class="tool-section">
+      <button class="tool-btn" id="zoom-out">-</button>
+      <span id="zoom-level">100%</span>
+      <button class="tool-btn" id="zoom-in">+</button>
+    </div>
+  </div>
+  
+  <div class="main-content">
+    <div id="canvas-container">
+      <canvas id="canvas"></canvas>
     </div>
   </div>
 
-  <!-- Load shared.js first -->
   <script src="shared.js"></script>
-  
-  <!-- Load our modular JS files -->
-  <script src="js/utils.js"></script>
-  <script src="js/drawing.js"></script>
-  <script src="js/network.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/app.js"></script>
+  <script>
+    // Globals for board state
+    let ws = null;
+    let currentPageUuid = null;
+    let verifiedHash = '';
+    let verifiedModActions = [];
+    let optimisticUpdates = [];
+    let pageNr = 1;
+    let totalPages = 1;
+    
+    // Drawing state
+    let isDrawing = false;
+    let currentPath = [];
+    let currentStyle = {
+      penType: shared.PEN_TYPES.MARKER,
+      color: "#000000",
+      opacity: 1.0,
+      width: 2.0,
+      capStyle: shared.CAP_STYLES.ROUND,
+      joinStyle: shared.JOIN_STYLES.ROUND,
+      dashPattern: [0],
+      pressureSensitivity: 1.0,
+      layer: 1
+    };
+    
+    // Zoom state
+    let zoomLevel = 1;
+    
+    // Tool state
+    let currentTool = 'pen';
+    let isErasing = false;
+    
+    // DOM elements
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvas-container');
+    const widthSelector = document.getElementById('width-selector');
+    const widthValue = document.getElementById('width-value');
+    const zoomLevelDisplay = document.getElementById('zoom-level');
+    const pageInfo = document.getElementById('page-info');
+    
+    // Initialize 
+    function init() {
+      setupCanvas();
+      setupWebSocket();
+      setupEventListeners();
+    }
+    
+    // Set up canvas size
+    function setupCanvas() {
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+    }
+    
+    // Resize canvas to fit window
+    function resizeCanvas() {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      applyZoom();
+      redrawCanvas();
+    }
+    
+    // Apply zoom transform
+    function applyZoom() {
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+    }
+    
+    // Set up WebSocket connection
+    function setupWebSocket() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const boardId = urlParams.get('id') || shared.generateUuid();
+      history.replaceState(null, null, `?id=${boardId}`);
+      
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}/ws/${boardId}`;
+      
+      ws = new WebSocket(wsUrl);
+      
+      ws.onopen = () => {
+        console.log('Connected to server');
+        // Create initial page
+        currentPageUuid = shared.generateUuid();
+        createNewPage(currentPageUuid);
+      };
+      
+      ws.onclose = () => {
+        console.log('Disconnected from server');
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+      
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('Received message:', data);
+        
+        switch (data.type) {
+          case shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE:
+            handleAcceptMessage(data);
+            break;
+          case shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE:
+            handleDeclineMessage(data);
+            break;
+          case shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE:
+            handleReplayMessage(data);
+            break;
+          case shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE:
+            handleFullPageMessage(data);
+            break;
+        }
+      };
+    }
+    
+    // Handle accept message from server
+    function handleAcceptMessage(data) {
+      const acceptedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID];
+      const acceptedAction = optimisticUpdates.find(a => 
+        a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === acceptedActionUuid
+      );
+      
+      if (acceptedAction) {
+        // Move action from optimistic to verified
+        optimisticUpdates = optimisticUpdates.filter(a => 
+          a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== acceptedActionUuid
+        );
+        
+        // Update hash values
+        acceptedAction.hashes = {
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: 
+            data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH],
+          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: 
+            data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]
+        };
+        
+        verifiedModActions.push(acceptedAction);
+        verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
+        
+        // Update page info
+        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR];
+        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES];
+        updatePageInfo();
+      } else {
+        // Request replay if we don't know about this action
+        requestReplay(currentPageUuid, verifiedHash);
+      }
+      
+      redrawCanvas();
+    }
+    
+    // Handle decline message from server
+    function handleDeclineMessage(data) {
+      const declinedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID];
+      
+      // Remove declined action from optimistic updates
+      optimisticUpdates = optimisticUpdates.filter(a => 
+        a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== declinedActionUuid
+      );
+      
+      // Request replay to ensure we're in sync
+      requestReplay(currentPageUuid, verifiedHash);
+      redrawCanvas();
+    }
+    
+    // Handle replay message from server
+    function handleReplayMessage(data) {
+      const replayActions = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.MOD_ACTIONS];
+      verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH];
+      
+      // Apply replayed actions
+      verifiedModActions = verifiedModActions.concat(replayActions);
+      redrawCanvas();
+    }
+    
+    // Handle full page message from server
+    function handleFullPageMessage(data) {
+      const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_UUID];
+      const modActions = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.MOD_ACTIONS];
+      const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.AFTER_HASH];
+      
+      // Replace current page data
+      currentPageUuid = pageUuid;
+      verifiedModActions = modActions;
+      optimisticUpdates = [];
+      verifiedHash = afterHash;
+      
+      // Update page info
+      pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.CURRENT_PAGE_NR];
+      totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.CURRENT_TOTAL_PAGES];
+      updatePageInfo();
+      
+      redrawCanvas();
+    }
+    
+    // Set up event listeners
+    function setupEventListeners() {
+      // Tool selection
+      document.getElementById('pen-tool').addEventListener('click', () => setTool('pen'));
+      document.getElementById('highlighter-tool').addEventListener('click', () => setTool('highlighter'));
+      document.getElementById('eraser-tool').addEventListener('click', () => setTool('eraser'));
+      
+      // Color selection
+      const colorSwatches = document.querySelectorAll('.color-swatch');
+      colorSwatches.forEach(swatch => {
+        swatch.addEventListener('click', () => {
+          colorSwatches.forEach(s => s.classList.remove('active'));
+          swatch.classList.add('active');
+          currentStyle.color = swatch.dataset.color;
+        });
+      });
+      
+      // Width selection
+      widthSelector.addEventListener('input', () => {
+        const width = parseInt(widthSelector.value);
+        widthValue.textContent = width;
+        currentStyle.width = width;
+      });
+      
+      // Page navigation
+      document.getElementById('prev-page').addEventListener('click', () => navigateToPage(pageNr - 1));
+      document.getElementById('next-page').addEventListener('click', () => navigateToPage(pageNr + 1));
+      document.getElementById('add-page').addEventListener('click', addNewPage);
+      document.getElementById('delete-page').addEventListener('click', deletePage);
+      
+      // Zoom controls
+      document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.1));
+      document.getElementById('zoom-out').addEventListener('click', () => adjustZoom(-0.1));
+      
+      // Canvas events
+      canvas.addEventListener('pointerdown', handlePointerDown);
+      canvas.addEventListener('pointermove', handlePointerMove);
+      canvas.addEventListener('pointerup', handlePointerUp);
+      canvas.addEventListener('pointerleave', handlePointerUp);
+      
+      // Prevent default touch behaviors
+      canvas.addEventListener('touchstart', e => e.preventDefault());
+      canvas.addEventListener('touchmove', e => e.preventDefault());
+      canvas.addEventListener('touchend', e => e.preventDefault());
+    }
+    
+    // Set current tool
+    function setTool(tool) {
+      currentTool = tool;
+      
+      // Update UI
+      document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`${tool}-tool`).classList.add('active');
+      
+      // Set appropriate styles for the tool
+      switch (tool) {
+        case 'pen':
+          currentStyle = {
+            ...currentStyle,
+            penType: shared.PEN_TYPES.MARKER,
+            opacity: 1.0,
+            capStyle: shared.CAP_STYLES.ROUND,
+            joinStyle: shared.JOIN_STYLES.ROUND
+          };
+          break;
+        case 'highlighter':
+          currentStyle = {
+            ...currentStyle,
+            penType: shared.PEN_TYPES.HIGHLIGHTER,
+            opacity: 0.5,
+            capStyle: shared.CAP_STYLES.SQUARE,
+            joinStyle: shared.JOIN_STYLES.ROUND
+          };
+          break;
+      }
+      
+      // Update cursor
+      switch (tool) {
+        case 'pen':
+          canvas.style.cursor = 'crosshair';
+          break;
+        case 'highlighter':
+          canvas.style.cursor = 'crosshair';
+          break;
+        case 'eraser':
+          canvas.style.cursor = 'cell';
+          break;
+      }
+    }
+    
+    // Adjust zoom level
+    function adjustZoom(delta) {
+      zoomLevel = Math.max(0.5, Math.min(3, zoomLevel + delta));
+      zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+      applyZoom();
+      redrawCanvas();
+    }
+    
+    // Update page info display
+    function updatePageInfo() {
+      pageInfo.textContent = `Page ${pageNr} of ${totalPages}`;
+    }
+    
+    // Handle pointer down event
+    function handlePointerDown(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / zoomLevel;
+      const y = (event.clientY - rect.top) / zoomLevel;
+      const pressure = event.pressure !== undefined ? event.pressure : 1.0;
+      
+      if (currentTool === 'eraser') {
+        isErasing = true;
+        const eraseAction = createEraseAction(x, y, 20);
+        sendEraseAction(eraseAction);
+      } else {
+        isDrawing = true;
+        currentPath = [];
+        
+        const point = {
+          x: x,
+          y: y,
+          pressure: pressure,
+          timestamp: Date.now()
+        };
+        
+        currentPath.push(point);
+      }
+    }
+    
+    // Handle pointer move event
+    function handlePointerMove(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / zoomLevel;
+      const y = (event.clientY - rect.top) / zoomLevel;
+      const pressure = event.pressure !== undefined ? event.pressure : 1.0;
+      
+      if (currentTool === 'eraser' && isErasing) {
+        const eraseAction = createEraseAction(x, y, 20);
+        sendEraseAction(eraseAction);
+      } else if (isDrawing) {
+        const point = {
+          x: x,
+          y: y,
+          pressure: pressure,
+          timestamp: Date.now()
+        };
+        
+        currentPath.push(point);
+        drawStroke({
+          points: currentPath.slice(-2),
+          style: currentStyle
+        });
+      }
+    }
+    
+    // Handle pointer up event
+    function handlePointerUp() {
+      if (currentTool === 'eraser') {
+        isErasing = false;
+      } else if (isDrawing) {
+        isDrawing = false;
+        
+        if (currentPath.length >= 2) {
+          const stroke = {
+            points: currentPath,
+            style: currentStyle
+          };
+          
+          sendStroke(stroke);
+        }
+        
+        currentPath = [];
+      }
+    }
+    
+    // Create an erase action
+    function createEraseAction(x, y, radius) {
+      return {
+        type: shared.MOD_ACTIONS.ERASE.TYPE,
+        position: { x, y },
+        radius: radius
+      };
+    }
+    
+    // Send a stroke to the server
+    function sendStroke(stroke) {
+      const actionUuid = shared.generateUuid();
+      
+      const action = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.DRAW.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
+          type: shared.MOD_ACTIONS.DRAW.TYPE,
+          stroke: stroke
+        }
+      };
+      
+      // Calculate expected hash
+      const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
+      
+      // Add to optimistic updates
+      const optimisticAction = {
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
+        hashes: {
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
+        }
+      };
+      
+      optimisticUpdates.push(optimisticAction);
+      
+      // Send to server
+      ws.send(JSON.stringify(action));
+    }
+    
+    // Send an erase action to the server
+    function sendEraseAction(eraseAction) {
+      const actionUuid = shared.generateUuid();
+      
+      const action = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.ERASE.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: eraseAction
+      };
+      
+      // Calculate expected hash
+      const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
+      
+      // Add to optimistic updates
+      const optimisticAction = {
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
+        hashes: {
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
+        }
+      };
+      
+      optimisticUpdates.push(optimisticAction);
+      
+      // Send to server
+      ws.send(JSON.stringify(action));
+    }
+    
+    // Create a new page
+    function createNewPage(pageUuid) {
+      const action = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.CREATE_PAGE.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: pageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: shared.generateUuid(),
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: '',
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
+          type: shared.MOD_ACTIONS.CREATE_PAGE.TYPE
+        }
+      };
+      
+      // Send to server
+      ws.send(JSON.stringify(action));
+      
+      // Reset local state
+      verifiedModActions = [];
+      optimisticUpdates = [];
+      verifiedHash = '';
+    }
+    
+    // Add a new page
+    function addNewPage() {
+      const newPageId = shared.generateUuid();
+      createNewPage(newPageId);
+    }
+    
+    // Delete current page
+    function deletePage() {
+      if (totalPages <= 1) {
+        alert("Cannot delete the only page");
+        return;
+      }
+      
+      const action = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: shared.generateUuid(),
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
+          type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE
+        }
+      };
+      
+      // Send to server
+      ws.send(JSON.stringify(action));
+    }
+    
+    // Navigate to a specific page
+    function navigateToPage(pageNumber) {
+      if (pageNumber < 1 || pageNumber > totalPages) {
+        return;
+      }
+      
+      const pageRequestMessage = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_REQUEST.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_REQUEST.PAGE_NR]: pageNumber
+      };
+      
+      ws.send(JSON.stringify(pageRequestMessage));
+    }
+    
+    // Request replay from server
+    function requestReplay(pageUuid, beforeHash) {
+      const replayMessage = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: pageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: beforeHash,
+        [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid()
+      };
+      
+      ws.send(JSON.stringify(replayMessage));
+    }
+    
+    // Draw a stroke on the canvas
+    function drawStroke(stroke) {
+      if (!stroke || !stroke.points || stroke.points.length < 2) return;
+      
+      const style = stroke.style;
+      
+      ctx.save();
+      
+      // Apply style
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = style.width;
+      
+      if (style.penType === shared.PEN_TYPES.HIGHLIGHTER) {
+        ctx.globalAlpha = 0.5;
+        ctx.lineJoin = shared.JOIN_STYLES.ROUND;
+        ctx.lineCap = shared.CAP_STYLES.SQUARE;
+      } else {
+        ctx.globalAlpha = style.opacity;
+        ctx.lineJoin = style.joinStyle;
+        ctx.lineCap = style.capStyle;
+      }
+      
+      if (style.dashPattern && style.dashPattern.length > 1) {
+        ctx.setLineDash(style.dashPattern);
+      } else {
+        ctx.setLineDash([]);
+      }
+      
+      // Draw the stroke
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      
+      for (let i = 1; i < stroke.points.length; i++) {
+        const point = stroke.points[i];
+        
+        // Apply pressure sensitivity if available
+        if (style.pressureSensitivity > 0 && point.pressure !== undefined) {
+          const pressureEffect = 1 + (point.pressure - 1) * style.pressureSensitivity;
+          ctx.lineWidth = style.width * pressureEffect;
+        }
+        
+        ctx.lineTo(point.x, point.y);
+      }
+      
+      ctx.stroke();
+      ctx.restore();
+    }
+    
+    // Redraw the entire canvas
+    function redrawCanvas() {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      
+      // Extract strokes from actions
+      const allActions = [...verifiedModActions, ...optimisticUpdates];
+      
+      // Process all actions
+      for (const action of allActions) {
+        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
+          drawStroke(payload.stroke);
+        }
+        // Erase actions are applied server-side
+      }
+    }
+    
+    // Initialize the app
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
 </body>
 </html>
