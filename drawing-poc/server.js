@@ -4,7 +4,7 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 
-const { calculateHash, generateUuid, MESSAGES, MOD_ACTIONS } = require('./shared');
+const { calculateHash, calculateChainHash, generateUuid, MESSAGES, MOD_ACTIONS } = require('./shared');
 
 // Server state structures
 const boards = {};
@@ -14,10 +14,9 @@ let pingInterval;
 function getOrCreateBoard(boardId) {
   if (!boards[boardId]) {
     const initialPageId = generateUuid();
-    const initialHash = calculateHash([]);
     boards[boardId] = {
       pageOrder: [initialPageId],
-      pages: { [initialPageId]: { modActions: [], hashes: { before: initialHash, after: initialHash } } }
+      pages: { [initialPageId]: { modActions: [], currentHash: calculateHash([]), hashes: {} } }
     };
     console.log(`[SERVER] Created new board: ${boardId} with initial page: ${initialPageId}`);
   }
@@ -108,7 +107,7 @@ function sendFullPage(ws, boardId, pageId, requestId) {
   ws.pageId = finalPageId;
   
   const pageState = currentBoard.pages[finalPageId].modActions;
-  const pageHash = calculateHash(pageState.map(action => action.payload));
+  const pageHash = currentBoard.pages[finalPageId].currentHash;
   const pageNr = currentBoard.pageOrder.indexOf(finalPageId) + 1;
   const totalPages = currentBoard.pageOrder.length;
   
@@ -130,8 +129,7 @@ function sendPing() {
       const currentBoard = boards[client.boardId];
       if (!currentBoard) return;
       const pageId = client.pageId;
-      const pageState = currentBoard.pages[pageId].modActions.map(action => action.payload);
-      const pageHash = calculateHash(pageState);
+      const pageHash = currentBoard.pages[pageId].currentHash;
       const pageNr = currentBoard.pageOrder.indexOf(pageId) + 1;
       const totalPages = currentBoard.pageOrder.length;
       const message = {
@@ -204,8 +202,7 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
   }
   
   const currentPage = board.pages[pageUuid];
-  const pageState = currentPage.modActions.map(action => action.payload);
-  const serverHash = calculateHash(pageState);
+  const serverHash = currentPage.currentHash;
 
   if (beforeHash !== serverHash) {
     const declineMessage = {
@@ -217,26 +214,30 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
     logSentMessage(declineMessage.type, declineMessage, requestId);
     return;
   }
-
-  const newPageState = [...pageState, payload];
-  const afterHash = calculateHash(newPageState);
-
-  const modAction = {
+  
+  const canonicalAction = {
     [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
     [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: payload,
+  };
+  const afterHash = calculateChainHash(beforeHash, canonicalAction);
+  
+  const modAction = {
+    ...canonicalAction,
     hashes: {
       [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: beforeHash,
       [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
     }
   };
+
   currentPage.modActions.push(modAction);
+  currentPage.currentHash = afterHash;
   
   const acceptMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: beforeHash,
-    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: currentPage.currentHash,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
   };
@@ -257,8 +258,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
   }
   
   const currentPage = board.pages[pageUuid];
-  const pageState = currentPage.modActions.map(action => action.payload);
-  const serverHash = calculateHash(pageState);
+  const serverHash = currentPage.currentHash;
 
   if (beforeHash !== serverHash) {
     const declineMessage = {
@@ -276,14 +276,42 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
   
   currentPage.modActions = newModActions;
 
-  const afterHash = calculateHash(newModActions.map(action => action.payload));
-
+  // Recalculate hash chain after an erase operation
+  let newCurrentHash = calculateHash([]);
+  for (const action of currentPage.modActions) {
+    const canonicalAction = {
+      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID],
+      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
+    };
+    const newAfterHash = calculateChainHash(newCurrentHash, canonicalAction);
+    action.hashes = { [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: newCurrentHash, [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: newAfterHash };
+    newCurrentHash = newAfterHash;
+  }
+  
+  const canonicalAction = {
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: payload,
+  };
+  
+  const afterHash = calculateChainHash(newCurrentHash, canonicalAction);
+  
+  const modAction = {
+    ...canonicalAction,
+    hashes: {
+      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: newCurrentHash,
+      [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
+    }
+  };
+  
+  currentPage.modActions.push(modAction);
+  currentPage.currentHash = afterHash;
+  
   const acceptMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: beforeHash,
-    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: currentPage.currentHash,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
   };
@@ -298,7 +326,7 @@ modActionHandlers[MOD_ACTIONS.NEW_PAGE.TYPE] = (ws, data, requestId) => {
   const newPageId = generateUuid();
   const index = board.pageOrder.indexOf(pageUuid);
   board.pageOrder.splice(index + 1, 0, newPageId);
-  board.pages[newPageId] = { modActions: [], hashes: {} };
+  board.pages[newPageId] = { modActions: [], currentHash: calculateHash([]), hashes: {} };
   ws.pageId = newPageId;
   sendFullPage(ws, ws.boardId, newPageId, requestId);
 };
