@@ -110,7 +110,7 @@ function sendFullPage(ws, boardId, pageId, requestId) {
   const totalPages = currentBoard.pageOrder.length;
   
   const message = {
-    [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE]: MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE,
+    type: MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE]: finalPageId,
     [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.STATE]: pageState,
     [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]: pageHash,
@@ -124,11 +124,11 @@ function sendFullPage(ws, boardId, pageId, requestId) {
 function sendPing(boardId) {
     const currentBoard = boards[boardId];
     if (!currentBoard) return;
-    const pageId = currentBoard.pageOrder[0]; // Ping the first page for simplicity
+    const pageId = currentBoard.pageOrder[0];
     const pageState = currentBoard.pages[pageId].modActions.map(action => action.payload);
     const pageHash = calculateHash(pageState);
     const message = {
-        [MESSAGES.SERVER_TO_CLIENT.PING.TYPE]: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
+        type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
         [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID]: pageId,
         [MESSAGES.SERVER_TO_CLIENT.PING.HASH]: pageHash,
         [MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_PAGE_NR]: 1,
@@ -199,7 +199,7 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
 
   if (beforeHash !== serverHash) {
     const declineMessage = {
-      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE]: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
     };
@@ -222,7 +222,7 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
   currentPage.modActions.push(modAction);
   
   const acceptMessage = {
-    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE]: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
+    type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: beforeHash,
@@ -252,7 +252,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
 
   if (beforeHash !== serverHash) {
     const declineMessage = {
-      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE]: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
     };
@@ -269,7 +269,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
   const afterHash = calculateHash(newModActions.map(action => action.payload));
 
   const acceptMessage = {
-    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE]: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
+    type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: beforeHash,
@@ -299,7 +299,7 @@ modActionHandlers[MOD_ACTIONS.DELETE_PAGE.TYPE] = (ws, data, requestId) => {
   const board = boards[ws.boardId];
   if (board.pageOrder.length <= 1) {
     const declineMessage = {
-      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE]: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid
     };
@@ -345,7 +345,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
   const afterHash = calculateHash(replayActions.map(a => a.payload));
   
   const replayMessage = {
-    [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE]: MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE,
+    type: MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.BEFORE_HASH]: beforeHash,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH]: afterHash,

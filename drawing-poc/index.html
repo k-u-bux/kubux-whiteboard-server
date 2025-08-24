@@ -72,7 +72,16 @@
     let pageNr = 0;
     let totalPages = 0;
     
+    function logEvent(message, data) {
+      console.log(`[EVENT] ${message}`, data);
+    }
+    
+    function logMessage(direction, type, data) {
+      console.log(`[MESSAGE ${direction}] Type: ${type}, Data:`, data);
+    }
+
     function setControlsEnabled(enabled) {
+      logEvent('Setting controls enabled state', enabled);
       canvas.style.pointerEvents = enabled ? 'auto' : 'none';
       penTool.disabled = !enabled;
       eraserTool.disabled = !enabled;
@@ -96,6 +105,7 @@
     }
     
     function renderCanvas() {
+      logEvent('Rendering canvas');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const allActions = [...verifiedModActions, ...optimisticUpdates];
       allActions.forEach(action => {
@@ -107,6 +117,7 @@
     }
     
     function updateUI() {
+        logEvent('Updating UI with new page information');
         pageInfo.textContent = `page ${pageNr} of ${totalPages}`;
         prevPageBtn.disabled = pageNr <= 1;
         nextPageBtn.disabled = pageNr >= totalPages;
@@ -152,6 +163,7 @@
 
     function sendModActionProposal(type, payload) {
       if (!isInitialized) return;
+      logEvent(`Sending mod action proposal for type: ${type}`);
       const actionUuid = shared.generateUuid();
       
       const combinedActions = [...verifiedModActions.map(a => a.payload), ...optimisticUpdates.map(a => a.payload)];
@@ -169,36 +181,46 @@
         const erasedActionUuid = payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID];
         const verifiedAction = verifiedModActions.find(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === erasedActionUuid);
         if (verifiedAction) {
+          logEvent('Optimistically removing verified action from client state.');
           verifiedModActions = verifiedModActions.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== erasedActionUuid);
         } else {
+          logEvent('Optimistically removing optimistic action from client state.');
           optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== erasedActionUuid);
         }
       }
       
       renderCanvas();
 
-      try {
-        ws.send(JSON.stringify({
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+      const message = {
+          type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
           [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageId,
-          ...proposal
-        }));
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: proposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID],
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: proposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: proposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH],
+      };
+      
+      try {
+        ws.send(JSON.stringify(message));
+        logMessage('CLIENT -> SERVER', message.type, message);
       } catch (e) {
           console.error('Failed to send message to server:', e);
       }
     }
 
     penTool.addEventListener('click', () => {
+      logEvent('Pen tool clicked.');
       tool = shared.MOD_ACTIONS.DRAW.TYPE;
       canvas.style.cursor = 'crosshair';
     });
     eraserTool.addEventListener('click', () => {
+      logEvent('Eraser tool clicked.');
       tool = shared.MOD_ACTIONS.ERASE.TYPE;
       canvas.style.cursor = 'cell';
     });
 
     canvas.addEventListener('mousedown', e => {
       if (!isInitialized) return;
+      logEvent('Mouse down on canvas');
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -230,6 +252,7 @@
     
     window.addEventListener('mouseup', () => {
       if (!isInitialized) return;
+      logEvent('Mouse up event.');
       if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
         if (currentStrokePoints.length > 1) {
           sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { points: currentStrokePoints });
@@ -241,6 +264,7 @@
 
     canvas.addEventListener('mouseleave', () => {
         if (!isInitialized) return;
+        logEvent('Mouse left canvas.');
         if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
             if (currentStrokePoints.length > 1) {
                 sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { points: currentStrokePoints });
@@ -252,46 +276,55 @@
 
     prevPageBtn.addEventListener('click', () => {
         if (!isInitialized) return;
+        logEvent('Previous page button clicked.');
+        const message = { 
+            type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
+            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: -1, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
+        };
         try {
-            ws.send(JSON.stringify({ 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: -1, 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-            }));
+            ws.send(JSON.stringify(message));
+            logMessage('CLIENT -> SERVER', message.type, message);
         } catch (e) {
             console.error('Failed to send previous page request:', e);
         }
     });
     nextPageBtn.addEventListener('click', () => {
         if (!isInitialized) return;
+        logEvent('Next page button clicked.');
+        const message = { 
+            type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
+            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: 1, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
+        };
         try {
-            ws.send(JSON.stringify({ 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: 1, 
-                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-            }));
+            ws.send(JSON.stringify(message));
+            logMessage('CLIENT -> SERVER', message.type, message);
         } catch (e) {
             console.error('Failed to send next page request:', e);
         }
     });
     deletePageBtn.addEventListener('click', () => {
         if (!isInitialized) return;
+        logEvent('Delete page button clicked.');
         sendModActionProposal(shared.MOD_ACTIONS.DELETE_PAGE.TYPE, {});
     });
     insertPageBtn.addEventListener('click', () => {
         if (!isInitialized) return;
+        logEvent('Insert page button clicked.');
         sendModActionProposal(shared.MOD_ACTIONS.NEW_PAGE.TYPE, {});
     });
 
     ws.onmessage = event => {
       const data = JSON.parse(event.data);
-      console.log('Received message:', data.type, data);
+      logMessage('SERVER -> CLIENT', data.type, data);
       
       if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE) {
+        logEvent('Received a FULL_PAGE message. Initializing/re-syncing state.');
         verifiedModActions = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.STATE];
         optimisticUpdates = [];
         currentPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
@@ -302,39 +335,52 @@
         setControlsEnabled(true);
         renderCanvas();
       } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE) {
+        logEvent('Received an ACCEPT_MESSAGE. Processing update.');
         const acceptedAction = optimisticUpdates.find(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]);
         if (acceptedAction) {
+          logEvent('Found accepted action in optimistic updates. Moving to verified.');
           verifiedModActions.push(acceptedAction);
           optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]);
           verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
           renderCanvas();
         } else if (data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH] !== verifiedHash) {
-          ws.send(JSON.stringify({ 
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
+          logEvent('Hash mismatch detected after receiving accept message. Requesting replay.');
+          const replayMessage = { 
+              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageId, 
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-          }));
+          };
+          ws.send(JSON.stringify(replayMessage));
+          logMessage('CLIENT -> SERVER', replayMessage.type, replayMessage);
         } else {
+          logEvent('Accepted message matches current state. Updating verified hash.');
           verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
         }
         pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR];
         totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES];
         updateUI();
       } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE) {
+        logEvent('Received a DECLINE_MESSAGE. Re-syncing and requesting replay.');
         optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]);
-        ws.send(JSON.stringify({ 
-            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
+        const replayMessage = { 
+            type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
             [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageId, 
             [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
             [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid() 
-        }));
+        };
+        ws.send(JSON.stringify(replayMessage));
+        logMessage('CLIENT -> SERVER', replayMessage.type, replayMessage);
       } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE) {
-        console.log('Replaying missing actions...');
+        logEvent('Received a REPLAY_MESSAGE. Replaying missing actions.');
         
-        verifiedModActions = [...verifiedModActions, ...data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE]];
-        data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE].forEach(action => {
-            optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]);
+        const replayActions = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE];
+        const lastAction = replayActions[replayActions.length - 1];
+
+        verifiedModActions = [...verifiedModActions, ...replayActions];
+        
+        optimisticUpdates = optimisticUpdates.filter(o => {
+            return !replayActions.some(r => r[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === o[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]);
         });
 
         verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH];
@@ -342,14 +388,17 @@
         totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES];
         renderCanvas();
       } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE) {
+        logEvent('Received a PING message.');
         if (verifiedHash !== data.hash) {
-            console.warn(`Ping received, hash mismatch. Requesting replay...`);
-            ws.send(JSON.stringify({ 
-                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+            logEvent(`Ping received, hash mismatch. Requesting replay...`);
+            const replayMessage = { 
+                type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
                 [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID], 
                 [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
                 [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid()
-            }));
+            };
+            ws.send(JSON.stringify(replayMessage));
+            logMessage('CLIENT -> SERVER', replayMessage.type, replayMessage);
         }
       }
     };
