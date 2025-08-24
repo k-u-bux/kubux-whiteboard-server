@@ -171,6 +171,7 @@
     // Tool state
     let currentTool = 'pen';
     let isErasing = false;
+    let eraserRadius = 20;
     
     // DOM elements
     const canvas = document.getElementById('canvas');
@@ -186,6 +187,11 @@
       setupCanvas();
       setupWebSocket();
       setupEventListeners();
+      
+      // Debug logging
+      window.debugLog = function(msg, data) {
+        console.log(`[DEBUG] ${msg}`, data || '');
+      };
     }
     
     // Set up canvas size
@@ -221,14 +227,14 @@
       ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
-        console.log('Connected to server');
+        debugLog('Connected to server');
         // Create initial page
         currentPageUuid = shared.generateUuid();
         createNewPage(currentPageUuid);
       };
       
       ws.onclose = () => {
-        console.log('Disconnected from server');
+        debugLog('Disconnected from server');
       };
       
       ws.onerror = (error) => {
@@ -237,7 +243,7 @@
       
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        console.log('Received message:', data);
+        debugLog('Received message:', data);
         
         switch (data.type) {
           case shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE:
@@ -363,8 +369,8 @@
       // Page navigation
       document.getElementById('prev-page').addEventListener('click', () => navigateToPage(pageNr - 1));
       document.getElementById('next-page').addEventListener('click', () => navigateToPage(pageNr + 1));
-      document.getElementById('add-page').addEventListener('click', addNewPage);
-      document.getElementById('delete-page').addEventListener('click', deletePage);
+      document.getElementById('add-page').addEventListener('click', () => addNewPage());
+      document.getElementById('delete-page').addEventListener('click', () => deletePage());
       
       // Zoom controls
       document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.1));
@@ -448,7 +454,7 @@
       
       if (currentTool === 'eraser') {
         isErasing = true;
-        const eraseAction = createEraseAction(x, y, 20);
+        const eraseAction = createEraseAction(x, y);
         sendEraseAction(eraseAction);
       } else {
         isDrawing = true;
@@ -473,7 +479,7 @@
       const pressure = event.pressure !== undefined ? event.pressure : 1.0;
       
       if (currentTool === 'eraser' && isErasing) {
-        const eraseAction = createEraseAction(x, y, 20);
+        const eraseAction = createEraseAction(x, y);
         sendEraseAction(eraseAction);
       } else if (isDrawing) {
         const point = {
@@ -512,11 +518,11 @@
     }
     
     // Create an erase action
-    function createEraseAction(x, y, radius) {
+    function createEraseAction(x, y) {
       return {
         type: shared.MOD_ACTIONS.ERASE.TYPE,
         position: { x, y },
-        radius: radius
+        radius: eraserRadius
       };
     }
     
@@ -601,6 +607,7 @@
       };
       
       // Send to server
+      debugLog('Sending create page action', action);
       ws.send(JSON.stringify(action));
       
       // Reset local state
@@ -611,8 +618,22 @@
     
     // Add a new page
     function addNewPage() {
-      const newPageId = shared.generateUuid();
-      createNewPage(newPageId);
+      // Create an ADD_PAGE action instead of CREATE_PAGE
+      const actionUuid = shared.generateUuid();
+      
+      const action = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.ADD_PAGE.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid, // Use current page as reference
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
+          type: shared.MOD_ACTIONS.ADD_PAGE.TYPE
+        }
+      };
+      
+      debugLog('Sending add page action', action);
+      ws.send(JSON.stringify(action));
     }
     
     // Delete current page
@@ -622,11 +643,13 @@
         return;
       }
       
+      const actionUuid = shared.generateUuid();
+      
       const action = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: shared.generateUuid(),
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
           type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE
@@ -634,6 +657,7 @@
       };
       
       // Send to server
+      debugLog('Sending delete page action', action);
       ws.send(JSON.stringify(action));
     }
     
@@ -648,6 +672,7 @@
         [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_REQUEST.PAGE_NR]: pageNumber
       };
       
+      debugLog('Sending page request', pageRequestMessage);
       ws.send(JSON.stringify(pageRequestMessage));
     }
     
@@ -723,6 +748,8 @@
       
       // Process all actions
       for (const action of allActions) {
+        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
+        
         const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
         if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
           drawStroke(payload.stroke);
