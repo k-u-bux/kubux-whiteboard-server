@@ -232,6 +232,7 @@
         totalPages = data.totalPages;
         renderCanvas();
       } else if (data.type === 'accept-message') {
+        currentHash = data['after-hash'];
         console.log(`Action ${data['action-uuid']} accepted. Before Hash: ${data['before-hash']}, After Hash: ${data['after-hash']}.`);
       } else if (data.type === 'decline-message') {
         console.warn(`Action ${data['action-uuid']} was declined. Re-syncing...`);
@@ -247,6 +248,7 @@
           }
         });
         currentPageId = data['page-uuid'];
+        currentHash = data['sequence of mod-actions'][data['sequence of mod-actions'].length - 1].hashes.after;
         pageNr = data['current page-nr in its board'];
         totalPages = data['current #pages of the board'];
         renderCanvas();
