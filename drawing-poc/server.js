@@ -104,6 +104,9 @@ function sendFullPage(ws, boardId, pageId, requestId) {
       return;
   }
   
+  ws.boardId = boardId;
+  ws.pageId = finalPageId;
+  
   const pageState = currentBoard.pages[finalPageId].modActions.map(action => action.payload);
   const pageHash = calculateHash(pageState);
   const pageNr = currentBoard.pageOrder.indexOf(finalPageId) + 1;
@@ -121,21 +124,27 @@ function sendFullPage(ws, boardId, pageId, requestId) {
   logSentMessage(message.type, message, requestId);
 }
 
-function sendPing(boardId) {
-    const currentBoard = boards[boardId];
-    if (!currentBoard) return;
-    const pageId = currentBoard.pageOrder[0];
-    const pageState = currentBoard.pages[pageId].modActions.map(action => action.payload);
-    const pageHash = calculateHash(pageState);
-    const message = {
+function sendPing() {
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN && client.boardId && client.pageId) {
+      const currentBoard = boards[client.boardId];
+      if (!currentBoard) return;
+      const pageId = client.pageId;
+      const pageState = currentBoard.pages[pageId].modActions.map(action => action.payload);
+      const pageHash = calculateHash(pageState);
+      const pageNr = currentBoard.pageOrder.indexOf(pageId) + 1;
+      const totalPages = currentBoard.pageOrder.length;
+      const message = {
         type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
         [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID]: pageId,
         [MESSAGES.SERVER_TO_CLIENT.PING.HASH]: pageHash,
-        [MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_PAGE_NR]: 1,
-        [MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_TOTAL_PAGES]: currentBoard.pageOrder.length
-    };
-    broadcastMessageToBoard(message, boardId);
-    logSentMessage(message.type, message, 'N/A');
+        [MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_PAGE_NR]: pageNr,
+        [MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_TOTAL_PAGES]: totalPages
+      };
+      client.send(JSON.stringify(message));
+      logSentMessage(message.type, message, 'N/A');
+    }
+  });
 }
 
 const messageHandlers = {};
@@ -330,7 +339,10 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
   const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH];
   const board = boards[ws.boardId];
   const page = board.pages[pageUuid];
-  if (!page) return;
+  if (!page) {
+    sendFullPage(ws, ws.boardId, ws.pageId, requestId);
+    return;
+  }
   
   const replayActions = [];
   let found = false;
@@ -372,11 +384,7 @@ wss.on('connection', (ws, req) => {
   
   if (!pingInterval) {
     pingInterval = setInterval(() => {
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                sendPing(client.boardId);
-            }
-        });
+        sendPing();
     }, 5000);
   }
 

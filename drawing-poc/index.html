@@ -389,7 +389,18 @@
         renderCanvas();
       } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE) {
         logEvent('Received a PING message.');
-        if (verifiedHash !== data.hash) {
+        if (data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID] !== currentPageId) {
+            logEvent(`Ping received for a different page. Requesting full page.`);
+            const fullPageRequest = { 
+                type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: 0, 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
+            };
+            ws.send(JSON.stringify(fullPageRequest));
+            logMessage('CLIENT -> SERVER', fullPageRequest.type, fullPageRequest);
+        } else if (verifiedHash !== data.hash) {
             logEvent(`Ping received, hash mismatch. Requesting replay...`);
             const replayMessage = { 
                 type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
