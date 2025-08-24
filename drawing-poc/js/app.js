@@ -214,25 +214,100 @@ const App = {
   },
   
   renderCanvas: function() {
-    // Extract strokes from mod actions
+    // First collect all draw actions to get strokes
     const strokes = [];
+    const allActions = [...this.verifiedModActions, ...this.optimisticUpdates];
     
-    // Process verified actions
-    for (const action of this.verifiedModActions) {
-      if (action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].type === shared.MOD_ACTIONS.DRAW.TYPE) {
-        strokes.push(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].stroke);
-      }
-    }
-    
-    // Process optimistic updates
-    for (const action of this.optimisticUpdates) {
-      if (action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].type === shared.MOD_ACTIONS.DRAW.TYPE) {
-        strokes.push(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].stroke);
+    // Process actions in order
+    for (const action of allActions) {
+      const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+      if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
+        strokes.push(payload.stroke);
+      } else if (payload.type === shared.MOD_ACTIONS.ERASE.TYPE) {
+        // We'll handle erase logic in the drawing manager
+        // For now we're not removing strokes, just passing the erase action
+        strokes.push({
+          isErase: true,
+          position: payload.position,
+          radius: payload.radius
+        });
       }
     }
     
     // Render all strokes
     this.drawingManager.renderStrokes(strokes);
+  }
+
+  sendEraseAction: function(eraseAction) {
+    const actionUuid = Utils.generateUuid();
+    
+    const action = {
+      type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.ERASE.TYPE,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: this.currentPageId,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: this.verifiedHash,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: eraseAction
+    };
+    
+    // Calculate what we think the hash will be
+    const nextHash = shared.hashNext(this.verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
+    
+    // Add action to optimistic updates
+    const optimisticAction = {
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
+      hashes: {
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: this.verifiedHash,
+        [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
+      }
+    };
+    
+    this.optimisticUpdates.push(optimisticAction);
+    this.renderCanvas();
+    
+    // Send to server
+    this.networkManager.sendModAction(action);
+  },
+  
+  addNewPage: function() {
+    const newPageId = Utils.generateUuid();
+    this.createNewPage(newPageId);
+  },
+  
+  deletePage: function() {
+    if (this.totalPages <= 1) {
+      alert("Cannot delete the only page");
+      return;
+    }
+    
+    const action = {
+      type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: this.currentPageId,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: Utils.generateUuid(),
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: this.verifiedHash,
+      [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
+        type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE
+      }
+    };
+    
+    // Send to server
+    this.networkManager.sendModAction(action);
+  },
+  
+  navigateToPage: function(pageNumber) {
+    if (pageNumber < 1 || pageNumber > this.totalPages) {
+      return;
+    }
+    
+    // Request the page from server
+    const pageRequestMessage = {
+      type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_REQUEST.TYPE,
+      [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_REQUEST.PAGE_NR]: pageNumber
+    };
+    
+    this.networkManager.ws.send(JSON.stringify(pageRequestMessage));
   }
 };
 

@@ -177,3 +177,11 @@ canvas {
 .zoom-slider {
   width: 100px;
 }
+
+.page-navigation {
+  display: flex;
+  gap: var(--small-gap);
+  border-right: 1px solid var(--toolbar-border);
+  padding-right: var(--medium-gap);
+  margin-right: var(--medium-gap);
+}

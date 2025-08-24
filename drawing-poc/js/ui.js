@@ -50,6 +50,23 @@ class UIManager {
       this.setZoom(zoomValue);
     });
     
+    // Page navigation
+    document.getElementById('prev-page').addEventListener('click', () => {
+      App.navigateToPage(App.pageNr - 1);
+    });
+    
+    document.getElementById('next-page').addEventListener('click', () => {
+      App.navigateToPage(App.pageNr + 1);
+    });
+    
+    document.getElementById('add-page').addEventListener('click', () => {
+      App.addNewPage();
+    });
+    
+    document.getElementById('delete-page').addEventListener('click', () => {
+      App.deletePage();
+    });
+
     // Canvas events
     this.canvas.addEventListener('pointerdown', this.handlePointerDown.bind(this));
     this.canvas.addEventListener('pointermove', this.handlePointerMove.bind(this));
@@ -134,42 +151,55 @@ class UIManager {
   }
   
   handlePointerDown(event) {
-    if (this.currentTool === 'eraser') {
-      // Eraser functionality will be implemented in Phase 2
-      return;
-    }
-    
     const rect = this.canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     const pressure = event.pressure !== undefined ? event.pressure : 1.0;
     const tilt = { x: event.tiltX || 0, y: event.tiltY || 0 };
     
-    this.drawingManager.startDrawing(x, y, pressure, tilt);
+    if (this.currentTool === 'eraser') {
+      // For eraser, we'll send erase actions on pointer move
+      this.isErasing = true;
+      this.lastEraseX = x;
+      this.lastEraseY = y;
+    } else {
+      this.drawingManager.startDrawing(x, y, pressure, tilt);
+    }
   }
   
   handlePointerMove(event) {
-    if (this.currentTool === 'eraser' || !this.drawingManager.isDrawing) {
-      return;
-    }
-    
     const rect = this.canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     const pressure = event.pressure !== undefined ? event.pressure : 1.0;
     const tilt = { x: event.tiltX || 0, y: event.tiltY || 0 };
     
-    this.drawingManager.continueDrawing(x, y, pressure, tilt);
+    if (this.currentTool === 'eraser' && this.isErasing) {
+      // Don't send erase actions for every pixel to avoid flooding
+      const dx = x - this.lastEraseX;
+      const dy = y - this.lastEraseY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Only send erase action if we've moved enough
+      if (distance > 10) {
+        const eraseAction = this.drawingManager.eraseStrokeAt(x, y, 20); // 20px erase radius
+        App.sendEraseAction(eraseAction);
+        this.lastEraseX = x;
+        this.lastEraseY = y;
+      }
+    } else if (this.drawingManager.isDrawing) {
+      this.drawingManager.continueDrawing(x, y, pressure, tilt);
+    }
   }
   
   handlePointerUp(event) {
-    if (this.currentTool === 'eraser' || !this.drawingManager.isDrawing) {
-      return;
-    }
-    
-    const stroke = this.drawingManager.finishDrawing();
-    if (stroke && stroke.points.length >= 2) {
-      App.sendStroke(stroke);
+    if (this.currentTool === 'eraser') {
+      this.isErasing = false;
+    } else if (this.drawingManager.isDrawing) {
+      const stroke = this.drawingManager.finishDrawing();
+      if (stroke && stroke.points.length >= 2) {
+        App.sendStroke(stroke);
+      }
     }
   }
   

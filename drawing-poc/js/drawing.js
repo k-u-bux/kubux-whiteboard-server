@@ -175,6 +175,20 @@ class DrawingManager {
     this.drawStrokePart(stroke.points, stroke.style);
   }
   
+  eraseStrokeAt(x, y, radius) {
+    // Convert coordinates to canvas space accounting for zoom
+    x = x / this.zoomLevel;
+    y = y / this.zoomLevel;
+    radius = radius / this.zoomLevel;
+    
+    // Create erase action
+    return {
+      type: shared.MOD_ACTIONS.ERASE.TYPE,
+      position: { x, y },
+      radius: radius
+    };
+  }
+
   clearCanvas() {
     this.ctx.save();
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -183,24 +197,26 @@ class DrawingManager {
   }
   
   renderStrokes(strokes) {
-    this.clearCanvas();
-    
-    // Group strokes by layer
-    const strokesByLayer = {};
-    for (const stroke of strokes) {
-      const layer = stroke.style.layer || 0;
-      if (!strokesByLayer[layer]) {
-        strokesByLayer[layer] = [];
-      }
-      strokesByLayer[layer].push(stroke);
-    }
-    
-    // Draw strokes in layer order (lower layers first)
-    const layers = Object.keys(strokesByLayer).sort((a, b) => a - b);
-    for (const layer of layers) {
-      for (const stroke of strokesByLayer[layer]) {
-        this.drawStroke(stroke);
-      }
-    }
+   this.clearCanvas();
+   
+   // Filter out erase actions for now
+   const drawStrokes = strokes.filter(stroke => !stroke.isErase);
+   
+   // Group strokes by layer
+   const strokesByLayer = {};
+   for (const stroke of drawStrokes) {
+     const layer = stroke.style?.layer || 0;
+     if (!strokesByLayer[layer]) {
+       strokesByLayer[layer] = [];
+     }
+     strokesByLayer[layer].push(stroke);
+   }
+   
+   // Draw strokes in layer order (lower layers first)
+   const layers = Object.keys(strokesByLayer).sort((a, b) => a - b);
+   for (const layer of layers) {
+     for (const stroke of strokesByLayer[layer]) {
+       this.drawStroke(stroke);
+     }
   }
 }
