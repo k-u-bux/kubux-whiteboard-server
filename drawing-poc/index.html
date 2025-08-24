@@ -44,8 +44,8 @@
     <button id="delete-page">Delete Page</button>
     <button id="insert-page">Insert Page</button>
   </div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuid.min.js"></script>
+  
+  <script src="./shared.js"></script>
   <script>
     const canvas = document.getElementById('whiteboard');
     const ctx = canvas.getContext('2d');
@@ -62,24 +62,26 @@
 
     let isDrawing = false;
     let currentStrokePoints = [];
-    let tool = 'pen';
+    let tool = shared.MOD_ACTIONS.DRAW.TYPE;
+    let isInitialized = false;
     
-    let localModActions = new Map();
+    let verifiedModActions = [];
+    let optimisticUpdates = [];
     let currentPageId = '';
-    let currentHash = '';
+    let verifiedHash = '';
     let pageNr = 0;
     let totalPages = 0;
     
-    function calculateHash(state) {
-      const data = JSON.stringify(state);
-      let hash = 0;
-      for (let i = 0; i < data.length; i++) {
-        const char = data.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash |= 0;
-      }
-      return hash.toString();
+    function setControlsEnabled(enabled) {
+      canvas.style.pointerEvents = enabled ? 'auto' : 'none';
+      penTool.disabled = !enabled;
+      eraserTool.disabled = !enabled;
+      prevPageBtn.disabled = !enabled || pageNr <= 1;
+      nextPageBtn.disabled = !enabled || pageNr >= totalPages;
+      deletePageBtn.disabled = !enabled || totalPages <= 1;
+      insertPageBtn.disabled = !enabled;
     }
+    setControlsEnabled(false);
 
     function drawStroke(stroke) {
       if (stroke.points.length > 1) {
@@ -95,8 +97,9 @@
     
     function renderCanvas() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      localModActions.forEach(action => {
-        if (action.type === 'draw') {
+      const allActions = [...verifiedModActions, ...optimisticUpdates];
+      allActions.forEach(action => {
+        if (action.payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
           drawStroke(action.payload);
         }
       });
@@ -111,9 +114,9 @@
     }
 
     function findStrokeAt(x, y) {
-      const allStrokes = Array.from(localModActions.values());
+      const allStrokes = [...verifiedModActions, ...optimisticUpdates];
       for (const action of allStrokes) {
-        if (action.type === 'draw') {
+        if (action.payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
           const points = action.payload.points;
           for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i];
@@ -148,50 +151,74 @@
     }
 
     function sendModActionProposal(type, payload) {
-      const actionUuid = uuid.v4();
+      if (!isInitialized) return;
+      const actionUuid = shared.generateUuid();
+      
+      const combinedActions = [...verifiedModActions.map(a => a.payload), ...optimisticUpdates.map(a => a.payload)];
+      const beforeHash = shared.calculateHash(combinedActions);
+      
       const proposal = {
-        'action-uuid': actionUuid,
-        payload: { type: type, ...payload },
-        'before-hash': currentHash
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: { type: type, ...payload },
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: beforeHash
       };
       
-      ws.send(JSON.stringify({
-        type: 'mod-action-proposals',
-        'pageUuid': currentPageId,
-        'action-uuid': actionUuid,
-        ...proposal
-      }));
+      if (type === shared.MOD_ACTIONS.DRAW.TYPE) {
+        optimisticUpdates.push(proposal);
+      } else if (type === shared.MOD_ACTIONS.ERASE.TYPE) {
+        const erasedActionUuid = payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID];
+        const verifiedAction = verifiedModActions.find(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === erasedActionUuid);
+        if (verifiedAction) {
+          verifiedModActions = verifiedModActions.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== erasedActionUuid);
+        } else {
+          optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== erasedActionUuid);
+        }
+      }
+      
+      renderCanvas();
+
+      try {
+        ws.send(JSON.stringify({
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageId,
+          ...proposal
+        }));
+      } catch (e) {
+          console.error('Failed to send message to server:', e);
+      }
     }
 
     penTool.addEventListener('click', () => {
-      tool = 'pen';
+      tool = shared.MOD_ACTIONS.DRAW.TYPE;
       canvas.style.cursor = 'crosshair';
     });
     eraserTool.addEventListener('click', () => {
-      tool = 'eraser';
+      tool = shared.MOD_ACTIONS.ERASE.TYPE;
       canvas.style.cursor = 'cell';
     });
 
     canvas.addEventListener('mousedown', e => {
+      if (!isInitialized) return;
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      if (tool === 'pen') {
+      if (tool === shared.MOD_ACTIONS.DRAW.TYPE) {
         isDrawing = true;
         currentStrokePoints.push({ x, y });
         ctx.beginPath();
         ctx.moveTo(x, y);
-      } else if (tool === 'eraser') {
+      } else if (tool === shared.MOD_ACTIONS.ERASE.TYPE) {
         const erasedAction = findStrokeAt(x, y);
         if (erasedAction) {
-          sendModActionProposal('erase', { actionUuid: erasedAction['action-uuid'] });
+          sendModActionProposal(shared.MOD_ACTIONS.ERASE.TYPE, { [shared.MOD_ACTIONS.ERASE.ACTION_UUID]: erasedAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] });
         }
       }
     });
 
     canvas.addEventListener('mousemove', e => {
-      if (tool === 'pen' && isDrawing) {
+      if (!isInitialized) return;
+      if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -200,58 +227,130 @@
         ctx.stroke();
       }
     });
-
-    canvas.addEventListener('mouseup', () => {
-      if (tool === 'pen' && isDrawing) {
+    
+    window.addEventListener('mouseup', () => {
+      if (!isInitialized) return;
+      if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
         if (currentStrokePoints.length > 1) {
-          sendModActionProposal('draw', { points: currentStrokePoints });
+          sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { points: currentStrokePoints });
         }
         currentStrokePoints = [];
-        ctx.beginPath();
       }
       isDrawing = false;
     });
 
+    canvas.addEventListener('mouseleave', () => {
+        if (!isInitialized) return;
+        if (tool === shared.MOD_ACTIONS.DRAW.TYPE && isDrawing) {
+            if (currentStrokePoints.length > 1) {
+                sendModActionProposal(shared.MOD_ACTIONS.DRAW.TYPE, { points: currentStrokePoints });
+            }
+            currentStrokePoints = [];
+            isDrawing = false;
+        }
+    });
+
     prevPageBtn.addEventListener('click', () => {
-        ws.send(JSON.stringify({ type: 'fullPage-requests', 'board-uuid': '1', 'page-uuid': currentPageId, 'Delta': -1, requestId: uuid.v4() }));
+        if (!isInitialized) return;
+        try {
+            ws.send(JSON.stringify({ 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: -1, 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
+            }));
+        } catch (e) {
+            console.error('Failed to send previous page request:', e);
+        }
     });
     nextPageBtn.addEventListener('click', () => {
-        ws.send(JSON.stringify({ type: 'fullPage-requests', 'board-uuid': '1', 'page-uuid': currentPageId, 'Delta': 1, requestId: uuid.v4() }));
+        if (!isInitialized) return;
+        try {
+            ws.send(JSON.stringify({ 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: '1', 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageId, 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: 1, 
+                [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid() 
+            }));
+        } catch (e) {
+            console.error('Failed to send next page request:', e);
+        }
     });
-    deletePageBtn.addEventListener('click', () => sendModActionProposal('delete page', {}));
-    insertPageBtn.addEventListener('click', () => sendModActionProposal('new page', {}));
+    deletePageBtn.addEventListener('click', () => {
+        if (!isInitialized) return;
+        sendModActionProposal(shared.MOD_ACTIONS.DELETE_PAGE.TYPE, {});
+    });
+    insertPageBtn.addEventListener('click', () => {
+        if (!isInitialized) return;
+        sendModActionProposal(shared.MOD_ACTIONS.NEW_PAGE.TYPE, {});
+    });
 
     ws.onmessage = event => {
       const data = JSON.parse(event.data);
-      if (data.type === 'fullPage') {
-        localModActions.clear();
-        data.state.forEach(stroke => localModActions.set(uuid.v4(), { type: 'draw', payload: stroke }));
-        currentPageId = data.page;
-        currentHash = data.hash;
-        pageNr = data.pageNr;
-        totalPages = data.totalPages;
+      console.log('Received message:', data.type, data);
+      
+      if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE) {
+        verifiedModActions = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.STATE];
+        optimisticUpdates = [];
+        currentPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
+        verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH];
+        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
+        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
+        isInitialized = true;
+        setControlsEnabled(true);
         renderCanvas();
-      } else if (data.type === 'accept-message') {
-        currentHash = data['after-hash'];
-        console.log(`Action ${data['action-uuid']} accepted. Before Hash: ${data['before-hash']}, After Hash: ${data['after-hash']}.`);
-      } else if (data.type === 'decline-message') {
-        console.warn(`Action ${data['action-uuid']} was declined. Re-syncing...`);
-        ws.send(JSON.stringify({ type: 'replay-requests', 'page-uuid': currentPageId, 'before-hash': currentHash, requestId: uuid.v4() }));
-      } else if (data.type === 'replay-message') {
+      } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE) {
+        const acceptedAction = optimisticUpdates.find(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]);
+        if (acceptedAction) {
+          verifiedModActions.push(acceptedAction);
+          optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]);
+          verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
+          renderCanvas();
+        } else if (data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH] !== verifiedHash) {
+          ws.send(JSON.stringify({ 
+              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
+              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageId, 
+              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
+              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid() 
+          }));
+        } else {
+          verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
+        }
+        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR];
+        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES];
+        updateUI();
+      } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE) {
+        optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]);
+        ws.send(JSON.stringify({ 
+            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageId, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
+            [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid() 
+        }));
+      } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE) {
         console.log('Replaying missing actions...');
-        localModActions.clear();
-        data['sequence of mod-actions'].forEach(action => {
-          if (action.payload.type === 'draw') {
-            localModActions.set(action['action-uuid'], action);
-          } else if (action.payload.type === 'erase') {
-            localModActions.delete(action.payload.actionUuid);
-          }
+        
+        verifiedModActions = [...verifiedModActions, ...data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE]];
+        data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE].forEach(action => {
+            optimisticUpdates = optimisticUpdates.filter(a => a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]);
         });
-        currentPageId = data['page-uuid'];
-        currentHash = data['sequence of mod-actions'][data['sequence of mod-actions'].length - 1].hashes.after;
-        pageNr = data['current page-nr in its board'];
-        totalPages = data['current #pages of the board'];
+
+        verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH];
+        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR];
+        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES];
         renderCanvas();
+      } else if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE) {
+        if (verifiedHash !== data.hash) {
+            console.warn(`Ping received, hash mismatch. Requesting replay...`);
+            ws.send(JSON.stringify({ 
+                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE]: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID], 
+                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash, 
+                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid()
+            }));
+        }
       }
     };
   </script>
