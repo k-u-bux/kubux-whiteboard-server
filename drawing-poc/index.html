@@ -52,20 +52,31 @@
     const penTool = document.getElementById('pen-tool');
     const eraserTool = document.getElementById('eraser-tool');
     const prevPageBtn = document.getElementById('prev-page');
-    const nextPageBtn = document = document.getElementById('next-page');
+    const nextPageBtn = document.getElementById('next-page');
     const deletePageBtn = document.getElementById('delete-page');
     const insertPageBtn = document.getElementById('insert-page');
+
+    const path = window.location.pathname;
+    const ws = new WebSocket(`ws://${window.location.host}${path}`);
 
     let isDrawing = false;
     let currentStrokePoints = [];
     let tool = 'pen';
-    let currentPageState = [];
+    let currentState = [];
     let pageOrder = [];
-    let currentPageId = '';
-    
-    // Connect to the WebSocket using the same path as the HTTP request
-    const path = window.location.pathname;
-    const ws = new WebSocket(`ws://${window.location.host}${path}`);
+    let currentPage = '';
+    let currentHash = '';
+
+    function calculateHash(state) {
+      const data = JSON.stringify(state);
+      let hash = 0;
+      for (let i = 0; i < data.length; i++) {
+        const char = data.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+      }
+      return hash.toString();
+    }
 
     function drawStroke(stroke) {
       if (stroke.points.length > 1) {
@@ -81,7 +92,7 @@
 
     function renderCanvas() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      currentPageState.forEach(drawStroke);
+      currentState.forEach(drawStroke);
     }
 
     penTool.addEventListener('click', () => {
@@ -106,7 +117,7 @@
       } else if (tool === 'eraser') {
         const erasedStroke = findStrokeAt(x, y);
         if (erasedStroke) {
-          ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id }));
+          ws.send(JSON.stringify({ type: 'erase', strokeId: erasedStroke.id, hash: currentHash, page: currentPage }));
         }
       }
     });
@@ -124,7 +135,7 @@
 
     canvas.addEventListener('mouseup', () => {
       if (tool === 'pen' && isDrawing) {
-        ws.send(JSON.stringify({ type: 'draw', points: currentStrokePoints }));
+        ws.send(JSON.stringify({ type: 'draw', points: currentStrokePoints, hash: currentHash, page: currentPage }));
         currentStrokePoints = [];
         ctx.beginPath();
       }
@@ -132,7 +143,7 @@
     });
 
     function findStrokeAt(x, y) {
-      for (const stroke of currentPageState) {
+      for (const stroke of currentState) {
         for (const point of stroke.points) {
           if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
             return stroke;
@@ -142,29 +153,29 @@
       return null;
     }
 
-    prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage' })));
-    nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage' })));
-    deletePageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'deletePage' })));
-    insertPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'insertPage' })));
+    prevPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'prevPage', page: currentPage })));
+    nextPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'nextPage', page: currentPage })));
+    deletePageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'deletePage', page: currentPage })));
+    insertPageBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'insertPage', page: currentPage })));
 
     ws.onmessage = event => {
       const data = JSON.parse(event.data);
       if (data.type === 'fullState') {
-        currentPageState = data.state;
+        currentState = data.state;
         pageOrder = data.pageOrder;
-        currentPageId = data.page;
-        pageInfo.textContent = `${pageOrder.indexOf(currentPageId) + 1} of ${pageOrder.length}`;
+        currentPage = data.page;
+        currentHash = data.hash;
+        pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
         renderCanvas();
       } else if (data.type === 'newStroke') {
-        // Only add the stroke if it's for the current page
-        if (data.page === currentPageId) {
-          currentPageState.push(data.stroke);
+        if (data.page === currentPage) {
+          currentState.push(data.stroke);
+          currentHash = data.hash;
           drawStroke(data.stroke);
         }
-      } else if (data.type === 'stateUpdate') {
-        // This message signals that the page order has changed on the server
+      } else if (data.type === 'pageOrderUpdate') {
         pageOrder = data.pageOrder;
-        pageInfo.textContent = `${pageOrder.indexOf(currentPageId) + 1} of ${pageOrder.length}`;
+        pageInfo.textContent = `${pageOrder.indexOf(currentPage) + 1} of ${pageOrder.length}`;
       }
     };
   </script>
