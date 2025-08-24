@@ -213,7 +213,7 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
 
   const modAction = {
     [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: { [MOD_ACTIONS.DRAW.TYPE]: MOD_ACTIONS.DRAW.TYPE, ...payload },
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: payload,
     hashes: {
       [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: beforeHash,
       [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
@@ -333,22 +333,23 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
   
   const replayActions = [];
   let found = false;
+  let finalHash = beforeHash;
+
   for (const action of page.modActions) {
     if (action.hashes[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH] === beforeHash) {
       found = true;
     }
     if (found) {
-      replayActions.push(action);
+        replayActions.push(action);
+        finalHash = action.hashes[MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
     }
   }
-
-  const afterHash = calculateHash(replayActions.map(a => a.payload));
   
   const replayMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.BEFORE_HASH]: beforeHash,
-    [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH]: afterHash,
+    [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH]: finalHash,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE]: replayActions,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
