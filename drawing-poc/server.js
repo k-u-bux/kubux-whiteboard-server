@@ -135,6 +135,7 @@ function sendPing(boardId) {
         [MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_TOTAL_PAGES]: currentBoard.pageOrder.length
     };
     broadcastMessageToBoard(message, boardId);
+    logSentMessage(message.type, message, 'N/A');
 }
 
 const messageHandlers = {};
