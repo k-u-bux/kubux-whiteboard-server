@@ -5,9 +5,9 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const url = require('url');
 
-[cite_start]// Server state structures [cite: 1]
+// Server state structures
 const boards = {};
-const deletionMap = {}; [cite_start]// Tracks page deletions and their replacements [cite: 2]
+const deletionMap = {}; // Tracks page deletions and their replacements
 
 function calculateHash(state) {
   const data = JSON.stringify(state);
@@ -89,18 +89,17 @@ function sendFullPage(ws, boardId, pageId, requestId) {
     totalPages: totalPages
   };
   ws.send(JSON.stringify(message));
-  logSentMessage('fullPage', message, requestId);
+  logSentMessage(message.type, message, requestId);
 }
 
 const messageHandlers = {};
 
-[cite_start]// Message router [cite: 12]
+// Message router
 function routeMessage(ws, message) {
   try {
     const data = JSON.parse(message);
     const requestId = data.requestId || data['action-uuid'] || 'N/A';
-    console.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client on board '${ws.boardId}':`, data); [cite_start]// Comprehensive logging [cite: 20]
-
+    console.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client on board '${ws.boardId}':`, data);
     const handler = messageHandlers[data.type];
     if (handler) {
       handler(ws, data, requestId);
@@ -112,7 +111,7 @@ function routeMessage(ws, message) {
   }
 }
 
-[cite_start]// Full page requests [cite: 11]
+// Full page requests
 messageHandlers['fullPage-requests'] = (ws, data, requestId) => {
   const board = boards[data.boardId];
   if (!board) return;
@@ -136,7 +135,7 @@ messageHandlers['fullPage-requests'] = (ws, data, requestId) => {
   }
 };
 
-[cite_start]// Mod-action proposals [cite: 9]
+// Mod-action proposals
 const modActionHandlers = {};
 
 modActionHandlers['draw'] = (ws, data, requestId) => {
@@ -147,22 +146,25 @@ modActionHandlers['draw'] = (ws, data, requestId) => {
   const serverHash = calculateHash(pageState);
 
   if (beforeHash !== serverHash) {
-    const acceptMessage = {
+    const declineMessage = {
       type: 'decline-message',
       'page-uuid': pageUuid,
       'action-uuid': actionUuid,
     };
-    ws.send(JSON.stringify(acceptMessage));
-    logSentMessage(acceptMessage.type, acceptMessage, requestId);
+    ws.send(JSON.stringify(declineMessage));
+    logSentMessage(declineMessage.type, declineMessage, requestId);
     return;
   }
+
+  const newPageState = [...pageState, payload];
+  const afterHash = calculateHash(newPageState);
 
   const modAction = {
     'action-uuid': actionUuid,
     payload: { type: 'draw', ...payload },
     hashes: {
       'before': beforeHash,
-      'after': calculateHash([...pageState, payload])
+      'after': afterHash
     }
   };
   currentPage.modActions.push(modAction);
@@ -171,6 +173,8 @@ modActionHandlers['draw'] = (ws, data, requestId) => {
     type: 'accept-message',
     'page-uuid': pageUuid,
     'action-uuid': actionUuid,
+    'before-hash': beforeHash,
+    'after-hash': afterHash,
     'current page-nr in its board': board.pageOrder.indexOf(pageUuid) + 1,
     'current #pages of the board': board.pageOrder.length
   };
@@ -201,10 +205,14 @@ modActionHandlers['erase'] = (ws, data, requestId) => {
   
   currentPage.modActions = newModActions;
 
+  const afterHash = calculateHash(newModActions.map(action => action.payload));
+
   const acceptMessage = {
     type: 'accept-message',
     'page-uuid': pageUuid,
     'action-uuid': actionUuid,
+    'before-hash': beforeHash,
+    'after-hash': afterHash,
     'current page-nr in its board': board.pageOrder.indexOf(pageUuid) + 1,
     'current #pages of the board': board.pageOrder.length
   };

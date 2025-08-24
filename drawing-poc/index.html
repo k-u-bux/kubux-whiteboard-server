@@ -58,7 +58,7 @@
     const insertPageBtn = document.getElementById('insert-page');
 
     const path = window.location.pathname;
-    const ws = new WebSocket(`ws://${window.location.host}${path}`);
+    const ws = new WebSocket(`ws://${window.location.hostname}:3001${path}`);
 
     let isDrawing = false;
     let currentStrokePoints = [];
@@ -114,8 +114,31 @@
       const allStrokes = Array.from(localModActions.values());
       for (const action of allStrokes) {
         if (action.type === 'draw') {
-          for (const point of action.payload.points) {
-            if (Math.abs(point.x - x) < 10 && Math.abs(point.y - y) < 10) {
+          const points = action.payload.points;
+          for (let i = 0; i < points.length - 1; i++) {
+            const p1 = points[i];
+            const p2 = points[i+1];
+            
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            
+            const t = ((x - p1.x) * dx + (y - p1.y) * dy) / (length * length);
+            
+            let closestX, closestY;
+            if (t < 0) {
+              closestX = p1.x;
+              closestY = p1.y;
+            } else if (t > 1) {
+              closestX = p2.x;
+              closestY = p2.y;
+            } else {
+              closestX = p1.x + t * dx;
+              closestY = p1.y + t * dy;
+            }
+            
+            const dist = Math.sqrt((x - closestX) ** 2 + (y - closestY) ** 2);
+            if (dist < 10) {
               return action;
             }
           }
@@ -201,15 +224,15 @@
     ws.onmessage = event => {
       const data = JSON.parse(event.data);
       if (data.type === 'fullPage') {
-        localModActions = new Map();
-        data.state.forEach(stroke => localModActions.set(stroke.id, { type: 'draw', payload: stroke }));
+        localModActions.clear();
+        data.state.forEach(stroke => localModActions.set(uuid.v4(), { type: 'draw', payload: stroke }));
         currentPageId = data.page;
         currentHash = data.hash;
         pageNr = data.pageNr;
         totalPages = data.totalPages;
         renderCanvas();
       } else if (data.type === 'accept-message') {
-        console.log(`Action ${data['action-uuid']} accepted.`);
+        console.log(`Action ${data['action-uuid']} accepted. Before Hash: ${data['before-hash']}, After Hash: ${data['after-hash']}.`);
       } else if (data.type === 'decline-message') {
         console.warn(`Action ${data['action-uuid']} was declined. Re-syncing...`);
         ws.send(JSON.stringify({ type: 'replay-requests', 'page-uuid': currentPageId, 'before-hash': currentHash, requestId: uuid.v4() }));
@@ -218,7 +241,7 @@
         localModActions.clear();
         data['sequence of mod-actions'].forEach(action => {
           if (action.payload.type === 'draw') {
-            localModActions.set(action.payload.id, action);
+            localModActions.set(action['action-uuid'], action);
           } else if (action.payload.type === 'erase') {
             localModActions.delete(action.payload.actionUuid);
           }

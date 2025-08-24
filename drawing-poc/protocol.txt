@@ -26,7 +26,8 @@ server to client messages:
 * fullPage message: (page, hash of page state,  current page-nr in its board, current #pages of the board)
 * replay-message (page-uuid, before-hash, after-hash, sequence of mod-actions,
                   current page-nr in its board, current #pages of the board)
-* accept-message (page-uuid, action-uuid, current page-nr in its board, current #pages of the board)
+* accept-message (page-uuid, action-uuid, before-hash, after-hash,
+                  current page-nr in its board, current #pages of the board)
   broadcast when the server accepts a mod-action proposal from the client. The before-hash says at which stage
   in the page history the server decided to put the action.
   This is sent when the server state is updated, i.e., the action is appended to the page.
