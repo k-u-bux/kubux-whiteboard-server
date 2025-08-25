@@ -251,7 +251,8 @@ const MESSAGES = {
     DECLINE_MESSAGE: {
       TYPE: 'decline-message',
       PAGE_UUID: 'page-uuid',
-      ACTION_UUID: 'action-uuid'
+      ACTION_UUID: 'action-uuid',
+      REASON: 'reason'
     },
     REPLAY_MESSAGE: {
       TYPE: 'replay-message',
@@ -287,8 +288,61 @@ const MOD_ACTIONS = {
     },
     DELETE_PAGE: {
         TYPE: 'delete page'
+    },
+    // New undo/redo action types
+    UNDO: {
+        TYPE: 'undo',
+        TARGET_ACTION_UUID: 'targetActionUuid',
+        CLIENT_ID: 'clientId'
+    },
+    REDO: {
+        TYPE: 'redo',
+        TARGET_UNDO_ACTION_UUID: 'targetUndoActionUuid',
+        CLIENT_ID: 'clientId'
     }
 };
+
+// Helper function to check if an action is an undo action
+function isUndoAction(action) {
+  return action && 
+         action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD] && 
+         action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].type === MOD_ACTIONS.UNDO.TYPE;
+}
+
+// Helper function to check if an action is a redo action
+function isRedoAction(action) {
+  return action && 
+         action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD] && 
+         action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].type === MOD_ACTIONS.REDO.TYPE;
+}
+
+// Helper function to get the target of an undo action
+function getUndoTarget(action) {
+  if (!isUndoAction(action)) return null;
+  return action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+}
+
+// Helper function to get the target of a redo action
+function getRedoTarget(action) {
+  if (!isRedoAction(action)) return null;
+  return action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+}
+
+// Helper function to check if an action has been undone
+function isActionUndone(modActions, actionUuid) {
+  return modActions.some(action => 
+    isUndoAction(action) && 
+    getUndoTarget(action) === actionUuid
+  );
+}
+
+// Helper function to find what action undid a specific action
+function findUndoActionFor(modActions, targetActionUuid) {
+  return modActions.find(action => 
+    isUndoAction(action) && 
+    getUndoTarget(action) === targetActionUuid
+  );
+}
 
 // Export for Node.js (server)
 if (typeof module !== 'undefined' && module.exports) {
@@ -318,7 +372,13 @@ if (typeof module !== 'undefined' && module.exports) {
     getCapStyleString,
     getJoinStyleString,
     MESSAGES,
-    MOD_ACTIONS
+    MOD_ACTIONS,
+    isUndoAction,
+    isRedoAction,
+    getUndoTarget,
+    getRedoTarget,
+    isActionUndone,
+    findUndoActionFor
   };
 }
 // Export for browsers (client)
@@ -349,6 +409,12 @@ else if (typeof window !== 'undefined') {
     getCapStyleString,
     getJoinStyleString,
     MESSAGES,
-    MOD_ACTIONS
+    MOD_ACTIONS,
+    isUndoAction,
+    isRedoAction,
+    getUndoTarget,
+    getRedoTarget,
+    isActionUndone,
+    findUndoActionFor
   };
 }
