@@ -193,7 +193,17 @@ function ensurePageLoaded(boardId, pageId) {
   return true;
 }
 
-const wss = new WebSocket.Server({ port: 3001, path: '/ws' });
+const wss = new WebSocket.Server({ 
+  port: 3001, 
+  path: '/ws',
+  perMessageDeflate: {
+    zlibDeflateOptions: { level: 6 },
+    zlibInflateOptions: { chunkSize: 16 * 1024 },
+    serverNoContextTakeover: false,
+    clientNoContextTakeover: false,
+    threshold: 512
+  }
+});
 
 const httpServer = http.createServer((req, res) => {
   const requestUrl = url.parse(req.url);
