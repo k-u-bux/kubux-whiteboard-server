@@ -6,23 +6,191 @@ const url = require('url');
 
 const { hashAny, hashNext, generateUuid, MESSAGES, MOD_ACTIONS } = require('./shared');
 
+// Data storage configuration
+const DATA_DIR = './data';
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  console.log(`[SERVER] Created data directory: ${DATA_DIR}`);
+}
+
+// Path helpers
+const getBoardsFilePath = () => path.join(DATA_DIR, 'boards.json');
+const getRemovalLogPath = () => path.join(DATA_DIR, 'to_be_removed.json');
+const getPageFilePath = (pageId) => path.join(DATA_DIR, `${pageId}.json`);
+
 // Server state structures
 const boards = {};
 const deletionMap = {};
 const clients = {}; // Map client IDs to WebSocket instances
 let pingInterval;
 
+// Initialize the server from persisted data
+function initializeFromDisk() {
+  try {
+    const boardsFilePath = getBoardsFilePath();
+    if (fs.existsSync(boardsFilePath)) {
+      const boardsData = JSON.parse(fs.readFileSync(boardsFilePath, 'utf8'));
+      
+      // Load board structures without page content (loaded on demand)
+      Object.keys(boardsData).forEach(boardId => {
+        boards[boardId] = {
+          pageOrder: boardsData[boardId].pageOrder || [],
+          pages: {}
+        };
+      });
+      
+      console.log(`[SERVER] Loaded ${Object.keys(boards).length} boards from disk`);
+    }
+    
+    // Load deletion map if it exists
+    const removalLogPath = getRemovalLogPath();
+    if (fs.existsSync(removalLogPath)) {
+      const removalEntries = fs.readFileSync(removalLogPath, 'utf8')
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => JSON.parse(line));
+      
+      removalEntries.forEach(entry => {
+        if (entry.type === 'page' && entry.replacementId) {
+          deletionMap[entry.uuid] = entry.replacementId;
+        }
+      });
+      
+      console.log(`[SERVER] Loaded ${Object.keys(deletionMap).length} deletion mappings`);
+    }
+  } catch (error) {
+    console.error('[SERVER] Error initializing from disk:', error);
+  }
+}
+
+// Save board metadata to disk
+function saveBoardMetadata() {
+  try {
+    const boardsData = {};
+    
+    Object.keys(boards).forEach(boardId => {
+      boardsData[boardId] = {
+        pageOrder: boards[boardId].pageOrder
+        // Add any other board metadata here
+      };
+    });
+    
+    fs.writeFileSync(getBoardsFilePath(), JSON.stringify(boardsData, null, 2), 'utf8');
+  } catch (error) {
+    console.error('[SERVER] Error saving board metadata:', error);
+  }
+}
+
+// Mark an entity for deletion
+function markForDeletion(uuid, type = 'page', metadata = {}) {
+  try {
+    const timestamp = new Date().toISOString();
+    const entryData = {
+      uuid,
+      type,
+      timestamp,
+      ...metadata
+    };
+    
+    const entryJson = JSON.stringify(entryData) + '\n';
+    fs.appendFileSync(getRemovalLogPath(), entryJson, 'utf8');
+    
+    console.log(`[SERVER] Marked ${type} ${uuid} for deletion at ${timestamp}`);
+  } catch (error) {
+    console.error('[SERVER] Error marking for deletion:', error);
+  }
+}
+
+// Load a page from disk
+function loadPageFromDisk(pageId) {
+  try {
+    const pageFilePath = getPageFilePath(pageId);
+    
+    if (!fs.existsSync(pageFilePath)) {
+      return { modActions: [], currentHash: hashAny([]) };
+    }
+    
+    const modActionsJson = fs.readFileSync(pageFilePath, 'utf8');
+    const modActions = JSON.parse(modActionsJson);
+    
+    // Calculate the current hash based on the loaded mod actions
+    let currentHash = hashAny([]);
+    for (const action of modActions) {
+      if (action.hashes && action.hashes[MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]) {
+        currentHash = action.hashes[MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
+      }
+    }
+    
+    return { modActions, currentHash };
+  } catch (error) {
+    console.error(`[SERVER] Error loading page ${pageId} from disk:`, error);
+    return { modActions: [], currentHash: hashAny([]) };
+  }
+}
+
+// Save a page to disk
+function savePageToDisk(pageId, modActions) {
+  try {
+    const pageFilePath = getPageFilePath(pageId);
+    fs.writeFileSync(pageFilePath, JSON.stringify(modActions, null, 2), 'utf8');
+  } catch (error) {
+    console.error(`[SERVER] Error saving page ${pageId} to disk:`, error);
+  }
+}
+
+// Append a modification action to a page file
+function appendModActionToDisk(pageId, modAction) {
+  try {
+    const pageFilePath = getPageFilePath(pageId);
+    
+    // If the file doesn't exist yet, initialize it with an array
+    if (!fs.existsSync(pageFilePath)) {
+      fs.writeFileSync(pageFilePath, JSON.stringify([modAction], null, 2), 'utf8');
+      return;
+    }
+    
+    // Load existing actions, append the new one, and save
+    const modActionsJson = fs.readFileSync(pageFilePath, 'utf8');
+    const modActions = JSON.parse(modActionsJson);
+    modActions.push(modAction);
+    fs.writeFileSync(pageFilePath, JSON.stringify(modActions, null, 2), 'utf8');
+  } catch (error) {
+    console.error(`[SERVER] Error appending mod action to page ${pageId}:`, error);
+  }
+}
+
 function getOrCreateBoard(boardId) {
   if (!boards[boardId]) {
     const initialPageId = generateUuid();
     const initialHash = hashAny([]); // Empty state hash
+    
     boards[boardId] = {
       pageOrder: [initialPageId],
       pages: { [initialPageId]: { modActions: [], currentHash: initialHash } }
     };
+    
+    // Save the new page and board metadata
+    savePageToDisk(initialPageId, []);
+    saveBoardMetadata();
+    
     console.log(`[SERVER] Created new board: ${boardId} with initial page: ${initialPageId}`);
   }
   return boards[boardId];
+}
+
+// Ensure a page is loaded in memory
+function ensurePageLoaded(boardId, pageId) {
+  const board = boards[boardId];
+  if (!board) return false;
+  
+  if (!board.pages[pageId]) {
+    // Load the page from disk
+    board.pages[pageId] = loadPageFromDisk(pageId);
+  }
+  
+  return true;
 }
 
 const wss = new WebSocket.Server({ port: 3001, path: '/ws' });
@@ -79,6 +247,9 @@ const httpServer = http.createServer((req, res) => {
 
 httpServer.listen(8080, '0.0.0.0', () => {
   console.log('[SERVER] HTTP server is running on port 8080');
+  
+  // Initialize server from disk
+  initializeFromDisk();
 });
 
 function logSentMessage(type, payload, requestId = 'N/A') {
@@ -100,7 +271,13 @@ function sendFullPage(ws, boardId, pageId, requestId) {
   }
   
   const currentBoard = boards[boardId];
-  if (!currentBoard || !currentBoard.pages[finalPageId]) {
+  if (!currentBoard) {
+    console.error(`[SERVER] Board not found: ${boardId}`);
+    return;
+  }
+  
+  // Ensure the page is loaded in memory
+  if (!ensurePageLoaded(boardId, finalPageId)) {
     console.error(`[SERVER] Page not found: ${finalPageId} on board: ${boardId}`);
     return;
   }
@@ -130,7 +307,12 @@ function sendPing() {
     if (client.readyState === WebSocket.OPEN && client.boardId && client.pageId) {
       const currentBoard = boards[client.boardId];
       if (!currentBoard) return;
+      
       const pageId = client.pageId;
+      
+      // Ensure the page is loaded
+      if (!ensurePageLoaded(client.boardId, pageId)) return;
+      
       const page = currentBoard.pages[pageId];
       if (!page) return;
       
@@ -251,8 +433,14 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
   const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
   const board = boards[boardId];
   
-  // Only check if the page exists
-  if (!board || !board.pages[pageUuid]) {
+  // Ensure the board exists
+  if (!board) {
+    console.error(`[SERVER] Board not found: ${boardId}`);
+    return;
+  }
+  
+  // Ensure the page is loaded
+  if (!ensurePageLoaded(boardId, pageUuid)) {
     sendFullPage(ws, boardId, pageUuid, requestId);
     return;
   }
@@ -260,7 +448,6 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
   const currentPage = board.pages[pageUuid];
   const serverHash = currentPage.currentHash;
 
-  // No hash verification - just accept the stroke
   // Calculate new hash by adding this action to the current state
   const afterHash = hashNext(serverHash, payload);
   
@@ -268,20 +455,24 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
     [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
     [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: payload,
     hashes: {
-      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: serverHash, // Use server's current hash
+      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: serverHash,
       [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
     }
   };
   
+  // Add to in-memory representation
   currentPage.modActions.push(modAction);
   currentPage.currentHash = afterHash;
   
+  // Persist to disk
+  appendModActionToDisk(pageUuid, modAction);
+  
   const acceptMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
-    boardId: boardId, // Include boardId in response
+    boardId: boardId,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
-    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash, // Server's hash, not client's
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
@@ -299,8 +490,14 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
   const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
   const board = boards[boardId];
   
-  // Check if the page exists
-  if (!board || !board.pages[pageUuid]) {
+  // Ensure the board exists
+  if (!board) {
+    console.error(`[SERVER] Board not found: ${boardId}`);
+    return;
+  }
+  
+  // Ensure the page is loaded
+  if (!ensurePageLoaded(boardId, pageUuid)) {
     sendFullPage(ws, boardId, pageUuid, requestId);
     return;
   }
@@ -318,7 +515,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
     // The stroke doesn't exist or was already erased
     const declineMessage = {
       type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
-      boardId: boardId, // Include boardId in response
+      boardId: boardId,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
     };
@@ -327,7 +524,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
     return;
   }
   
-  // Remove the stroke
+  // Remove the stroke from in-memory representation
   const newModActions = currentPage.modActions.filter(action => 
     action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== erasedStrokeActionUuid
   );
@@ -335,15 +532,31 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
   // Calculate new hash
   const afterHash = hashNext(serverHash, payload);
   
+  // Update in-memory state
   currentPage.modActions = newModActions;
   currentPage.currentHash = afterHash;
-
+  
+  // For erase operations, we rewrite the entire page file since we're removing an action
+  savePageToDisk(pageUuid, newModActions);
+  
+  // Create an erase mod action
+  const eraseModAction = {
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: payload,
+    hashes: {
+      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: serverHash,
+      [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
+    }
+  };
+  
+  // We don't append this to disk since we've already rewritten the file
+  
   const acceptMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
-    boardId: boardId, // Include boardId in response
+    boardId: boardId,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
-    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash, // Server's hash, not client's
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
@@ -363,6 +576,9 @@ modActionHandlers[MOD_ACTIONS.NEW_PAGE.TYPE] = (ws, data, requestId) => {
     return;
   }
   
+  // Ensure current page is loaded
+  ensurePageLoaded(boardId, pageUuid);
+  
   const newPageId = generateUuid();
   const initialHash = hashAny([]);
   
@@ -372,6 +588,10 @@ modActionHandlers[MOD_ACTIONS.NEW_PAGE.TYPE] = (ws, data, requestId) => {
     modActions: [], 
     currentHash: initialHash 
   };
+  
+  // Persist the new page and updated board metadata
+  savePageToDisk(newPageId, []);
+  saveBoardMetadata();
   
   ws.pageId = newPageId;
   sendFullPage(ws, boardId, newPageId, requestId);
@@ -391,7 +611,7 @@ modActionHandlers[MOD_ACTIONS.DELETE_PAGE.TYPE] = (ws, data, requestId) => {
   if (board.pageOrder.length <= 1) {
     const declineMessage = {
       type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
-      boardId: boardId, // Include boardId in response
+      boardId: boardId,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid
     };
@@ -403,10 +623,27 @@ modActionHandlers[MOD_ACTIONS.DELETE_PAGE.TYPE] = (ws, data, requestId) => {
   const index = board.pageOrder.indexOf(pageUuid);
   const replacementPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 2)];
   
+  // Update deletion map
   deletionMap[pageUuid] = replacementPageId;
+  
+  // Mark for deletion
+  markForDeletion(pageUuid, 'page', {
+    boardId: boardId,
+    deletedBy: ws.clientId || 'unknown',
+    pagePosition: index,
+    replacementId: replacementPageId
+  });
+  
+  // Update in-memory state
   board.pageOrder.splice(index, 1);
   delete board.pages[pageUuid];
   
+  // Persist the updated board metadata
+  saveBoardMetadata();
+  
+  // We don't delete the file - it will be handled by the garbage collector
+  
+  // Update client to replacement page
   ws.pageId = replacementPageId;
   sendFullPage(ws, boardId, replacementPageId, requestId);
 };
@@ -429,12 +666,13 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     return;
   }
   
-  const page = board.pages[pageUuid];
-  
-  if (!page) {
+  // Ensure the page is loaded
+  if (!ensurePageLoaded(boardId, pageUuid)) {
     sendFullPage(ws, boardId, ws.pageId, requestId);
     return;
   }
+  
+  const page = board.pages[pageUuid];
   
   const replayActions = [];
   let found = false;
@@ -452,7 +690,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
   
   const replayMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE,
-    boardId: boardId, // Include boardId in response
+    boardId: boardId,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.BEFORE_HASH]: beforeHash,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH]: finalHash,
@@ -485,4 +723,11 @@ wss.on('connection', (ws, req) => {
       delete clients[ws.clientId];
     }
   });
+});
+
+process.on('SIGINT', () => {
+  console.log('[SERVER] Shutting down gracefully...');
+  // Make sure all data is persisted before exit
+  saveBoardMetadata();
+  process.exit(0);
 });
