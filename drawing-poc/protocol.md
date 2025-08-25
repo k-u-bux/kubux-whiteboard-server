@@ -1,3 +1,10 @@
+# Updated Protocol.md and Shared.js with Undo/Redo Support
+
+Here are the updated files with undo/redo functionality integrated.
+
+## protocol.md
+
+```markdown
 # Xournal++ Clone Protocol Documentation
 
 ## Overview
@@ -8,6 +15,7 @@ This document defines the communication protocol between clients and the server 
 
 - v1.0: Initial protocol definition
 - v2.0: Updated to include boardId in message payloads rather than URL path
+- v2.1: Added undo/redo functionality
 
 ## Server State
 
@@ -59,6 +67,8 @@ The client maintains:
   - Verified state is used as the starting point for replay updates
 - `pageNr`: Current page position in the board
 - `totalPages`: Total number of pages in the board
+- `myActions`: Array of action UUIDs performed by this client (for undo/redo)
+- `undoneActions`: Map of undone action UUIDs to their undo action UUIDs (for redo)
 
 ## Protocol Messages
 
@@ -141,7 +151,8 @@ All server-to-client messages now include `boardId` in their payload.
   "type": "decline-message",
   "boardId": "board-uuid",
   "page-uuid": "page-uuid",
-  "action-uuid": "action-uuid"
+  "action-uuid": "action-uuid",
+  "reason": "optional reason for decline"
 }
 ```
 
@@ -169,7 +180,7 @@ All client-to-server messages must include `boardId` in their payload.
   "page-uuid": "page-uuid",
   "action-uuid": "action-uuid",
   "payload": {
-    "type": "draw|erase|new page|delete page",
+    "type": "draw|erase|new page|delete page|undo|redo",
     ...action-specific-fields
   },
   "before-hash": "hash-value"
@@ -215,6 +226,24 @@ All client-to-server messages must include `boardId` in their payload.
 ```json
 {
   "type": "delete page"
+}
+```
+
+##### Undo Action Payload
+```json
+{
+  "type": "undo",
+  "targetActionUuid": "uuid-of-action-to-undo",
+  "clientId": "client-id-that-performed-original-action"
+}
+```
+
+##### Redo Action Payload
+```json
+{
+  "type": "redo",
+  "targetUndoActionUuid": "uuid-of-undo-action-to-undo",
+  "clientId": "client-id-that-performed-original-undo"
 }
 ```
 
@@ -280,9 +309,29 @@ const modActionHandlers = {
   'draw': handleDrawAction,
   'erase': handleEraseAction,
   'new page': handleNewPageAction,
-  'delete page': handleDeletePageAction
+  'delete page': handleDeletePageAction,
+  'undo': handleUndoAction,
+  'redo': handleRedoAction
 };
 ```
+
+### Undo/Redo Implementation
+
+The undo/redo functionality is implemented as regular mod-actions with special properties:
+
+1. **Undo as a Mod-Action**: An undo is implemented as a special modification that references a previous action
+2. **Redo as an Undo of an Undo**: A redo is implemented as an undo of a previous undo action
+3. **Server Authority**: The server decides if an undo/redo is valid based on the current page state
+4. **Action Tracking**: Clients track their own actions to populate the undo/redo UI
+
+#### Undo/Redo Workflow
+
+1. Client identifies an action to undo (typically the most recent action performed by that client)
+2. Client sends an undo mod-action proposal referencing the target action
+3. Server validates if the undo is possible in the current collaborative state
+4. If valid, server applies the undo as a new mod-action and broadcasts to all clients
+5. If invalid, server declines the undo with a reason
+6. Clients update their UI based on the server's response
 
 ### Shared Code Implementation
 
@@ -300,6 +349,8 @@ A `shared.js` file is used by both client and server to ensure consistency in:
 2. **Optimistic Updates**: The client should apply modifications locally before server confirmation but be prepared to reconcile differences if the server disagrees.
 
 3. **Hash Reconciliation**: The client should maintain a clear distinction between verified state (confirmed by server) and optimistic updates.
+
+4. **Undo/Redo UI**: The client should only show undo/redo options for actions performed by the current client.
 
 ### Logging
 
@@ -323,3 +374,5 @@ For debugging purposes, the server performs comprehensive logging:
 3. **Better Connection Management**: Clients can switch between boards or reconnect to specific boards more easily
 4. **Enhanced Error Handling**: More robust error messages for connection and registration issues
 5. **Request Tracking**: Includes tracking of pending requests for better debugging and response matching
+6. **Collaborative Undo/Redo**: Supports undo/redo functionality in a collaborative context
+```
