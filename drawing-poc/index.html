@@ -1,1065 +1,1196 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Xournal++ Clone</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      overflow: hidden;
-    }
-    
-    .toolbar {
-      display: flex;
-      background-color: #f0f0f0;
-      padding: 5px;
-      border-bottom: 1px solid #ccc;
-    }
-    
-    .tool-section {
-      display: flex;
-      margin-right: 10px;
-      padding-right: 10px;
-      border-right: 1px solid #ddd;
-    }
-    
-    .tool-btn {
-      width: 30px;
-      height: 30px;
-      margin: 0 2px;
-      cursor: pointer;
-      border: 1px solid transparent;
-      background-color: transparent;
-      border-radius: 4px;
-    }
-    
-    .tool-btn:hover {
-      background-color: #e0e0e0;
-    }
-    
-    .tool-btn.active {
-      border-color: #3498db;
-      background-color: #ebf5fb;
-    }
-    
-    .color-swatch {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      margin: 3px;
-      cursor: pointer;
-      border: 1px solid #ccc;
-    }
-    
-    .color-swatch.active {
-      border-color: #333;
-      border-width: 2px;
-    }
-    
-    #canvas-container {
-      position: relative;
-      flex-grow: 1;
-      overflow: hidden;
-    }
-    
-    canvas {
-      position: absolute;
-      background-color: white;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-    
-    .main-content {
-      display: flex;
-      height: calc(100vh - 42px);
-    }
-    
-    #width-selector {
-      width: 100px;
-      margin: 0 10px;
-    }
-    
-    .page-controls {
-      display: flex;
-      align-items: center;
-    }
-    
-    #page-info {
-      margin: 0 10px;
-    }
-    
-    .error-banner {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background-color: #f44336;
-      color: white;
-      padding: 15px;
-      text-align: center;
-      z-index: 1000;
-      display: none;
-    }
-    
-    .error-banner button {
-      margin-left: 15px;
-      background-color: white;
-      color: #f44336;
-      border: none;
-      padding: 5px 10px;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xournal++ Clone</title>
+    <script src="shared.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #toolbar {
+            background-color: #f0f0f0;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #ccc;
+        }
+        #canvas-container {
+            flex-grow: 1;
+            background-color: #e0e0e0;
+            overflow: hidden;
+            position: relative;
+        }
+        canvas {
+            position: absolute;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+        #status {
+            background-color: #f0f0f0;
+            padding: 5px 10px;
+            border-top: 1px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .tool-group {
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
+            padding-right: 15px;
+            border-right: 1px solid #ccc;
+        }
+        .tool-group:last-child {
+            border-right: none;
+        }
+        button {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px 10px;
+            margin: 0 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        button:hover {
+            background-color: #e6e6e6;
+        }
+        button.active {
+            background-color: #ddf;
+            border-color: #99c;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        button img {
+            width: 16px;
+            height: 16px;
+            margin-right: 5px;
+        }
+        .color-picker {
+            display: flex;
+            align-items: center;
+        }
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        .color-swatch.active {
+            border: 2px solid #000;
+        }
+        input[type="color"] {
+            width: 24px;
+            height: 24px;
+            border: none;
+            padding: 0;
+            background: none;
+        }
+        #connection-status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .connected {
+            background-color: #4CAF50;
+        }
+        .disconnected {
+            background-color: #F44336;
+        }
+        .connecting {
+            background-color: #FFC107;
+        }
+        #page-controls {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+        }
+        #page-info {
+            margin: 0 10px;
+            white-space: nowrap;
+        }
+        .shortcut-hint {
+            font-size: 10px;
+            color: #666;
+            margin-left: 5px;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 120px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        /* History controls style */
+        #history-controls {
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
+            padding-right: 15px;
+            border-right: 1px solid #ccc;
+        }
+        #undo-btn, #redo-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            font-size: 18px;
+        }
+    </style>
 </head>
 <body>
-  <div class="error-banner" id="error-banner">
-    <span id="error-message">Connection error</span>
-    <button id="reconnect-button">Reconnect</button>
-  </div>
-  
-  <div class="toolbar">
-    <!-- Tools Section -->
-    <div class="tool-section">
-      <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
-      <button class="tool-btn" id="highlighter-tool" title="Highlighter">🖌️</button>
-      <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
-    </div>
-    
-    <!-- Colors Section -->
-    <div class="tool-section">
-      <div class="color-swatch active" style="background-color: black;" data-color="#000000"></div>
-      <div class="color-swatch" style="background-color: red;" data-color="#ff0000"></div>
-      <div class="color-swatch" style="background-color: green;" data-color="#00ff00"></div>
-      <div class="color-swatch" style="background-color: blue;" data-color="#0000ff"></div>
-      <div class="color-swatch" style="background-color: yellow;" data-color="#ffff00"></div>
-    </div>
-    
-    <!-- Width Section -->
-    <div class="tool-section">
-      <label for="width-selector">Width:</label>
-      <input type="range" id="width-selector" min="1" max="10" value="2">
-      <span id="width-value">2</span>
-    </div>
-    
-    <!-- Page Controls -->
-    <div class="tool-section page-controls">
-      <button class="tool-btn" id="prev-page">◀️</button>
-      <span id="page-info">Page 1 of 1</span>
-      <button class="tool-btn" id="next-page">▶️</button>
-      <button class="tool-btn" id="add-page">➕</button>
-      <button class="tool-btn" id="delete-page">➖</button>
-    </div>
-    
-    <!-- Zoom Controls -->
-    <div class="tool-section">
-      <button class="tool-btn" id="zoom-out">-</button>
-      <span id="zoom-level">100%</span>
-      <button class="tool-btn" id="zoom-in">+</button>
-    </div>
-  </div>
-  
-  <div class="main-content">
-    <div id="canvas-container">
-      <canvas id="canvas"></canvas>
-    </div>
-  </div>
-
-  <script src="shared.js"></script>
-  <script>
-    // Debug logging function
-    function debugLog(msg, data) {
-      console.log(`[DEBUG] ${msg}`, data || '');
-    }
-
-    // Globals for board state
-    let ws = null;
-    let boardId = null;
-    let clientId = shared.generateUuid(); // Unique client identifier
-    let currentPageUuid = null;
-    let verifiedHash = '';
-    let verifiedModActions = [];
-    let optimisticUpdates = [];
-    let pageNr = 1;
-    let totalPages = 1;
-    let lastDrawUuid = null;  // Track last drawn stroke UUID for eraser
-    let pendingRequests = {}; // Track in-flight requests
-    let connectionEstablished = false;
-    
-    // Drawing state
-    let isDrawing = false;
-    let isErasing = false;
-    let currentPath = [];
-    let currentStyle = [
-      "stroke",                    // type
-      [],                          // points
-      "#000000",                   // color
-      2.0,                         // width
-      shared.PEN_TYPES.MARKER,     // penType
-      1.0,                         // opacity
-      shared.CAP_STYLES.ROUND,     // capStyle
-      shared.JOIN_STYLES.ROUND,    // joinStyle
-      [0],                         // dashPattern
-      1.0,                         // pressureSensitivity
-      1                            // layer
-    ];
-    
-    // Zoom state
-    let zoomLevel = 1;
-    
-    // Tool state
-    let currentTool = 'pen';
-    let eraserRadius = 20;
-    
-    // DOM elements
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const container = document.getElementById('canvas-container');
-    const widthSelector = document.getElementById('width-selector');
-    const widthValue = document.getElementById('width-value');
-    const zoomLevelDisplay = document.getElementById('zoom-level');
-    const pageInfo = document.getElementById('page-info');
-    const errorBanner = document.getElementById('error-banner');
-    const errorMessage = document.getElementById('error-message');
-    const reconnectButton = document.getElementById('reconnect-button');
-    
-    // Initialize 
-    function init() {
-      setupCanvas();
-      setupWebSocket();
-      setupEventListeners();
-    }
-    
-    // Set up canvas size
-    function setupCanvas() {
-      resizeCanvas();
-      window.addEventListener('resize', resizeCanvas);
-    }
-    
-    // Resize canvas to fit window
-    function resizeCanvas() {
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
-      applyZoom();
-      redrawCanvas();
-    }
-    
-    // Apply zoom transform
-    function applyZoom() {
-      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
-    }
-    
-    // Show error message
-    function showError(message) {
-      errorMessage.textContent = message;
-      errorBanner.style.display = 'block';
-    }
-    
-    // Hide error message
-    function hideError() {
-      errorBanner.style.display = 'none';
-    }
-    
-    // Generate a unique request ID and register it
-    function createRequestId() {
-      const requestId = shared.generateUuid();
-      pendingRequests[requestId] = true;
-      return requestId;
-    }
-    
-    // Reconnect WebSocket
-    function reconnectWebSocket() {
-      if (ws) {
-        ws.close();
-      }
-      setupWebSocket();
-      hideError();
-    }
-    
-    // Set up WebSocket connection
-    function setupWebSocket() {
-      const urlParams = new URLSearchParams(window.location.search);
-      boardId = urlParams.get('id') || shared.generateUuid();
-      history.replaceState(null, null, `?id=${boardId}`);
-      
-      // Simplified WebSocket URL - no board ID in the path
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const hostname = window.location.hostname || 'localhost';
-      const wsUrl = `${wsProtocol}//${hostname}:3001/ws`;
-      
-      debugLog('Connecting to WebSocket:', wsUrl);
-      
-      ws = new WebSocket(wsUrl);
-      connectionEstablished = false;
-      
-      ws.onopen = () => {
-        debugLog('WebSocket connection established');
-        // Register with the board immediately after connection
-        registerBoard();
-      };
-      
-      ws.onclose = () => {
-        debugLog('Disconnected from server');
-        connectionEstablished = false;
-        showError('Connection to server lost. Please reconnect.');
-      };
-      
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        connectionEstablished = false;
-        showError('Failed to connect to server. Please check your connection.');
-      };
-      
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        debugLog('Received message:', data);
+    <div id="container">
+        <div id="toolbar">
+            <!-- History controls (Undo/Redo) -->
+            <div id="history-controls" class="tool-group">
+                <button id="undo-btn" class="tooltip" disabled>
+                    ↩
+                    <span class="tooltiptext">Undo (Ctrl+Z)</span>
+                </button>
+                <button id="redo-btn" class="tooltip" disabled>
+                    ↪
+                    <span class="tooltiptext">Redo (Ctrl+Y)</span>
+                </button>
+            </div>
+            
+            <!-- Drawing tools -->
+            <div class="tool-group">
+                <button id="pen-tool" class="tooltip active">
+                    ✏️
+                    <span class="tooltiptext">Pen (P)</span>
+                </button>
+                <button id="highlighter-tool" class="tooltip">
+                    🖌️
+                    <span class="tooltiptext">Highlighter (H)</span>
+                </button>
+                <button id="eraser-tool" class="tooltip">
+                    🧽
+                    <span class="tooltiptext">Eraser (E)</span>
+                </button>
+            </div>
+            
+            <!-- Color picker -->
+            <div class="tool-group color-picker">
+                <div class="color-swatch active" style="background-color: #000000;" data-color="#000000"></div>
+                <div class="color-swatch" style="background-color: #FF0000;" data-color="#FF0000"></div>
+                <div class="color-swatch" style="background-color: #0000FF;" data-color="#0000FF"></div>
+                <div class="color-swatch" style="background-color: #00FF00;" data-color="#00FF00"></div>
+                <input type="color" id="color-picker" value="#000000">
+            </div>
+            
+            <!-- Pen width -->
+            <div class="tool-group">
+                <label for="pen-width">Width:</label>
+                <input type="range" id="pen-width" min="1" max="20" value="2" style="width: 100px;">
+                <span id="pen-width-value">2px</span>
+            </div>
+            
+            <!-- Page controls -->
+            <div class="tool-group" id="page-controls">
+                <button id="prev-page" class="tooltip">
+                    ◀
+                    <span class="tooltiptext">Previous Page (PgUp)</span>
+                </button>
+                <span id="page-info">Page 1 of 1</span>
+                <button id="next-page" class="tooltip">
+                    ▶
+                    <span class="tooltiptext">Next Page (PgDn)</span>
+                </button>
+                <button id="add-page" class="tooltip">
+                    +
+                    <span class="tooltiptext">Add Page (Ctrl+N)</span>
+                </button>
+                <button id="delete-page" class="tooltip">
+                    🗑️
+                    <span class="tooltiptext">Delete Page (Del)</span>
+                </button>
+            </div>
+        </div>
         
-        // Handle existing message types
-        switch (data.type) {
-          case shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE:
-            handleAcceptMessage(data);
-            break;
-          case shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE:
-            handleDeclineMessage(data);
-            break;
-          case shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE:
-            handleReplayMessage(data);
-            break;
-          case shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE:
-            handleFullPageMessage(data);
-            break;
-          case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
-            handlePingMessage(data);
-            break;
-          case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE:
-            handleBoardRegistered(data);
-            break;
+        <div id="canvas-container">
+            <canvas id="drawing-canvas"></canvas>
+        </div>
+        
+        <div id="status">
+            <div>
+                <span id="connection-status" class="disconnected"></span>
+                <span id="connection-text">Disconnected</span>
+            </div>
+            <div id="sync-status">Ready</div>
+        </div>
+    </div>
+    
+    <script>
+        // DOM Elements
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        const penTool = document.getElementById('pen-tool');
+        const highlighterTool = document.getElementById('highlighter-tool');
+        const eraserTool = document.getElementById('eraser-tool');
+        const colorSwatches = document.querySelectorAll('.color-swatch');
+        const colorPicker = document.getElementById('color-picker');
+        const penWidth = document.getElementById('pen-width');
+        const penWidthValue = document.getElementById('pen-width-value');
+        const prevPageBtn = document.getElementById('prev-page');
+        const nextPageBtn = document.getElementById('next-page');
+        const addPageBtn = document.getElementById('add-page');
+        const deletePageBtn = document.getElementById('delete-page');
+        const pageInfo = document.getElementById('page-info');
+        const connectionStatus = document.getElementById('connection-status');
+        const connectionText = document.getElementById('connection-text');
+        const syncStatus = document.getElementById('sync-status');
+        const undoBtn = document.getElementById('undo-btn');
+        const redoBtn = document.getElementById('redo-btn');
+        
+        // Canvas setup
+        function resizeCanvas() {
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            // Position canvas in center
+            canvas.style.left = '0px';
+            canvas.style.top = '0px';
+            
+            // Redraw after resize
+            redrawCanvas();
         }
-      };
-    }
-    
-    // Register with a board
-    function registerBoard() {
-      const requestId = createRequestId();
-      
-      const registerMessage = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID]: boardId,
-        [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID]: clientId,
-        [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.REQUEST_ID]: requestId
-      };
-      
-      debugLog('Sending board registration:', registerMessage);
-      ws.send(JSON.stringify(registerMessage));
-    }
-    
-    // Handle board registration response
-    function handleBoardRegistered(data) {
-      debugLog('Board registered successfully');
-      connectionEstablished = true;
-      hideError();
-      
-      // Remove the request from pending
-      const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID];
-      delete pendingRequests[requestId];
-      
-      // Reset local state - server will send us a full page message after registration
-      verifiedModActions = [];
-      optimisticUpdates = [];
-      verifiedHash = '';
-      
-      // The server might update our boardId (e.g., if we connected with a new one)
-      boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID];
-      
-      // If the URL doesn't match our boardId, update it
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('id') !== boardId) {
-        history.replaceState(null, null, `?id=${boardId}`);
-      }
-    }
-    
-    // Handle ping message from server
-    function handlePingMessage(data) {
-      // Extract page information from ping
-      const pingPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID];
-      const pingPageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH];
-      const pingPageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_PAGE_NR];
-      const pingTotalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_TOTAL_PAGES];
-      
-      debugLog('Received ping with page info', {
-        serverPageUuid: pingPageUuid, 
-        serverPageHash: pingPageHash, 
-        serverPageNr: pingPageNr, 
-        serverTotalPages: pingTotalPages,
-        currentPageUuid: currentPageUuid
-      });
-      
-      // Check if we're on a different page than the server thinks we should be
-      if (currentPageUuid !== pingPageUuid) {
-        debugLog('Server indicates we should be on a different page', {
-          localPageUuid: currentPageUuid,
-          serverPageUuid: pingPageUuid
+        
+        // Initial resize
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Drawing state
+        let isDrawing = false;
+        let currentStroke = null;
+        let activeToolButton = penTool;
+        let activeColorSwatch = colorSwatches[0];
+        let currentColor = '#000000';
+        let currentWidth = 2;
+        let currentTool = 'pen';
+        
+        // Board state
+        let boardId = localStorage.getItem('boardId') || generateBoardId();
+        let currentPageUuid = '';
+        let pageNr = 1;
+        let totalPages = 1;
+        
+        // Store boardId in localStorage
+        localStorage.setItem('boardId', boardId);
+        
+        // Generate a board ID if none exists
+        function generateBoardId() {
+            return shared.generateUuid();
+        }
+        
+        // WebSocket connection
+        let ws;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 10;
+        const RECONNECT_DELAY = 1000; // 1 second
+        
+        // Track client actions for undo/redo
+        let myActions = [];
+        let undoneActions = new Map(); // Map of undone actionUuid -> undo actionUuid
+        
+        function connectWebSocket() {
+            updateConnectionStatus('connecting');
+            
+            // Create WebSocket connection
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                updateConnectionStatus('connected');
+                reconnectAttempts = 0;
+                
+                // Register with the board
+                const registrationMessage = {
+                    type: shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE,
+                    [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID]: boardId,
+                    [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID]: getClientId(),
+                    [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.REQUEST_ID]: shared.generateUuid()
+                };
+                
+                ws.send(JSON.stringify(registrationMessage));
+            };
+            
+            ws.onmessage = (event) => {
+                handleServerMessage(JSON.parse(event.data));
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus('disconnected');
+                
+                // Attempt reconnection
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    setTimeout(connectWebSocket, RECONNECT_DELAY * reconnectAttempts);
+                } else {
+                    syncStatus.textContent = 'Failed to reconnect. Please refresh the page.';
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+        
+        // Generate or retrieve client ID
+        function getClientId() {
+            let clientId = localStorage.getItem('clientId');
+            if (!clientId) {
+                clientId = shared.generateUuid();
+                localStorage.setItem('clientId', clientId);
+            }
+            return clientId;
+        }
+        
+        // Update connection status indicator
+        function updateConnectionStatus(status) {
+            connectionStatus.className = status;
+            connectionText.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+        
+        // Handle server messages
+        function handleServerMessage(message) {
+            console.log('Received message:', message.type);
+            
+            switch (message.type) {
+                case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE:
+                    handleBoardRegistered(message);
+                    break;
+                    
+                case shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE:
+                    handleFullPage(message);
+                    break;
+                    
+                case shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE:
+                    handleAcceptMessage(message);
+                    break;
+                    
+                case shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE:
+                    handleDeclineMessage(message);
+                    break;
+                    
+                case shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE:
+                    handleReplayMessage(message);
+                    break;
+                    
+                case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
+                    // Just log for now, could use for syncing
+                    console.log('Ping received:', message);
+                    break;
+                    
+                default:
+                    console.warn('Unknown message type:', message.type);
+            }
+        }
+        
+        // Handle board registration response
+        function handleBoardRegistered(message) {
+            console.log('Board registered:', message);
+            // Board registration successful, the server will send a fullPage message next
+        }
+        
+        // Page state management
+        let verifiedHash = '';
+        let verifiedModActions = [];
+        let optimisticUpdates = [];
+        
+        // Handle full page data
+        function handleFullPage(message) {
+            currentPageUuid = message[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
+            verifiedModActions = message[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.STATE];
+            verifiedHash = message[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH];
+            pageNr = message[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
+            totalPages = message[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
+            
+            // Clear optimistic updates since we have a new page
+            optimisticUpdates = [];
+            
+            // Update page navigation UI
+            updatePageInfo();
+            
+            // Redraw canvas with the new state
+            redrawCanvas();
+            
+            // Update sync status
+            syncStatus.textContent = 'Page loaded';
+            
+            // Update undo/redo buttons
+            updateUndoRedoButtons();
+        }
+        
+        // Handle accept message (action confirmation)
+        function handleAcceptMessage(message) {
+            const actionUuid = message[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID];
+            const afterHash = message[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
+            
+            // Find the optimistic update
+            const updateIndex = optimisticUpdates.findIndex(update => 
+                update[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === actionUuid
+            );
+            
+            if (updateIndex !== -1) {
+                // Get the action
+                const action = optimisticUpdates[updateIndex];
+                
+                // Add to verified actions with the correct hashes
+                const verifiedAction = {
+                    ...action,
+                    hashes: {
+                        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: message[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH],
+                        [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
+                    }
+                };
+                
+                verifiedModActions.push(verifiedAction);
+                
+                // Remove from optimistic updates
+                optimisticUpdates.splice(updateIndex, 1);
+                
+                // Update verified hash
+                verifiedHash = afterHash;
+                
+                // Update page info if needed
+                pageNr = message[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR];
+                totalPages = message[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES];
+                updatePageInfo();
+                
+                // Handle undo/redo tracking
+                const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+                
+                // Check if this is an undo action
+                if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
+                    const targetActionUuid = payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+                    
+                    // Find the original action in myActions and remove it
+                    const actionIndex = myActions.indexOf(targetActionUuid);
+                    if (actionIndex !== -1) {
+                        myActions.splice(actionIndex, 1);
+                    }
+                    
+                    // Store the mapping for potential redo
+                    undoneActions.set(targetActionUuid, actionUuid);
+                    
+                    // Add this undo action to my actions for potential "undo of undo"
+                    myActions.push(actionUuid);
+                }
+                // Check if this is a redo action (undo of an undo)
+                else if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
+                    const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+                    
+                    // Find the original undo action in myActions and remove it
+                    const undoIndex = myActions.indexOf(targetUndoActionUuid);
+                    if (undoIndex !== -1) {
+                        myActions.splice(undoIndex, 1);
+                    }
+                    
+                    // Find the action that was undone (now being redone)
+                    for (const [originalAction, undoAction] of undoneActions.entries()) {
+                        if (undoAction === targetUndoActionUuid) {
+                            // Add the original action back to myActions
+                            myActions.push(originalAction);
+                            // Remove from undone map
+                            undoneActions.delete(originalAction);
+                            break;
+                        }
+                    }
+                    
+                    // Add this redo action to myActions for potential undo
+                    myActions.push(actionUuid);
+                }
+                // For normal drawing/editing actions
+                else if (payload.type !== shared.MOD_ACTIONS.NEW_PAGE.TYPE && 
+                         payload.type !== shared.MOD_ACTIONS.DELETE_PAGE.TYPE) {
+                    // Add to my actions for undo tracking
+                    myActions.push(actionUuid);
+                }
+                
+                // Update undo/redo buttons
+                updateUndoRedoButtons();
+            }
+            
+            // Update sync status
+            syncStatus.textContent = 'Changes saved';
+            
+            // Redraw canvas with the new state
+            redrawCanvas();
+        }
+        
+        // Handle decline message (action rejection)
+        function handleDeclineMessage(message) {
+            const actionUuid = message[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID];
+            const reason = message[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON];
+            
+            console.log(`Action declined: ${actionUuid}`, reason ? `Reason: ${reason}` : '');
+            
+            // Find and remove the optimistic update
+            const updateIndex = optimisticUpdates.findIndex(update => 
+                update[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === actionUuid
+            );
+            
+            if (updateIndex !== -1) {
+                optimisticUpdates.splice(updateIndex, 1);
+                
+                // Update sync status
+                syncStatus.textContent = `Action declined${reason ? ': ' + reason : ''}`;
+                
+                // Redraw canvas with the updated state
+                redrawCanvas();
+                
+                // Update undo/redo buttons
+                updateUndoRedoButtons();
+            }
+        }
+        
+        // Handle replay message (catch up with missed actions)
+        function handleReplayMessage(message) {
+            const beforeHash = message[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.BEFORE_HASH];
+            const afterHash = message[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH];
+            const sequence = message[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE];
+            
+            // Verify we're applying to the correct state
+            if (beforeHash !== verifiedHash) {
+                console.warn('Replay hash mismatch, requesting full page');
+                requestFullPage();
+                return;
+            }
+            
+            // Apply all actions in the sequence
+            verifiedModActions = verifiedModActions.concat(sequence);
+            verifiedHash = afterHash;
+            
+            // Update page info
+            pageNr = message[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR];
+            totalPages = message[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES];
+            updatePageInfo();
+            
+            // Redraw canvas with the updated state
+            redrawCanvas();
+            
+            // Update sync status
+            syncStatus.textContent = 'Synchronized';
+            
+            // Update undo/redo buttons
+            updateUndoRedoButtons();
+        }
+        
+        // Request a full page from the server
+        function requestFullPage(pageId, delta) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.error('WebSocket not connected');
+                return;
+            }
+            
+            const requestId = shared.generateUuid();
+            const request = {
+                type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+                boardId: boardId,
+                requestId: requestId
+            };
+            
+            if (pageId) {
+                request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID] = pageId;
+            } else if (delta !== undefined) {
+                request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] = delta;
+            }
+            
+            ws.send(JSON.stringify(request));
+            syncStatus.textContent = 'Loading page...';
+        }
+        
+        // Request a replay from the server (to catch up on missed actions)
+        function requestReplay() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.error('WebSocket not connected');
+                return;
+            }
+            
+            const requestId = shared.generateUuid();
+            const request = {
+                type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                boardId: boardId,
+                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageUuid,
+                [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: verifiedHash,
+                requestId: requestId
+            };
+            
+            ws.send(JSON.stringify(request));
+            syncStatus.textContent = 'Synchronizing...';
+        }
+        
+        // Update page information display
+        function updatePageInfo() {
+            pageInfo.textContent = `Page ${pageNr} of ${totalPages}`;
+            
+            // Update navigation buttons
+            prevPageBtn.disabled = pageNr <= 1;
+            nextPageBtn.disabled = pageNr >= totalPages;
+            deletePageBtn.disabled = totalPages <= 1;
+        }
+        
+        // Update undo/redo buttons state
+        function updateUndoRedoButtons() {
+            undoBtn.disabled = myActions.length === 0;
+            redoBtn.disabled = undoneActions.size === 0;
+        }
+        
+        // Send a mod action proposal to the server
+        function sendModActionProposal(action) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.error('WebSocket not connected');
+                return;
+            }
+            
+            const actionUuid = shared.generateUuid();
+            const proposal = {
+                type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+                boardId: boardId,
+                [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+                [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+                [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action,
+                [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash
+            };
+            
+            // Create an optimistic update
+            const optimisticUpdate = {
+                [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+                [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action,
+                clientId: getClientId() // Add client ID for undo tracking
+            };
+            
+            // Add to optimistic updates
+            optimisticUpdates.push(optimisticUpdate);
+            
+            // Send to server
+            ws.send(JSON.stringify(proposal));
+            
+            // Update status
+            syncStatus.textContent = 'Saving changes...';
+            
+            return actionUuid;
+        }
+        
+        // Canvas drawing functions
+        function redrawCanvas() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw all verified actions
+            drawActions(verifiedModActions);
+            
+            // Draw optimistic updates
+            drawActions(optimisticUpdates);
+        }
+        
+        // Draw a collection of actions on the canvas
+        function drawActions(actions) {
+            // Keep track of which actions are undone
+            const undoneActionIds = new Set();
+            
+            // First pass: identify all undone actions
+            for (const action of actions) {
+                const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+                
+                // If this is an undo action, mark its target as undone
+                if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
+                    undoneActionIds.add(payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]);
+                }
+                
+                // If this is a redo action (undo of undo), unmark its target's target
+                if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
+                    // Find the undo action that's being undone
+                    const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+                    
+                    // Find the undo action in the list
+                    const undoAction = actions.find(a => 
+                        a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetUndoActionUuid
+                    );
+                    
+                    if (undoAction) {
+                        // Get the original action that was undone
+                        const originalActionUuid = undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+                        
+                        // Remove it from the undone set (it's been redone)
+                        undoneActionIds.delete(originalActionUuid);
+                    }
+                }
+            }
+            
+            // Second pass: draw non-undone strokes
+            for (const action of actions) {
+                // Skip if this action has been undone
+                if (undoneActionIds.has(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID])) {
+                    continue;
+                }
+                
+                const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+                
+                if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
+                    drawStroke(payload[shared.MOD_ACTIONS.DRAW.STROKE]);
+                }
+                // Erase actions don't need to be processed here as we're already filtering undone actions
+                // Undo/Redo actions are handled in the first pass
+            }
+        }
+        
+        // Draw a single stroke on the canvas
+        function drawStroke(stroke) {
+            if (!stroke || !stroke.points || stroke.points.length === 0) {
+                return;
+            }
+            
+            // Set up stroke style
+            ctx.strokeStyle = stroke.style.color || '#000000';
+            ctx.lineWidth = stroke.style.width || 2;
+            ctx.lineCap = stroke.style.capStyle || 'round';
+            ctx.lineJoin = stroke.style.joinStyle || 'round';
+            ctx.globalAlpha = stroke.style.opacity || 1.0;
+            
+            // Start path
+            ctx.beginPath();
+            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            
+            // Draw path
+            for (let i = 1; i < stroke.points.length; i++) {
+                ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+            }
+            
+            // Complete the stroke
+            ctx.stroke();
+            
+            // Reset alpha
+            ctx.globalAlpha = 1.0;
+        }
+        
+        // Start drawing a stroke
+        function startStroke(x, y, pressure = 0.5) {
+            isDrawing = true;
+            
+            // Create a new stroke based on current tool
+            if (currentTool === 'pen') {
+                currentStroke = {
+                    points: [{ x, y, pressure, timestamp: Date.now() }],
+                    style: {
+                        color: currentColor,
+                        width: currentWidth,
+                        penType: 'marker',
+                        opacity: 1.0,
+                        capStyle: 'round',
+                        joinStyle: 'round'
+                    }
+                };
+            } else if (currentTool === 'highlighter') {
+                currentStroke = {
+                    points: [{ x, y, pressure, timestamp: Date.now() }],
+                    style: {
+                        color: currentColor,
+                        width: currentWidth * 5, // Highlighters are wider
+                        penType: 'highlighter',
+                        opacity: 0.5, // Highlighters are semi-transparent
+                        capStyle: 'square',
+                        joinStyle: 'round'
+                    }
+                };
+            }
+            
+            // Draw the initial point
+            redrawCanvas();
+        }
+        
+        // Continue drawing a stroke
+        function continueStroke(x, y, pressure = 0.5) {
+            if (!isDrawing || !currentStroke) return;
+            
+            // Add point to the stroke
+            currentStroke.points.push({ x, y, pressure, timestamp: Date.now() });
+            
+            // Redraw canvas
+            redrawCanvas();
+            
+            // Draw the current stroke
+            drawStroke(currentStroke);
+        }
+        
+        // Finish drawing a stroke
+        function finishStroke() {
+            if (!isDrawing || !currentStroke) return;
+            
+            isDrawing = false;
+            
+            // Send the stroke to the server
+            if (currentStroke.points.length > 1) {
+                if (currentTool === 'pen' || currentTool === 'highlighter') {
+                    const action = {
+                        type: shared.MOD_ACTIONS.DRAW.TYPE,
+                        [shared.MOD_ACTIONS.DRAW.STROKE]: currentStroke
+                    };
+                    
+                    sendModActionProposal(action);
+                }
+            }
+            
+            currentStroke = null;
+        }
+        
+        // Eraser functionality
+        function eraseAt(x, y) {
+            if (optimisticUpdates.length > 0) {
+                // Can't erase while having pending optimistic updates
+                // This is to avoid complex sync issues
+                syncStatus.textContent = 'Please wait for pending actions to complete';
+                return;
+            }
+            
+            // Find all strokes and determine which one is under the cursor
+            const allActions = [...verifiedModActions, ...optimisticUpdates];
+            const eraseRadius = currentWidth * 5; // Larger area for eraser
+            
+            // Find actionUuids of draw actions that are under the eraser
+            const actionUuidsToErase = new Set();
+            
+            for (const action of allActions) {
+                const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+                const actionUuid = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+                
+                // Only consider draw actions that aren't already erased
+                if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
+                    const stroke = payload[shared.MOD_ACTIONS.DRAW.STROKE];
+                    
+                    // Check if any point is near the eraser
+                    for (const point of stroke.points) {
+                        const distance = Math.sqrt(Math.pow(point.x - x, 2) + Math.pow(point.y - y, 2));
+                        if (distance <= eraseRadius) {
+                            actionUuidsToErase.add(actionUuid);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // If found any strokes to erase, send erase actions
+            for (const actionUuidToErase of actionUuidsToErase) {
+                const action = {
+                    type: shared.MOD_ACTIONS.ERASE.TYPE,
+                    [shared.MOD_ACTIONS.ERASE.ACTION_UUID]: actionUuidToErase
+                };
+                
+                sendModActionProposal(action);
+            }
+        }
+        
+        // Initialize WebSocket connection
+        connectWebSocket();
+        
+        // Canvas event listeners
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (currentTool === 'pen' || currentTool === 'highlighter') {
+                startStroke(x, y);
+            } else if (currentTool === 'eraser') {
+                eraseAt(x, y);
+            }
         });
         
-        // This could happen if our current page was deleted by another client
-        // Request full page for the page the server thinks we should be on
-        const requestId = createRequestId();
-        const fullPageRequest = {
-          type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-          boardId: boardId,
-          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: pingPageUuid,
-          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
-        };
-        
-        debugLog('Requesting full page due to page mismatch', fullPageRequest);
-        sendMessage(fullPageRequest);
-        return;
-      }
-      
-      // Update page position information
-      if (pageNr !== pingPageNr || totalPages !== pingTotalPages) {
-        debugLog('Page position out of sync', {
-          local: { pageNr, totalPages },
-          server: { pageNr: pingPageNr, totalPages: pingTotalPages }
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (currentTool === 'pen' || currentTool === 'highlighter') {
+                continueStroke(x, y);
+            } else if (currentTool === 'eraser' && e.buttons === 1) {
+                eraseAt(x, y);
+            }
         });
         
-        // Update our local page info
-        pageNr = pingPageNr;
-        totalPages = pingTotalPages;
-        updatePageInfo();
-      }
-      
-      // Check if we need to request a replay (our hash doesn't match server's)
-      if (verifiedHash !== pingPageHash) {
-        debugLog('Page hash out of sync, requesting replay', {
-          localHash: verifiedHash,
-          serverHash: pingPageHash
+        canvas.addEventListener('mouseup', () => {
+            finishStroke();
         });
-        requestReplay(currentPageUuid, verifiedHash);
-      }
-    }
-
-    // Handle accept message from server
-    function handleAcceptMessage(data) {
-      const acceptedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID];
-      const acceptedAction = optimisticUpdates.find(a => 
-        a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === acceptedActionUuid
-      );
-      
-      if (acceptedAction) {
-        // Move action from optimistic to verified
-        optimisticUpdates = optimisticUpdates.filter(a => 
-          a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== acceptedActionUuid
-        );
         
-        // Update hash values
-        acceptedAction.hashes = {
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: 
-            data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH],
-          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: 
-            data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]
-        };
-        
-        verifiedModActions.push(acceptedAction);
-        verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
-        
-        // Update page info
-        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR];
-        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES];
-        updatePageInfo();
-      } else {
-        // Request replay if we don't know about this action
-        requestReplay(currentPageUuid, verifiedHash);
-      }
-      
-      redrawCanvas();
-    }
-    
-    // Handle decline message from server
-    function handleDeclineMessage(data) {
-      const declinedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID];
-      
-      // Remove declined action from optimistic updates
-      optimisticUpdates = optimisticUpdates.filter(a => 
-        a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== declinedActionUuid
-      );
-      
-      // Request replay to ensure we're in sync
-      requestReplay(currentPageUuid, verifiedHash);
-      redrawCanvas();
-    }
-    
-    // Handle replay message from server
-    function handleReplayMessage(data) {
-      const replayActions = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE];
-      verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH];
-      
-      // Apply replayed actions
-      if (Array.isArray(replayActions)) {
-        verifiedModActions = verifiedModActions.concat(replayActions);
-      }
-      
-      // Update page info
-      if (data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR]) {
-        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR];
-      }
-      if (data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES]) {
-        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES];
-      }
-      updatePageInfo();
-      
-      redrawCanvas();
-    }
-    
-    // Handle full page message from server
-    function handleFullPageMessage(data) {
-      const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
-      const modActions = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.STATE];
-      const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH];
-      
-      // Replace current page data
-      currentPageUuid = pageUuid;
-      verifiedModActions = Array.isArray(modActions) ? modActions : [];
-      optimisticUpdates = [];
-      verifiedHash = afterHash;
-      
-      // Update page info
-      pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
-      totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
-      updatePageInfo();
-      
-      redrawCanvas();
-    }
-    
-    // Send a message to the server
-    function sendMessage(message) {
-      if (!connectionEstablished) {
-        showError('Not connected to server. Please reconnect.');
-        return false;
-      }
-      
-      // Add boardId to all outgoing messages
-      message.boardId = boardId;
-      
-      debugLog('Sending message:', message);
-      ws.send(JSON.stringify(message));
-      return true;
-    }
-    
-    // Set up event listeners
-    function setupEventListeners() {
-      // Reconnect button
-      reconnectButton.addEventListener('click', reconnectWebSocket);
-      
-      // Tool selection
-      document.getElementById('pen-tool').addEventListener('click', () => setTool('pen'));
-      document.getElementById('highlighter-tool').addEventListener('click', () => setTool('highlighter'));
-      document.getElementById('eraser-tool').addEventListener('click', () => setTool('eraser'));
-      
-      // Color selection
-      const colorSwatches = document.querySelectorAll('.color-swatch');
-      colorSwatches.forEach(swatch => {
-        swatch.addEventListener('click', () => {
-          colorSwatches.forEach(s => s.classList.remove('active'));
-          swatch.classList.add('active');
-          currentStyle[shared.STROKE.COLOR] = swatch.dataset.color;
+        canvas.addEventListener('mouseleave', () => {
+            finishStroke();
         });
-      });
-      
-      // Width selection
-      widthSelector.addEventListener('input', () => {
-        const width = parseInt(widthSelector.value);
-        widthValue.textContent = width;
-        currentStyle[shared.STROKE.WIDTH] = width;
-      });
-      
-      // Page navigation
-      document.getElementById('prev-page').addEventListener('click', () => navigateToPage(pageNr - 1));
-      document.getElementById('next-page').addEventListener('click', () => navigateToPage(pageNr + 1));
-      document.getElementById('add-page').addEventListener('click', addNewPage);
-      document.getElementById('delete-page').addEventListener('click', deletePage);
-      
-      // Zoom controls
-      document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.1));
-      document.getElementById('zoom-out').addEventListener('click', () => adjustZoom(-0.1));
-      
-      // Canvas events
-      canvas.addEventListener('pointerdown', handlePointerDown);
-      canvas.addEventListener('pointermove', handlePointerMove);
-      canvas.addEventListener('pointerup', handlePointerUp);
-      canvas.addEventListener('pointerleave', handlePointerUp);
-      
-      // Prevent default touch behaviors
-      canvas.addEventListener('touchstart', e => e.preventDefault());
-      canvas.addEventListener('touchmove', e => e.preventDefault());
-      canvas.addEventListener('touchend', e => e.preventDefault());
-    }
-    
-    // Set current tool
-    function setTool(tool) {
-      currentTool = tool;
-      
-      // Update UI
-      document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-      document.getElementById(`${tool}-tool`).classList.add('active');
-      
-      // Set appropriate styles for the tool
-      switch (tool) {
-        case 'pen':
-          currentStyle = [
-            "stroke",                       // type
-            [],                             // points
-            currentStyle[shared.STROKE.COLOR],  // maintain color
-            currentStyle[shared.STROKE.WIDTH],  // maintain width
-            shared.PEN_TYPES.MARKER,        // penType
-            1.0,                            // opacity
-            shared.CAP_STYLES.ROUND,        // capStyle
-            shared.JOIN_STYLES.ROUND,       // joinStyle
-            [0],                            // dashPattern
-            1.0,                            // pressureSensitivity
-            1                               // layer
-          ];
-          break;
-        case 'highlighter':
-          currentStyle = [
-            "stroke",                       // type
-            [],                             // points
-            currentStyle[shared.STROKE.COLOR],  // maintain color
-            currentStyle[shared.STROKE.WIDTH],  // maintain width
-            shared.PEN_TYPES.HIGHLIGHTER,   // penType
-            0.5,                            // opacity
-            shared.CAP_STYLES.SQUARE,       // capStyle
-            shared.JOIN_STYLES.ROUND,       // joinStyle
-            [0],                            // dashPattern
-            0.3,                            // pressureSensitivity
-            1                               // layer
-          ];
-          break;
-      }
-      
-      // Update cursor
-      switch (tool) {
-        case 'pen':
-          canvas.style.cursor = 'crosshair';
-          break;
-        case 'highlighter':
-          canvas.style.cursor = 'crosshair';
-          break;
-        case 'eraser':
-          canvas.style.cursor = 'cell';
-          break;
-      }
-    }
-    
-    // Adjust zoom level
-    function adjustZoom(delta) {
-      zoomLevel = Math.max(0.5, Math.min(3, zoomLevel + delta));
-      zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
-      applyZoom();
-      redrawCanvas();
-    }
-    
-    // Update page info display
-    function updatePageInfo() {
-      pageInfo.textContent = `Page ${pageNr} of ${totalPages}`;
-    }
-    
-    // Handle pointer down event
-    function handlePointerDown(event) {
-      const rect = canvas.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / zoomLevel;
-      const y = (event.clientY - rect.top) / zoomLevel;
-      const pressure = event.pressure !== undefined ? event.pressure : 1.0;
-      
-      if (currentTool === 'eraser') {
-        isErasing = true;
         
-        // Find strokes near this point and erase them
-        const strokeUuid = findStrokeToErase(x, y);
-        if (strokeUuid) {
-          sendEraseAction(strokeUuid);
-        }
-      } else {
-        isDrawing = true;
-        currentPath = [];
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            if (currentTool === 'pen' || currentTool === 'highlighter') {
+                startStroke(x, y, touch.force || 0.5);
+            } else if (currentTool === 'eraser') {
+                eraseAt(x, y);
+            }
+        });
         
-        // Create point in compact format [x, y, pressure, timestamp]
-        const point = [x, y, pressure, Date.now()];
-        currentPath.push(point);
-      }
-    }
-    
-    // Handle pointer move event
-    function handlePointerMove(event) {
-      const rect = canvas.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / zoomLevel;
-      const y = (event.clientY - rect.top) / zoomLevel;
-      const pressure = event.pressure !== undefined ? event.pressure : 1.0;
-      
-      if (currentTool === 'eraser' && isErasing) {
-        // Find strokes near this point and erase them
-        const strokeUuid = findStrokeToErase(x, y);
-        if (strokeUuid) {
-          sendEraseAction(strokeUuid);
-        }
-      } else if (isDrawing) {
-        // Create point in compact format
-        const point = [x, y, pressure, Date.now()];
-        currentPath.push(point);
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            if (currentTool === 'pen' || currentTool === 'highlighter') {
+                continueStroke(x, y, touch.force || 0.5);
+            } else if (currentTool === 'eraser') {
+                eraseAt(x, y);
+            }
+        });
         
-        // Create a temporary stroke for drawing
-        const tempStroke = [...currentStyle];  // Clone the style
-        tempStroke[shared.STROKE.POINTS] = currentPath.slice(-2);  // Last two points
+        canvas.addEventListener('touchend', () => {
+            finishStroke();
+        });
         
-        drawStroke(tempStroke);
-      }
-    }
-    
-    // Handle pointer up event
-    function handlePointerUp() {
-      if (currentTool === 'eraser') {
-        isErasing = false;
-      } else if (isDrawing) {
-        isDrawing = false;
+        canvas.addEventListener('touchcancel', () => {
+            finishStroke();
+        });
         
-        if (currentPath.length >= 2) {
-          // Create a complete stroke using the current style and path
-          const stroke = [...currentStyle];  // Clone the style
-          stroke[shared.STROKE.POINTS] = [...currentPath];  // All points
-          
-          sendStroke(stroke);
+        // Tool selection
+        function setActiveTool(button, tool) {
+            // Deactivate current tool
+            activeToolButton.classList.remove('active');
+            
+            // Activate new tool
+            button.classList.add('active');
+            activeToolButton = button;
+            currentTool = tool;
+            
+            // Update cursor
+            if (tool === 'eraser') {
+                canvas.style.cursor = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Ccircle cx=\'12\' cy=\'12\' r=\'10\' fill=\'%23ffffff\' stroke=\'%23000000\' stroke-width=\'1\'/%3E%3C/svg%3E") 12 12, auto';
+            } else {
+                canvas.style.cursor = 'crosshair';
+            }
         }
         
-        currentPath = [];
-      }
-    }
-    
-    // Find a stroke to erase at the given position
-    function findStrokeToErase(x, y) {
-      // Combine verified and optimistic actions
-      const allActions = [...verifiedModActions, ...optimisticUpdates];
-      
-      // Find the most recent DRAW action with a stroke near this point
-      for (let i = allActions.length - 1; i >= 0; i--) {
-        const action = allActions[i];
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
+        penTool.addEventListener('click', () => setActiveTool(penTool, 'pen'));
+        highlighterTool.addEventListener('click', () => setActiveTool(highlighterTool, 'highlighter'));
+        eraserTool.addEventListener('click', () => setActiveTool(eraserTool, 'eraser'));
         
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          const stroke = payload.stroke;
-          if (isPointNearStroke(x, y, stroke)) {
-            return action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-          }
-        }
-      }
-      
-      return null;
-    }
-    
-    // Check if a point is near a stroke
-    function isPointNearStroke(x, y, stroke) {
-      if (!stroke || !stroke[shared.STROKE.POINTS] || stroke[shared.STROKE.POINTS].length < 2) return false;
-      
-      const threshold = eraserRadius;
-      const points = stroke[shared.STROKE.POINTS];
-      
-      // Check each segment of the stroke
-      for (let i = 1; i < points.length; i++) {
-        const p1 = points[i - 1];
-        const p2 = points[i];
+        // Color selection
+        colorSwatches.forEach(swatch => {
+            swatch.addEventListener('click', () => {
+                // Deactivate current swatch
+                activeColorSwatch.classList.remove('active');
+                
+                // Activate new swatch
+                swatch.classList.add('active');
+                activeColorSwatch = swatch;
+                
+                // Update current color
+                currentColor = swatch.dataset.color;
+                colorPicker.value = currentColor;
+            });
+        });
         
-        // Calculate distance from point to line segment
-        const distance = distanceToLineSegment(
-          x, y, 
-          p1[shared.POINT.X], p1[shared.POINT.Y], 
-          p2[shared.POINT.X], p2[shared.POINT.Y]
-        );
+        colorPicker.addEventListener('input', () => {
+            // Deactivate all swatches
+            colorSwatches.forEach(swatch => swatch.classList.remove('active'));
+            
+            // Update current color
+            currentColor = colorPicker.value;
+        });
         
-        if (distance < threshold) {
-          return true;
-        }
-      }
-      
-      return false;
-    }
-    
-    // Calculate distance from point to line segment
-    function distanceToLineSegment(px, py, x1, y1, x2, y2) {
-      const A = px - x1;
-      const B = py - y1;
-      const C = x2 - x1;
-      const D = y2 - y1;
-      
-      const dot = A * C + B * D;
-      const lenSq = C * C + D * D;
-      let param = -1;
-      
-      if (lenSq !== 0) {
-        param = dot / lenSq;
-      }
-      
-      let xx, yy;
-      
-      if (param < 0) {
-        xx = x1;
-        yy = y1;
-      } else if (param > 1) {
-        xx = x2;
-        yy = y2;
-      } else {
-        xx = x1 + param * C;
-        yy = y1 + param * D;
-      }
-      
-      const dx = px - xx;
-      const dy = py - yy;
-      
-      return Math.sqrt(dx * dx + dy * dy);
-    }
-    
-    // Send an erase action to the server
-    function sendEraseAction(strokeUuid) {
-      if (!strokeUuid) return;
-      
-      const actionUuid = shared.generateUuid();
-      
-      // Create the erase action in the format the server expects
-      const action = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
-          type: shared.MOD_ACTIONS.ERASE.TYPE,
-          [shared.MOD_ACTIONS.ERASE.ACTION_UUID]: strokeUuid
-        }
-      };
-      
-      // Calculate expected hash
-      const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
-      
-      // Add to optimistic updates
-      const optimisticAction = {
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
-        hashes: {
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
-        }
-      };
-      
-      optimisticUpdates.push(optimisticAction);
-      
-      // Send to server
-      sendMessage(action);
-      
-      // Immediately redraw with the stroke removed
-      redrawCanvas();
-    }
-    
-    // Send a stroke to the server
-    function sendStroke(stroke) {
-      const actionUuid = shared.generateUuid();
-      lastDrawUuid = actionUuid; // Store for eraser
-      
-      const action = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
-          type: shared.MOD_ACTIONS.DRAW.TYPE,
-          stroke: stroke
-        }
-      };
-      
-      // Calculate expected hash
-      const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
-      
-      // Add to optimistic updates
-      const optimisticAction = {
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
-        hashes: {
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
-        }
-      };
-      
-      optimisticUpdates.push(optimisticAction);
-      
-      // Send to server
-      sendMessage(action);
-    }
-    
-    // Add a new page
-    function addNewPage() {
-      const actionUuid = shared.generateUuid();
-      
-      const action = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
-          type: shared.MOD_ACTIONS.NEW_PAGE.TYPE
-        }
-      };
-      
-      debugLog('Sending new page action', action);
-      sendMessage(action);
-    }
-    
-    // Delete current page
-    function deletePage() {
-      if (totalPages <= 1) {
-        alert("Cannot delete the only page");
-        return;
-      }
-      
-      const actionUuid = shared.generateUuid();
-      
-      const action = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
-          type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE
-        }
-      };
-      
-      // Send to server
-      debugLog('Sending delete page action', action);
-      sendMessage(action);
-    }
-    
-    // Navigate to a specific page
-    function navigateToPage(pageNumber) {
-      if (pageNumber < 1 || pageNumber > totalPages) {
-        return;
-      }
-      
-      const requestId = createRequestId();
-      
-      // Using the structure the server expects for page requests
-      const fullPageRequest = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-        boardId: boardId,
-        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER]: pageNumber,
-        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
-      };
-      
-      debugLog('Sending page request', fullPageRequest);
-      sendMessage(fullPageRequest);
-    }
-    
-    // Request replay from server
-    function requestReplay(pageUuid, beforeHash) {
-      const requestId = createRequestId();
-      
-      const replayMessage = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-        boardId: boardId,
-        [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: pageUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: beforeHash,
-        [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
-      };
-      
-      sendMessage(replayMessage);
-    }
-    
-    // Draw a stroke on the canvas
-    function drawStroke(stroke) {
-      if (!stroke || !stroke[shared.STROKE.POINTS] || stroke[shared.STROKE.POINTS].length < 2) return;
-      
-      const points = stroke[shared.STROKE.POINTS];
-      
-      ctx.save();
-      
-      // Apply style
-      ctx.strokeStyle = stroke[shared.STROKE.COLOR];
-      ctx.lineWidth = stroke[shared.STROKE.WIDTH];
-      
-      if (stroke[shared.STROKE.PEN_TYPE] === shared.PEN_TYPES.HIGHLIGHTER) {
-        ctx.globalAlpha = 0.5;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "square";
-      } else {
-        ctx.globalAlpha = stroke[shared.STROKE.OPACITY];
-        ctx.lineJoin = shared.getJoinStyleString(stroke[shared.STROKE.JOIN_STYLE]);
-        ctx.lineCap = shared.getCapStyleString(stroke[shared.STROKE.CAP_STYLE]);
-      }
-      
-      const dashPattern = stroke[shared.STROKE.DASH_PATTERN];
-      if (dashPattern && dashPattern.length > 1) {
-        ctx.setLineDash(dashPattern);
-      } else {
-        ctx.setLineDash([]);
-      }
-      
-      // Draw the stroke
-      ctx.beginPath();
-      ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
-      
-      for (let i = 1; i < points.length; i++) {
-        const point = points[i];
+        // Pen width
+        penWidth.addEventListener('input', () => {
+            currentWidth = parseInt(penWidth.value);
+            penWidthValue.textContent = `${currentWidth}px`;
+        });
         
-        // Apply pressure sensitivity if available
-        if (stroke[shared.STROKE.PRESSURE_SENS] > 0 && point[shared.POINT.PRESSURE] !== undefined) {
-          const pressureEffect = 1 + (point[shared.POINT.PRESSURE] - 1) * stroke[shared.STROKE.PRESSURE_SENS];
-          ctx.lineWidth = stroke[shared.STROKE.WIDTH] * pressureEffect;
+        // Page navigation
+        prevPageBtn.addEventListener('click', () => {
+            requestFullPage(null, -1);
+        });
+        
+        nextPageBtn.addEventListener('click', () => {
+            requestFullPage(null, 1);
+        });
+        
+        // Add page
+        addPageBtn.addEventListener('click', () => {
+            const action = {
+                type: shared.MOD_ACTIONS.NEW_PAGE.TYPE
+            };
+            
+            sendModActionProposal(action);
+        });
+        
+        // Delete page
+        deletePageBtn.addEventListener('click', () => {
+            if (totalPages <= 1) {
+                alert('Cannot delete the last page');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to delete this page?')) {
+                const action = {
+                    type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE
+                };
+                
+                sendModActionProposal(action);
+            }
+        });
+        
+        // Undo button handler
+        undoBtn.addEventListener('click', handleUndo);
+        
+        // Redo button handler
+        redoBtn.addEventListener('click', handleRedo);
+        
+        // Undo function
+        function handleUndo() {
+            if (myActions.length === 0) return;
+            
+            // Get the most recent action from myActions
+            const actionToUndo = myActions[myActions.length - 1];
+            
+            // Create an undo action
+            const undoAction = {
+                type: shared.MOD_ACTIONS.UNDO.TYPE,
+                [shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]: actionToUndo,
+                [shared.MOD_ACTIONS.UNDO.CLIENT_ID]: getClientId()
+            };
+            
+            // Send the undo action to the server
+            sendModActionProposal(undoAction);
         }
         
-        ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
-      }
-      
-      ctx.stroke();
-      ctx.restore();
-    }
-    
-    // Redraw the entire canvas
-    function redrawCanvas() {
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.restore();
-      
-      // Get list of all stroke UUIDs that have been erased
-      const erasedStrokes = [];
-      const allActions = [...verifiedModActions, ...optimisticUpdates];
-      
-      for (const action of allActions) {
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
-        
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (payload.type === shared.MOD_ACTIONS.ERASE.TYPE && payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID]) {
-          erasedStrokes.push(payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID]);
+        // Redo function
+        function handleRedo() {
+            if (undoneActions.size === 0) return;
+            
+            // Get the most recently undone action
+            // This gets the most recent undo action from myActions
+            // that corresponds to an entry in undoneActions
+            let targetUndoAction = null;
+            let originalAction = null;
+            
+            // Find the most recent undone action
+            for (let i = myActions.length - 1; i >= 0; i--) {
+                const actionUuid = myActions[i];
+                
+                // Check if this is an undo action in our map
+                for (const [original, undo] of undoneActions.entries()) {
+                    if (undo === actionUuid) {
+                        targetUndoAction = actionUuid;
+                        originalAction = original;
+                        break;
+                    }
+                }
+                
+                if (targetUndoAction) break;
+            }
+            
+            if (!targetUndoAction) return;
+            
+            // Create a redo action (which is an undo of the undo)
+            const redoAction = {
+                type: shared.MOD_ACTIONS.REDO.TYPE,
+                [shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID]: targetUndoAction,
+                [shared.MOD_ACTIONS.REDO.CLIENT_ID]: getClientId()
+            };
+            
+            // Send the redo action to the server
+            sendModActionProposal(redoAction);
         }
-      }
-      
-      // Draw all non-erased strokes
-      for (const action of allActions) {
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
         
-        // Skip drawing if this stroke has been erased
-        if (erasedStrokes.includes(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID])) {
-          continue;
-        }
-        
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          drawStroke(payload.stroke);
-        }
-      }
-    }
-    
-    // Initialize the app
-    window.addEventListener('DOMContentLoaded', init);
-  </script>
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Tool selection shortcuts
+            if (e.key === 'p' || e.key === 'P') {
+                setActiveTool(penTool, 'pen');
+            } else if (e.key === 'h' || e.key === 'H') {
+                setActiveTool(highlighterTool, 'highlighter');
+            } else if (e.key === 'e' || e.key === 'E') {
+                setActiveTool(eraserTool, 'eraser');
+            }
+            
+            // Page navigation shortcuts
+            if (e.key === 'PageUp') {
+                if (!prevPageBtn.disabled) {
+                    requestFullPage(null, -1);
+                }
+            } else if (e.key === 'PageDown') {
+                if (!nextPageBtn.disabled) {
+                    requestFullPage(null, 1);
+                }
+            }
+            
+            // Add/delete page shortcuts
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                addPageBtn.click();
+            } else if (e.key === 'Delete' && !deletePageBtn.disabled) {
+                if (document.activeElement === document.body) {
+                    deletePageBtn.click();
+                }
+            }
+            
+            // Undo/Redo shortcuts
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                if (!e.shiftKey && !undoBtn.disabled) {
+                    // Undo
+                    handleUndo();
+                } else if (e.shiftKey && !redoBtn.disabled) {
+                    // Redo with Ctrl+Shift+Z
+                    handleRedo();
+                }
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'y' && !redoBtn.disabled) {
+                // Alternative Redo with Ctrl+Y
+                e.preventDefault();
+                handleRedo();
+            }
+        });
+    </script>
 </body>
 </html>
