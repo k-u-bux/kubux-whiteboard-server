@@ -190,25 +190,27 @@
     
     // Drawing state
     let isDrawing = false;
+    let isErasing = false;
     let currentPath = [];
-    let currentStyle = {
-      penType: shared.PEN_TYPES.MARKER,
-      color: "#000000",
-      opacity: 1.0,
-      width: 2.0,
-      capStyle: shared.CAP_STYLES.ROUND,
-      joinStyle: shared.JOIN_STYLES.ROUND,
-      dashPattern: [0],
-      pressureSensitivity: 1.0,
-      layer: 1
-    };
+    let currentStyle = [
+      "stroke",                    // type
+      [],                          // points
+      "#000000",                   // color
+      2.0,                         // width
+      shared.PEN_TYPES.MARKER,     // penType
+      1.0,                         // opacity
+      shared.CAP_STYLES.ROUND,     // capStyle
+      shared.JOIN_STYLES.ROUND,    // joinStyle
+      [0],                         // dashPattern
+      1.0,                         // pressureSensitivity
+      1                            // layer
+    ];
     
     // Zoom state
     let zoomLevel = 1;
     
     // Tool state
     let currentTool = 'pen';
-    let isErasing = false;
     let eraserRadius = 20;
     
     // DOM elements
@@ -564,7 +566,7 @@
         swatch.addEventListener('click', () => {
           colorSwatches.forEach(s => s.classList.remove('active'));
           swatch.classList.add('active');
-          currentStyle.color = swatch.dataset.color;
+          currentStyle[shared.STROKE.COLOR] = swatch.dataset.color;
         });
       });
       
@@ -572,7 +574,7 @@
       widthSelector.addEventListener('input', () => {
         const width = parseInt(widthSelector.value);
         widthValue.textContent = width;
-        currentStyle.width = width;
+        currentStyle[shared.STROKE.WIDTH] = width;
       });
       
       // Page navigation
@@ -608,22 +610,34 @@
       // Set appropriate styles for the tool
       switch (tool) {
         case 'pen':
-          currentStyle = {
-            ...currentStyle,
-            penType: shared.PEN_TYPES.MARKER,
-            opacity: 1.0,
-            capStyle: shared.CAP_STYLES.ROUND,
-            joinStyle: shared.JOIN_STYLES.ROUND
-          };
+          currentStyle = [
+            "stroke",                       // type
+            [],                             // points
+            currentStyle[shared.STROKE.COLOR],  // maintain color
+            currentStyle[shared.STROKE.WIDTH],  // maintain width
+            shared.PEN_TYPES.MARKER,        // penType
+            1.0,                            // opacity
+            shared.CAP_STYLES.ROUND,        // capStyle
+            shared.JOIN_STYLES.ROUND,       // joinStyle
+            [0],                            // dashPattern
+            1.0,                            // pressureSensitivity
+            1                               // layer
+          ];
           break;
         case 'highlighter':
-          currentStyle = {
-            ...currentStyle,
-            penType: shared.PEN_TYPES.HIGHLIGHTER,
-            opacity: 0.5,
-            capStyle: shared.CAP_STYLES.SQUARE,
-            joinStyle: shared.JOIN_STYLES.ROUND
-          };
+          currentStyle = [
+            "stroke",                       // type
+            [],                             // points
+            currentStyle[shared.STROKE.COLOR],  // maintain color
+            currentStyle[shared.STROKE.WIDTH],  // maintain width
+            shared.PEN_TYPES.HIGHLIGHTER,   // penType
+            0.5,                            // opacity
+            shared.CAP_STYLES.SQUARE,       // capStyle
+            shared.JOIN_STYLES.ROUND,       // joinStyle
+            [0],                            // dashPattern
+            0.3,                            // pressureSensitivity
+            1                               // layer
+          ];
           break;
       }
       
@@ -673,13 +687,8 @@
         isDrawing = true;
         currentPath = [];
         
-        const point = {
-          x: x,
-          y: y,
-          pressure: pressure,
-          timestamp: Date.now()
-        };
-        
+        // Create point in compact format [x, y, pressure, timestamp]
+        const point = [x, y, pressure, Date.now()];
         currentPath.push(point);
       }
     }
@@ -698,18 +707,15 @@
           sendEraseAction(strokeUuid);
         }
       } else if (isDrawing) {
-        const point = {
-          x: x,
-          y: y,
-          pressure: pressure,
-          timestamp: Date.now()
-        };
-        
+        // Create point in compact format
+        const point = [x, y, pressure, Date.now()];
         currentPath.push(point);
-        drawStroke({
-          points: currentPath.slice(-2),
-          style: currentStyle
-        });
+        
+        // Create a temporary stroke for drawing
+        const tempStroke = [...currentStyle];  // Clone the style
+        tempStroke[shared.STROKE.POINTS] = currentPath.slice(-2);  // Last two points
+        
+        drawStroke(tempStroke);
       }
     }
     
@@ -721,10 +727,9 @@
         isDrawing = false;
         
         if (currentPath.length >= 2) {
-          const stroke = {
-            points: currentPath,
-            style: currentStyle
-          };
+          // Create a complete stroke using the current style and path
+          const stroke = [...currentStyle];  // Clone the style
+          stroke[shared.STROKE.POINTS] = [...currentPath];  // All points
           
           sendStroke(stroke);
         }
@@ -757,17 +762,23 @@
     
     // Check if a point is near a stroke
     function isPointNearStroke(x, y, stroke) {
-      if (!stroke || !stroke.points || stroke.points.length < 2) return false;
+      if (!stroke || !stroke[shared.STROKE.POINTS] || stroke[shared.STROKE.POINTS].length < 2) return false;
       
       const threshold = eraserRadius;
+      const points = stroke[shared.STROKE.POINTS];
       
       // Check each segment of the stroke
-      for (let i = 1; i < stroke.points.length; i++) {
-        const p1 = stroke.points[i - 1];
-        const p2 = stroke.points[i];
+      for (let i = 1; i < points.length; i++) {
+        const p1 = points[i - 1];
+        const p2 = points[i];
         
         // Calculate distance from point to line segment
-        const distance = distanceToLineSegment(x, y, p1.x, p1.y, p2.x, p2.y);
+        const distance = distanceToLineSegment(
+          x, y, 
+          p1[shared.POINT.X], p1[shared.POINT.Y], 
+          p2[shared.POINT.X], p2[shared.POINT.Y]
+        );
+        
         if (distance < threshold) {
           return true;
         }
@@ -819,7 +830,6 @@
       // Create the erase action in the format the server expects
       const action = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.ERASE.TYPE,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
@@ -858,7 +868,6 @@
       
       const action = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.DRAW.TYPE,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
@@ -893,7 +902,6 @@
       
       const action = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.NEW_PAGE.TYPE,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
@@ -917,7 +925,6 @@
       
       const action = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
@@ -939,10 +946,10 @@
       
       const requestId = createRequestId();
       
-      // Using the structure the server expects for page requests, with boardId
+      // Using the structure the server expects for page requests
       const fullPageRequest = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-        boardId: boardId, // Add boardId explicitly
+        boardId: boardId,
         [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER]: pageNumber,
         [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
       };
@@ -957,7 +964,7 @@
       
       const replayMessage = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-        boardId: boardId, // Add boardId explicitly
+        boardId: boardId,
         [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: pageUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: beforeHash,
         [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
@@ -968,46 +975,47 @@
     
     // Draw a stroke on the canvas
     function drawStroke(stroke) {
-      if (!stroke || !stroke.points || stroke.points.length < 2) return;
+      if (!stroke || !stroke[shared.STROKE.POINTS] || stroke[shared.STROKE.POINTS].length < 2) return;
       
-      const style = stroke.style;
+      const points = stroke[shared.STROKE.POINTS];
       
       ctx.save();
       
       // Apply style
-      ctx.strokeStyle = style.color;
-      ctx.lineWidth = style.width;
+      ctx.strokeStyle = stroke[shared.STROKE.COLOR];
+      ctx.lineWidth = stroke[shared.STROKE.WIDTH];
       
-      if (style.penType === shared.PEN_TYPES.HIGHLIGHTER) {
+      if (stroke[shared.STROKE.PEN_TYPE] === shared.PEN_TYPES.HIGHLIGHTER) {
         ctx.globalAlpha = 0.5;
-        ctx.lineJoin = shared.JOIN_STYLES.ROUND;
-        ctx.lineCap = shared.CAP_STYLES.SQUARE;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "square";
       } else {
-        ctx.globalAlpha = style.opacity;
-        ctx.lineJoin = style.joinStyle;
-        ctx.lineCap = style.capStyle;
+        ctx.globalAlpha = stroke[shared.STROKE.OPACITY];
+        ctx.lineJoin = shared.getJoinStyleString(stroke[shared.STROKE.JOIN_STYLE]);
+        ctx.lineCap = shared.getCapStyleString(stroke[shared.STROKE.CAP_STYLE]);
       }
       
-      if (style.dashPattern && style.dashPattern.length > 1) {
-        ctx.setLineDash(style.dashPattern);
+      const dashPattern = stroke[shared.STROKE.DASH_PATTERN];
+      if (dashPattern && dashPattern.length > 1) {
+        ctx.setLineDash(dashPattern);
       } else {
         ctx.setLineDash([]);
       }
       
       // Draw the stroke
       ctx.beginPath();
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
       
-      for (let i = 1; i < stroke.points.length; i++) {
-        const point = stroke.points[i];
+      for (let i = 1; i < points.length; i++) {
+        const point = points[i];
         
         // Apply pressure sensitivity if available
-        if (style.pressureSensitivity > 0 && point.pressure !== undefined) {
-          const pressureEffect = 1 + (point.pressure - 1) * style.pressureSensitivity;
-          ctx.lineWidth = style.width * pressureEffect;
+        if (stroke[shared.STROKE.PRESSURE_SENS] > 0 && point[shared.POINT.PRESSURE] !== undefined) {
+          const pressureEffect = 1 + (point[shared.POINT.PRESSURE] - 1) * stroke[shared.STROKE.PRESSURE_SENS];
+          ctx.lineWidth = stroke[shared.STROKE.WIDTH] * pressureEffect;
         }
         
-        ctx.lineTo(point.x, point.y);
+        ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
       }
       
       ctx.stroke();

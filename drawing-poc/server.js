@@ -4,7 +4,7 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 
-const { hashAny, hashNext, generateUuid, MESSAGES, MOD_ACTIONS } = require('./shared');
+const { hashAny, hashNext, generateUuid, MESSAGES, MOD_ACTIONS, STROKE, POINT } = require('./shared');
 
 // Data storage configuration
 const DATA_DIR = './data';

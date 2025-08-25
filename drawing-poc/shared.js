@@ -26,74 +26,174 @@ function hashNext(previousHash, newData) {
 const calculateHash = hashAny;
 const calculateChainHash = hashNext;
 
+// Indices for point arrays [x, y, pressure, timestamp]
+const POINT = {
+  X: 0,
+  Y: 1,
+  PRESSURE: 2,
+  TIMESTAMP: 3
+};
+
+// Indices for stroke arrays [type, points[], color, width, penType, opacity, capStyle, joinStyle, dashPattern, pressureSensitivity, layer]
+const STROKE = {
+  TYPE: 0,         // Always "stroke"
+  POINTS: 1,       // Array of point arrays
+  COLOR: 2,        // Color string
+  WIDTH: 3,        // Stroke width
+  PEN_TYPE: 4,     // Pen type constant
+  OPACITY: 5,      // Opacity (0-1)
+  CAP_STYLE: 6,    // Cap style constant
+  JOIN_STYLE: 7,   // Join style constant
+  DASH_PATTERN: 8, // Dash pattern array
+  PRESSURE_SENS: 9, // Pressure sensitivity
+  LAYER: 10        // Layer number
+};
+
 // Stroke style definitions
 const PEN_TYPES = {
-  MARKER: "marker",
-  PENCIL: "pencil",
-  HIGHLIGHTER: "highlighter",
-  BRUSH: "brush"
+  MARKER: 0,
+  PENCIL: 1,
+  HIGHLIGHTER: 2,
+  BRUSH: 3
 };
 
 const CAP_STYLES = {
-  ROUND: "round",
-  BUTT: "butt",
-  SQUARE: "square"
+  ROUND: 0,
+  BUTT: 1,
+  SQUARE: 2
 };
 
 const JOIN_STYLES = {
-  ROUND: "round",
-  BEVEL: "bevel",
-  MITER: "miter"
+  ROUND: 0,
+  BEVEL: 1,
+  MITER: 2
 };
 
-// Default stroke styles
+// Map numeric constants back to CSS string values
+const PEN_TYPE_STRINGS = ["marker", "pencil", "highlighter", "brush"];
+const CAP_STYLE_STRINGS = ["round", "butt", "square"];
+const JOIN_STYLE_STRINGS = ["round", "bevel", "miter"];
+
+// Default stroke styles (using compact array format)
 const STROKE_STYLES = {
-  PEN: {
-    penType: PEN_TYPES.MARKER,
-    color: "#000000",
-    opacity: 1.0,
-    width: 2.0,
-    capStyle: CAP_STYLES.ROUND,
-    joinStyle: JOIN_STYLES.ROUND,
-    dashPattern: [0], // Solid line
-    pressureSensitivity: 1.0,
-    tiltSensitivity: 0.0
-  },
-  HIGHLIGHTER: {
-    penType: PEN_TYPES.HIGHLIGHTER,
-    color: "#FFFF00",
-    opacity: 0.5,
-    width: 12.0,
-    capStyle: CAP_STYLES.SQUARE,
-    joinStyle: JOIN_STYLES.ROUND,
-    dashPattern: [0], // Solid line
-    pressureSensitivity: 0.3,
-    tiltSensitivity: 0.0
-  }
+  PEN: [
+    "stroke",             // type
+    [],                   // points
+    "#000000",            // color
+    2.0,                  // width
+    PEN_TYPES.MARKER,     // penType
+    1.0,                  // opacity
+    CAP_STYLES.ROUND,     // capStyle
+    JOIN_STYLES.ROUND,    // joinStyle
+    [0],                  // dashPattern
+    1.0,                  // pressureSensitivity
+    1                     // layer
+  ],
+  HIGHLIGHTER: [
+    "stroke",             // type
+    [],                   // points
+    "#FFFF00",            // color
+    12.0,                 // width
+    PEN_TYPES.HIGHLIGHTER, // penType
+    0.5,                  // opacity
+    CAP_STYLES.SQUARE,    // capStyle
+    JOIN_STYLES.ROUND,    // joinStyle
+    [0],                  // dashPattern
+    0.3,                  // pressureSensitivity
+    1                     // layer
+  ]
 };
 
 // Function to create a new stroke with specific style
-function createStroke(style = STROKE_STYLES.PEN) {
-  return {
-    points: [],
-    style: { ...style } // Clone the style object
-  };
+function createStroke(styleTemplate = STROKE_STYLES.PEN) {
+  // Clone the style array
+  return [...styleTemplate];
 }
 
-// Function to add a point to a stroke with pressure and tilt
-function addPointToStroke(stroke, x, y, pressure = 0.5, tiltX = 0, tiltY = 0) {
-  const point = {
-    x: x,
-    y: y,
-    pressure: pressure,
-    tilt: { x: tiltX, y: tiltY },
-    timestamp: Date.now()
-  };
+// Function to add a point to a stroke with pressure and timestamp
+function addPointToStroke(stroke, x, y, pressure = 0.5, timestamp = Date.now()) {
+  // Create a compact point representation [x, y, pressure, timestamp]
+  const point = [x, y, pressure, timestamp];
   
-  stroke.points.push(point);
+  // Make sure points array exists
+  if (!Array.isArray(stroke[STROKE.POINTS])) {
+    stroke[STROKE.POINTS] = [];
+  }
+  
+  // Add the point
+  stroke[STROKE.POINTS].push(point);
   return stroke;
 }
 
+// Helper for converting legacy point objects to compact format
+function convertPointToCompact(pointObj) {
+  return [
+    pointObj.x, 
+    pointObj.y, 
+    pointObj.pressure || 0.5,
+    pointObj.timestamp || Date.now()
+  ];
+}
+
+// Helper for converting legacy stroke objects to compact format
+function convertStrokeToCompact(strokeObj) {
+  const compactStroke = [
+    "stroke",  // type
+    [],        // points (will fill below)
+    strokeObj.style.color || "#000000",
+    strokeObj.style.width || 2.0,
+    getPenTypeValue(strokeObj.style.penType),
+    strokeObj.style.opacity || 1.0,
+    getCapStyleValue(strokeObj.style.capStyle),
+    getJoinStyleValue(strokeObj.style.joinStyle),
+    strokeObj.style.dashPattern || [0],
+    strokeObj.style.pressureSensitivity || 1.0,
+    strokeObj.style.layer || 1
+  ];
+  
+  // Convert points
+  if (strokeObj.points && Array.isArray(strokeObj.points)) {
+    compactStroke[STROKE.POINTS] = strokeObj.points.map(p => 
+      Array.isArray(p) ? p : convertPointToCompact(p)
+    );
+  }
+  
+  return compactStroke;
+}
+
+// Helper functions to handle string/number conversions
+function getPenTypeValue(penTypeString) {
+  if (typeof penTypeString === 'number') return penTypeString;
+  const index = PEN_TYPE_STRINGS.indexOf(penTypeString);
+  return index >= 0 ? index : PEN_TYPES.MARKER;
+}
+
+function getCapStyleValue(capStyleString) {
+  if (typeof capStyleString === 'number') return capStyleString;
+  const index = CAP_STYLE_STRINGS.indexOf(capStyleString);
+  return index >= 0 ? index : CAP_STYLES.ROUND;
+}
+
+function getJoinStyleValue(joinStyleString) {
+  if (typeof joinStyleString === 'number') return joinStyleString;
+  const index = JOIN_STYLE_STRINGS.indexOf(joinStyleString);
+  return index >= 0 ? index : JOIN_STYLES.ROUND;
+}
+
+// Get string values for rendering
+function getPenTypeString(value) {
+  return PEN_TYPE_STRINGS[value] || "marker";
+}
+
+function getCapStyleString(value) {
+  return CAP_STYLE_STRINGS[value] || "round";
+}
+
+function getJoinStyleString(value) {
+  return JOIN_STYLE_STRINGS[value] || "round";
+}
+
+// Message constants remain the same for backward compatibility
 const MESSAGES = {
   CLIENT_TO_SERVER: {
     REGISTER_BOARD: {
@@ -172,6 +272,7 @@ const MESSAGES = {
   }
 };
 
+// Action types using compact format for MOD_ACTIONS
 const MOD_ACTIONS = {
     DRAW: {
         TYPE: 'draw',
@@ -197,12 +298,25 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateChainHash,
     hashAny,
     hashNext,
+    POINT,
+    STROKE,
     PEN_TYPES,
     CAP_STYLES,
     JOIN_STYLES,
+    PEN_TYPE_STRINGS,
+    CAP_STYLE_STRINGS, 
+    JOIN_STYLE_STRINGS,
     STROKE_STYLES,
     createStroke,
     addPointToStroke,
+    convertPointToCompact,
+    convertStrokeToCompact,
+    getPenTypeValue,
+    getCapStyleValue,
+    getJoinStyleValue,
+    getPenTypeString,
+    getCapStyleString,
+    getJoinStyleString,
     MESSAGES,
     MOD_ACTIONS
   };
@@ -215,12 +329,25 @@ else if (typeof window !== 'undefined') {
     calculateChainHash,
     hashAny,
     hashNext,
+    POINT,
+    STROKE,
     PEN_TYPES,
     CAP_STYLES,
     JOIN_STYLES,
+    PEN_TYPE_STRINGS,
+    CAP_STYLE_STRINGS,
+    JOIN_STYLE_STRINGS,
     STROKE_STYLES,
     createStroke,
     addPointToStroke,
+    convertPointToCompact,
+    convertStrokeToCompact,
+    getPenTypeValue,
+    getCapStyleValue,
+    getJoinStyleValue,
+    getPenTypeString,
+    getCapStyleString,
+    getJoinStyleString,
     MESSAGES,
     MOD_ACTIONS
   };
