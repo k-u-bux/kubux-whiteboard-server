@@ -221,8 +221,14 @@
       const boardId = urlParams.get('id') || shared.generateUuid();
       history.replaceState(null, null, `?id=${boardId}`);
       
+      // Use the correct port 3001 for WebSocket connection
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws/${boardId}`;
+      
+      // Extract hostname without port
+      const hostname = window.location.hostname || 'localhost';
+      
+      // Use the specific WebSocket port (3001)
+      const wsUrl = `${wsProtocol}//${hostname}:3001/ws/${boardId}`;
       
       ws = new WebSocket(wsUrl);
       
