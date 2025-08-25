@@ -93,7 +93,7 @@ const STROKE_STYLES = {
     "stroke",             // type
     [],                   // points
     "#FFFF00",            // color
-    12.0,                 // width
+    24.0,                 // width
     PEN_TYPES.HIGHLIGHTER, // penType
     0.5,                  // opacity
     CAP_STYLES.SQUARE,    // capStyle
