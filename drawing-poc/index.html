@@ -316,12 +316,6 @@
         const data = JSON.parse(event.data);
         debugLog('Received message:', data);
         
-        // Handle the new board registration message
-        if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE) {
-          handleBoardRegistered(data);
-          return;
-        }
-        
         // Handle existing message types
         switch (data.type) {
           case shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE:
@@ -337,7 +331,10 @@
             handleFullPageMessage(data);
             break;
           case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
-            // Just acknowledge pings
+            handlePingMessage(data);
+            break;
+          case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE:
+            handleBoardRegistered(data);
             break;
         }
       };
@@ -383,6 +380,67 @@
       }
     }
     
+    // Handle ping message from server
+    function handlePingMessage(data) {
+      // Extract page information from ping
+      const pingPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID];
+      const pingPageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH];
+      const pingPageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_PAGE_NR];
+      const pingTotalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_TOTAL_PAGES];
+      
+      debugLog('Received ping with page info', {
+        serverPageUuid: pingPageUuid, 
+        serverPageHash: pingPageHash, 
+        serverPageNr: pingPageNr, 
+        serverTotalPages: pingTotalPages,
+        currentPageUuid: currentPageUuid
+      });
+      
+      // Check if we're on a different page than the server thinks we should be
+      if (currentPageUuid !== pingPageUuid) {
+        debugLog('Server indicates we should be on a different page', {
+          localPageUuid: currentPageUuid,
+          serverPageUuid: pingPageUuid
+        });
+        
+        // This could happen if our current page was deleted by another client
+        // Request full page for the page the server thinks we should be on
+        const requestId = createRequestId();
+        const fullPageRequest = {
+          type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+          boardId: boardId,
+          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: pingPageUuid,
+          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
+        };
+        
+        debugLog('Requesting full page due to page mismatch', fullPageRequest);
+        sendMessage(fullPageRequest);
+        return;
+      }
+      
+      // Update page position information
+      if (pageNr !== pingPageNr || totalPages !== pingTotalPages) {
+        debugLog('Page position out of sync', {
+          local: { pageNr, totalPages },
+          server: { pageNr: pingPageNr, totalPages: pingTotalPages }
+        });
+        
+        // Update our local page info
+        pageNr = pingPageNr;
+        totalPages = pingTotalPages;
+        updatePageInfo();
+      }
+      
+      // Check if we need to request a replay (our hash doesn't match server's)
+      if (verifiedHash !== pingPageHash) {
+        debugLog('Page hash out of sync, requesting replay', {
+          localHash: verifiedHash,
+          serverHash: pingPageHash
+        });
+        requestReplay(currentPageUuid, verifiedHash);
+      }
+    }
+
     // Handle accept message from server
     function handleAcceptMessage(data) {
       const acceptedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID];
