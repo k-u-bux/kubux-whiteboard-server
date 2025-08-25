@@ -96,6 +96,12 @@ function addPointToStroke(stroke, x, y, pressure = 0.5, tiltX = 0, tiltY = 0) {
 
 const MESSAGES = {
   CLIENT_TO_SERVER: {
+    REGISTER_BOARD: {
+      TYPE: 'register-board',
+      BOARD_ID: 'boardId',
+      CLIENT_ID: 'clientId',
+      REQUEST_ID: 'requestId'
+    },
     FULL_PAGE_REQUESTS: {
       TYPE: 'fullPage-requests',
       BOARD_UUID: 'board-uuid',
@@ -118,6 +124,13 @@ const MESSAGES = {
     }
   },
   SERVER_TO_CLIENT: {
+    BOARD_REGISTERED: {
+      TYPE: 'board-registered',
+      BOARD_ID: 'boardId',
+      INITIAL_PAGE_ID: 'initialPageId',
+      TOTAL_PAGES: 'totalPages',
+      REQUEST_ID: 'requestId'
+    },
     FULL_PAGE: {
       TYPE: 'fullPage',
       PAGE: 'page',

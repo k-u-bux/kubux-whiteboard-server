@@ -6,27 +6,6 @@ const url = require('url');
 
 const { hashAny, hashNext, generateUuid, MESSAGES, MOD_ACTIONS } = require('./shared');
 
-// New protocol constants for server
-const PROTOCOL = {
-  CLIENT_TO_SERVER: {
-    REGISTER_BOARD: {
-      TYPE: 'register-board',
-      BOARD_ID: 'boardId',
-      CLIENT_ID: 'clientId',
-      REQUEST_ID: 'requestId'
-    }
-  },
-  SERVER_TO_CLIENT: {
-    BOARD_REGISTERED: {
-      TYPE: 'board-registered',
-      BOARD_ID: 'boardId',
-      INITIAL_PAGE_ID: 'initialPageId',
-      TOTAL_PAGES: 'totalPages',
-      REQUEST_ID: 'requestId'
-    }
-  }
-};
-
 // Server state structures
 const boards = {};
 const deletionMap = {};
@@ -175,9 +154,9 @@ function sendPing() {
 const messageHandlers = {};
 
 // New handler for board registration
-messageHandlers[PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
-  const clientId = data[PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
-  let boardId = data[PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID];
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
+  const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
+  let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID];
   
   // If no board ID provided, generate one
   if (!boardId) {
@@ -198,11 +177,11 @@ messageHandlers[PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
   
   // Send board registration acknowledgment
   const registrationResponse = {
-    type: PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
-    [PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID]: boardId,
-    [PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.INITIAL_PAGE_ID]: ws.pageId,
-    [PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
-    [PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
+    type: MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
+    [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID]: boardId,
+    [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.INITIAL_PAGE_ID]: ws.pageId,
+    [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
+    [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
   };
   ws.send(JSON.stringify(registrationResponse));
   

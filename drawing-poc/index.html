@@ -174,27 +174,6 @@
       console.log(`[DEBUG] ${msg}`, data || '');
     }
 
-    // New protocol constants
-    const PROTOCOL = {
-      CLIENT_TO_SERVER: {
-        REGISTER_BOARD: {
-          TYPE: 'register-board',
-          BOARD_ID: 'boardId',
-          CLIENT_ID: 'clientId',
-          REQUEST_ID: 'requestId'
-        }
-      },
-      SERVER_TO_CLIENT: {
-        BOARD_REGISTERED: {
-          TYPE: 'board-registered',
-          BOARD_ID: 'boardId',
-          INITIAL_PAGE_ID: 'initialPageId',
-          TOTAL_PAGES: 'totalPages',
-          REQUEST_ID: 'requestId'
-        }
-      }
-    };
-
     // Globals for board state
     let ws = null;
     let boardId = null;
@@ -338,7 +317,7 @@
         debugLog('Received message:', data);
         
         // Handle the new board registration message
-        if (data.type === PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE) {
+        if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE) {
           handleBoardRegistered(data);
           return;
         }
@@ -369,10 +348,10 @@
       const requestId = createRequestId();
       
       const registerMessage = {
-        type: PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE,
-        [PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID]: boardId,
-        [PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID]: clientId,
-        [PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.REQUEST_ID]: requestId
+        type: shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID]: boardId,
+        [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID]: clientId,
+        [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.REQUEST_ID]: requestId
       };
       
       debugLog('Sending board registration:', registerMessage);
@@ -386,7 +365,7 @@
       hideError();
       
       // Remove the request from pending
-      const requestId = data[PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID];
+      const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID];
       delete pendingRequests[requestId];
       
       // Reset local state - server will send us a full page message after registration
@@ -395,7 +374,7 @@
       verifiedHash = '';
       
       // The server might update our boardId (e.g., if we connected with a new one)
-      boardId = data[PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID];
+      boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID];
       
       // If the URL doesn't match our boardId, update it
       const urlParams = new URLSearchParams(window.location.search);
