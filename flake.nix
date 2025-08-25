@@ -11,14 +11,22 @@
     nixpkgs,
     flake-utils,
   }:
+  let
+    nixpkgs-config = { 
+      allowBroken = true;
+      allowUnfree = true; 
+      permittedInsecurePackages = [];
+    };
+  in
     flake-utils.lib.eachDefaultSystem (
       system: let
-        pkgs = import nixpkgs {inherit system;};
+        pkgs = import nixpkgs {inherit system; config = nixpkgs-config; };
       in {
 
         devShells = {
           default = pkgs.mkShell {
             buildInputs = [
+              pkgs.code-cursor-fhs
               pkgs.nodejs
             ];
 
