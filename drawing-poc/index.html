@@ -117,7 +117,7 @@
 <body>
   <div class="error-banner" id="error-banner">
     <span id="error-message">Connection error</span>
-    <button onclick="reconnectWebSocket()">Reconnect</button>
+    <button id="reconnect-button">Reconnect</button>
   </div>
   
   <div class="toolbar">
@@ -169,8 +169,36 @@
 
   <script src="shared.js"></script>
   <script>
+    // Debug logging function
+    function debugLog(msg, data) {
+      console.log(`[DEBUG] ${msg}`, data || '');
+    }
+
+    // New protocol constants
+    const PROTOCOL = {
+      CLIENT_TO_SERVER: {
+        REGISTER_BOARD: {
+          TYPE: 'register-board',
+          BOARD_ID: 'boardId',
+          CLIENT_ID: 'clientId',
+          REQUEST_ID: 'requestId'
+        }
+      },
+      SERVER_TO_CLIENT: {
+        BOARD_REGISTERED: {
+          TYPE: 'board-registered',
+          BOARD_ID: 'boardId',
+          INITIAL_PAGE_ID: 'initialPageId',
+          TOTAL_PAGES: 'totalPages',
+          REQUEST_ID: 'requestId'
+        }
+      }
+    };
+
     // Globals for board state
     let ws = null;
+    let boardId = null;
+    let clientId = shared.generateUuid(); // Unique client identifier
     let currentPageUuid = null;
     let verifiedHash = '';
     let verifiedModActions = [];
@@ -178,6 +206,8 @@
     let pageNr = 1;
     let totalPages = 1;
     let lastDrawUuid = null;  // Track last drawn stroke UUID for eraser
+    let pendingRequests = {}; // Track in-flight requests
+    let connectionEstablished = false;
     
     // Drawing state
     let isDrawing = false;
@@ -212,17 +242,13 @@
     const pageInfo = document.getElementById('page-info');
     const errorBanner = document.getElementById('error-banner');
     const errorMessage = document.getElementById('error-message');
+    const reconnectButton = document.getElementById('reconnect-button');
     
     // Initialize 
     function init() {
       setupCanvas();
       setupWebSocket();
       setupEventListeners();
-      
-      // Debug logging
-      window.debugLog = function(msg, data) {
-        console.log(`[DEBUG] ${msg}`, data || '');
-      };
     }
     
     // Set up canvas size
@@ -257,6 +283,13 @@
       errorBanner.style.display = 'none';
     }
     
+    // Generate a unique request ID and register it
+    function createRequestId() {
+      const requestId = shared.generateUuid();
+      pendingRequests[requestId] = true;
+      return requestId;
+    }
+    
     // Reconnect WebSocket
     function reconnectWebSocket() {
       if (ws) {
@@ -269,40 +302,34 @@
     // Set up WebSocket connection
     function setupWebSocket() {
       const urlParams = new URLSearchParams(window.location.search);
-      const boardId = urlParams.get('id') || shared.generateUuid();
+      boardId = urlParams.get('id') || shared.generateUuid();
       history.replaceState(null, null, `?id=${boardId}`);
       
-      // Use the correct port 3001 for WebSocket connection
+      // Simplified WebSocket URL - no board ID in the path
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      
-      // Extract hostname without port
       const hostname = window.location.hostname || 'localhost';
-      
-      // Use the specific WebSocket port (3001)
-      const wsUrl = `${wsProtocol}//${hostname}:3001/ws/${boardId}`;
+      const wsUrl = `${wsProtocol}//${hostname}:3001/ws`;
       
       debugLog('Connecting to WebSocket:', wsUrl);
       
       ws = new WebSocket(wsUrl);
+      connectionEstablished = false;
       
       ws.onopen = () => {
-        debugLog('Connected to server');
-        hideError();
-        
-        // We don't need to create a page - the server will send us a FULL_PAGE message automatically
-        // Just set up our page variables
-        verifiedModActions = [];
-        optimisticUpdates = [];
-        verifiedHash = '';
+        debugLog('WebSocket connection established');
+        // Register with the board immediately after connection
+        registerBoard();
       };
       
       ws.onclose = () => {
         debugLog('Disconnected from server');
+        connectionEstablished = false;
         showError('Connection to server lost. Please reconnect.');
       };
       
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        connectionEstablished = false;
         showError('Failed to connect to server. Please check your connection.');
       };
       
@@ -310,6 +337,13 @@
         const data = JSON.parse(event.data);
         debugLog('Received message:', data);
         
+        // Handle the new board registration message
+        if (data.type === PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE) {
+          handleBoardRegistered(data);
+          return;
+        }
+        
+        // Handle existing message types
         switch (data.type) {
           case shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE:
             handleAcceptMessage(data);
@@ -328,6 +362,46 @@
             break;
         }
       };
+    }
+    
+    // Register with a board
+    function registerBoard() {
+      const requestId = createRequestId();
+      
+      const registerMessage = {
+        type: PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE,
+        [PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID]: boardId,
+        [PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID]: clientId,
+        [PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.REQUEST_ID]: requestId
+      };
+      
+      debugLog('Sending board registration:', registerMessage);
+      ws.send(JSON.stringify(registerMessage));
+    }
+    
+    // Handle board registration response
+    function handleBoardRegistered(data) {
+      debugLog('Board registered successfully');
+      connectionEstablished = true;
+      hideError();
+      
+      // Remove the request from pending
+      const requestId = data[PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID];
+      delete pendingRequests[requestId];
+      
+      // Reset local state - server will send us a full page message after registration
+      verifiedModActions = [];
+      optimisticUpdates = [];
+      verifiedHash = '';
+      
+      // The server might update our boardId (e.g., if we connected with a new one)
+      boardId = data[PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID];
+      
+      // If the URL doesn't match our boardId, update it
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('id') !== boardId) {
+        history.replaceState(null, null, `?id=${boardId}`);
+      }
     }
     
     // Handle accept message from server
@@ -422,8 +496,26 @@
       redrawCanvas();
     }
     
+    // Send a message to the server
+    function sendMessage(message) {
+      if (!connectionEstablished) {
+        showError('Not connected to server. Please reconnect.');
+        return false;
+      }
+      
+      // Add boardId to all outgoing messages
+      message.boardId = boardId;
+      
+      debugLog('Sending message:', message);
+      ws.send(JSON.stringify(message));
+      return true;
+    }
+    
     // Set up event listeners
     function setupEventListeners() {
+      // Reconnect button
+      reconnectButton.addEventListener('click', reconnectWebSocket);
+      
       // Tool selection
       document.getElementById('pen-tool').addEventListener('click', () => setTool('pen'));
       document.getElementById('highlighter-tool').addEventListener('click', () => setTool('highlighter'));
@@ -716,7 +808,7 @@
       optimisticUpdates.push(optimisticAction);
       
       // Send to server
-      ws.send(JSON.stringify(action));
+      sendMessage(action);
       
       // Immediately redraw with the stroke removed
       redrawCanvas();
@@ -755,7 +847,7 @@
       optimisticUpdates.push(optimisticAction);
       
       // Send to server
-      ws.send(JSON.stringify(action));
+      sendMessage(action);
     }
     
     // Add a new page
@@ -764,7 +856,7 @@
       
       const action = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.NEW_PAGE.TYPE, // Using NEW_PAGE not CREATE_PAGE
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.NEW_PAGE.TYPE,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
@@ -774,7 +866,7 @@
       };
       
       debugLog('Sending new page action', action);
-      ws.send(JSON.stringify(action));
+      sendMessage(action);
     }
     
     // Delete current page
@@ -799,7 +891,7 @@
       
       // Send to server
       debugLog('Sending delete page action', action);
-      ws.send(JSON.stringify(action));
+      sendMessage(action);
     }
     
     // Navigate to a specific page
@@ -808,28 +900,33 @@
         return;
       }
       
-      // Using the structure the server expects for page requests
+      const requestId = createRequestId();
+      
+      // Using the structure the server expects for page requests, with boardId
       const fullPageRequest = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: currentPageUuid,
+        boardId: boardId, // Add boardId explicitly
         [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER]: pageNumber,
-        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid()
+        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
       };
       
       debugLog('Sending page request', fullPageRequest);
-      ws.send(JSON.stringify(fullPageRequest));
+      sendMessage(fullPageRequest);
     }
     
     // Request replay from server
     function requestReplay(pageUuid, beforeHash) {
+      const requestId = createRequestId();
+      
       const replayMessage = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+        boardId: boardId, // Add boardId explicitly
         [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: pageUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH]: beforeHash,
-        [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: shared.generateUuid()
+        [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
       };
       
-      ws.send(JSON.stringify(replayMessage));
+      sendMessage(replayMessage);
     }
     
     // Draw a stroke on the canvas

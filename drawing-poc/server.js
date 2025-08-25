@@ -6,9 +6,31 @@ const url = require('url');
 
 const { hashAny, hashNext, generateUuid, MESSAGES, MOD_ACTIONS } = require('./shared');
 
+// New protocol constants for server
+const PROTOCOL = {
+  CLIENT_TO_SERVER: {
+    REGISTER_BOARD: {
+      TYPE: 'register-board',
+      BOARD_ID: 'boardId',
+      CLIENT_ID: 'clientId',
+      REQUEST_ID: 'requestId'
+    }
+  },
+  SERVER_TO_CLIENT: {
+    BOARD_REGISTERED: {
+      TYPE: 'board-registered',
+      BOARD_ID: 'boardId',
+      INITIAL_PAGE_ID: 'initialPageId',
+      TOTAL_PAGES: 'totalPages',
+      REQUEST_ID: 'requestId'
+    }
+  }
+};
+
 // Server state structures
 const boards = {};
 const deletionMap = {};
+const clients = {}; // Map client IDs to WebSocket instances
 let pingInterval;
 
 function getOrCreateBoard(boardId) {
@@ -24,7 +46,7 @@ function getOrCreateBoard(boardId) {
   return boards[boardId];
 }
 
-const wss = new WebSocket.Server({ port: 3001 });
+const wss = new WebSocket.Server({ port: 3001, path: '/ws' });
 
 const httpServer = http.createServer((req, res) => {
   const requestUrl = url.parse(req.url);
@@ -152,11 +174,57 @@ function sendPing() {
 
 const messageHandlers = {};
 
+// New handler for board registration
+messageHandlers[PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
+  const clientId = data[PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
+  let boardId = data[PROTOCOL.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID];
+  
+  // If no board ID provided, generate one
+  if (!boardId) {
+    boardId = generateUuid();
+  }
+  
+  const board = getOrCreateBoard(boardId);
+  ws.boardId = boardId; // Store boardId in WebSocket client
+  ws.clientId = clientId; // Optional: store client ID for tracking
+  ws.pageId = board.pageOrder[0]; // Default to first page
+  
+  // Store client reference by ID if provided
+  if (clientId) {
+    clients[clientId] = ws;
+  }
+  
+  console.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
+  
+  // Send board registration acknowledgment
+  const registrationResponse = {
+    type: PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
+    [PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID]: boardId,
+    [PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.INITIAL_PAGE_ID]: ws.pageId,
+    [PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
+    [PROTOCOL.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
+  };
+  ws.send(JSON.stringify(registrationResponse));
+  
+  // Follow up with a full page message for the initial page
+  sendFullPage(ws, boardId, ws.pageId, requestId);
+};
+
 function routeMessage(ws, message) {
   try {
     const data = JSON.parse(message);
     const requestId = data.requestId || data['action-uuid'] || 'N/A';
-    console.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client on board '${ws.boardId}':`, data);
+    
+    // Extract boardId from message or use stored one
+    const boardId = data.boardId || ws.boardId;
+    
+    // If the message includes a boardId, update the WebSocket client
+    if (data.boardId && data.boardId !== ws.boardId) {
+      ws.boardId = data.boardId;
+    }
+    
+    console.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client on board '${boardId}':`, data);
+    
     const handler = messageHandlers[data.type];
     if (handler) {
       handler(ws, data, requestId);
@@ -169,13 +237,16 @@ function routeMessage(ws, message) {
 }
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, requestId) => {
-  const board = boards[data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]];
+  const boardId = data.boardId || ws.boardId;
+  const board = boards[boardId];
   if (!board) return;
 
   let pageId;
   if (data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER]) {
-    pageId = board.pageOrder[data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER] - 1];
-  } else if (data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID] && data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] !== undefined) {
+    const pageNumber = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER];
+    pageId = board.pageOrder[pageNumber - 1];
+  } else if (data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID] && 
+             data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] !== undefined) {
     const index = board.pageOrder.indexOf(data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]);
     if (index !== -1) {
       const newIndex = index + data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
@@ -187,22 +258,23 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
   
   if (pageId) {
     ws.pageId = pageId;
-    sendFullPage(ws, ws.boardId, pageId, requestId);
+    sendFullPage(ws, boardId, pageId, requestId);
   }
 };
 
 const modActionHandlers = {};
 
 modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
+  const boardId = data.boardId || ws.boardId;
   const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID];
   const payload = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
   const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH];
   const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-  const board = boards[ws.boardId];
+  const board = boards[boardId];
   
   // Only check if the page exists
-  if (!board.pages[pageUuid]) {
-    sendFullPage(ws, ws.boardId, pageUuid, requestId);
+  if (!board || !board.pages[pageUuid]) {
+    sendFullPage(ws, boardId, pageUuid, requestId);
     return;
   }
   
@@ -227,6 +299,7 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
   
   const acceptMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
+    boardId: boardId, // Include boardId in response
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash, // Server's hash, not client's
@@ -235,20 +308,21 @@ modActionHandlers[MOD_ACTIONS.DRAW.TYPE] = (ws, data, requestId) => {
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
   };
   
-  broadcastMessageToBoard(acceptMessage, ws.boardId);
+  broadcastMessageToBoard(acceptMessage, boardId);
   logSentMessage(acceptMessage.type, acceptMessage, requestId);
 };
 
 modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
+  const boardId = data.boardId || ws.boardId;
   const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID];
   const payload = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
   const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH];
   const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-  const board = boards[ws.boardId];
+  const board = boards[boardId];
   
   // Check if the page exists
-  if (!board.pages[pageUuid]) {
-    sendFullPage(ws, ws.boardId, pageUuid, requestId);
+  if (!board || !board.pages[pageUuid]) {
+    sendFullPage(ws, boardId, pageUuid, requestId);
     return;
   }
   
@@ -265,6 +339,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
     // The stroke doesn't exist or was already erased
     const declineMessage = {
       type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId, // Include boardId in response
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
     };
@@ -286,6 +361,7 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
 
   const acceptMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
+    boardId: boardId, // Include boardId in response
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash, // Server's hash, not client's
@@ -293,14 +369,21 @@ modActionHandlers[MOD_ACTIONS.ERASE.TYPE] = (ws, data, requestId) => {
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
     [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
   };
-  broadcastMessageToBoard(acceptMessage, ws.boardId);
+  broadcastMessageToBoard(acceptMessage, boardId);
   logSentMessage(acceptMessage.type, acceptMessage, requestId);
 };
 
 modActionHandlers[MOD_ACTIONS.NEW_PAGE.TYPE] = (ws, data, requestId) => {
+  const boardId = data.boardId || ws.boardId;
   const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID];
   const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-  const board = boards[ws.boardId];
+  const board = boards[boardId];
+  
+  if (!board) {
+    console.error(`[SERVER] Board not found: ${boardId}`);
+    return;
+  }
+  
   const newPageId = generateUuid();
   const initialHash = hashAny([]);
   
@@ -312,17 +395,24 @@ modActionHandlers[MOD_ACTIONS.NEW_PAGE.TYPE] = (ws, data, requestId) => {
   };
   
   ws.pageId = newPageId;
-  sendFullPage(ws, ws.boardId, newPageId, requestId);
+  sendFullPage(ws, boardId, newPageId, requestId);
 };
 
 modActionHandlers[MOD_ACTIONS.DELETE_PAGE.TYPE] = (ws, data, requestId) => {
+  const boardId = data.boardId || ws.boardId;
   const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID];
   const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-  const board = boards[ws.boardId];
+  const board = boards[boardId];
+  
+  if (!board) {
+    console.error(`[SERVER] Board not found: ${boardId}`);
+    return;
+  }
   
   if (board.pageOrder.length <= 1) {
     const declineMessage = {
       type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId, // Include boardId in response
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
       [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid
     };
@@ -339,7 +429,7 @@ modActionHandlers[MOD_ACTIONS.DELETE_PAGE.TYPE] = (ws, data, requestId) => {
   delete board.pages[pageUuid];
   
   ws.pageId = replacementPageId;
-  sendFullPage(ws, ws.boardId, replacementPageId, requestId);
+  sendFullPage(ws, boardId, replacementPageId, requestId);
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data, requestId) => {
@@ -350,13 +440,20 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, requestId) => {
+  const boardId = data.boardId || ws.boardId;
   const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID];
   const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BEFORE_HASH];
-  const board = boards[ws.boardId];
+  
+  const board = boards[boardId];
+  if (!board) {
+    console.error(`[SERVER] Board not found: ${boardId}`);
+    return;
+  }
+  
   const page = board.pages[pageUuid];
   
   if (!page) {
-    sendFullPage(ws, ws.boardId, ws.pageId, requestId);
+    sendFullPage(ws, boardId, ws.pageId, requestId);
     return;
   }
   
@@ -376,6 +473,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
   
   const replayMessage = {
     type: MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.TYPE,
+    boardId: boardId, // Include boardId in response
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.PAGE_UUID]: pageUuid,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.BEFORE_HASH]: beforeHash,
     [MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH]: finalHash,
@@ -388,15 +486,9 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
 };
 
 wss.on('connection', (ws, req) => {
-  const parsedUrl = url.parse(req.url, true);
-  const boardId = parsedUrl.pathname.slice(1) || '1';
+  console.log(`[SERVER] New WebSocket connection established`);
   
-  const board = getOrCreateBoard(boardId);
-  ws.boardId = boardId;
-  ws.pageId = board.pageOrder[0];
-
-  console.log(`[SERVER] Client connected to board: ${ws.boardId}`);
-  sendFullPage(ws, ws.boardId, ws.pageId, 'initial-connection');
+  // We don't set boardId here anymore - client will send it in registration message
   
   if (!pingInterval) {
     pingInterval = setInterval(() => {
@@ -407,6 +499,11 @@ wss.on('connection', (ws, req) => {
   ws.on('message', message => routeMessage(ws, message));
   
   ws.on('close', () => {
-    console.log(`[SERVER] Client disconnected from board: ${ws.boardId}`);
+    console.log(`[SERVER] Client disconnected from board: ${ws.boardId || 'unknown'}`);
+    
+    // Clean up client reference if client ID was stored
+    if (ws.clientId && clients[ws.clientId] === ws) {
+      delete clients[ws.clientId];
+    }
   });
 });
