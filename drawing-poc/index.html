@@ -89,9 +89,37 @@
     #page-info {
       margin: 0 10px;
     }
+    
+    .error-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: #f44336;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      z-index: 1000;
+      display: none;
+    }
+    
+    .error-banner button {
+      margin-left: 15px;
+      background-color: white;
+      color: #f44336;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
+  <div class="error-banner" id="error-banner">
+    <span id="error-message">Connection error</span>
+    <button onclick="reconnectWebSocket()">Reconnect</button>
+  </div>
+  
   <div class="toolbar">
     <!-- Tools Section -->
     <div class="tool-section">
@@ -149,6 +177,7 @@
     let optimisticUpdates = [];
     let pageNr = 1;
     let totalPages = 1;
+    let lastDrawUuid = null;  // Track last drawn stroke UUID for eraser
     
     // Drawing state
     let isDrawing = false;
@@ -181,6 +210,8 @@
     const widthValue = document.getElementById('width-value');
     const zoomLevelDisplay = document.getElementById('zoom-level');
     const pageInfo = document.getElementById('page-info');
+    const errorBanner = document.getElementById('error-banner');
+    const errorMessage = document.getElementById('error-message');
     
     // Initialize 
     function init() {
@@ -215,6 +246,26 @@
       ctx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
     }
     
+    // Show error message
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorBanner.style.display = 'block';
+    }
+    
+    // Hide error message
+    function hideError() {
+      errorBanner.style.display = 'none';
+    }
+    
+    // Reconnect WebSocket
+    function reconnectWebSocket() {
+      if (ws) {
+        ws.close();
+      }
+      setupWebSocket();
+      hideError();
+    }
+    
     // Set up WebSocket connection
     function setupWebSocket() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -230,21 +281,29 @@
       // Use the specific WebSocket port (3001)
       const wsUrl = `${wsProtocol}//${hostname}:3001/ws/${boardId}`;
       
+      debugLog('Connecting to WebSocket:', wsUrl);
+      
       ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
         debugLog('Connected to server');
-        // Create initial page
-        currentPageUuid = shared.generateUuid();
-        createNewPage(currentPageUuid);
+        hideError();
+        
+        // We don't need to create a page - the server will send us a FULL_PAGE message automatically
+        // Just set up our page variables
+        verifiedModActions = [];
+        optimisticUpdates = [];
+        verifiedHash = '';
       };
       
       ws.onclose = () => {
         debugLog('Disconnected from server');
+        showError('Connection to server lost. Please reconnect.');
       };
       
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        showError('Failed to connect to server. Please check your connection.');
       };
       
       ws.onmessage = (event) => {
@@ -263,6 +322,9 @@
             break;
           case shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE:
             handleFullPageMessage(data);
+            break;
+          case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
+            // Just acknowledge pings
             break;
         }
       };
@@ -320,29 +382,41 @@
     
     // Handle replay message from server
     function handleReplayMessage(data) {
-      const replayActions = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.MOD_ACTIONS];
+      const replayActions = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.SEQUENCE];
       verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.AFTER_HASH];
       
       // Apply replayed actions
-      verifiedModActions = verifiedModActions.concat(replayActions);
+      if (Array.isArray(replayActions)) {
+        verifiedModActions = verifiedModActions.concat(replayActions);
+      }
+      
+      // Update page info
+      if (data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR]) {
+        pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR];
+      }
+      if (data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES]) {
+        totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_TOTAL_PAGES];
+      }
+      updatePageInfo();
+      
       redrawCanvas();
     }
     
     // Handle full page message from server
     function handleFullPageMessage(data) {
-      const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_UUID];
-      const modActions = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.MOD_ACTIONS];
-      const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.AFTER_HASH];
+      const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
+      const modActions = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.STATE];
+      const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH];
       
       // Replace current page data
       currentPageUuid = pageUuid;
-      verifiedModActions = modActions;
+      verifiedModActions = Array.isArray(modActions) ? modActions : [];
       optimisticUpdates = [];
       verifiedHash = afterHash;
       
       // Update page info
-      pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.CURRENT_PAGE_NR];
-      totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.CURRENT_TOTAL_PAGES];
+      pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
+      totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
       updatePageInfo();
       
       redrawCanvas();
@@ -375,8 +449,8 @@
       // Page navigation
       document.getElementById('prev-page').addEventListener('click', () => navigateToPage(pageNr - 1));
       document.getElementById('next-page').addEventListener('click', () => navigateToPage(pageNr + 1));
-      document.getElementById('add-page').addEventListener('click', () => addNewPage());
-      document.getElementById('delete-page').addEventListener('click', () => deletePage());
+      document.getElementById('add-page').addEventListener('click', addNewPage);
+      document.getElementById('delete-page').addEventListener('click', deletePage);
       
       // Zoom controls
       document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.1));
@@ -460,8 +534,12 @@
       
       if (currentTool === 'eraser') {
         isErasing = true;
-        const eraseAction = createEraseAction(x, y);
-        sendEraseAction(eraseAction);
+        
+        // Find strokes near this point and erase them
+        const strokeUuid = findStrokeToErase(x, y);
+        if (strokeUuid) {
+          sendEraseAction(strokeUuid);
+        }
       } else {
         isDrawing = true;
         currentPath = [];
@@ -485,8 +563,11 @@
       const pressure = event.pressure !== undefined ? event.pressure : 1.0;
       
       if (currentTool === 'eraser' && isErasing) {
-        const eraseAction = createEraseAction(x, y);
-        sendEraseAction(eraseAction);
+        // Find strokes near this point and erase them
+        const strokeUuid = findStrokeToErase(x, y);
+        if (strokeUuid) {
+          sendEraseAction(strokeUuid);
+        }
       } else if (isDrawing) {
         const point = {
           x: x,
@@ -523,18 +604,128 @@
       }
     }
     
-    // Create an erase action
-    function createEraseAction(x, y) {
-      return {
-        type: shared.MOD_ACTIONS.ERASE.TYPE,
-        position: { x, y },
-        radius: eraserRadius
+    // Find a stroke to erase at the given position
+    function findStrokeToErase(x, y) {
+      // Combine verified and optimistic actions
+      const allActions = [...verifiedModActions, ...optimisticUpdates];
+      
+      // Find the most recent DRAW action with a stroke near this point
+      for (let i = allActions.length - 1; i >= 0; i--) {
+        const action = allActions[i];
+        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
+        
+        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
+          const stroke = payload.stroke;
+          if (isPointNearStroke(x, y, stroke)) {
+            return action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+          }
+        }
+      }
+      
+      return null;
+    }
+    
+    // Check if a point is near a stroke
+    function isPointNearStroke(x, y, stroke) {
+      if (!stroke || !stroke.points || stroke.points.length < 2) return false;
+      
+      const threshold = eraserRadius;
+      
+      // Check each segment of the stroke
+      for (let i = 1; i < stroke.points.length; i++) {
+        const p1 = stroke.points[i - 1];
+        const p2 = stroke.points[i];
+        
+        // Calculate distance from point to line segment
+        const distance = distanceToLineSegment(x, y, p1.x, p1.y, p2.x, p2.y);
+        if (distance < threshold) {
+          return true;
+        }
+      }
+      
+      return false;
+    }
+    
+    // Calculate distance from point to line segment
+    function distanceToLineSegment(px, py, x1, y1, x2, y2) {
+      const A = px - x1;
+      const B = py - y1;
+      const C = x2 - x1;
+      const D = y2 - y1;
+      
+      const dot = A * C + B * D;
+      const lenSq = C * C + D * D;
+      let param = -1;
+      
+      if (lenSq !== 0) {
+        param = dot / lenSq;
+      }
+      
+      let xx, yy;
+      
+      if (param < 0) {
+        xx = x1;
+        yy = y1;
+      } else if (param > 1) {
+        xx = x2;
+        yy = y2;
+      } else {
+        xx = x1 + param * C;
+        yy = y1 + param * D;
+      }
+      
+      const dx = px - xx;
+      const dy = py - yy;
+      
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    // Send an erase action to the server
+    function sendEraseAction(strokeUuid) {
+      if (!strokeUuid) return;
+      
+      const actionUuid = shared.generateUuid();
+      
+      // Create the erase action in the format the server expects
+      const action = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.ERASE.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
+          type: shared.MOD_ACTIONS.ERASE.TYPE,
+          [shared.MOD_ACTIONS.ERASE.ACTION_UUID]: strokeUuid
+        }
       };
+      
+      // Calculate expected hash
+      const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
+      
+      // Add to optimistic updates
+      const optimisticAction = {
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
+        hashes: {
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
+        }
+      };
+      
+      optimisticUpdates.push(optimisticAction);
+      
+      // Send to server
+      ws.send(JSON.stringify(action));
+      
+      // Immediately redraw with the stroke removed
+      redrawCanvas();
     }
     
     // Send a stroke to the server
     function sendStroke(stroke) {
       const actionUuid = shared.generateUuid();
+      lastDrawUuid = actionUuid; // Store for eraser
       
       const action = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
@@ -567,78 +758,22 @@
       ws.send(JSON.stringify(action));
     }
     
-    // Send an erase action to the server
-    function sendEraseAction(eraseAction) {
+    // Add a new page
+    function addNewPage() {
       const actionUuid = shared.generateUuid();
       
       const action = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.ERASE.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.NEW_PAGE.TYPE, // Using NEW_PAGE not CREATE_PAGE
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: eraseAction
-      };
-      
-      // Calculate expected hash
-      const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
-      
-      // Add to optimistic updates
-      const optimisticAction = {
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
-        hashes: {
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
-        }
-      };
-      
-      optimisticUpdates.push(optimisticAction);
-      
-      // Send to server
-      ws.send(JSON.stringify(action));
-    }
-    
-    // Create a new page
-    function createNewPage(pageUuid) {
-      const action = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.CREATE_PAGE.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: pageUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: shared.generateUuid(),
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: '',
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
-          type: shared.MOD_ACTIONS.CREATE_PAGE.TYPE
+          type: shared.MOD_ACTIONS.NEW_PAGE.TYPE
         }
       };
       
-      // Send to server
-      debugLog('Sending create page action', action);
-      ws.send(JSON.stringify(action));
-      
-      // Reset local state
-      verifiedModActions = [];
-      optimisticUpdates = [];
-      verifiedHash = '';
-    }
-    
-    // Add a new page
-    function addNewPage() {
-      // Create an ADD_PAGE action instead of CREATE_PAGE
-      const actionUuid = shared.generateUuid();
-      
-      const action = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_TYPE]: shared.MOD_ACTIONS.ADD_PAGE.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid, // Use current page as reference
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
-          type: shared.MOD_ACTIONS.ADD_PAGE.TYPE
-        }
-      };
-      
-      debugLog('Sending add page action', action);
+      debugLog('Sending new page action', action);
       ws.send(JSON.stringify(action));
     }
     
@@ -673,13 +808,16 @@
         return;
       }
       
-      const pageRequestMessage = {
-        type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_REQUEST.TYPE,
-        [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_REQUEST.PAGE_NR]: pageNumber
+      // Using the structure the server expects for page requests
+      const fullPageRequest = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: currentPageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER]: pageNumber,
+        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: shared.generateUuid()
       };
       
-      debugLog('Sending page request', pageRequestMessage);
-      ws.send(JSON.stringify(pageRequestMessage));
+      debugLog('Sending page request', fullPageRequest);
+      ws.send(JSON.stringify(fullPageRequest));
     }
     
     // Request replay from server
@@ -749,18 +887,32 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
       
-      // Extract strokes from actions
+      // Get list of all stroke UUIDs that have been erased
+      const erasedStrokes = [];
       const allActions = [...verifiedModActions, ...optimisticUpdates];
       
-      // Process all actions
       for (const action of allActions) {
         if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
+        
+        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+        if (payload.type === shared.MOD_ACTIONS.ERASE.TYPE && payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID]) {
+          erasedStrokes.push(payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID]);
+        }
+      }
+      
+      // Draw all non-erased strokes
+      for (const action of allActions) {
+        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
+        
+        // Skip drawing if this stroke has been erased
+        if (erasedStrokes.includes(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID])) {
+          continue;
+        }
         
         const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
         if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
           drawStroke(payload.stroke);
         }
-        // Erase actions are applied server-side
       }
     }
     
