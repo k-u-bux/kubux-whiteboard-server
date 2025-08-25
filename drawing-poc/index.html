@@ -39,6 +39,11 @@
     .tool-btn:hover {
       background-color: #e0e0e0;
     }
+
+    .tool-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     
     .tool-btn.active {
       border-color: #3498db;
@@ -112,6 +117,35 @@
       cursor: pointer;
       border-radius: 4px;
     }
+
+    /* Add tooltips for buttons */
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 120px;
+      background-color: #555;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -60px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 12px;
+    }
+
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -121,6 +155,16 @@
   </div>
   
   <div class="toolbar">
+    <!-- Undo/Redo Section -->
+    <div class="tool-section">
+      <button class="tool-btn tooltip" id="undo-btn" title="Undo" disabled>↩
+        <span class="tooltiptext">Undo (Ctrl+Z)</span>
+      </button>
+      <button class="tool-btn tooltip" id="redo-btn" title="Redo" disabled>↪
+        <span class="tooltiptext">Redo (Ctrl+Y)</span>
+      </button>
+    </div>
+    
     <!-- Tools Section -->
     <div class="tool-section">
       <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
@@ -213,6 +257,10 @@
     let currentTool = 'pen';
     let eraserRadius = 20;
     
+    // Undo/Redo state
+    let myActions = [];          // Actions performed by this client
+    let undoneActions = new Map(); // Map of undone actionUuid -> undo actionUuid
+    
     // DOM elements
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
@@ -224,6 +272,8 @@
     const errorBanner = document.getElementById('error-banner');
     const errorMessage = document.getElementById('error-message');
     const reconnectButton = document.getElementById('reconnect-button');
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
     
     // Initialize 
     function init() {
@@ -371,6 +421,9 @@
       verifiedModActions = [];
       optimisticUpdates = [];
       verifiedHash = '';
+      myActions = []; // Reset undo history
+      undoneActions.clear(); // Clear redo history
+      updateUndoRedoButtons(); // Update button states
       
       // The server might update our boardId (e.g., if we connected with a new one)
       boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID];
@@ -467,10 +520,69 @@
         verifiedModActions.push(acceptedAction);
         verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
         
+        // Handle undo/redo tracking
+        const payload = acceptedAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+        
+        // Check if this is a normal action (not undo/redo/page)
+        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE || 
+            payload.type === shared.MOD_ACTIONS.ERASE.TYPE) {
+          // Add to my actions for undo
+          myActions.push(acceptedActionUuid);
+        }
+        // Check if this is an undo action
+        else if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
+          const targetActionUuid = payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+          
+          // Remove target action from myActions
+          const index = myActions.indexOf(targetActionUuid);
+          if (index !== -1) {
+            myActions.splice(index, 1);
+          }
+          
+          // Store mapping for redo
+          undoneActions.set(targetActionUuid, acceptedActionUuid);
+          
+          // Add this undo action to myActions (for potential undo of undo)
+          myActions.push(acceptedActionUuid);
+        }
+        // Check if this is a redo action
+        else if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
+          const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+          
+          // Find original action that was undone
+          let originalActionUuid = null;
+          for (const [original, undo] of undoneActions.entries()) {
+            if (undo === targetUndoActionUuid) {
+              originalActionUuid = original;
+              break;
+            }
+          }
+          
+          if (originalActionUuid) {
+            // Add original action back to myActions
+            myActions.push(originalActionUuid);
+            
+            // Remove from undone mapping
+            undoneActions.delete(originalActionUuid);
+          }
+          
+          // Remove undo action from myActions
+          const undoIndex = myActions.indexOf(targetUndoActionUuid);
+          if (undoIndex !== -1) {
+            myActions.splice(undoIndex, 1);
+          }
+          
+          // Add this redo action to myActions
+          myActions.push(acceptedActionUuid);
+        }
+        
         // Update page info
         pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR];
         totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES];
         updatePageInfo();
+        
+        // Update undo/redo buttons
+        updateUndoRedoButtons();
       } else {
         // Request replay if we don't know about this action
         requestReplay(currentPageUuid, verifiedHash);
@@ -491,6 +603,9 @@
       // Request replay to ensure we're in sync
       requestReplay(currentPageUuid, verifiedHash);
       redrawCanvas();
+      
+      // Update undo/redo buttons
+      updateUndoRedoButtons();
     }
     
     // Handle replay message from server
@@ -513,6 +628,9 @@
       updatePageInfo();
       
       redrawCanvas();
+      
+      // Update undo/redo buttons
+      updateUndoRedoButtons();
     }
     
     // Handle full page message from server
@@ -527,12 +645,89 @@
       optimisticUpdates = [];
       verifiedHash = afterHash;
       
+      // Reset undo/redo state when changing pages
+      myActions = [];
+      undoneActions.clear();
+      
+      // Rebuild myActions and undoneActions by analyzing verifiedModActions
+      rebuildUndoRedoState();
+      
       // Update page info
       pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
       totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
       updatePageInfo();
       
       redrawCanvas();
+      
+      // Update undo/redo buttons
+      updateUndoRedoButtons();
+    }
+    
+    // Rebuild undo/redo state from verified actions
+    function rebuildUndoRedoState() {
+      myActions = [];
+      undoneActions.clear();
+      
+      // Map of action UUIDs that have been undone to their undo action
+      const undoneActionsMap = new Map();
+      
+      // First pass: find all undo actions and their targets
+      for (const action of verifiedModActions) {
+        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+        const actionUuid = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+        
+        if (!payload) continue;
+        
+        // If this is an undo action, record its target
+        if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
+          const targetActionUuid = payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+          undoneActionsMap.set(targetActionUuid, actionUuid);
+        }
+        
+        // If this is a redo action, remove its target from undone map
+        if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
+          const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+          
+          // Find the original action that was undone
+          for (const [original, undo] of undoneActionsMap.entries()) {
+            if (undo === targetUndoActionUuid) {
+              undoneActionsMap.delete(original);
+              break;
+            }
+          }
+        }
+      }
+      
+      // Second pass: collect all actions by this client that haven't been undone
+      for (const action of verifiedModActions) {
+        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+        const actionUuid = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+        
+        if (!payload) continue;
+        
+        // Skip actions by other clients
+        if (action.clientId && action.clientId !== clientId) {
+          continue;
+        }
+        
+        // Include only actions that can be undone and haven't been undone
+        if ((payload.type === shared.MOD_ACTIONS.DRAW.TYPE || 
+             payload.type === shared.MOD_ACTIONS.ERASE.TYPE) && 
+            !undoneActionsMap.has(actionUuid)) {
+          myActions.push(actionUuid);
+        }
+      }
+      
+      // Populate undoneActions with mappings for actions undone by this client
+      for (const [original, undo] of undoneActionsMap.entries()) {
+        const undoAction = verifiedModActions.find(a => 
+          a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === undo
+        );
+        
+        if (undoAction && undoAction.clientId === clientId) {
+          undoneActions.set(original, undo);
+        }
+      }
     }
     
     // Send a message to the server
@@ -587,6 +782,10 @@
       document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.1));
       document.getElementById('zoom-out').addEventListener('click', () => adjustZoom(-0.1));
       
+      // Undo/Redo buttons
+      undoBtn.addEventListener('click', handleUndo);
+      redoBtn.addEventListener('click', handleRedo);
+      
       // Canvas events
       canvas.addEventListener('pointerdown', handlePointerDown);
       canvas.addEventListener('pointermove', handlePointerMove);
@@ -597,6 +796,118 @@
       canvas.addEventListener('touchstart', e => e.preventDefault());
       canvas.addEventListener('touchmove', e => e.preventDefault());
       canvas.addEventListener('touchend', e => e.preventDefault());
+      
+      // Keyboard shortcuts
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    
+    // Handle keyboard shortcuts
+    function handleKeyDown(e) {
+      // Undo: Ctrl+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (!undoBtn.disabled) {
+          handleUndo();
+        }
+      }
+      // Redo: Ctrl+Y or Ctrl+Shift+Z
+      else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        if (!redoBtn.disabled) {
+          handleRedo();
+        }
+      }
+    }
+    
+    // Update undo/redo button states
+    function updateUndoRedoButtons() {
+      undoBtn.disabled = myActions.length === 0;
+      redoBtn.disabled = undoneActions.size === 0;
+    }
+    
+    // Handle undo action
+    function handleUndo() {
+      if (myActions.length === 0) return;
+      
+      // Get most recent action
+      const actionToUndo = myActions[myActions.length - 1];
+      
+      // Create undo action
+      const undoAction = {
+        type: shared.MOD_ACTIONS.UNDO.TYPE,
+        [shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]: actionToUndo,
+        [shared.MOD_ACTIONS.UNDO.CLIENT_ID]: clientId
+      };
+      
+      // Send undo proposal
+      sendUndoRedoAction(undoAction);
+    }
+    
+    // Handle redo action
+    function handleRedo() {
+      if (undoneActions.size === 0) return;
+      
+      // Find the most recently undone action's undo action
+      let targetUndoAction = null;
+      let originalAction = null;
+      
+      // Iterate through myActions in reverse to find the most recent undo
+      for (let i = myActions.length - 1; i >= 0; i--) {
+        const actionUuid = myActions[i];
+        
+        // Check if this is an undo action in our map
+        for (const [original, undo] of undoneActions.entries()) {
+          if (undo === actionUuid) {
+            targetUndoAction = actionUuid;
+            originalAction = original;
+            break;
+          }
+        }
+        
+        if (targetUndoAction) break;
+      }
+      
+      if (!targetUndoAction) return;
+      
+      // Create redo action (undo of the undo)
+      const redoAction = {
+        type: shared.MOD_ACTIONS.REDO.TYPE,
+        [shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID]: targetUndoAction,
+        [shared.MOD_ACTIONS.REDO.CLIENT_ID]: clientId
+      };
+      
+      // Send redo proposal
+      sendUndoRedoAction(redoAction);
+    }
+    
+    // Send undo or redo action to server
+    function sendUndoRedoAction(action) {
+      const actionUuid = shared.generateUuid();
+      
+      const proposal = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action
+      };
+      
+      // Create optimistic update
+      const optimisticAction = {
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action,
+        clientId: clientId
+      };
+      
+      // Add to optimistic updates
+      optimisticUpdates.push(optimisticAction);
+      
+      // Temporarily disable undo/redo buttons until server responds
+      undoBtn.disabled = true;
+      redoBtn.disabled = true;
+      
+      // Send to server
+      sendMessage(proposal);
     }
     
     // Set current tool
@@ -743,16 +1054,48 @@
       // Combine verified and optimistic actions
       const allActions = [...verifiedModActions, ...optimisticUpdates];
       
+      // Find actions that have been undone
+      const undoneActionIds = new Set();
+      for (const action of allActions) {
+        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+        if (!payload) continue;
+        
+        // If this is an undo action, mark its target as undone
+        if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
+          undoneActionIds.add(payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]);
+        }
+        
+        // If this is a redo action, unmark its target's target
+        if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
+          const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+          
+          // Find the undo action in the list
+          const undoAction = allActions.find(a => 
+            a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetUndoActionUuid
+          );
+          
+          if (undoAction && undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) {
+            const originalActionUuid = undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+            undoneActionIds.delete(originalActionUuid);
+          }
+        }
+      }
+      
       // Find the most recent DRAW action with a stroke near this point
       for (let i = allActions.length - 1; i >= 0; i--) {
         const action = allActions[i];
         if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
         
+        const actionUuid = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+        
+        // Skip if this action has been undone
+        if (undoneActionIds.has(actionUuid)) continue;
+        
         const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
         if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
           const stroke = payload.stroke;
           if (isPointNearStroke(x, y, stroke)) {
-            return action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+            return actionUuid;
           }
         }
       }
@@ -762,10 +1105,10 @@
     
     // Check if a point is near a stroke
     function isPointNearStroke(x, y, stroke) {
-      if (!stroke || !stroke[shared.STROKE.POINTS] || stroke[shared.STROKE.POINTS].length < 2) return false;
+      if (!stroke || !stroke.points || stroke.points.length < 2) return false;
       
       const threshold = eraserRadius;
-      const points = stroke[shared.STROKE.POINTS];
+      const points = stroke.points;
       
       // Check each segment of the stroke
       for (let i = 1; i < points.length; i++) {
@@ -775,8 +1118,8 @@
         // Calculate distance from point to line segment
         const distance = distanceToLineSegment(
           x, y, 
-          p1[shared.POINT.X], p1[shared.POINT.Y], 
-          p2[shared.POINT.X], p2[shared.POINT.Y]
+          p1.x, p1.y, 
+          p2.x, p2.y
         );
         
         if (distance < threshold) {
@@ -849,7 +1192,8 @@
         hashes: {
           [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
           [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
-        }
+        },
+        clientId: clientId // Add client ID for undo tracking
       };
       
       optimisticUpdates.push(optimisticAction);
@@ -887,7 +1231,8 @@
         hashes: {
           [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
           [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
-        }
+        },
+        clientId: clientId // Add client ID for undo tracking
       };
       
       optimisticUpdates.push(optimisticAction);
@@ -1029,25 +1374,45 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
       
-      // Get list of all stroke UUIDs that have been erased
-      const erasedStrokes = [];
+      // Collect all actions (verified + optimistic)
       const allActions = [...verifiedModActions, ...optimisticUpdates];
       
+      // Find actions that have been undone
+      const undoneActionIds = new Set();
+      
+      // First pass: identify all undone actions
       for (const action of allActions) {
         if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
         
         const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (payload.type === shared.MOD_ACTIONS.ERASE.TYPE && payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID]) {
-          erasedStrokes.push(payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID]);
+        
+        // If this is an undo action, mark its target as undone
+        if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
+          undoneActionIds.add(payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]);
+        }
+        
+        // If this is a redo action, unmark its target's target
+        if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
+          const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+          
+          // Find the undo action in the list
+          const undoAction = allActions.find(a => 
+            a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetUndoActionUuid
+          );
+          
+          if (undoAction && undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) {
+            const originalActionUuid = undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+            undoneActionIds.delete(originalActionUuid);
+          }
         }
       }
       
-      // Draw all non-erased strokes
+      // Second pass: draw non-undone strokes
       for (const action of allActions) {
         if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
         
-        // Skip drawing if this stroke has been erased
-        if (erasedStrokes.includes(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID])) {
+        // Skip drawing if this action has been undone
+        if (undoneActionIds.has(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID])) {
           continue;
         }
         

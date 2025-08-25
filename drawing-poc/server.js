@@ -711,6 +711,274 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
   logSentMessage(replayMessage.type, replayMessage, requestId);
 };
 
+// Add these handlers to the modActionHandlers object in server.js
+
+// Handle undo actions
+modActionHandlers[MOD_ACTIONS.UNDO.TYPE] = (ws, data, requestId) => {
+  const boardId = data.boardId || ws.boardId;
+  const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID];
+  const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+  const payload = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+  const targetActionUuid = payload[MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+  const clientId = payload[MOD_ACTIONS.UNDO.CLIENT_ID];
+  
+  // Ensure the board exists
+  const board = boards[boardId];
+  if (!board) {
+    console.error(`[SERVER] Board not found: ${boardId}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Board not found"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  // Ensure the page is loaded
+  if (!ensurePageLoaded(boardId, pageUuid)) {
+    console.error(`[SERVER] Page not found: ${pageUuid}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Page not found"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  const page = board.pages[pageUuid];
+  
+  // Find the target action to undo
+  const targetAction = page.modActions.find(action => 
+    action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetActionUuid
+  );
+  
+  if (!targetAction) {
+    console.error(`[SERVER] Target action not found: ${targetActionUuid}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Target action not found"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  // Check if this action has already been undone
+  const alreadyUndone = page.modActions.some(action => {
+    const actionPayload = action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+    return actionPayload && 
+           actionPayload.type === MOD_ACTIONS.UNDO.TYPE && 
+           actionPayload[MOD_ACTIONS.UNDO.TARGET_ACTION_UUID] === targetActionUuid;
+  });
+  
+  if (alreadyUndone) {
+    console.error(`[SERVER] Action already undone: ${targetActionUuid}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Action already undone"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  // Optional: Check if the client is allowed to undo this action
+  // For example, you might only allow clients to undo their own actions
+  if (targetAction.clientId && clientId && targetAction.clientId !== clientId) {
+    console.error(`[SERVER] Client ${clientId} not allowed to undo action by client ${targetAction.clientId}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Not allowed to undo another client's action"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  // Calculate new hash
+  const serverHash = page.currentHash;
+  const afterHash = hashNext(serverHash, payload);
+  
+  // Create the mod action
+  const modAction = {
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: payload,
+    hashes: {
+      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: serverHash,
+      [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
+    },
+    clientId: clientId // Store client ID for tracking
+  };
+  
+  // Update page state
+  page.modActions.push(modAction);
+  page.currentHash = afterHash;
+  
+  // Persist to disk
+  appendModActionToDisk(pageUuid, modAction);
+  
+  // Send accept message
+  const acceptMessage = {
+    type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
+    boardId: boardId,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
+  };
+  
+  broadcastMessageToBoard(acceptMessage, boardId);
+  logSentMessage(acceptMessage.type, acceptMessage, requestId);
+};
+
+// Handle redo actions
+modActionHandlers[MOD_ACTIONS.REDO.TYPE] = (ws, data, requestId) => {
+  const boardId = data.boardId || ws.boardId;
+  const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID];
+  const actionUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+  const payload = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+  const targetUndoActionUuid = payload[MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+  const clientId = payload[MOD_ACTIONS.REDO.CLIENT_ID];
+  
+  // Ensure the board exists
+  const board = boards[boardId];
+  if (!board) {
+    console.error(`[SERVER] Board not found: ${boardId}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Board not found"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  // Ensure the page is loaded
+  if (!ensurePageLoaded(boardId, pageUuid)) {
+    console.error(`[SERVER] Page not found: ${pageUuid}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Page not found"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  const page = board.pages[pageUuid];
+  
+  // Find the undo action to redo
+  const undoAction = page.modActions.find(action => 
+    action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetUndoActionUuid &&
+    action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]?.type === MOD_ACTIONS.UNDO.TYPE
+  );
+  
+  if (!undoAction) {
+    console.error(`[SERVER] Target undo action not found: ${targetUndoActionUuid}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Target undo action not found"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  // Check if this undo action has already been redone
+  const alreadyRedone = page.modActions.some(action => {
+    const actionPayload = action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+    return actionPayload && 
+           actionPayload.type === MOD_ACTIONS.REDO.TYPE && 
+           actionPayload[MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID] === targetUndoActionUuid;
+  });
+  
+  if (alreadyRedone) {
+    console.error(`[SERVER] Action already redone: ${targetUndoActionUuid}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Action already redone"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  // Optional: Check if the client is allowed to redo this action
+  // For example, you might only allow clients to redo their own undos
+  if (undoAction.clientId && clientId && undoAction.clientId !== clientId) {
+    console.error(`[SERVER] Client ${clientId} not allowed to redo undo by client ${undoAction.clientId}`);
+    const declineMessage = {
+      type: MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.TYPE,
+      boardId: boardId,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.PAGE_UUID]: pageUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID]: actionUuid,
+      [MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON]: "Not allowed to redo another client's undo"
+    };
+    ws.send(JSON.stringify(declineMessage));
+    return;
+  }
+  
+  // Calculate new hash
+  const serverHash = page.currentHash;
+  const afterHash = hashNext(serverHash, payload);
+  
+  // Create the mod action
+  const modAction = {
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
+    [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: payload,
+    hashes: {
+      [MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: serverHash,
+      [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash
+    },
+    clientId: clientId // Store client ID for tracking
+  };
+  
+  // Update page state
+  page.modActions.push(modAction);
+  page.currentHash = afterHash;
+  
+  // Persist to disk
+  appendModActionToDisk(pageUuid, modAction);
+  
+  // Send accept message
+  const acceptMessage = {
+    type: MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.TYPE,
+    boardId: boardId,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.PAGE_UUID]: pageUuid,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.ACTION_UUID]: actionUuid,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.BEFORE_HASH]: serverHash,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: afterHash,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
+    [MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.CURRENT_TOTAL_PAGES]: board.pageOrder.length
+  };
+  
+  broadcastMessageToBoard(acceptMessage, boardId);
+  logSentMessage(acceptMessage.type, acceptMessage, requestId);
+};
+
+
 wss.on('connection', (ws, req) => {
   console.log(`[SERVER] New WebSocket connection established`);
   
