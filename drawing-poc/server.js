@@ -631,8 +631,10 @@ modActionHandlers[MOD_ACTIONS.DELETE_PAGE.TYPE] = (ws, data, requestId) => {
   }
   
   const index = board.pageOrder.indexOf(pageUuid);
-  const replacementPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 2)];
-  
+  board.pageOrder.splice(index, 1);
+  delete board.pages[pageUuid];
+  const replacementPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 1)];
+
   // Update deletion map
   deletionMap[pageUuid] = replacementPageId;
   
@@ -644,9 +646,6 @@ modActionHandlers[MOD_ACTIONS.DELETE_PAGE.TYPE] = (ws, data, requestId) => {
     replacementId: replacementPageId
   });
   
-  // Update in-memory state
-  board.pageOrder.splice(index, 1);
-  delete board.pages[pageUuid];
   
   // Persist the updated board metadata
   saveBoardMetadata();
