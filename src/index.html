@@ -226,6 +226,7 @@
     let verifiedHash = '';
     let verifiedModActions = [];
     let optimisticUpdates = [];
+    let currentVisualState = []; // Current compiled visual state
     let pageNr = 1;
     let totalPages = 1;
     let lastDrawUuid = null;  // Track last drawn stroke UUID for eraser
@@ -389,8 +390,17 @@
           case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE:
             handleBoardRegistered(data);
             break;
+          case "error":
+            handleErrorMessage(data);
+            break;
         }
       };
+    }
+    
+    // Handle server error message
+    function handleErrorMessage(data) {
+      console.error(`[SERVER ERROR] ${data.message}`, data.stack);
+      showError(`Server error: ${data.message}`);
     }
     
     // Register with a board
@@ -421,6 +431,7 @@
       // Reset local state - server will send us a full page message after registration
       verifiedModActions = [];
       optimisticUpdates = [];
+      currentVisualState = [];
       verifiedHash = '';
       myActions = []; // Reset undo history
       undoneActions.clear(); // Clear redo history
@@ -521,6 +532,11 @@
         verifiedModActions.push(acceptedAction);
         verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
         
+        // Update visual state from server
+        if (data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.VISUAL_STATE]) {
+          currentVisualState = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.VISUAL_STATE];
+        }
+        
         // Handle undo/redo tracking
         const payload = acceptedAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
         
@@ -595,6 +611,9 @@
     // Handle decline message from server
     function handleDeclineMessage(data) {
       const declinedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.ACTION_UUID];
+      const reason = data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE_MESSAGE.REASON];
+      
+      console.error(`[SERVER] Declined action ${declinedActionUuid}: ${reason}`);
       
       // Remove declined action from optimistic updates
       optimisticUpdates = optimisticUpdates.filter(a => 
@@ -619,6 +638,11 @@
         verifiedModActions = verifiedModActions.concat(replayActions);
       }
       
+      // Update visual state from server
+      if (data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.VISUAL_STATE]) {
+        currentVisualState = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.VISUAL_STATE];
+      }
+      
       // Update page info
       if (data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR]) {
         pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY_MESSAGE.CURRENT_PAGE_NR];
@@ -639,12 +663,14 @@
       const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
       const modActions = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.STATE];
       const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH];
+      const visualState = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.VISUAL_STATE];
       
       // Replace current page data
       currentPageUuid = pageUuid;
       verifiedModActions = Array.isArray(modActions) ? modActions : [];
       optimisticUpdates = [];
       verifiedHash = afterHash;
+      currentVisualState = Array.isArray(visualState) ? visualState : [];
       
       // Reset undo/redo state when changing pages
       myActions = [];
@@ -734,8 +760,7 @@
     // Send a message to the server
     function sendMessage(message) {
       if (!connectionEstablished) {
-        showError('Not connected to server. Please reconnect.');
-        return false;
+        throw new Error('Not connected to server');
       }
       
       // Add boardId to all outgoing messages
@@ -999,12 +1024,7 @@
     
     // Update page info display
     function updatePageInfo() {
-      if (pageNr > 0 && totalPages > 0) {
-        pageInfo.textContent = `Page ${pageNr} of ${totalPages}`;
-      } else {
-        // Handle edge case when server returns invalid page numbers
-        pageInfo.textContent = "Page data unavailable";
-      }
+      pageInfo.textContent = `Page ${pageNr} of ${totalPages}`;
     }
     
     // Handle pointer down event
@@ -1077,54 +1097,18 @@
       }
     }
     
-    // Find a stroke to erase at the given position
+    // Find a stroke to erase at the given position using visual state
     function findStrokeToErase(x, y) {
-      // Combine verified and optimistic actions
-      const allActions = [...verifiedModActions, ...optimisticUpdates];
+      // Only consider visible strokes from the visual state
+      const visibleStrokes = currentVisualState.filter(item => 
+        item.type === "stroke" && !item.erased && !item.undone
+      );
       
-      // Find actions that have been undone
-      const undoneActionIds = new Set();
-      for (const action of allActions) {
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (!payload) continue;
-        
-        // If this is an undo action, mark its target as undone
-        if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
-          undoneActionIds.add(payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]);
-        }
-        
-        // If this is a redo action, unmark its target's target
-        if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
-          const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
-          
-          // Find the undo action in the list
-          const undoAction = allActions.find(a => 
-            a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetUndoActionUuid
-          );
-          
-          if (undoAction && undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) {
-            const originalActionUuid = undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
-            undoneActionIds.delete(originalActionUuid);
-          }
-        }
-      }
-      
-      // Find the most recent DRAW action with a stroke near this point
-      for (let i = allActions.length - 1; i >= 0; i--) {
-        const action = allActions[i];
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
-        
-        const actionUuid = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-        
-        // Skip if this action has been undone
-        if (undoneActionIds.has(actionUuid)) continue;
-        
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          const stroke = payload.stroke;
-          if (isPointNearStroke(x, y, stroke)) {
-            return actionUuid;
-          }
+      // Iterate in reverse to find the most recently drawn stroke first
+      for (let i = visibleStrokes.length - 1; i >= 0; i--) {
+        const item = visibleStrokes[i];
+        if (isPointNearStroke(x, y, item.stroke)) {
+          return item.actionUuid;
         }
       }
       
@@ -1220,6 +1204,18 @@
       // Calculate expected hash
       const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
       
+      // Create temporary visual state update for optimistic rendering
+      const updatedVisualState = currentVisualState.map(item => {
+        if (item.actionUuid === strokeUuid) {
+          return {
+            ...item,
+            erased: true,
+            erasedBy: actionUuid
+          };
+        }
+        return item;
+      });
+      
       // Add to optimistic updates
       const optimisticAction = {
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
@@ -1228,10 +1224,14 @@
           [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
           [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
         },
-        clientId: clientId // Add client ID for undo tracking
+        clientId: clientId, // Add client ID for undo tracking
+        visualStateUpdate: updatedVisualState
       };
       
       optimisticUpdates.push(optimisticAction);
+      
+      // Update local visual state optimistically
+      currentVisualState = updatedVisualState;
       
       // Send to server
       sendMessage(action);
@@ -1259,6 +1259,17 @@
       // Calculate expected hash
       const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
       
+      // Create temporary visual state update for optimistic rendering
+      const newVisualStateItem = {
+        type: "stroke",
+        stroke: stroke,
+        actionUuid: actionUuid,
+        erased: false,
+        undone: false
+      };
+      
+      const updatedVisualState = [...currentVisualState, newVisualStateItem];
+      
       // Add to optimistic updates
       const optimisticAction = {
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
@@ -1267,13 +1278,20 @@
           [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
           [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
         },
-        clientId: clientId // Add client ID for undo tracking
+        clientId: clientId, // Add client ID for undo tracking
+        visualStateUpdate: updatedVisualState
       };
       
       optimisticUpdates.push(optimisticAction);
       
+      // Update local visual state optimistically
+      currentVisualState = updatedVisualState;
+      
       // Send to server
       sendMessage(action);
+      
+      // Redraw to show the new stroke
+      redrawCanvas();
     }
     
     // Add a new page
@@ -1321,7 +1339,7 @@
     // Navigate to a specific page
     function navigateToPage(pageNumber) {
       if (pageNumber < 1 || pageNumber > totalPages) {
-        return;
+        throw new Error(`Invalid page number: ${pageNumber}`);
       }
       
       const requestId = createRequestId();
@@ -1402,65 +1420,48 @@
       ctx.restore();
     }
     
-    // Redraw the entire canvas
+    // Redraw the entire canvas using visual state
     function redrawCanvas() {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
       
-      // Collect all actions (verified + optimistic)
-      const allActions = [...verifiedModActions, ...optimisticUpdates];
+      // Get the combined visual state (verified + optimistic)
+      let renderState = currentVisualState;
       
-      // Find actions that have been undone
-      const undoneActionIds = new Set();
-      
-      // First pass: identify all undone actions
-      for (const action of allActions) {
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
+      // If there are optimistic updates with visual state updates, use the latest one
+      if (optimisticUpdates.length > 0) {
+        const lastOptimisticWithVisualState = optimisticUpdates
+          .slice()
+          .reverse()
+          .find(update => update.visualStateUpdate);
         
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        
-        // If this is an undo action, mark its target as undone
-        if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
-          undoneActionIds.add(payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]);
-        }
-        
-        // If this is a redo action, unmark its target's target
-        if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
-          const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
-          
-          // Find the undo action in the list
-          const undoAction = allActions.find(a => 
-            a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetUndoActionUuid
-          );
-          
-          if (undoAction && undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) {
-            const originalActionUuid = undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
-            undoneActionIds.delete(originalActionUuid);
-          }
+        if (lastOptimisticWithVisualState) {
+          renderState = lastOptimisticWithVisualState.visualStateUpdate;
         }
       }
       
-      // Second pass: draw non-undone strokes
-      for (const action of allActions) {
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
-        
-        // Skip drawing if this action has been undone
-        if (undoneActionIds.has(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID])) {
-          continue;
+      // Draw all visible strokes from the visual state
+      for (const item of renderState) {
+        if (item.type === "stroke" && !item.erased && !item.undone) {
+          drawStroke(item.stroke);
         }
-        
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          drawStroke(payload.stroke);
-        }
+      }
+      
+      // Also draw the current stroke if we're in the middle of drawing
+      if (isDrawing && currentPath.length >= 2) {
+        const tempStroke = [...currentStyle];
+        tempStroke[shared.STROKE.POINTS] = currentPath;
+        drawStroke(tempStroke);
       }
     }
     
     // Send a group action (for future use)
     function sendGroupAction(actions) {
-      if (!Array.isArray(actions) || actions.length === 0) return;
+      if (!Array.isArray(actions) || actions.length === 0) {
+        throw new Error("Group action must contain at least one action");
+      }
       
       const groupUuid = shared.generateUuid();
       
