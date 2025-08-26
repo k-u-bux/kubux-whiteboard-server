@@ -976,7 +976,12 @@
     
     // Update page info display
     function updatePageInfo() {
-      pageInfo.textContent = `Page ${pageNr} of ${totalPages}`;
+      if (pageNr > 0 && totalPages > 0) {
+        pageInfo.textContent = `Page ${pageNr} of ${totalPages}`;
+      } else {
+        // Handle edge case when server returns invalid page numbers
+        pageInfo.textContent = "Page data unavailable";
+      }
     }
     
     // Handle pointer down event
@@ -1105,22 +1110,24 @@
     
     // Check if a point is near a stroke
     function isPointNearStroke(x, y, stroke) {
-      if (!stroke || !stroke.points || stroke.points.length < 2) return false;
+      if (!stroke || !Array.isArray(stroke[shared.STROKE.POINTS]) || stroke[shared.STROKE.POINTS].length < 2) return false;
       
       const threshold = eraserRadius;
-      const points = stroke.points;
+      const points = stroke[shared.STROKE.POINTS];
       
       // Check each segment of the stroke
       for (let i = 1; i < points.length; i++) {
         const p1 = points[i - 1];
         const p2 = points[i];
         
+        // Extract x and y coordinates based on array format
+        const x1 = p1[shared.POINT.X];
+        const y1 = p1[shared.POINT.Y];
+        const x2 = p2[shared.POINT.X];
+        const y2 = p2[shared.POINT.Y];
+        
         // Calculate distance from point to line segment
-        const distance = distanceToLineSegment(
-          x, y, 
-          p1.x, p1.y, 
-          p2.x, p2.y
-        );
+        const distance = distanceToLineSegment(x, y, x1, y1, x2, y2);
         
         if (distance < threshold) {
           return true;
@@ -1320,7 +1327,7 @@
     
     // Draw a stroke on the canvas
     function drawStroke(stroke) {
-      if (!stroke || !stroke[shared.STROKE.POINTS] || stroke[shared.STROKE.POINTS].length < 2) return;
+      if (!stroke || !Array.isArray(stroke[shared.STROKE.POINTS]) || stroke[shared.STROKE.POINTS].length < 2) return;
       
       const points = stroke[shared.STROKE.POINTS];
       
@@ -1421,6 +1428,52 @@
           drawStroke(payload.stroke);
         }
       }
+    }
+    
+    // Send a group action (for future use)
+    function sendGroupAction(actions) {
+      if (!Array.isArray(actions) || actions.length === 0) return;
+      
+      const groupUuid = shared.generateUuid();
+      
+      // Prepare actions with client-generated UUIDs
+      const groupActions = actions.map(action => {
+        return {
+          actionUuid: shared.generateUuid(),
+          payload: action
+        };
+      });
+      
+      // Create group action proposal
+      const groupProposal = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: groupUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
+          type: shared.MOD_ACTIONS.GROUP.TYPE,
+          [shared.MOD_ACTIONS.GROUP.ACTIONS]: groupActions
+        }
+      };
+      
+      // Calculate expected hash
+      const nextHash = shared.hashNext(verifiedHash, groupProposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
+      
+      // Add to optimistic updates
+      const optimisticAction = {
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: groupUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupProposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
+        hashes: {
+          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
+          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
+        },
+        clientId: clientId
+      };
+      
+      optimisticUpdates.push(optimisticAction);
+      
+      // Send to server
+      sendMessage(groupProposal);
     }
     
     // Initialize the app
