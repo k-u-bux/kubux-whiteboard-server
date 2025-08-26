@@ -249,6 +249,10 @@
       1.0,                         // pressureSensitivity
       1                            // layer
     ];
+
+    // Visual state for rendering
+    let currentVisualState = shared.createEmptyVisualState();
+    let currentEraserElement = null;
     
     // Zoom state
     let zoomLevel = 1;
@@ -422,6 +426,7 @@
       verifiedModActions = [];
       optimisticUpdates = [];
       verifiedHash = '';
+      currentVisualState = shared.createEmptyVisualState();
       myActions = []; // Reset undo history
       undoneActions.clear(); // Clear redo history
       updateUndoRedoButtons(); // Update button states
@@ -518,8 +523,12 @@
             data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]
         };
         
+        // Add to verified actions
         verifiedModActions.push(acceptedAction);
         verifiedHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH];
+        
+        // Update the visual state with the accepted action
+        currentVisualState = shared.applyModAction(currentVisualState, acceptedAction);
         
         // Handle undo/redo tracking
         const payload = acceptedAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
@@ -601,9 +610,11 @@
         a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] !== declinedActionUuid
       );
       
+      // Recalculate visual state
+      rebuildVisualState();
+      
       // Request replay to ensure we're in sync
       requestReplay(currentPageUuid, verifiedHash);
-      redrawCanvas();
       
       // Update undo/redo buttons
       updateUndoRedoButtons();
@@ -617,6 +628,9 @@
       // Apply replayed actions
       if (Array.isArray(replayActions)) {
         verifiedModActions = verifiedModActions.concat(replayActions);
+        
+        // Rebuild visual state from verified actions
+        rebuildVisualState();
       }
       
       // Update page info
@@ -628,9 +642,11 @@
       }
       updatePageInfo();
       
-      redrawCanvas();
+      // Rebuild undo/redo state
+      rebuildUndoRedoState();
       
-      // Update undo/redo buttons
+      // Update UI
+      redrawCanvas();
       updateUndoRedoButtons();
     }
     
@@ -646,11 +662,14 @@
       optimisticUpdates = [];
       verifiedHash = afterHash;
       
+      // Build visual state from scratch using the page's mod actions
+      rebuildVisualState();
+      
       // Reset undo/redo state when changing pages
       myActions = [];
       undoneActions.clear();
       
-      // Rebuild myActions and undoneActions by analyzing verifiedModActions
+      // Rebuild undo/redo state by analyzing verifiedModActions
       rebuildUndoRedoState();
       
       // Update page info
@@ -662,6 +681,33 @@
       
       // Update undo/redo buttons
       updateUndoRedoButtons();
+    }
+    
+    // Rebuild the visual state from verified actions
+    function rebuildVisualState() {
+      // Start with an empty visual state
+      currentVisualState = shared.createEmptyVisualState();
+      
+      // Apply all verified actions to build the visual state
+      for (const action of verifiedModActions) {
+        currentVisualState = shared.applyModAction(currentVisualState, action);
+        
+        // Check if visual state couldn't be built
+        if (currentVisualState === null) {
+          console.error("Failed to rebuild visual state, requesting full page");
+          currentVisualState = shared.createEmptyVisualState();
+          requestFullPage(currentPageUuid);
+          return;
+        }
+      }
+      
+      // Apply optimistic updates on top of verified state
+      for (const action of optimisticUpdates) {
+        const tempState = shared.applyModAction(currentVisualState, action);
+        if (tempState !== null) {
+          currentVisualState = tempState;
+        }
+      }
     }
     
     // Rebuild undo/redo state from verified actions
@@ -925,9 +971,18 @@
       // Add to optimistic updates
       optimisticUpdates.push(optimisticAction);
       
+      // Apply optimistic update to visual state
+      const newVisualState = shared.applyModAction(currentVisualState, optimisticAction);
+      if (newVisualState !== null) {
+        currentVisualState = newVisualState;
+      }
+      
       // Temporarily disable undo/redo buttons until server responds
       undoBtn.disabled = true;
       redoBtn.disabled = true;
+      
+      // Redraw immediately to show the change
+      redrawCanvas();
       
       // Send to server
       sendMessage(proposal);
@@ -1017,10 +1072,30 @@
       if (currentTool === 'eraser') {
         isErasing = true;
         
-        // Find strokes near this point and erase them
-        const strokeUuid = findStrokeToErase(x, y);
-        if (strokeUuid) {
-          sendEraseAction(strokeUuid);
+        // Create eraser stroke element
+        const eraserPoint = {
+          x: x,
+          y: y,
+          width: eraserRadius * 2
+        };
+        
+        currentEraserElement = {
+          type: shared.VISUAL_STATE.ELEMENT_TYPES.STROKE,
+          points: [eraserPoint],
+          color: { hex: '#ff0000', opacity: 0.3 },
+          isBezier: false,
+          isClosed: false,
+          transform: shared.createIdentityTransform()
+        };
+        
+        // Find strokes that intersect with this eraser point
+        const intersectingIds = shared.findIntersectingElements(currentVisualState, currentEraserElement);
+        
+        // Send erase action for each intersecting element
+        if (intersectingIds.length > 0) {
+          for (const id of intersectingIds) {
+            sendEraseAction(id);
+          }
         }
       } else {
         isDrawing = true;
@@ -1040,11 +1115,47 @@
       const pressure = event.pressure !== undefined ? event.pressure : 1.0;
       
       if (currentTool === 'eraser' && isErasing) {
-        // Find strokes near this point and erase them
-        const strokeUuid = findStrokeToErase(x, y);
-        if (strokeUuid) {
-          sendEraseAction(strokeUuid);
+        // Update eraser element with new point
+        const eraserPoint = {
+          x: x,
+          y: y,
+          width: eraserRadius * 2
+        };
+        
+        // Add point to eraser element
+        if (currentEraserElement) {
+          currentEraserElement.points.push(eraserPoint);
+          
+          // Keep only last few points to limit memory usage
+          if (currentEraserElement.points.length > 10) {
+            currentEraserElement.points = currentEraserElement.points.slice(-10);
+          }
+        } else {
+          // Create new eraser element if needed
+          currentEraserElement = {
+            type: shared.VISUAL_STATE.ELEMENT_TYPES.STROKE,
+            points: [eraserPoint],
+            color: { hex: '#ff0000', opacity: 0.3 },
+            isBezier: false,
+            isClosed: false,
+            transform: shared.createIdentityTransform()
+          };
         }
+        
+        // Find strokes that intersect with this eraser element
+        const intersectingIds = shared.findIntersectingElements(currentVisualState, currentEraserElement);
+        
+        // Send erase action for each intersecting element
+        if (intersectingIds.length > 0) {
+          for (const id of intersectingIds) {
+            sendEraseAction(id);
+          }
+        }
+        
+        // Draw temporary visualization of eraser
+        redrawCanvas();
+        drawEraserPreview(currentEraserElement);
+        
       } else if (isDrawing) {
         // Create point in compact format
         const point = [x, y, pressure, Date.now()];
@@ -1052,8 +1163,12 @@
         
         // Create a temporary stroke for drawing
         const tempStroke = [...currentStyle];  // Clone the style
-        tempStroke[shared.STROKE.POINTS] = currentPath.slice(-2);  // Last two points
+        tempStroke[shared.STROKE.POINTS] = currentPath;
         
+        // Draw all existing content
+        redrawCanvas();
+        
+        // Draw the current stroke on top
         drawStroke(tempStroke);
       }
     }
@@ -1062,6 +1177,8 @@
     function handlePointerUp() {
       if (currentTool === 'eraser') {
         isErasing = false;
+        currentEraserElement = null;
+        redrawCanvas(); // Redraw to remove eraser preview
       } else if (isDrawing) {
         isDrawing = false;
         
@@ -1077,131 +1194,53 @@
       }
     }
     
-    // Find a stroke to erase at the given position
-    function findStrokeToErase(x, y) {
-      // Combine verified and optimistic actions
-      const allActions = [...verifiedModActions, ...optimisticUpdates];
+    // Draw eraser preview on canvas
+    function drawEraserPreview(eraserElement) {
+      if (!eraserElement || !eraserElement.points || eraserElement.points.length === 0) return;
       
-      // Find actions that have been undone
-      const undoneActionIds = new Set();
-      for (const action of allActions) {
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (!payload) continue;
-        
-        // If this is an undo action, mark its target as undone
-        if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
-          undoneActionIds.add(payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]);
-        }
-        
-        // If this is a redo action, unmark its target's target
-        if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
-          const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
-          
-          // Find the undo action in the list
-          const undoAction = allActions.find(a => 
-            a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetUndoActionUuid
-          );
-          
-          if (undoAction && undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) {
-            const originalActionUuid = undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
-            undoneActionIds.delete(originalActionUuid);
-          }
-        }
+      ctx.save();
+      
+      // Draw the eraser path
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+      ctx.lineWidth = eraserRadius * 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      ctx.beginPath();
+      ctx.moveTo(eraserElement.points[0].x, eraserElement.points[0].y);
+      
+      for (let i = 1; i < eraserElement.points.length; i++) {
+        ctx.lineTo(eraserElement.points[i].x, eraserElement.points[i].y);
       }
       
-      // Find the most recent DRAW action with a stroke near this point
-      for (let i = allActions.length - 1; i >= 0; i--) {
-        const action = allActions[i];
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
-        
-        const actionUuid = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-        
-        // Skip if this action has been undone
-        if (undoneActionIds.has(actionUuid)) continue;
-        
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          const stroke = payload.stroke;
-          if (isPointNearStroke(x, y, stroke)) {
-            return actionUuid;
-          }
-        }
-      }
+      ctx.stroke();
       
-      return null;
-    }
-    
-    // Check if a point is near a stroke
-    function isPointNearStroke(x, y, stroke) {
-      if (!stroke || !Array.isArray(stroke[shared.STROKE.POINTS]) || stroke[shared.STROKE.POINTS].length < 2) return false;
+      // Draw circle at current position
+      const lastPoint = eraserElement.points[eraserElement.points.length - 1];
+      ctx.beginPath();
+      ctx.arc(lastPoint.x, lastPoint.y, eraserRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
       
-      const threshold = eraserRadius;
-      const points = stroke[shared.STROKE.POINTS];
-      
-      // Check each segment of the stroke
-      for (let i = 1; i < points.length; i++) {
-        const p1 = points[i - 1];
-        const p2 = points[i];
-        
-        // Make sure we're using array indices, not object properties
-        const x1 = p1[shared.POINT.X];
-        const y1 = p1[shared.POINT.Y];
-        const x2 = p2[shared.POINT.X];
-        const y2 = p2[shared.POINT.Y];
-        
-        if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) {
-          // Skip invalid points
-          continue;
-        }
-        
-        // Calculate distance from point to line segment
-        const distance = distanceToLineSegment(x, y, x1, y1, x2, y2);
-        
-        if (distance < threshold) {
-          return true;
-        }
-      }
-      
-      return false;
-    }
-    
-    // Calculate distance from point to line segment
-    function distanceToLineSegment(px, py, x1, y1, x2, y2) {
-      const A = px - x1;
-      const B = py - y1;
-      const C = x2 - x1;
-      const D = y2 - y1;
-      
-      const dot = A * C + B * D;
-      const lenSq = C * C + D * D;
-      let param = -1;
-      
-      if (lenSq !== 0) {
-        param = dot / lenSq;
-      }
-      
-      let xx, yy;
-      
-      if (param < 0) {
-        xx = x1;
-        yy = y1;
-      } else if (param > 1) {
-        xx = x2;
-        yy = y2;
-      } else {
-        xx = x1 + param * C;
-        yy = y1 + param * D;
-      }
-      
-      const dx = px - xx;
-      const dy = py - yy;
-      
-      return Math.sqrt(dx * dx + dy * dy);
+      ctx.restore();
     }
     
     // Send an erase action to the server
     function sendEraseAction(strokeUuid) {
       if (!strokeUuid) return;
+      
+      // Check if we've already sent an erase action for this stroke
+      const alreadyErasing = optimisticUpdates.some(action => {
+        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+        return payload && 
+               payload.type === shared.MOD_ACTIONS.ERASE.TYPE && 
+               payload[shared.MOD_ACTIONS.ERASE.ACTION_UUID] === strokeUuid;
+      });
+      
+      if (alreadyErasing) return;
       
       const actionUuid = shared.generateUuid();
       
@@ -1217,27 +1256,24 @@
         }
       };
       
-      // Calculate expected hash
-      const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
-      
-      // Add to optimistic updates
+      // Create optimistic action
       const optimisticAction = {
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
-        hashes: {
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
-        },
-        clientId: clientId // Add client ID for undo tracking
+        clientId: clientId
       };
       
+      // Add to optimistic updates
       optimisticUpdates.push(optimisticAction);
+      
+      // Apply optimistic update to visual state
+      const newVisualState = shared.applyModAction(currentVisualState, optimisticAction);
+      if (newVisualState !== null) {
+        currentVisualState = newVisualState;
+      }
       
       // Send to server
       sendMessage(action);
-      
-      // Immediately redraw with the stroke removed
-      redrawCanvas();
     }
     
     // Send a stroke to the server
@@ -1256,24 +1292,27 @@
         }
       };
       
-      // Calculate expected hash
-      const nextHash = shared.hashNext(verifiedHash, action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
-      
-      // Add to optimistic updates
+      // Create optimistic update
       const optimisticAction = {
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: actionUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
-        hashes: {
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
-        },
-        clientId: clientId // Add client ID for undo tracking
+        clientId: clientId
       };
       
+      // Add to optimistic updates
       optimisticUpdates.push(optimisticAction);
+      
+      // Apply optimistic update to visual state
+      const newVisualState = shared.applyModAction(currentVisualState, optimisticAction);
+      if (newVisualState !== null) {
+        currentVisualState = newVisualState;
+      }
       
       // Send to server
       sendMessage(action);
+      
+      // Redraw to show the stroke immediately
+      redrawCanvas();
     }
     
     // Add a new page
@@ -1353,6 +1392,21 @@
       sendMessage(replayMessage);
     }
     
+    // Request full page from server
+    function requestFullPage(pageUuid) {
+      const requestId = createRequestId();
+      
+      const fullPageRequest = {
+        type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+        boardId: boardId,
+        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: pageUuid,
+        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: 0,
+        [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
+      };
+      
+      sendMessage(fullPageRequest);
+    }
+    
     // Draw a stroke on the canvas
     function drawStroke(stroke) {
       if (!stroke || !Array.isArray(stroke[shared.STROKE.POINTS]) || stroke[shared.STROKE.POINTS].length < 2) return;
@@ -1402,59 +1456,103 @@
       ctx.restore();
     }
     
-    // Redraw the entire canvas
+    // Draw an element from the visual state
+    function drawElement(element) {
+      if (!element) return;
+      
+      if (element.type === shared.VISUAL_STATE.ELEMENT_TYPES.STROKE) {
+        // Draw stroke
+        ctx.save();
+        
+        // Apply transform if available
+        if (element.transform) {
+          const t = element.transform;
+          ctx.transform(t[0], t[1], t[2], t[3], t[4], t[5]);
+        }
+        
+        // Apply style
+        ctx.strokeStyle = element.color.hex;
+        ctx.globalAlpha = element.color.opacity;
+        
+        // Get width from first point or use default
+        const width = element.points.length > 0 && element.points[0].width ? 
+                     element.points[0].width : 2;
+        ctx.lineWidth = width;
+        
+        // Apply styles if available
+        if (element.styles) {
+          if (element.styles.penType === shared.PEN_TYPES.HIGHLIGHTER) {
+            ctx.lineJoin = "round";
+            ctx.lineCap = "square";
+          } else {
+            ctx.lineJoin = element.styles.joinStyle !== undefined ? 
+                          shared.getJoinStyleString(element.styles.joinStyle) : "round";
+            ctx.lineCap = element.styles.capStyle !== undefined ? 
+                         shared.getCapStyleString(element.styles.capStyle) : "round";
+          }
+          
+          if (element.styles.dashPattern && element.styles.dashPattern.length > 1) {
+            ctx.setLineDash(element.styles.dashPattern);
+          } else {
+            ctx.setLineDash([]);
+          }
+        } else {
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          ctx.setLineDash([]);
+        }
+        
+        // Draw the path
+        if (element.points.length > 0) {
+          ctx.beginPath();
+          ctx.moveTo(element.points[0].x, element.points[0].y);
+          
+          for (let i = 1; i < element.points.length; i++) {
+            const point = element.points[i];
+            
+            // Adjust line width for each point if width is specified
+            if (point.width !== undefined && point.width !== width) {
+              ctx.stroke(); // Finish current segment
+              ctx.beginPath(); // Start new segment
+              ctx.lineWidth = point.width;
+              ctx.moveTo(element.points[i-1].x, element.points[i-1].y);
+            }
+            
+            ctx.lineTo(point.x, point.y);
+          }
+          
+          ctx.stroke();
+        }
+        
+        ctx.restore();
+      }
+    }
+    
+    // Redraw the entire canvas using the visual state
     function redrawCanvas() {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
       
-      // Collect all actions (verified + optimistic)
-      const allActions = [...verifiedModActions, ...optimisticUpdates];
+      // Get renderable elements from current visual state
+      const renderableElements = shared.getRenderableElements(currentVisualState);
       
-      // Find actions that have been undone
-      const undoneActionIds = new Set();
-      
-      // First pass: identify all undone actions
-      for (const action of allActions) {
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
-        
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        
-        // If this is an undo action, mark its target as undone
-        if (payload.type === shared.MOD_ACTIONS.UNDO.TYPE) {
-          undoneActionIds.add(payload[shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]);
-        }
-        
-        // If this is a redo action, unmark its target's target
-        if (payload.type === shared.MOD_ACTIONS.REDO.TYPE) {
-          const targetUndoActionUuid = payload[shared.MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
-          
-          // Find the undo action in the list
-          const undoAction = allActions.find(a => 
-            a[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === targetUndoActionUuid
-          );
-          
-          if (undoAction && undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) {
-            const originalActionUuid = undoAction[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][shared.MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
-            undoneActionIds.delete(originalActionUuid);
-          }
-        }
+      // Draw each element
+      for (const element of renderableElements) {
+        drawElement(element);
       }
       
-      // Second pass: draw non-undone strokes
-      for (const action of allActions) {
-        if (!action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) continue;
-        
-        // Skip drawing if this action has been undone
-        if (undoneActionIds.has(action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID])) {
-          continue;
-        }
-        
-        const payload = action[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-        if (payload.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-          drawStroke(payload.stroke);
-        }
+      // If drawing, draw the current stroke on top
+      if (isDrawing && currentPath.length >= 2) {
+        const tempStroke = [...currentStyle];  // Clone the style
+        tempStroke[shared.STROKE.POINTS] = currentPath;
+        drawStroke(tempStroke);
+      }
+      
+      // If erasing, draw eraser preview
+      if (isErasing && currentEraserElement) {
+        drawEraserPreview(currentEraserElement);
       }
     }
     
@@ -1484,21 +1582,22 @@
         }
       };
       
-      // Calculate expected hash
-      const nextHash = shared.hashNext(verifiedHash, groupProposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]);
-      
-      // Add to optimistic updates
+      // Create optimistic action
       const optimisticAction = {
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID]: groupUuid,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupProposal[shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD],
-        hashes: {
-          [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
-          [shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT_MESSAGE.AFTER_HASH]: nextHash
-        },
         clientId: clientId
       };
       
+      // Add to optimistic updates
       optimisticUpdates.push(optimisticAction);
+      
+      // Apply optimistic update to visual state
+      const newVisualState = shared.applyModAction(currentVisualState, optimisticAction);
+      if (newVisualState !== null) {
+        currentVisualState = newVisualState;
+        redrawCanvas();
+      }
       
       // Send to server
       sendMessage(groupProposal);
