@@ -347,6 +347,384 @@ function findUndoActionFor(modActions, targetActionUuid) {
   );
 }
 
+
+// visual state and actions to state compiler
+// ==========================================
+
+// Visual State constants and structures
+const VISUAL_STATE = {
+  // Element types
+  ELEMENT_TYPES: {
+    STROKE: 'stroke',
+    FILL: 'fill'
+  },
+  
+  // Interpolation types
+  INTERPOLATION: {
+    PIECEWISE_LINEAR: 0,
+    BEZIER_CURVE: 1
+  },
+  
+  // Entry structure indices
+  ENTRY: {
+    ELEMENT: 0,    // The visual element
+    VISIBLE: 1,    // Boolean indicating visibility
+    CREATOR_ID: 2  // Action UUID that created this element
+  }
+};
+
+// Affine transform structure [a, b, c, d, e, f]
+// Represents the matrix:
+// [a c e]
+// [b d f]
+// [0 0 1]
+const TRANSFORM = {
+  A: 0, // scale x
+  B: 1, // skew y
+  C: 2, // skew x
+  D: 3, // scale y
+  E: 4, // translate x
+  F: 5  // translate y
+};
+
+// Create an identity transform
+function createIdentityTransform() {
+  return [1, 0, 0, 1, 0, 0];
+}
+
+// Apply transform to a point
+function applyTransform(transform, x, y) {
+  return {
+    x: transform[TRANSFORM.A] * x + transform[TRANSFORM.C] * y + transform[TRANSFORM.E],
+    y: transform[TRANSFORM.B] * x + transform[TRANSFORM.D] * y + transform[TRANSFORM.F]
+  };
+}
+
+// Create a visual state entry from a stroke
+function createStrokeElement(stroke, transform = createIdentityTransform()) {
+  return {
+    type: VISUAL_STATE.ELEMENT_TYPES.STROKE,
+    points: stroke[STROKE.POINTS].map(point => ({
+      x: point[POINT.X],
+      y: point[POINT.Y],
+      width: stroke[STROKE.WIDTH] * (stroke[STROKE.PRESSURE_SENS] ? point[POINT.PRESSURE] : 1)
+    })),
+    isBezier: false, // Currently all strokes are piecewise linear
+    isClosed: false, // Currently all strokes are open paths
+    transform: transform,
+    color: {
+      hex: stroke[STROKE.COLOR],
+      opacity: stroke[STROKE.OPACITY]
+    },
+    styles: {
+      penType: stroke[STROKE.PEN_TYPE],
+      capStyle: stroke[STROKE.CAP_STYLE],
+      joinStyle: stroke[STROKE.JOIN_STYLE],
+      dashPattern: stroke[STROKE.DASH_PATTERN]
+    }
+  };
+}
+
+// Create a visual state entry
+function createVisualStateEntry(element, visible, creatorId) {
+  return [element, visible, creatorId];
+}
+
+// Function to get an element from a visual state entry
+function getElement(entry) {
+  return entry[VISUAL_STATE.ENTRY.ELEMENT];
+}
+
+// Function to check if an entry is visible
+function isVisible(entry) {
+  return entry[VISUAL_STATE.ENTRY.VISIBLE];
+}
+
+// Function to get the creator ID of an entry
+function getCreatorId(entry) {
+  return entry[VISUAL_STATE.ENTRY.CREATOR_ID];
+}
+
+// Creates an empty visual state
+function createEmptyVisualState() {
+  return [];
+}
+
+// Applies a mod action to a visual state
+function applyModAction(visualState, action) {
+  const payload = action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+  const actionUuid = action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
+  
+  if (!payload || !payload.type) {
+    return null; // Invalid action
+  }
+  
+  switch (payload.type) {
+    case MOD_ACTIONS.DRAW.TYPE:
+      return applyDrawAction(visualState, payload, actionUuid);
+    
+    case MOD_ACTIONS.ERASE.TYPE:
+      return applyEraseAction(visualState, payload, actionUuid);
+    
+    case MOD_ACTIONS.UNDO.TYPE:
+      return applyUndoAction(visualState, payload, actionUuid);
+    
+    case MOD_ACTIONS.REDO.TYPE:
+      return applyRedoAction(visualState, payload, actionUuid);
+    
+    case MOD_ACTIONS.GROUP.TYPE:
+      return applyGroupAction(visualState, payload, actionUuid);
+    
+    case MOD_ACTIONS.NEW_PAGE.TYPE:
+    case MOD_ACTIONS.DELETE_PAGE.TYPE:
+      // These actions don't directly affect the visual state of the current page
+      return visualState;
+    
+    default:
+      return null; // Unknown action type
+  }
+}
+
+// Apply a draw action
+function applyDrawAction(visualState, payload, actionUuid) {
+  if (!payload[MOD_ACTIONS.DRAW.STROKE]) {
+    return null; // Invalid draw action
+  }
+  
+  const stroke = payload[MOD_ACTIONS.DRAW.STROKE];
+  const element = createStrokeElement(stroke);
+  const entry = createVisualStateEntry(element, true, actionUuid);
+  
+  return [...visualState, entry];
+}
+
+// Apply an erase action
+function applyEraseAction(visualState, payload, actionUuid) {
+  if (!payload[MOD_ACTIONS.ERASE.ACTION_UUID]) {
+    return null; // Invalid erase action
+  }
+  
+  const targetActionUuid = payload[MOD_ACTIONS.ERASE.ACTION_UUID];
+  
+  // Find all entries created by the target action
+  const hasTargetAction = visualState.some(entry => 
+    getCreatorId(entry) === targetActionUuid && isVisible(entry)
+  );
+  
+  if (!hasTargetAction) {
+    return null; // Nothing to erase
+  }
+  
+  // Create a new state with targeted elements marked as invisible
+  return visualState.map(entry => {
+    if (getCreatorId(entry) === targetActionUuid && isVisible(entry)) {
+      return createVisualStateEntry(getElement(entry), false, getCreatorId(entry));
+    }
+    return entry;
+  });
+}
+
+// Apply an undo action
+function applyUndoAction(visualState, payload, actionUuid) {
+  if (!payload[MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]) {
+    return null; // Invalid undo action
+  }
+  
+  const targetActionUuid = payload[MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
+  
+  // Find entries created by the target action
+  const hasTargetAction = visualState.some(entry => 
+    getCreatorId(entry) === targetActionUuid
+  );
+  
+  if (!hasTargetAction) {
+    return null; // Cannot undo an action that doesn't exist
+  }
+  
+  // Toggle visibility of elements created by the target action
+  return visualState.map(entry => {
+    if (getCreatorId(entry) === targetActionUuid) {
+      return createVisualStateEntry(getElement(entry), !isVisible(entry), getCreatorId(entry));
+    }
+    return entry;
+  });
+}
+
+// Apply a redo action
+function applyRedoAction(visualState, payload, actionUuid) {
+  if (!payload[MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID]) {
+    return null; // Invalid redo action
+  }
+  
+  const targetUndoActionUuid = payload[MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
+  
+  // First, find the undo action this redo is targeting
+  const undoAction = visualState.find(entry => 
+    getCreatorId(entry) === targetUndoActionUuid
+  );
+  
+  if (!undoAction) {
+    return null; // Cannot find the undo action to redo
+  }
+  
+  // Now find the original action that was undone
+  const originalActionUuid = undoAction[VISUAL_STATE.ENTRY.ELEMENT].targetActionUuid;
+  
+  if (!originalActionUuid) {
+    return null; // Cannot determine what action to redo
+  }
+  
+  // Toggle visibility of elements created by the original action
+  return visualState.map(entry => {
+    if (getCreatorId(entry) === originalActionUuid) {
+      return createVisualStateEntry(getElement(entry), !isVisible(entry), getCreatorId(entry));
+    }
+    return entry;
+  });
+}
+
+// Apply a group action
+function applyGroupAction(visualState, payload, actionUuid) {
+  if (!payload[MOD_ACTIONS.GROUP.ACTIONS] || !Array.isArray(payload[MOD_ACTIONS.GROUP.ACTIONS])) {
+    return null; // Invalid group action
+  }
+  
+  // Apply each action in the group sequentially
+  let currentState = [...visualState];
+  
+  for (const groupedAction of payload[MOD_ACTIONS.GROUP.ACTIONS]) {
+    const newState = applyModAction(currentState, groupedAction);
+    if (newState !== null) {
+      currentState = newState;
+    }
+  }
+  
+  return currentState;
+}
+
+// Compile a sequence of mod actions into a visual state
+function compileVisualState(actions) {
+  let state = createEmptyVisualState();
+  
+  for (const action of actions) {
+    const newState = applyModAction(state, action);
+    if (newState !== null) {
+      state = newState;
+    }
+  }
+  
+  return state;
+}
+
+// Get a flattened list of visible elements for rendering
+function getRenderableElements(visualState) {
+  return visualState
+    .filter(entry => isVisible(entry))
+    .map(entry => getElement(entry));
+}
+
+// Helper function to determine if two elements intersect
+function doElementsIntersect(element1, element2) {
+  // Simplified implementation - in reality, this would need proper
+  // path intersection tests based on element types and shapes
+  
+  // For now, just check if any points overlap within a certain distance
+  if (element1.type === VISUAL_STATE.ELEMENT_TYPES.STROKE && 
+      element2.type === VISUAL_STATE.ELEMENT_TYPES.STROKE) {
+    
+    // Simple bounding box check first
+    const bbox1 = calculateBoundingBox(element1);
+    const bbox2 = calculateBoundingBox(element2);
+    
+    if (!doBoundingBoxesIntersect(bbox1, bbox2)) {
+      return false;
+    }
+    
+    // Detailed check - compare points within threshold
+    const threshold = Math.max(
+      getMaxWidth(element1.points),
+      getMaxWidth(element2.points)
+    );
+    
+    for (const p1 of element1.points) {
+      for (const p2 of element2.points) {
+        const distance = Math.sqrt(
+          Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)
+        );
+        if (distance < threshold) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
+// Helper to calculate a simple bounding box
+function calculateBoundingBox(element) {
+  if (!element.points || element.points.length === 0) {
+    return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  }
+  
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  
+  for (const point of element.points) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+  
+  // Add width to the bounding box
+  const maxWidth = getMaxWidth(element.points);
+  
+  return {
+    minX: minX - maxWidth/2,
+    minY: minY - maxWidth/2,
+    maxX: maxX + maxWidth/2,
+    maxY: maxY + maxWidth/2
+  };
+}
+
+// Helper to check if two bounding boxes intersect
+function doBoundingBoxesIntersect(bbox1, bbox2) {
+  return !(
+    bbox1.maxX < bbox2.minX ||
+    bbox1.minX > bbox2.maxX ||
+    bbox1.maxY < bbox2.minY ||
+    bbox1.minY > bbox2.maxY
+  );
+}
+
+// Helper to get maximum width in a stroke
+function getMaxWidth(points) {
+  if (!points || points.length === 0) {
+    return 0;
+  }
+  
+  let maxWidth = 0;
+  for (const point of points) {
+    if (typeof point.width === 'number') {
+      maxWidth = Math.max(maxWidth, point.width);
+    }
+  }
+  
+  return maxWidth || 1; // Default to 1 if no width found
+}
+
+// Helper to find elements that intersect with a given element
+function findIntersectingElements(visualState, testElement) {
+  return visualState
+    .filter(entry => isVisible(entry))
+    .filter(entry => doElementsIntersect(getElement(entry), testElement))
+    .map(entry => getCreatorId(entry));
+}
+
+
 // Export for Node.js (server)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -381,7 +759,26 @@ if (typeof module !== 'undefined' && module.exports) {
     getUndoTarget,
     getRedoTarget,
     isActionUndone,
-    findUndoActionFor
+    findUndoActionFor,
+    // visual state and compiler
+    VISUAL_STATE,
+    TRANSFORM,
+    createIdentityTransform,
+    applyTransform,
+    createStrokeElement,
+    createVisualStateEntry,
+    getElement,
+    isVisible,
+    getCreatorId,
+    createEmptyVisualState,
+    applyModAction,
+    compileVisualState,
+    getRenderableElements,
+    doElementsIntersect,
+    calculateBoundingBox,
+    doBoundingBoxesIntersect,
+    getMaxWidth,
+    findIntersectingElements
   };
 }
 // Export for browsers (client)
@@ -418,6 +815,25 @@ else if (typeof window !== 'undefined') {
     getUndoTarget,
     getRedoTarget,
     isActionUndone,
-    findUndoActionFor
+    findUndoActionFor,
+    // visual state and compiler
+    VISUAL_STATE,
+    TRANSFORM,
+    createIdentityTransform,
+    applyTransform,
+    createStrokeElement,
+    createVisualStateEntry,
+    getElement,
+    isVisible,
+    getCreatorId,
+    createEmptyVisualState,
+    applyModAction,
+    compileVisualState,
+    getRenderableElements,
+    doElementsIntersect,
+    calculateBoundingBox,
+    doBoundingBoxesIntersect,
+    getMaxWidth,
+    findIntersectingElements,
   };
 }
