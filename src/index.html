@@ -280,6 +280,7 @@
       setupCanvas();
       setupWebSocket();
       setupEventListeners();
+      debugStylusEvents(); // Add stylus debugging
     }
     
     // Set up canvas size
@@ -458,17 +459,17 @@
           serverPageUuid: pingPageUuid
         });
         
-        // This could happen if our current page was deleted by another client
-        // Request full page for the page the server thinks we should be on
+        // Request full page for the replacement page the server suggests
         const requestId = createRequestId();
         const fullPageRequest = {
           type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
           boardId: boardId,
           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: pingPageUuid,
+          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: 0,
           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
         };
         
-        debugLog('Requesting full page due to page mismatch', fullPageRequest);
+        debugLog('Requesting replacement page due to page mismatch', fullPageRequest);
         sendMessage(fullPageRequest);
         return;
       }
@@ -743,6 +744,28 @@
       debugLog('Sending message:', message);
       ws.send(JSON.stringify(message));
       return true;
+    }
+    
+    // Add stylus debugging function
+    function debugStylusEvents() {
+      canvas.addEventListener('pointerdown', logStylusEvent);
+      canvas.addEventListener('pointermove', logStylusEvent);
+      canvas.addEventListener('pointerup', logStylusEvent);
+    }
+
+    function logStylusEvent(event) {
+      if (event.pointerType === 'pen') {
+        console.log('Stylus Event:', {
+          type: event.type,
+          pointerType: event.pointerType,
+          pressure: event.pressure,
+          tiltX: event.tiltX,
+          tiltY: event.tiltY,
+          twist: event.twist,
+          isPrimary: event.isPrimary,
+          tool: currentTool
+        });
+      }
     }
     
     // Set up event listeners
@@ -1120,11 +1143,16 @@
         const p1 = points[i - 1];
         const p2 = points[i];
         
-        // Extract x and y coordinates based on array format
+        // Make sure we're using array indices, not object properties
         const x1 = p1[shared.POINT.X];
         const y1 = p1[shared.POINT.Y];
         const x2 = p2[shared.POINT.X];
         const y2 = p2[shared.POINT.Y];
+        
+        if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) {
+          // Skip invalid points
+          continue;
+        }
         
         // Calculate distance from point to line segment
         const distance = distanceToLineSegment(x, y, x1, y1, x2, y2);

@@ -26,6 +26,49 @@ const deletionMap = {};
 const clients = {}; // Map client IDs to WebSocket instances
 let pingInterval;
 
+/**
+ * Resolves a potentially deleted page to its current valid replacement.
+ * Follows the deletion chain until it finds a page that hasn't been deleted.
+ * 
+ * @param {string} pageId - The original page UUID to check
+ * @param {Object} boardId - The board ID (to check page existence)
+ * @returns {string} - A valid page UUID (either the original or its replacement)
+ */
+function existingPage(pageId, boardId) {
+  // First check if the page exists directly (fast path)
+  if (boards[boardId] && boards[boardId].pages[pageId]) {
+    return pageId;
+  }
+  
+  // Follow the deletion chain
+  let currentId = pageId;
+  let replacementId = deletionMap[currentId];
+  
+  while (replacementId) {
+    currentId = replacementId;
+    replacementId = deletionMap[currentId];
+    
+    // Optional: guard against circular references
+    if (replacementId === pageId) {
+      console.error(`Circular reference detected in deletion map for page ${pageId}`);
+      break;
+    }
+  }
+  
+  // Verify the final replacement actually exists
+  if (boards[boardId] && boards[boardId].pages[currentId]) {
+    return currentId;
+  }
+  
+  // Fallback: if we still don't have a valid page, return the first page of the board
+  if (boards[boardId] && boards[boardId].pageOrder.length > 0) {
+    return boards[boardId].pageOrder[0];
+  }
+  
+  // Last resort: return the input ID (caller should handle this case)
+  return currentId;
+}
+
 // Initialize the server from persisted data
 function initializeFromDisk() {
   try {
@@ -275,11 +318,7 @@ function broadcastMessageToBoard(message, boardId, excludeWs = null) {
 }
 
 function sendFullPage(ws, boardId, pageId, requestId) {
-  let finalPageId = pageId;
-  while (deletionMap[finalPageId] && !boards[boardId].pages[finalPageId]) {
-    finalPageId = deletionMap[finalPageId];
-  }
-  
+  const finalPageId = existingPage(pageId, boardId)
   const currentBoard = boards[boardId];
   if (!currentBoard) {
     console.error(`[SERVER] Board not found: ${boardId}`);
@@ -318,18 +357,22 @@ function sendPing() {
       const currentBoard = boards[client.boardId];
       if (!currentBoard) return;
       
-      const pageId = client.pageId;
-      
-      // Ensure the page is loaded
-      if (!ensurePageLoaded(client.boardId, pageId)) return;
+      // Get valid page ID (either current or replacement)
+      const pageId = existingPage(client.pageId, client.boardId);
+      client.pageId = pageId;
       
       const page = currentBoard.pages[pageId];
-      if (!page) return;
-      
+      if (!page) {
+        console.error(`[SERVER] Page not found: should never happen at this point`);
+        return;
+      }
+
+      // Get current state information
       const pageHash = page.currentHash;
       const pageNr = currentBoard.pageOrder.indexOf(pageId) + 1;
       const totalPages = currentBoard.pageOrder.length;
       
+      // Construct ping message with state information
       const message = {
         type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
         [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_UUID]: pageId,
@@ -337,6 +380,8 @@ function sendPing() {
         [MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PING.CURRENT_TOTAL_PAGES]: totalPages
       };
+      
+      // Send the ping to this client
       client.send(JSON.stringify(message));
       logSentMessage(message.type, message, 'N/A');
     }
@@ -949,7 +994,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
     pageId = board.pageOrder[pageNumber - 1];
   } else if (data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID] && 
              data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] !== undefined) {
-    const index = board.pageOrder.indexOf(data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]);
+    pageId = existingPage(data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID], boardId)
+    const index = board.pageOrder.indexOf(pageId);
     if (index !== -1) {
       const newIndex = index + data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
       if (newIndex >= 0 && newIndex < board.pageOrder.length) {
