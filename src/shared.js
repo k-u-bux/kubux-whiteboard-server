@@ -586,33 +586,25 @@ function applyRedoAction(visualState, payload, actionUuid) {
 // Apply a group action
 function applyGroupAction(visualState, payload, actionUuid) {
   if (!payload[MOD_ACTIONS.GROUP.ACTIONS] || !Array.isArray(payload[MOD_ACTIONS.GROUP.ACTIONS])) {
-    return null; // Invalid group action
+    return null; // Fails to enforce preconditions, hides bugs
   }
   
   // Apply each action in the group sequentially
   let currentState = [...visualState];
-  
   for (const groupedAction of payload[MOD_ACTIONS.GROUP.ACTIONS]) {
-    const newState = applyModAction(currentState, groupedAction);
-    if (newState !== null) {
-      currentState = newState;
-    }
+    currentState = applyModAction(currentState, groupedAction);
+    if (currentState == null) { return currentState; }
   }
-  
   return currentState;
 }
 
 // Compile a sequence of mod actions into a visual state
 function compileVisualState(actions) {
   let state = createEmptyVisualState();
-  
   for (const action of actions) {
-    const newState = applyModAction(state, action);
-    if (newState !== null) {
-      state = newState;
-    }
+    state = applyModAction(state, action);
+    if (state == null) { return state; }
   }
-  
   return state;
 }
 
@@ -623,12 +615,10 @@ function getRenderableElements(visualState) {
     .map(entry => getElement(entry));
 }
 
+
 // Helper function to determine if two elements intersect
+// used, e.g., by erase
 function doElementsIntersect(element1, element2) {
-  // Simplified implementation - in reality, this would need proper
-  // path intersection tests based on element types and shapes
-  
-  // For now, just check if any points overlap within a certain distance
   if (element1.type === VISUAL_STATE.ELEMENT_TYPES.STROKE && 
       element2.type === VISUAL_STATE.ELEMENT_TYPES.STROKE) {
     
@@ -640,18 +630,39 @@ function doElementsIntersect(element1, element2) {
       return false;
     }
     
-    // Detailed check - compare points within threshold
+    // Get the maximum width as our distance threshold
     const threshold = Math.max(
       getMaxWidth(element1.points),
       getMaxWidth(element2.points)
-    );
+    ) / 2; // Half the width is reasonable for threshold
     
-    for (const p1 of element1.points) {
-      for (const p2 of element2.points) {
-        const distance = Math.sqrt(
-          Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)
-        );
-        if (distance < threshold) {
+    // Check line segments for intersection or proximity
+    for (let i = 0; i < element1.points.length - 1; i++) {
+      const line1 = {
+        x1: element1.points[i].x,
+        y1: element1.points[i].y,
+        x2: element1.points[i + 1].x,
+        y2: element1.points[i + 1].y,
+        width: element1.points[i].width || 1
+      };
+      
+      for (let j = 0; j < element2.points.length - 1; j++) {
+        const line2 = {
+          x1: element2.points[j].x,
+          y1: element2.points[j].y,
+          x2: element2.points[j + 1].x,
+          y2: element2.points[j + 1].y,
+          width: element2.points[j].width || 1
+        };
+        
+        // Check if line segments intersect directly
+        if (lineSegmentsIntersect(line1.x1, line1.y1, line1.x2, line1.y2, 
+                                  line2.x1, line2.y1, line2.x2, line2.y2)) {
+          return true;
+        }
+        
+        // If no direct intersection, check if they come within threshold distance
+        if (minimumDistanceBetweenLineSegments(line1, line2) < threshold) {
           return true;
         }
       }
@@ -660,6 +671,66 @@ function doElementsIntersect(element1, element2) {
   
   return false;
 }
+
+// Check if two line segments intersect
+function lineSegmentsIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+  // Calculate direction vectors
+  const dx1 = x2 - x1;
+  const dy1 = y2 - y1;
+  const dx2 = x4 - x3;
+  const dy2 = y4 - y3;
+  
+  // Calculate determinant
+  const determinant = dx1 * dy2 - dy1 * dx2;
+  
+  // If determinant is zero, lines are parallel
+  if (Math.abs(determinant) < 1e-6) {
+    return false;
+  }
+  
+  // Calculate the parameters of intersection
+  const s = ((x3 - x1) * dy2 - (y3 - y1) * dx2) / determinant;
+  const t = ((x3 - x1) * dy1 - (y3 - y1) * dx1) / determinant;
+  
+  // Check if intersection occurs within both line segments
+  return (s >= 0 && s <= 1 && t >= 0 && t <= 1);
+}
+
+// Calculate the minimum distance between two line segments
+function minimumDistanceBetweenLineSegments(line1, line2) {
+  // Check distance from endpoints of line1 to line2
+  const d1 = pointToLineDistance(line1.x1, line1.y1, line2.x1, line2.y1, line2.x2, line2.y2);
+  const d2 = pointToLineDistance(line1.x2, line1.y2, line2.x1, line2.y1, line2.x2, line2.y2);
+  
+  // Check distance from endpoints of line2 to line1
+  const d3 = pointToLineDistance(line2.x1, line2.y1, line1.x1, line1.y1, line1.x2, line1.y2);
+  const d4 = pointToLineDistance(line2.x2, line2.y2, line1.x1, line1.y1, line1.x2, line1.y2);
+  
+  // Return minimum of all distances
+  return Math.min(d1, d2, d3, d4);
+}
+
+// Calculate distance from point (x0,y0) to line segment (x1,y1)-(x2,y2)
+function pointToLineDistance(x0, y0, x1, y1, x2, y2) {
+  // Calculate length of line segment
+  const lineLengthSquared = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+  
+  // If line segment is just a point, return distance to that point
+  if (lineLengthSquared < 1e-6) {
+    return Math.sqrt((x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1));
+  }
+  
+  // Calculate projection of point onto line
+  const t = Math.max(0, Math.min(1, ((x0 - x1) * (x2 - x1) + (y0 - y1) * (y2 - y1)) / lineLengthSquared));
+  
+  // Calculate closest point on line segment
+  const projX = x1 + t * (x2 - x1);
+  const projY = y1 + t * (y2 - y1);
+  
+  // Return distance to closest point
+  return Math.sqrt((x0 - projX) * (x0 - projX) + (y0 - projY) * (y0 - projY));
+}
+
 
 // Helper to calculate a simple bounding box
 function calculateBoundingBox(element) {
