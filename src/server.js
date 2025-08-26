@@ -502,6 +502,119 @@ function processModAction(actionType, context, requestId) {
   }
 }
 
+// Process a single action for group processing
+function processActionInternally(actionType, context, actionContext) {
+  const strategy = actionStrategies[actionType];
+  
+  if (!strategy) {
+    console.error(`[SERVER] Unknown action type in group: ${actionType}`);
+    return { success: false };
+  }
+  
+  // Calculate hash for this action
+  const afterHash = strategy.computeHash ? 
+    strategy.computeHash(actionContext) : 
+    hashNext(actionContext.serverHash, actionContext.payload);
+  
+  // Create mod action
+  const modAction = createModAction(actionContext, afterHash);
+  
+  // Update state based on strategy
+  if (strategy.updateState) {
+    strategy.updateState(actionContext, modAction, afterHash);
+  } else {
+    // Default state update
+    updatePageState(actionContext, modAction, afterHash);
+  }
+  
+  // Persist the individual action
+  if (strategy.persistChanges) {
+    strategy.persistChanges(actionContext, modAction);
+  } else {
+    // Default persistence
+    appendModActionToDisk(actionContext.pageUuid, modAction);
+  }
+  
+  return { success: true, afterHash, modAction };
+}
+
+// Process a group of actions
+// Process a group of actions
+function processGroupAction(context, requestId) {
+  if (!context.payload || !context.payload[MOD_ACTIONS.GROUP.ACTIONS] || 
+      !Array.isArray(context.payload[MOD_ACTIONS.GROUP.ACTIONS])) {
+    sendDeclineMessage(context, "Group action must contain an array of actions", requestId);
+    return;
+  }
+  
+  const actions = context.payload[MOD_ACTIONS.GROUP.ACTIONS];
+  
+  // Start with the current state
+  let currentHash = context.serverHash;
+  let success = true;
+  let failureReason = "";
+  
+  // Process each action in the group
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+    
+    // Ensure each action has an actionUuid (should be provided by client)
+    if (!action.actionUuid) {
+      success = false;
+      failureReason = `Action at index ${i} missing actionUuid`;
+      break;
+    }
+    
+    // Create a context for this individual action
+    const actionContext = {
+      ...context,
+      payload: action.payload,
+      actionUuid: action.actionUuid, // Use client-provided UUID
+      serverHash: currentHash
+    };
+    
+    // Check if we can process this action type
+    const actionType = action.payload.type;
+    if (!actionStrategies[actionType]) {
+      success = false;
+      failureReason = `Unknown action type in group: ${actionType}`;
+      break;
+    }
+    
+    // Validate this action
+    const strategy = actionStrategies[actionType];
+    if (strategy.validate && !strategy.validate(actionContext)) {
+      success = false;
+      failureReason = strategy.getDeclineReason ? 
+        strategy.getDeclineReason(actionContext) : 
+        `Action at index ${i} failed validation`;
+      break;
+    }
+    
+    // Process this action
+    const result = processActionInternally(actionType, context, actionContext);
+    if (!result.success) {
+      success = false;
+      failureReason = `Failed to process action at index ${i}`;
+      break;
+    }
+    
+    // Update hash for next action
+    currentHash = result.afterHash;
+  }
+  
+  // If any action failed, decline the whole group
+  if (!success) {
+    sendDeclineMessage(context, failureReason, requestId);
+    return;
+  }
+  
+  // Send a single accept message for the entire group
+  const acceptMessage = createAcceptMessage(context, currentHash);
+  broadcastMessageToBoard(acceptMessage, context.boardId);
+  logSentMessage(acceptMessage.type, acceptMessage, requestId);
+}
+
 // Action-specific strategies
 const actionStrategies = {
   [MOD_ACTIONS.DRAW.TYPE]: {
@@ -739,6 +852,50 @@ const actionStrategies = {
       
       return "Validation failed";
     }
+  },
+  
+  // New strategy for group actions
+  [MOD_ACTIONS.GROUP.TYPE]: {
+    validate: (context) => {
+      // Check that we have an array of actions
+      return context.payload && 
+             context.payload[MOD_ACTIONS.GROUP.ACTIONS] && 
+             Array.isArray(context.payload[MOD_ACTIONS.GROUP.ACTIONS]) &&
+             context.payload[MOD_ACTIONS.GROUP.ACTIONS].length > 0;
+    },
+    
+    getDeclineReason: (context) => {
+      if (!context.payload || !context.payload[MOD_ACTIONS.GROUP.ACTIONS]) {
+        return "Group action must contain actions array";
+      }
+      
+      if (!Array.isArray(context.payload[MOD_ACTIONS.GROUP.ACTIONS])) {
+        return "Group actions must be an array";
+      }
+      
+      if (context.payload[MOD_ACTIONS.GROUP.ACTIONS].length === 0) {
+        return "Group action cannot be empty";
+      }
+      
+      return "Invalid group action";
+    },
+    
+    // Special handling for groups - defer to the group processor
+    updateState: (context, modAction, afterHash) => {
+      // The actual state update is handled by processGroupAction
+      // which processes each action in the group individually
+      // This function is a placeholder to prevent the default state update
+    },
+    
+    persistChanges: (context, modAction) => {
+      // Individual actions are persisted by processGroupAction
+      // This function is a placeholder to prevent the default persistence
+    },
+    
+    sendResponse: (context, modAction, afterHash, requestId) => {
+      // Response is sent by processGroupAction
+      // This function is a placeholder to prevent the default response
+    }
   }
 };
 
@@ -817,9 +974,16 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     return;
   }
   
-  // Get action type and process it
+  // Get action type 
   const actionType = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].type;
-  processModAction(actionType, context, requestId);
+  
+  // Special handling for group actions
+  if (actionType === MOD_ACTIONS.GROUP.TYPE) {
+    processGroupAction(context, requestId);
+  } else {
+    // Regular action processing
+    processModAction(actionType, context, requestId);
+  }
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, requestId) => {

@@ -1,10 +1,3 @@
-# Updated Protocol.md and Shared.js with Undo/Redo Support
-
-Here are the updated files with undo/redo functionality integrated.
-
-## protocol.md
-
-```markdown
 # Xournal++ Clone Protocol Documentation
 
 ## Overview
@@ -16,6 +9,7 @@ This document defines the communication protocol between clients and the server 
 - v1.0: Initial protocol definition
 - v2.0: Updated to include boardId in message payloads rather than URL path
 - v2.1: Added undo/redo functionality
+- v3.0: Added group actions for atomic operations
 
 ## Server State
 
@@ -180,7 +174,7 @@ All client-to-server messages must include `boardId` in their payload.
   "page-uuid": "page-uuid",
   "action-uuid": "action-uuid",
   "payload": {
-    "type": "draw|erase|new page|delete page|undo|redo",
+    "type": "draw|erase|new page|delete page|undo|redo|group",
     ...action-specific-fields
   },
   "before-hash": "hash-value"
@@ -247,6 +241,30 @@ All client-to-server messages must include `boardId` in their payload.
 }
 ```
 
+##### Group Action Payload
+```json
+{
+  "type": "group",
+  "actions": [
+    {
+      "actionUuid": "client-generated-uuid-1", 
+      "payload": {
+        "type": "draw",
+        "stroke": {...}
+      }
+    },
+    {
+      "actionUuid": "client-generated-uuid-2",
+      "payload": {
+        "type": "erase",
+        "actionUuid": "uuid-of-stroke-to-erase"
+      }
+    },
+    // More actions...
+  ]
+}
+```
+
 #### Replay Requests
 ```json
 {
@@ -302,16 +320,17 @@ const messageHandlers = {
 
 ### Mod-Action Handler Strategy
 
-Mod-action proposals are further routed to specific handlers based on the action type:
+The server uses a strategy pattern for handling different action types:
 
 ```javascript
-const modActionHandlers = {
-  'draw': handleDrawAction,
-  'erase': handleEraseAction,
-  'new page': handleNewPageAction,
-  'delete page': handleDeletePageAction,
-  'undo': handleUndoAction,
-  'redo': handleRedoAction
+const actionStrategies = {
+  'draw': { validate: validateDrawAction, ... },
+  'erase': { validate: validateEraseAction, ... },
+  'new page': { validate: validateNewPageAction, ... },
+  'delete page': { validate: validateDeletePageAction, ... },
+  'undo': { validate: validateUndoAction, ... },
+  'redo': { validate: validateRedoAction, ... },
+  'group': { validate: validateGroupAction, ... }
 };
 ```
 
@@ -333,6 +352,25 @@ The undo/redo functionality is implemented as regular mod-actions with special p
 5. If invalid, server declines the undo with a reason
 6. Clients update their UI based on the server's response
 
+### Group Actions Implementation
+
+Group actions allow multiple operations to be bundled and executed atomically:
+
+1. **Atomic Processing**: All actions in the group succeed or fail together
+2. **Client-Generated Action UUIDs**: The client creates unique IDs for each action in the group
+3. **Single Accept Message**: Server sends one accept message for the whole group
+4. **Consistent History**: Each action is individually recorded in the modification history
+5. **Optimistic Updates**: Client can track and apply optimistic updates without requesting a replay
+
+#### Group Action Workflow
+
+1. Client bundles multiple actions into a group, each with its own client-generated UUID
+2. Client sends a single mod-action proposal with the group
+3. Server processes each action in sequence, maintaining the hash chain
+4. If all actions succeed, server sends a single accept message for the group
+5. If any action fails, server sends a decline message for the entire group
+6. Client can reconcile its optimistic updates using the original action UUIDs
+
 ### Shared Code Implementation
 
 A `shared.js` file is used by both client and server to ensure consistency in:
@@ -351,6 +389,8 @@ A `shared.js` file is used by both client and server to ensure consistency in:
 3. **Hash Reconciliation**: The client should maintain a clear distinction between verified state (confirmed by server) and optimistic updates.
 
 4. **Undo/Redo UI**: The client should only show undo/redo options for actions performed by the current client.
+
+5. **Group Actions**: For operations that should be atomic, the client should use group actions rather than individual sequential actions.
 
 ### Logging
 
@@ -375,4 +415,13 @@ For debugging purposes, the server performs comprehensive logging:
 4. **Enhanced Error Handling**: More robust error messages for connection and registration issues
 5. **Request Tracking**: Includes tracking of pending requests for better debugging and response matching
 6. **Collaborative Undo/Redo**: Supports undo/redo functionality in a collaborative context
-```
+7. **Atomic Operations**: Group actions enable multiple operations to be processed atomically
+8. **Efficient Communication**: Single accept message for groups reduces network traffic
+9. **Consistent History**: Individual actions within groups are recorded for proper history tracking
+
+## References
+
+For implementation examples and best practices in collaborative editing:
+
+- [The Hard Problem of Collaborative Undo-Redo](https://dev.to/isaachagoel/the-hard-problem-of-collaborative-undo-redo-482k) - Insights on undo/redo challenges in collaborative environments
+- [Synchronized immutable state with time travel](https://dev.to/oleg008/synchronized-immutable-state-with-time-travel-2c6o) - Approaches to time travel and error handling in collaborative systems

@@ -289,7 +289,6 @@ const MOD_ACTIONS = {
     DELETE_PAGE: {
         TYPE: 'delete page'
     },
-    // New undo/redo action types
     UNDO: {
         TYPE: 'undo',
         TARGET_ACTION_UUID: 'targetActionUuid',
@@ -299,6 +298,10 @@ const MOD_ACTIONS = {
         TYPE: 'redo',
         TARGET_UNDO_ACTION_UUID: 'targetUndoActionUuid',
         CLIENT_ID: 'clientId'
+    },
+    GROUP: {
+        TYPE: 'group',
+        ACTIONS: 'actions' // array of mod_actions
     }
 };
 
