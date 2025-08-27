@@ -28,6 +28,7 @@
             buildInputs = [
               pkgs.code-cursor-fhs
               pkgs.nodejs
+              pkgs.jq
             ];
 
             shellHook = ''
