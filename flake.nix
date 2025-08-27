@@ -28,6 +28,8 @@
             buildInputs = [
               pkgs.code-cursor-fhs
               pkgs.nodejs
+              pkgs.nodePackages.ts-node
+              pkgs.typescript
               pkgs.jq
             ];
 
