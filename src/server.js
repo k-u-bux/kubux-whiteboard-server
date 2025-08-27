@@ -26,7 +26,8 @@ const getPageFilePath = (pageId) => path.join(DATA_DIR, `${pageId}.json`);
 const boards = {};
 const deletionMap = {};
 const clients = {}; // Map client IDs to WebSocket instances
-let pingInterval;
+const pingInterval = 5000;
+let pingTimer;
 
 /**
  * Resolves a potentially deleted page to its current valid replacement.
@@ -196,7 +197,7 @@ function getOrCreateBoard(boardId) {
     const initialPageId = generateUuid();
     const initialModActions = [];
     const initialHash = hashAny(intialModActions);
-    cosnt initialVisualState = createEmptyVisualState();
+    const initialVisualState = createEmptyVisualState();
 
     boards[boardId] = {
       pageOrder: [initialPageId],
@@ -1131,10 +1132,10 @@ function routeMessage(ws, message) {
 wss.on('connection', (ws, req) => {
   console.log(`[SERVER] New WebSocket connection established`);
   
-  if (!pingInterval) {
-    pingInterval = setInterval(() => {
+  if (!pingTimer) {
+    pingTimer = setInterval(() => {
         sendPing();
-    }, 5000);
+    }, pingInterval);
   }
 
   ws.on('message', message => routeMessage(ws, message));
