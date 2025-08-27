@@ -474,7 +474,7 @@ function compose(t1, t2) {
 
 // Create a visual state entry from a stroke
 function createStrokeElement(stroke) {
-    return {
+    const element = {
         type: DRAWABLE.TYPE.STROKE,
         path: DRAWABLE.PATH.OPEN_PIECEWISE_LINEAR,
         points: stroke[STROKE.POINTS].map(point => ({
@@ -494,12 +494,55 @@ function createStrokeElement(stroke) {
             dashPattern: stroke[STROKE.DASH_PATTERN]
         }
     };
+    return Object.freeze( element );
 }
 
 function applyTransform(element, transform) {
     let result = { ... element };
     result.transform = compose( transform, result.transform );
-    return result;
+    return Object.freeze( result );
+}
+
+
+function addElementPure(visualState, uuid, element) {
+    newState = { ... visualState };
+    newState.visible = structuredClone( visualState.visible );
+    newState.visible.add( uuid );
+    newState.element.set( uuid, element );
+    return newState;
+}
+
+function delElementPure(visualState, uuid) {
+    if ( ! visualState.visible.has( uuid ) ) {
+        return null;
+    }
+    newState = { ... visualState };
+    newState.visible = structuredClone( visualState.visible );
+    newState.visible.del( uuid );
+    return newState;
+}
+
+function putElement(visualState, uuid, element) {
+    // on the server side, the drawables do not exist
+    if ( visualState.element ) {
+        visualState.element.set( uuid, element );
+    }
+}
+
+function addElement(visualState, uuid) {
+    if ( visualState.visible.has( uuid ) ) {
+        return false;
+    }
+    visualState.visible.add( uuid );
+    return ( true );
+}
+
+function delElement(visualState, uuid) {
+    if ( ! visualState.visible.has( uuid ) ) {
+        return false;
+    }
+    visualState.visible.del( uuid );
+    return ( true );
 }
 
 // Create a visual state entry
