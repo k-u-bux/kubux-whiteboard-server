@@ -26,6 +26,53 @@ function hashNext(previousHash, newData) {
 const calculateHash = hashAny;
 const calculateChainHash = hashNext;
 
+// value equality
+function isEqual(obj1, obj2) {
+  // Same reference or primitive equality
+  if (obj1 === obj2) return true;
+  
+  // If either is null or not an object, they can't be equal
+  if (obj1 === null || obj2 === null || 
+      typeof obj1 !== 'object' || typeof obj2 !== 'object') {
+    return false;
+  }
+  
+  // Special case: Date objects
+  if (obj1 instanceof Date && obj2 instanceof Date) {
+    return obj1.getTime() === obj2.getTime();
+  }
+  
+  // Special case: RegExp objects
+  if (obj1 instanceof RegExp && obj2 instanceof RegExp) {
+    return obj1.toString() === obj2.toString();
+  }
+  
+  // Different constructor means different types
+  if (obj1.constructor !== obj2.constructor) return false;
+  
+  // Arrays: check length and elements
+  if (Array.isArray(obj1)) {
+    if (obj1.length !== obj2.length) return false;
+    return obj1.every((item, index) => isEqual(item, obj2[index]));
+  }
+  
+  // Regular objects: check keys and values
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+  
+  if (keys1.length !== keys2.length) return false;
+  
+  return keys1.every(key => 
+    keys2.includes(key) && isEqual(obj1[key], obj2[key])
+  );
+}
+
+// For negation, just use the ! operator with the function
+function isNotEqual(obj1, obj2) {
+  return !isEqual(obj1, obj2);
+}
+
+
 // Indices for point arrays [x, y, pressure, timestamp]
 const POINT = {
   X: 0,
@@ -586,27 +633,27 @@ function applyRedoAction(visualState, payload, actionUuid) {
 // Apply a group action
 function applyGroupAction(visualState, payload, actionUuid) {
   if (!payload[MOD_ACTIONS.GROUP.ACTIONS] || !Array.isArray(payload[MOD_ACTIONS.GROUP.ACTIONS])) {
-    return null; // Fails to enforce preconditions, hides bugs
+    throw new Error("Invalid group action: missing or non-array actions field");
   }
-  
-  // Apply each action in the group sequentially
-  let currentState = [...visualState];
-  for (const groupedAction of payload[MOD_ACTIONS.GROUP.ACTIONS]) {
-    currentState = applyModAction(currentState, groupedAction);
-    if (currentState == null) { return currentState; }
+  return applyActionSequence(visualState, payload[MOD_ACTIONS.GROUP.ACTIONS])
+}
+
+// apply a sequence of mod actions to a visual state
+function applyActionSequence(input_state, actions) {
+  let output_state = [...input_state];
+  for (const action of actions) {
+    output_state = applyModAction(output_state, action);
+    if (output_state == null) { return output_state; }
   }
-  return currentState;
+  return output_state;
 }
 
 // Compile a sequence of mod actions into a visual state
 function compileVisualState(actions) {
   let state = createEmptyVisualState();
-  for (const action of actions) {
-    state = applyModAction(state, action);
-    if (state == null) { return state; }
-  }
-  return state;
+  return applyActionSequence(state, actions);
 }
+
 
 // Get a flattened list of visible elements for rendering
 function getRenderableElements(visualState) {
@@ -804,6 +851,8 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateChainHash,
     hashAny,
     hashNext,
+    isEqual,
+    isNotEqual,
     POINT,
     STROKE,
     PEN_TYPES,
@@ -860,6 +909,8 @@ else if (typeof window !== 'undefined') {
     calculateChainHash,
     hashAny,
     hashNext,
+    isEqual,
+    isNotEqual,
     POINT,
     STROKE,
     PEN_TYPES,

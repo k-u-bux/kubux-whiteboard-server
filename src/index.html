@@ -665,12 +665,19 @@
       const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH];
       const visualState = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.VISUAL_STATE];
       
+      if (!Array.isArray(modActions)) {
+        throw new Error("modActions not an array.");
+      }
+
       // Replace current page data
       currentPageUuid = pageUuid;
-      verifiedModActions = Array.isArray(modActions) ? modActions : [];
+      verifiedModActions = modActions;
       optimisticUpdates = [];
       verifiedHash = afterHash;
-      currentVisualState = Array.isArray(visualState) ? visualState : [];
+      currentVisualState = shared.compileVisualState(verifiedModActions);
+      if (shared.isNotEqual(currentVisualState, visualState)) {
+        throw new Error(`Server-Client disagreement: ${JSON.stringify(currentVisualState)} vs ${JSON.stringify(visualState)}`);
+      }
       
       // Reset undo/redo state when changing pages
       myActions = [];

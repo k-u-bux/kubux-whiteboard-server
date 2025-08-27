@@ -4,7 +4,9 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 
-const { hashAny, hashNext, generateUuid, MESSAGES, MOD_ACTIONS, STROKE, POINT } = require('./shared');
+const { hashAny, hashNext, generateUuid, 
+        createEmptyVisualState, applyModAction, applyActionSequence, compileVisualState , 
+        MESSAGES, MOD_ACTIONS, STROKE, POINT } = require('./shared');
 
 // Data storage configuration
 const DATA_DIR = './data';
@@ -25,115 +27,6 @@ const boards = {};
 const deletionMap = {};
 const clients = {}; // Map client IDs to WebSocket instances
 let pingInterval;
-
-/**
- * Creates a new visual state from an empty array
- */
-function createEmptyVisualState() {
-  return [];
-}
-
-/**
- * Compiles the visual state from a sequence of mod actions
- * Returns null if compilation fails
- */
-function compileVisualState(modActions) {
-  // Initialize empty visual state
-  const visualState = [];
-  
-  // Process each action to build up the visual state
-  for (const action of modActions) {
-    const payload = action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-    
-    if (!payload) {
-      console.error('[SERVER] Action missing payload:', action);
-      return null;
-    }
-    
-    const actionUuid = action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-    
-    switch (payload.type) {
-      case MOD_ACTIONS.DRAW.TYPE:
-        if (!payload.stroke) {
-          console.error('[SERVER] Draw action missing stroke:', action);
-          return null;
-        }
-        
-        // Add the stroke to visual state with its action UUID for reference
-        visualState.push({
-          type: "stroke",
-          stroke: payload.stroke,
-          actionUuid: actionUuid
-        });
-        break;
-      
-      case MOD_ACTIONS.ERASE.TYPE:
-        const erasedStrokeUuid = payload[MOD_ACTIONS.ERASE.ACTION_UUID];
-        
-        // Find the stroke's index in the visual state
-        const strokeIndex = visualState.findIndex(item => 
-          item.type === "stroke" && item.actionUuid === erasedStrokeUuid
-        );
-        
-        if (strokeIndex !== -1) {
-          // Mark the stroke as erased
-          visualState[strokeIndex].erased = true;
-          visualState[strokeIndex].erasedBy = actionUuid;
-        }
-        break;
-      
-      case MOD_ACTIONS.UNDO.TYPE:
-        const undoTargetUuid = payload[MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
-        
-        // Find all visual elements affected by the target action
-        for (const element of visualState) {
-          if (element.actionUuid === undoTargetUuid) {
-            // Mark the element as undone
-            element.undone = true;
-            element.undoneBy = actionUuid;
-          } else if (element.erasedBy === undoTargetUuid) {
-            // If this element was erased by the undone action, un-erase it
-            element.erased = false;
-            element.erasedBy = null;
-          }
-        }
-        break;
-      
-      case MOD_ACTIONS.REDO.TYPE:
-        const redoTargetUuid = payload[MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
-        
-        // Find the undo action in our mod actions
-        const undoAction = modActions.find(a => 
-          a[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID] === redoTargetUuid
-        );
-        
-        if (!undoAction || !undoAction[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]) {
-          console.error('[SERVER] Redo references unknown undo action:', redoTargetUuid);
-          return null;
-        }
-        
-        const originalActionUuid = undoAction[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
-        
-        // Undo the undo effects
-        for (const element of visualState) {
-          if (element.undoneBy === redoTargetUuid) {
-            // This element was undone by the undo we're redoing, so un-undo it
-            element.undone = false;
-            element.undoneBy = null;
-          } else if (element.actionUuid === originalActionUuid) {
-            // This is the original element that was undone
-            element.undone = false;
-            element.undoneBy = null;
-          }
-        }
-        break;
-      
-      // Other action types (NEW_PAGE, DELETE_PAGE, GROUP) don't directly affect the visual state
-    }
-  }
-  
-  return visualState;
-}
 
 /**
  * Resolves a potentially deleted page to its current valid replacement.
@@ -266,7 +159,11 @@ function loadPageFromDisk(pageId) {
   }
   
   // Compile visual state from mod actions
-  const visualState = compileVisualState(modActions) || createEmptyVisualState();
+  const visualState = compileVisualState(modActions)
+  if (!visualState) {
+    console.log(`[SERVER] cannot compile mod actions.`);
+    process.exit(1);
+  }
   
   return { modActions, currentHash, visualState };
 }
@@ -297,15 +194,17 @@ function appendModActionToDisk(pageId, modAction) {
 function getOrCreateBoard(boardId) {
   if (!boards[boardId]) {
     const initialPageId = generateUuid();
-    const initialHash = hashAny([]); // Empty state hash
-    
+    const initialModActions = [];
+    const initialHash = hashAny(intialModActions);
+    cosnt initialVisualState = createEmptyVisualState();
+
     boards[boardId] = {
       pageOrder: [initialPageId],
       pages: { 
         [initialPageId]: { 
-          modActions: [], 
+          modActions: initialModActions, 
           currentHash: initialHash,
-          visualState: createEmptyVisualState() 
+          visualState: initialVisualState
         } 
       }
     };
@@ -432,7 +331,8 @@ function sendFullPage(ws, boardId, pageId, requestId) {
   const page = currentBoard.pages[finalPageId];
   const pageState = page.modActions;
   const pageHash = page.currentHash;
-  const visualState = page.visualState;
+  // const visualState = page.visualState;
+  const visualState = compileVisualState(pageState);
   const pageNr = currentBoard.pageOrder.indexOf(finalPageId) + 1;
   const totalPages = currentBoard.pageOrder.length;
   
@@ -549,6 +449,7 @@ function updatePageState(context, modAction, afterHash) {
   
   // Update visual state by compiling it from scratch
   // This ensures any complex interactions between actions are handled correctly
+  // TODO: this should just apply one action.
   context.currentPage.visualState = compileVisualState(context.currentPage.modActions);
   if (!context.currentPage.visualState) {
     console.error('[SERVER] Failed to compile visual state, creating empty state');
