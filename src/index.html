@@ -1134,7 +1134,7 @@
         const p1 = points[i - 1];
         const p2 = points[i];
         
-        // Make sure we're using array indices, not object properties
+        // Make sure we are using array indices, not object properties
         const x1 = p1[shared.POINT.X];
         const y1 = p1[shared.POINT.Y];
         const x2 = p2[shared.POINT.X];
@@ -1204,7 +1204,7 @@
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
           type: shared.MOD_ACTIONS.ERASE.TYPE,
-          [shared.MOD_ACTIONS.ERASE.ACTION_UUID]: strokeUuid
+          [shared.MOD_ACTIONS.ERASE.TARGET_ACTION]: strokeUuid
         }
       };
       
@@ -1259,7 +1259,7 @@
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: {
           type: shared.MOD_ACTIONS.DRAW.TYPE,
-          stroke: stroke
+          [shared.MOD_ACTIONS.DRAW.STROKE]: stroke
         }
       };
       
@@ -1456,7 +1456,7 @@
         }
       }
       
-      // Also draw the current stroke if we're in the middle of drawing
+      // Also draw the current stroke if we are in the middle of drawing
       if (isDrawing && currentPath.length >= 2) {
         const tempStroke = [...currentStyle];
         tempStroke[shared.STROKE.POINTS] = currentPath;

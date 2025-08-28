@@ -76,6 +76,8 @@ function isNotEqual(obj1, obj2) {
 
 // Action types using compact format for MOD_ACTIONS
 const MOD_ACTIONS = {
+    UUID: 'uuid',
+    TYPE: 'type',
     // edit ops (creating the time line)
     DRAW: {
         TYPE: 'draw',
@@ -420,10 +422,10 @@ const VISUAL_STATE = {
     VISIBLE: 'visible' // sed of uuids of visible elements
 };
 
-function render(visualState, renderer) {
+function render_all_visible_elements(visualState, render) {
     for ( const [uuid, element] of visualState.element ) {
         if ( visualState.visible.has( uuid ) ) {
-            rederer( element );
+            reder( element );
         }
     }
 };
@@ -504,32 +506,15 @@ function applyTransform(element, transform) {
 }
 
 
-function addElementPure(visualState, uuid, element) {
-    newState = { ... visualState };
-    newState.visible = structuredClone( visualState.visible );
-    newState.visible.add( uuid );
-    newState.element.set( uuid, element );
-    return newState;
-}
-
-function delElementPure(visualState, uuid) {
-    if ( ! visualState.visible.has( uuid ) ) {
-        return null;
-    }
-    newState = { ... visualState };
-    newState.visible = structuredClone( visualState.visible );
-    newState.visible.del( uuid );
-    return newState;
-}
-
-function putElement(visualState, uuid, element) {
+// manipulating visual state
+function addElement(visualState, uuid, element) {
     // on the server side, the drawables do not exist
     if ( visualState.element ) {
         visualState.element.set( uuid, element );
     }
 }
 
-function addElement(visualState, uuid) {
+function showElement(visualState, uuid) {
     if ( visualState.visible.has( uuid ) ) {
         return false;
     }
@@ -537,12 +522,81 @@ function addElement(visualState, uuid) {
     return ( true );
 }
 
-function delElement(visualState, uuid) {
+function hideElement(visualState, uuid) {
     if ( ! visualState.visible.has( uuid ) ) {
         return false;
     }
     visualState.visible.del( uuid );
     return ( true );
+}
+
+
+function commitEdit(visualState, payload, uuid) {
+    const type = payload.type;
+    switch ( type ) {
+    case MOD_ACTIONS.DRAW.TYPE:
+        return commitDraw(visuaState, payload[MOD_ACTIONS.DRAW.STROKE], uuid);
+    case MOD_ACTIONS.ERASE.TYPE:
+        return commitErase(visuaState, payload[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid);
+    case MOD_ACTIONS.GROUP.TYPE:
+        return commitGroup(visuaState, payload[MOD_ACTIONS.GROUP.ACTIONS], uuid);
+    }
+}
+
+function commitDraw(visuaState, stroke, uuid) {
+    addElement(visuaState, uuid, stroke);
+    return showElement(visuaState, uuid);
+}
+
+function commitErase(visuaState, target, uuid) {
+    return hideElement(visuaState, target);
+}
+
+function commitGroup(visuaState, actions, uuid) {
+    const previouslyVisible = structuralClone( visuaState.visible );
+    let flag = true;
+    for ( const edit of actions ) {
+        flag = flag & commitEdit(visuaState, edit.payload, edit.uuid);
+        if (!flag) {
+            visuaState.visible = previouslyVisible;
+            return false;
+        }
+    }
+    return true;
+}
+
+function revertEdit(visualState, payload, uuid) {
+    const type = payload.type;
+    switch ( type ) {
+    case MOD_ACTIONS.DRAW.TYPE:
+        return revertDraw(visuaState, payload[MOD_ACTIONS.DRAW.STROKE], uuid);
+    case MOD_ACTIONS.ERASE.TYPE:
+        return revertErase(visuaState, payload[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid);
+    case MOD_ACTIONS.GROUP.TYPE:
+        return revertGroup(visuaState, payload[MOD_ACTIONS.GROUP.ACTIONS], uuid);
+    }
+}
+
+function revertDraw(visuaState, stroke, uuid) {
+    return hideElement(visuaState, uuid);
+}
+
+function revertErase(visuaState, target, uuid) {
+    return showElement(visuaState, target);
+}
+
+function revertGroup(visuaState, actions, uuid) {
+    const previouslyVisible = structuralClone( visuaState.visible );
+    let flag = true;
+    for ( let index = actions.length - 1; index >= 0; -- index ){
+        const edti = actions[ index ];
+        flag = flag & commitEdit(visuaState, edit.payload, edit.uuid);
+        if (!flag) {
+            visuaState.visible = previouslyVisible;
+            return false;
+        }
+    }
+    return true;
 }
 
 // Create a visual state entry
