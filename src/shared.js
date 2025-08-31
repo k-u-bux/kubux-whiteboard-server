@@ -8,16 +8,54 @@ function generateUuid() {
 }
 
 
+// serialization / deserialization
+const serialize = (data) => {
+    const replacer = (key, value) => {
+        if (typeof value === 'bigint') {
+            return { __type: 'BigInt', value: value.toString() };
+        }
+        if (value instanceof Set) {
+            return { __type: 'Set', value: [...value] };
+        }
+        if (value instanceof Map) {
+            return { __type: 'Map', value: Array.from(value.entries()) };
+        }
+        return value;
+    };
+    return JSON.stringify(data, replacer, 2);
+};
+
+const deserialize = (jsonString) => {
+    const reviver = (key, value) => {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            if (value.__type === 'BigInt') {
+                return BigInt(value.value);
+            }
+            if (value.__type === 'Set') {
+                return new Set(value.value);
+            }
+            if (value.__type === 'Map') {
+                return new Map(value.value);
+            }
+        }
+        return value;
+    };
+    return JSON.parse(jsonString, reviver);
+};
+
+
 // hash stringify-ables
 function hashAny(data) {
-    const dataString = JSON.stringify(data);
-    let hash = 0;
+    const mask = 0xffffffffffffffffffffffffffffffn; // 120 bit
+    const dataString = serialize( data );
+    let hash = 0n;
     for (let i = 0; i < dataString.length; i++) {
         const char = dataString.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash |= 0;
+        hash += BigInt( char );
+        hash = (hash << 25n) - hash;
+        hash &= mask;
     }
-    return hash.toString();
+    return hash.toString(32); // 120 / 5 = 24 characters
 }
 
 // chain hashing
@@ -74,7 +112,9 @@ function isNotEqual(obj1, obj2) {
 }
 
 
-// Action types using compact format for MOD_ACTIONS
+// Schemas
+// =======
+
 const MOD_ACTIONS = {
     UUID: 'uuid',
     TYPE: 'type',
@@ -109,8 +149,107 @@ const MOD_ACTIONS = {
     }
 };
 
+const MESSAGES = {
+    CLIENT_TO_SERVER: {
+        REGISTER_BOARD: {
+            TYPE: 'register-board',
+            BOARD_ID: 'boardId',
+            CLIENT_ID: 'clientId',
+            REQUEST_ID: 'requestId'
+        },
+        CREATE_BOARD: {
+            TYPE: 'register-board',
+            PASSWD: 'passwd'
+            CLIENT_ID: 'clientId',
+            REQUEST_ID: 'requestId'
+        },
+        FULL_PAGE_REQUESTS: {
+            TYPE: 'fullPage-requests',
+            BOARD_UUID: 'board-uuid',
+            PAGE_ID: 'pageId',
+            DELTA: 'delta',
+            REQUEST_ID: 'requestId'
+        },
+        MOD_ACTION_PROPOSALS: {
+            TYPE: 'mod-action-proposals',
+            PAGE_UUID: 'page-uuid',
+            PAYLOAD: 'payload',
+            BEFORE_HASH: 'before-hash'
+        },
+        REPLAY_REQUESTS: {
+            TYPE: 'replay-requests',
+            PAGE_UUID: 'page-uuid',
+            PRESENT: 'present'
+            PRESENT_HASH: 'present-hash',
+            REQUEST_ID: 'requestId'
+        }
+    },
+    SERVER_TO_CLIENT: {
+        BOARD_REGISTERED: {
+            TYPE: 'board-registered',
+            BOARD_ID: 'boardId',
+            FIRST_PAGE_ID: 'firstPageId',
+            TOTAL_PAGES: 'totalPages',
+            REQUEST_ID: 'requestId'
+        },
+        FULL_PAGE: {
+            TYPE: 'fullPage',
+            UUID: 'uuid',
+            HISTORY: 'history',
+            PRESENT: 'present',
+            HASH: 'hash',
+            PAGE_NR: 'pageNr',
+            TOTAL_PAGES: 'totalPages'
+        },
+        ACCEPT: {
+            TYPE: 'accept',
+            UUID: 'uuid',
+            ACTION_UUID: 'action-uuid',
+            BEFORE_HASH: 'before-hash',
+            AFTER_HASH: 'after-hash',
+            CURRENT_PAGE_NR: 'current page-nr in its board',
+            CURRENT_TOTAL_PAGES: 'current #pages of the board'
+        },
+        DECLINE: {
+            TYPE: 'decline',
+            UUID: 'uuid',
+            ACTION_UUID: 'action-uuid',
+            REASON: 'reason'
+        },
+        REPLAY: {
+            TYPE: 'replay',
+            UUID: 'uuid',
+            BEFORE_HASH: 'beforeHash',
+            AFTER_HASH: 'afterHash',
+            SEQUENCE: 'edits',
+            PRESENT: 'present'
+            CURRENT_HASH: 'currentHash',
+            PAGE_NR: 'pageNr',
+            TOTAL_PAGES: 'totalPages'
+        },
+        PING: {
+            TYPE: 'ping',
+            UUID: 'uuid',
+            HASH: 'hash',
+            PAGE_NR: 'pageNr',
+            TOTAL_PAGES: 'totalPages'
+        }
+    }
+};
 
-// Indices for point arrays [x, y, pressure, timestamp]
+const DRAWABLE = {
+    TYPE: {
+        STROKE: 'stroke',
+        FILL: 'fill'
+    },
+    PATH: {
+        OPEN_PIECEWISE_LINEAR: 'opl',
+        CLOSED_PIECEWISE_LINEAR: 'cpl',
+        OPEN_BEZIER_CURVE: 'obz',
+        CLOSED_BEZIER_CURVE: 'cbz'
+    }
+};
+
 const POINT = {
     X: 0,
     Y: 1,
@@ -118,27 +257,26 @@ const POINT = {
     TIMESTAMP: 3
 };
 
-// Indices for stroke arrays [type, points[], color, width, penType, opacity, capStyle, joinStyle, dashPattern, pressureSensitivity, layer]
-const STROKE = {
-    TYPE: 0,         // Always "stroke"
-    POINTS: 1,       // Array of point arrays
-    COLOR: 2,        // Color string
-    WIDTH: 3,        // Stroke width
-    PEN_TYPE: 4,     // Pen type constant
-    OPACITY: 5,      // Opacity (0-1)
-    CAP_STYLE: 6,    // Cap style constant
-    JOIN_STYLE: 7,   // Join style constant
-    DASH_PATTERN: 8, // Dash pattern array
-    PRESSURE_SENS: 9, // Pressure sensitivity
-    LAYER: 10        // Layer number
+const ELEMENT = {
+    TYPE: 0,         // At the moment always DRAWABLE.STROKE
+    PATH: 1,         // At the moment always DRAWABLE.OPEN_PIECEWISE_LINEAR
+    POINTS: 2,       // Array of points
+    COLOR: 3,        // Color string
+    WIDTH: 4,        // Stroke width
+    TRANSFORM: 5,    // Affine transformation (at the moment the identity)
+    OPACITY: 6,      // Opacity (0-1)
+    CAP_STYLE: 7,    // Cap style constant
+    JOIN_STYLE: 8,   // Join style constant
+    DASH_PATTERN: 9, // Dash pattern array
+    SENSITIVITY: 10, // Pressure sensitivity
+    LAYER: 11,       // Layer number
+    PEN_TYPE: 12     // pen type (may influcence the visual representation) at the moment: PEN_TYPES.MARKER
 };
 
-// Stroke style definitions
 const PEN_TYPES = {
     MARKER: 0,
     PENCIL: 1,
-    HIGHLIGHTER: 2,
-    BRUSH: 3
+    BRUSH: 2
 };
 
 const CAP_STYLES = {
@@ -158,283 +296,15 @@ const PEN_TYPE_STRINGS = ["marker", "pencil", "highlighter", "brush"];
 const CAP_STYLE_STRINGS = ["round", "butt", "square"];
 const JOIN_STYLE_STRINGS = ["round", "bevel", "miter"];
 
-// Default stroke styles (using compact array format)
-const STROKE_STYLES = {
-    PEN: [
-        "stroke",             // type
-        [],                   // points
-        "#000000",            // color
-        2.0,                  // width
-        PEN_TYPES.MARKER,     // penType
-        1.0,                  // opacity
-        CAP_STYLES.ROUND,     // capStyle
-        JOIN_STYLES.ROUND,    // joinStyle
-        [0],                  // dashPattern
-        1.0,                  // pressureSensitivity
-        1                     // layer
-    ],
-    HIGHLIGHTER: [
-        "stroke",             // type
-        [],                   // points
-        "#FFFF00",            // color
-        24.0,                 // width
-        PEN_TYPES.HIGHLIGHTER, // penType
-        0.5,                  // opacity
-        CAP_STYLES.SQUARE,    // capStyle
-        JOIN_STYLES.ROUND,    // joinStyle
-        [0],                  // dashPattern
-        0.3,                  // pressureSensitivity
-        1                     // layer
-    ]
-};
 
-// Function to create a new stroke with specific style
-function createStroke(styleTemplate = STROKE_STYLES.PEN) {
-    // Clone the style array
-    return [...styleTemplate];
-}
-
-// Function to add a point to a stroke with pressure and timestamp
-function addPointToStroke(stroke, x, y, pressure = 0.5, timestamp = Date.now()) {
-    // Create a compact point representation [x, y, pressure, timestamp]
-    const point = [x, y, pressure, timestamp];
-    
-    // Make sure points array exists
-    if (!Array.isArray(stroke[STROKE.POINTS])) {
-        stroke[STROKE.POINTS] = [];
-    }
-    
-    // Add the point
-    stroke[STROKE.POINTS].push(point);
-    return stroke;
-}
-
-// Helper for converting legacy point objects to compact format
-function convertPointToCompact(pointObj) {
-    return [
-        pointObj.x, 
-        pointObj.y, 
-        pointObj.pressure || 0.5,
-        pointObj.timestamp || Date.now()
-    ];
-}
-
-// Helper for converting legacy stroke objects to compact format
-function convertStrokeToCompact(strokeObj) {
-    const compactStroke = [
-        "stroke",  // type
-        [],        // points (will fill below)
-        strokeObj.style.color || "#000000",
-        strokeObj.style.width || 2.0,
-        getPenTypeValue(strokeObj.style.penType),
-        strokeObj.style.opacity || 1.0,
-        getCapStyleValue(strokeObj.style.capStyle),
-        getJoinStyleValue(strokeObj.style.joinStyle),
-        strokeObj.style.dashPattern || [0],
-        strokeObj.style.pressureSensitivity || 1.0,
-        strokeObj.style.layer || 1
-    ];
-    
-    // Convert points
-    if (strokeObj.points && Array.isArray(strokeObj.points)) {
-        compactStroke[STROKE.POINTS] = strokeObj.points.map(p => 
-            Array.isArray(p) ? p : convertPointToCompact(p)
-        );
-    }
-    
-    return compactStroke;
-}
-
-// Helper functions to handle string/number conversions
-function getPenTypeValue(penTypeString) {
-    if (typeof penTypeString === 'number') return penTypeString;
-    const index = PEN_TYPE_STRINGS.indexOf(penTypeString);
-    return index >= 0 ? index : PEN_TYPES.MARKER;
-}
-
-function getCapStyleValue(capStyleString) {
-    if (typeof capStyleString === 'number') return capStyleString;
-    const index = CAP_STYLE_STRINGS.indexOf(capStyleString);
-    return index >= 0 ? index : CAP_STYLES.ROUND;
-}
-
-function getJoinStyleValue(joinStyleString) {
-    if (typeof joinStyleString === 'number') return joinStyleString;
-    const index = JOIN_STYLE_STRINGS.indexOf(joinStyleString);
-    return index >= 0 ? index : JOIN_STYLES.ROUND;
-}
-
-// Get string values for rendering
-function getPenTypeString(value) {
-    return PEN_TYPE_STRINGS[value] || "marker";
-}
-
-function getCapStyleString(value) {
-    return CAP_STYLE_STRINGS[value] || "round";
-}
-
-function getJoinStyleString(value) {
-    return JOIN_STYLE_STRINGS[value] || "round";
-}
-
-const MESSAGES = {
-    CLIENT_TO_SERVER: {
-        REGISTER_BOARD: {
-            TYPE: 'register-board',
-            BOARD_ID: 'boardId',
-            CLIENT_ID: 'clientId',
-            REQUEST_ID: 'requestId'
-        },
-        FULL_PAGE_REQUESTS: {
-            TYPE: 'fullPage-requests',
-            BOARD_UUID: 'board-uuid',
-            PAGE_ID: 'pageId',
-            DELTA: 'delta',
-            REQUEST_ID: 'requestId'
-        },
-        MOD_ACTION_PROPOSALS: {
-            TYPE: 'mod-action-proposals',
-            PAGE_UUID: 'page-uuid',
-            ACTION_UUID: 'action-uuid',
-            PAYLOAD: 'payload',
-            BEFORE_HASH: 'before-hash'
-        },
-        REPLAY_REQUESTS: {
-            TYPE: 'replay-requests',
-            PAGE_UUID: 'page-uuid',
-            BEFORE_HASH: 'before-hash',
-            REQUEST_ID: 'requestId'
-        }
-    },
-    SERVER_TO_CLIENT: {
-        BOARD_REGISTERED: {
-            TYPE: 'board-registered',
-            BOARD_ID: 'boardId',
-            INITIAL_PAGE_ID: 'initialPageId',
-            TOTAL_PAGES: 'totalPages',
-            REQUEST_ID: 'requestId'
-        },
-        FULL_PAGE: {
-            TYPE: 'fullPage',
-            PAGE: 'page',
-            STATE: 'state',
-            HASH: 'hash',
-            PAGE_NR: 'pageNr',
-            TOTAL_PAGES: 'totalPages'
-        },
-        ACCEPT_MESSAGE: {
-            TYPE: 'accept-message',
-            PAGE_UUID: 'page-uuid',
-            ACTION_UUID: 'action-uuid',
-            BEFORE_HASH: 'before-hash',
-            AFTER_HASH: 'after-hash',
-            CURRENT_PAGE_NR: 'current page-nr in its board',
-            CURRENT_TOTAL_PAGES: 'current #pages of the board'
-        },
-        DECLINE_MESSAGE: {
-            TYPE: 'decline-message',
-            PAGE_UUID: 'page-uuid',
-            ACTION_UUID: 'action-uuid',
-            REASON: 'reason'
-        },
-        REPLAY_MESSAGE: {
-            TYPE: 'replay-message',
-            PAGE_UUID: 'page-uuid',
-            BEFORE_HASH: 'before-hash',
-            AFTER_HASH: 'after-hash',
-            SEQUENCE: 'sequence of mod-actions',
-            CURRENT_PAGE_NR: 'current page-nr in its board',
-            CURRENT_TOTAL_PAGES: 'current #pages of the board'
-        },
-        PING: {
-            TYPE: 'ping',
-            PAGE_UUID: 'page-uuid',
-            HASH: 'hash',
-            CURRENT_PAGE_NR: 'current page-nr in its board',
-            CURRENT_TOTAL_PAGES: 'current #pages of the board'
-        }
-    }
-};
-
-// Helper function to check if an action is an undo action
-function isUndoAction(action) {
-    return action && 
-        action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD] && 
-        action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].type === MOD_ACTIONS.UNDO.TYPE;
-}
-
-// Helper function to check if an action is a redo action
-function isRedoAction(action) {
-    return action && 
-        action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD] && 
-        action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD].type === MOD_ACTIONS.REDO.TYPE;
-}
-
-// Helper function to get the target of an undo action
-function getUndoTarget(action) {
-    if (!isUndoAction(action)) return null;
-    return action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
-}
-
-// Helper function to get the target of a redo action
-function getRedoTarget(action) {
-    if (!isRedoAction(action)) return null;
-    return action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD][MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
-}
-
-// Helper function to check if an action has been undone
-function isActionUndone(modActions, actionUuid) {
-    return modActions.some(action => 
-        isUndoAction(action) && 
-            getUndoTarget(action) === actionUuid
-    );
-}
-
-// Helper function to find what action undid a specific action
-function findUndoActionFor(modActions, targetActionUuid) {
-    return modActions.find(action => 
-        isUndoAction(action) && 
-            getUndoTarget(action) === targetActionUuid
-    );
-}
-
-
-// visual state and actions to state compiler
-// ==========================================
-
-// visual elements constants and structures
-const DRAWABLE = {
-    TYPE: {
-        STROKE: 'stroke',
-        FILL: 'fill'
-    },
-    PATH: {
-        OPEN_PIECEWISE_LINEAR: 0,
-        CLOSED_PIECEWISE_LINEAR: 1,
-        OPEN_BEZIER_CURVE: 2,
-        CLOSED_BEZIER_CURVE: 3
-    }
-};
-
-// visual state
-const VISUAL_STATE = {
-    ELEMENT: 'element' // map creating_action_uuid -> drawable
-    VISIBLE: 'visible' // sed of uuids of visible elements
-};
-
-function render_all_visible_elements(visualState, render) {
-    for ( const [uuid, element] of visualState.element ) {
-        if ( visualState.visible.has( uuid ) ) {
-            reder( element );
-        }
-    }
-};
-
-// Affine transform structure [a, b, c, d, e, f]
+// Affine transformations
+// ======================
+// [a, b, c, d, e, f]
 // Represents the matrix:
 // [a c e]
 // [b d f]
 // [0 0 1]
+
 const TRANSFORM = {
     A: 0, // scale x
     B: 1, // skew y
@@ -445,19 +315,19 @@ const TRANSFORM = {
 };
 
 // Create an identity transform
-function createIdentityTransform() {
+function createIdentityTransform () {
     return [1, 0, 0, 1, 0, 0];
 }
 
 // Apply transform to a point
-function applyTransform(transform, x, y) {
+function applyTransform ( transform, x, y ) {
     return {
         x: transform[TRANSFORM.A] * x + transform[TRANSFORM.C] * y + transform[TRANSFORM.E],
         y: transform[TRANSFORM.B] * x + transform[TRANSFORM.D] * y + transform[TRANSFORM.F]
     };
 }
 
-function compose(t1, t2) {
+function compose ( t1, t2 ) {
     const { x: a, y: b } = applyTransform( t2, 0, 0 );
     const { x: c, y: d } = applyTransform( t2, 1, 0 );
     const { x: e, y: f } = applyTransform( t2, 0, 1 );
@@ -474,47 +344,111 @@ function compose(t1, t2) {
     ]
 }
 
-// Create a visual state entry from a stroke
-function createStrokeElement(stroke) {
-    const element = {
-        type: DRAWABLE.TYPE.STROKE,
-        path: DRAWABLE.PATH.OPEN_PIECEWISE_LINEAR,
-        points: stroke[STROKE.POINTS].map(point => ({
-            x: point[POINT.X],
-            y: point[POINT.Y],
-            width: stroke[STROKE.WIDTH] * (stroke[STROKE.PRESSURE_SENS] ? point[POINT.PRESSURE] : 1)
-        })),
-        transform: createIdentityTransform(),
-        color: {
-            hex: stroke[STROKE.COLOR],
-            opacity: stroke[STROKE.OPACITY]
-        },
-        styles: {
-            penType: stroke[STROKE.PEN_TYPE],
-            capStyle: stroke[STROKE.CAP_STYLE],
-            joinStyle: stroke[STROKE.JOIN_STYLE],
-            dashPattern: stroke[STROKE.DASH_PATTERN]
-        }
-    };
-    return Object.freeze( element );
+
+// Default stroke styles (using compact array format)
+const STROKE_STYLES = {
+    PEN: [
+        "stroke",             // type
+        "opl",                // path
+        [],                   // points
+        "#000000",            // color
+        2.0,                  // width
+        createIdentityTransform(), // transform
+        1.0,                  // opacity
+        CAP_STYLES.ROUND,     // capStyle
+        JOIN_STYLES.ROUND,    // joinStyle
+        [0],                  // dashPattern
+        1.0,                  // pressureSensitivity
+        1,                    // layer
+        PEN_TYPES.MARKER      // penType
+    ],
+    HIGHLIGHTER: [
+        "stroke",             // type
+        "opl",                // path
+        [],                   // points
+        "#000000",            // color
+        24,                   // width
+        createIdentityTransform(), // transform
+        0.5,                  // opacity
+        CAP_STYLES.SQUARE,    // capStyle
+        JOIN_STYLES.ROUND,    // joinStyle
+        [0],                  // dashPattern
+        0.3,                  // pressureSensitivity
+        1,                    // layer
+        PEN_TYPES.MARKER      // penType
+    ]
+};
+
+function createStroke ( styleTemplate = STROKE_STYLES.PEN ) {
+    return [ ... styleTemplate ];
 }
 
-function applyTransform(element, transform) {
+function createPoint ( x, y, pressure = 0.5, timestamp = Date.now() ) {
+    return [ x, y, pressure, timestamp ];
+}
+
+function addPointToStroke ( stroke, point ) {
+    assert( Array.isArray( stroke[STROKE.POINTS] ) )
+    stroke[STROKE.POINTS].push( point );
+    return stroke;
+}
+
+
+// visual state and actions to state compiler
+// ==========================================
+
+const VISUAL_STATE = {
+    ELEMENT: 'element' // map edit_uuid -> element
+    VISIBLE: 'visible' // set of uuids of visible elements
+};
+
+function createEmptyVisualState () {
+    return {
+        element: new Map(),  // map uuid -> drawable
+        visible: new Set()   // set of uuid
+    };
+}
+
+function compileVisualState ( actions ) {
+    let state = createEmptyVisualState();
+    if ( commitGroup( state, actions ) ) {
+        return state;
+    }
+    return null;
+}
+
+
+function getRenderableElements ( visualState ) {
+    for ( [ uuid, element ] of visualState.element ) {
+        if ( visualState.visible.has( uuid ) ) {
+            result.push( element );
+        }
+    }
+}
+
+function render_all_visible_elements ( visualState, render ) {
+    for ( const [ uuid, element ] of visualState.element ) {
+        if ( visualState.visible.has( uuid ) ) {
+            reder( element );
+        }
+    }
+};
+
+
+function applyTransform ( element, transform ) {
     let result = { ... element };
     result.transform = compose( transform, result.transform );
     return Object.freeze( result );
 }
 
-
-// manipulating visual state
-function addElement(visualState, uuid, element) {
+function addElement ( visualState, uuid, element ) {
     // on the server side, the drawables do not exist
     if ( visualState.element ) {
         visualState.element.set( uuid, element );
     }
 }
 
-function showElement(visualState, uuid) {
+function showElement ( visualState, uuid ) {
     if ( visualState.visible.has( uuid ) ) {
         return false;
     }
@@ -522,7 +456,7 @@ function showElement(visualState, uuid) {
     return ( true );
 }
 
-function hideElement(visualState, uuid) {
+function hideElement ( visualState, uuid ) {
     if ( ! visualState.visible.has( uuid ) ) {
         return false;
     }
@@ -531,287 +465,102 @@ function hideElement(visualState, uuid) {
 }
 
 
-function commitEdit(visualState, payload, uuid) {
-    const type = payload.type;
+function commitEdit( visualState, action ) {
+    const type = action.type;
+    const uuid = action.uuid;
     switch ( type ) {
     case MOD_ACTIONS.DRAW.TYPE:
-        return commitDraw(visuaState, payload[MOD_ACTIONS.DRAW.STROKE], uuid);
+        return commitDraw( visualState, payload[MOD_ACTIONS.DRAW.STROKE], uuid );
     case MOD_ACTIONS.ERASE.TYPE:
-        return commitErase(visuaState, payload[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid);
+        return commitErase( visualState, payload[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid );
     case MOD_ACTIONS.GROUP.TYPE:
-        return commitGroup(visuaState, payload[MOD_ACTIONS.GROUP.ACTIONS], uuid);
+        return commitGroup( visualState, payload[MOD_ACTIONS.GROUP.ACTIONS], uuid );
     }
 }
 
-function commitDraw(visuaState, stroke, uuid) {
-    addElement(visuaState, uuid, stroke);
-    return showElement(visuaState, uuid);
+function commitDraw ( visualState, stroke, uuid ) {
+    addElement( visualState, uuid, stroke );
+    return showElement( visualState, uuid );
 }
 
-function commitErase(visuaState, target, uuid) {
-    return hideElement(visuaState, target);
+function commitErase ( visualState, target, uuid ) {
+    return hideElement( visualState, target );
 }
 
-function commitGroup(visuaState, actions, uuid) {
-    const previouslyVisible = structuralClone( visuaState.visible );
+function commitGroup ( visualState, actions, uuid = "" ) {
+    const previouslyVisible = structuredClone( visualState.visible );
     let flag = true;
     for ( const edit of actions ) {
-        flag = flag & commitEdit(visuaState, edit.payload, edit.uuid);
+        flag = flag & commitEdit( visualState, edit );
         if (!flag) {
-            visuaState.visible = previouslyVisible;
+            visualState.visible = previouslyVisible;
             return false;
         }
     }
     return true;
 }
 
-function revertEdit(visualState, payload, uuid) {
+function revertEdit ( visualState, payload, uuid ) {
     const type = payload.type;
     switch ( type ) {
     case MOD_ACTIONS.DRAW.TYPE:
-        return revertDraw(visuaState, payload[MOD_ACTIONS.DRAW.STROKE], uuid);
+        return revertDraw( visualState, payload[MOD_ACTIONS.DRAW.STROKE], uuid );
     case MOD_ACTIONS.ERASE.TYPE:
-        return revertErase(visuaState, payload[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid);
+        return revertErase( visualState, payload[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid );
     case MOD_ACTIONS.GROUP.TYPE:
-        return revertGroup(visuaState, payload[MOD_ACTIONS.GROUP.ACTIONS], uuid);
+        return revertGroup( visualState, payload[MOD_ACTIONS.GROUP.ACTIONS], uuid );
     }
 }
 
-function revertDraw(visuaState, stroke, uuid) {
-    return hideElement(visuaState, uuid);
+function revertDraw ( visualState, stroke, uuid ) {
+    return hideElement( visualState, uuid );
 }
 
-function revertErase(visuaState, target, uuid) {
-    return showElement(visuaState, target);
+function revertErase ( visualState, target, uuid ) {
+    return showElement( visualState, target );
 }
 
-function revertGroup(visuaState, actions, uuid) {
-    const previouslyVisible = structuralClone( visuaState.visible );
+function revertGroup ( visualState, actions, uuid ) {
+    const previouslyVisible = structuredClone( visualState.visible );
     let flag = true;
     for ( let index = actions.length - 1; index >= 0; -- index ){
         const edti = actions[ index ];
-        flag = flag & commitEdit(visuaState, edit.payload, edit.uuid);
-        if (!flag) {
-            visuaState.visible = previouslyVisible;
+        flag = flag & commitEdit( visualState, edit.payload, edit.uuid );
+        if ( ! flag ) {
+            visualState.visible = previouslyVisible;
             return false;
         }
     }
     return true;
 }
 
-// Create a visual state entry
-function createVisualStateEntry(element, visible, creatorId) {
-    return [element, visible, creatorId];
-}
 
-// Function to get an element from a visual state entry
-function getElement(entry) {
-    return entry[VISUAL_STATE.ENTRY.ELEMENT];
-}
-
-// Function to check if an entry is visible
-function isVisible(entry) {
-    return entry[VISUAL_STATE.ENTRY.VISIBLE];
-}
-
-// Function to get the creator ID of an entry
-function getCreatorId(entry) {
-    return entry[VISUAL_STATE.ENTRY.CREATOR_ID];
-}
-
-// Creates an empty visual state
-function createEmptyVisualState() {
-    return [];
-}
-
-// Applies a mod action to a visual state
-function applyModAction(visualState, action) {
-    const payload = action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-    const actionUuid = action[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.ACTION_UUID];
-    
-    if (!payload || !payload.type) {
-        return null; // Invalid action
-    }
-    
-    switch (payload.type) {
-    case MOD_ACTIONS.DRAW.TYPE:
-        return applyDrawAction(visualState, payload, actionUuid);
-        
-    case MOD_ACTIONS.ERASE.TYPE:
-        return applyEraseAction(visualState, payload, actionUuid);
-        
-    case MOD_ACTIONS.UNDO.TYPE:
-        return applyUndoAction(visualState, payload, actionUuid);
-        
-    case MOD_ACTIONS.REDO.TYPE:
-        return applyRedoAction(visualState, payload, actionUuid);
-        
-    case MOD_ACTIONS.GROUP.TYPE:
-        return applyGroupAction(visualState, payload, actionUuid);
-        
-    case MOD_ACTIONS.NEW_PAGE.TYPE:
-    case MOD_ACTIONS.DELETE_PAGE.TYPE:
-        // These actions don't directly affect the visual state of the current page
-        return visualState;
-        
-    default:
-        return null; // Unknown action type
-    }
-}
-
-// Apply a draw action
-function applyDrawAction(visualState, payload, actionUuid) {
-    if (!payload[MOD_ACTIONS.DRAW.STROKE]) {
-        return null; // Invalid draw action
-    }
-    
-    const stroke = payload[MOD_ACTIONS.DRAW.STROKE];
-    const element = createStrokeElement(stroke);
-    const entry = createVisualStateEntry(element, true, actionUuid);
-    
-    return [...visualState, entry];
-}
-
-// Apply an erase action
-function applyEraseAction(visualState, payload, actionUuid) {
-    if (!payload[MOD_ACTIONS.ERASE.ACTION_UUID]) {
-        return null; // Invalid erase action
-    }
-    
-    const targetActionUuid = payload[MOD_ACTIONS.ERASE.ACTION_UUID];
-    
-    // Find all entries created by the target action
-    const hasTargetAction = visualState.some(entry => 
-        getCreatorId(entry) === targetActionUuid && isVisible(entry)
-    );
-    
-    if (!hasTargetAction) {
-        return null; // Nothing to erase
-    }
-    
-    // Create a new state with targeted elements marked as invisible
-    return visualState.map(entry => {
-        if (getCreatorId(entry) === targetActionUuid && isVisible(entry)) {
-            return createVisualStateEntry(getElement(entry), false, getCreatorId(entry));
-        }
-        return entry;
-    });
-}
-
-// Apply an undo action
-function applyUndoAction(visualState, payload, actionUuid) {
-    if (!payload[MOD_ACTIONS.UNDO.TARGET_ACTION_UUID]) {
-        return null; // Invalid undo action
-    }
-    
-    const targetActionUuid = payload[MOD_ACTIONS.UNDO.TARGET_ACTION_UUID];
-    
-    // Find entries created by the target action
-    const hasTargetAction = visualState.some(entry => 
-        getCreatorId(entry) === targetActionUuid
-    );
-    
-    if (!hasTargetAction) {
-        return null; // Cannot undo an action that doesn't exist
-    }
-    
-    // Toggle visibility of elements created by the target action
-    return visualState.map(entry => {
-        if (getCreatorId(entry) === targetActionUuid) {
-            return createVisualStateEntry(getElement(entry), !isVisible(entry), getCreatorId(entry));
-        }
-        return entry;
-    });
-}
-
-// Apply a redo action
-function applyRedoAction(visualState, payload, actionUuid) {
-    if (!payload[MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID]) {
-        return null; // Invalid redo action
-    }
-    
-    const targetUndoActionUuid = payload[MOD_ACTIONS.REDO.TARGET_UNDO_ACTION_UUID];
-    
-    // First, find the undo action this redo is targeting
-    const undoAction = visualState.find(entry => 
-        getCreatorId(entry) === targetUndoActionUuid
-    );
-    
-    if (!undoAction) {
-        return null; // Cannot find the undo action to redo
-    }
-    
-    // Now find the original action that was undone
-    const originalActionUuid = undoAction[VISUAL_STATE.ENTRY.ELEMENT].targetActionUuid;
-    
-    if (!originalActionUuid) {
-        return null; // Cannot determine what action to redo
-    }
-    
-    // Toggle visibility of elements created by the original action
-    return visualState.map(entry => {
-        if (getCreatorId(entry) === originalActionUuid) {
-            return createVisualStateEntry(getElement(entry), !isVisible(entry), getCreatorId(entry));
-        }
-        return entry;
-    });
-}
-
-// Apply a group action
-function applyGroupAction(visualState, payload, actionUuid) {
-    if (!payload[MOD_ACTIONS.GROUP.ACTIONS] || !Array.isArray(payload[MOD_ACTIONS.GROUP.ACTIONS])) {
-        throw new Error("Invalid group action: missing or non-array actions field");
-    }
-    return applyActionSequence(visualState, payload[MOD_ACTIONS.GROUP.ACTIONS])
-}
-
-// apply a sequence of mod actions to a visual state
-function applyActionSequence(input_state, actions) {
-    let output_state = [...input_state];
-    for (const action of actions) {
-        output_state = applyModAction(output_state, action);
-        if (output_state == null) { return output_state; }
-    }
-    return output_state;
-}
-
-// Compile a sequence of mod actions into a visual state
-function compileVisualState(actions) {
-    let state = createEmptyVisualState();
-    return applyActionSequence(state, actions);
-}
-
-
-// Get a flattened list of visible elements for rendering
-function getRenderableElements(visualState) {
-    return visualState
-        .filter(entry => isVisible(entry))
-        .map(entry => getElement(entry));
-}
-
+// Geometry
+// ========
 
 // Helper function to determine if two elements intersect
 // used, e.g., by erase
-function doElementsIntersect(element1, element2) {
-    if (element1.type === VISUAL_STATE.ELEMENT_TYPES.STROKE && 
-        element2.type === VISUAL_STATE.ELEMENT_TYPES.STROKE) {
+
+function doElementsIntersect ( element1, element2 ) {
+    if ( element1.type === VISUAL_STATE.ELEMENT_TYPES.STROKE && 
+         element2.type === VISUAL_STATE.ELEMENT_TYPES.STROKE ) {
         
         // Simple bounding box check first
-        const bbox1 = calculateBoundingBox(element1);
-        const bbox2 = calculateBoundingBox(element2);
+        const bbox1 = calculateBoundingBox( element1 );
+        const bbox2 = calculateBoundingBox( element2 );
         
-        if (!doBoundingBoxesIntersect(bbox1, bbox2)) {
+        if ( ! doBoundingBoxesIntersect (bbox1, bbox2 ) ) {
             return false;
         }
         
         // Get the maximum width as our distance threshold
         const threshold = Math.max(
-            getMaxWidth(element1.points),
-            getMaxWidth(element2.points)
+            getMaxWidth( element1.points ),
+            getMaxWidth( element2.points )
         ) / 2; // Half the width is reasonable for threshold
         
         // Check line segments for intersection or proximity
-        for (let i = 0; i < element1.points.length - 1; i++) {
+        for ( let i = 0; i < element1.points.length - 1; i++ ) {
             const line1 = {
                 x1: element1.points[i].x,
                 y1: element1.points[i].y,
@@ -820,7 +569,7 @@ function doElementsIntersect(element1, element2) {
                 width: element1.points[i].width || 1
             };
             
-            for (let j = 0; j < element2.points.length - 1; j++) {
+            for ( let j = 0; j < element2.points.length - 1; j++ ) {
                 const line2 = {
                     x1: element2.points[j].x,
                     y1: element2.points[j].y,
@@ -830,13 +579,13 @@ function doElementsIntersect(element1, element2) {
                 };
                 
                 // Check if line segments intersect directly
-                if (lineSegmentsIntersect(line1.x1, line1.y1, line1.x2, line1.y2, 
-                                          line2.x1, line2.y1, line2.x2, line2.y2)) {
+                if ( lineSegmentsIntersect( line1.x1, line1.y1, line1.x2, line1.y2, 
+                                            line2.x1, line2.y1, line2.x2, line2.y2 ) ) {
                     return true;
                 }
                 
                 // If no direct intersection, check if they come within threshold distance
-                if (minimumDistanceBetweenLineSegments(line1, line2) < threshold) {
+                if ( minimumDistanceBetweenLineSegments(line1, line2) < threshold ) {
                     return true;
                 }
             }
@@ -847,7 +596,7 @@ function doElementsIntersect(element1, element2) {
 }
 
 // Check if two line segments intersect
-function lineSegmentsIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+function lineSegmentsIntersect ( x1, y1, x2, y2, x3, y3, x4, y4 ) {
     // Calculate direction vectors
     const dx1 = x2 - x1;
     const dy1 = y2 - y1;
