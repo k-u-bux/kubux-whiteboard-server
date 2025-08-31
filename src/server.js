@@ -275,26 +275,9 @@ const serverOptions = {
     cert: fs.readFileSync(getFilePath("server", "cert"))
 };
 
-const httpsServer = https.createServer(serverOptions);
+console.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
-const wss = new WebSocket.Server({
-    server: httpsServer,
-    path: '/ws',
-    perMessageDeflate: {
-        zlibDeflateOptions: { level: 6 },
-        zlibInflateOptions: { chunkSize: 16 * 1024 },
-        serverNoContextTakeover: false,
-        clientNoContextTakeover: false,
-        threshold: 512
-    }
-});
-
-httpsServer.listen(3001, () => {
-    console.log('WebSocket-Server läuft auf wss://localhost:3001/ws');
-});
-
-
-const httpServer = http.createServer((req, res) => {
+const httpsServer = https.createServer(serverOptions, (req, res) => {
     // always serve just index.html
     // rationale: allowing the client to request files opens the attack surface
     // consequence: index.html will be a self contained file; thus we embed shared.js on the fly
@@ -340,8 +323,23 @@ const httpServer = http.createServer((req, res) => {
     });
 });
 
-httpServer.listen(8080, '0.0.0.0', () => {
-    console.log('[SERVER] HTTP server is running on port 8080');
+const wss = new WebSocket.Server({
+    server: httpsServer,
+    path: '/ws',
+    perMessageDeflate: {
+        zlibDeflateOptions: { level: 6 },
+        zlibInflateOptions: { chunkSize: 16 * 1024 },
+        serverNoContextTakeover: false,
+        clientNoContextTakeover: false,
+        threshold: 512
+    }
+});
+
+const PORT = 8080;
+
+httpsServer.listen(PORT, () => {
+    console.log('[SERVER] HTTPS server is running on port ${8080}');
+    console.log(`WebSocket-Server läuft auf wss://localhost:${PORT}/ws`);
 });
 
 
