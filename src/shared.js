@@ -125,7 +125,7 @@ const MOD_ACTIONS = {
     },
     ERASE: {
         TYPE: 'erase',
-        TAGET_ACTION: 'targetActionUuid'
+        TARGET_ACTION: 'targetActionUuid'
     },
     GROUP: {
         TYPE: 'group',
@@ -158,8 +158,8 @@ const MESSAGES = {
             REQUEST_ID: 'requestId'
         },
         CREATE_BOARD: {
-            TYPE: 'register-board',
-            PASSWD: 'passwd'
+            TYPE: 'create-board',
+            PASSWD: 'passwd',
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
@@ -179,7 +179,7 @@ const MESSAGES = {
         REPLAY_REQUESTS: {
             TYPE: 'replay-requests',
             PAGE_UUID: 'page-uuid',
-            PRESENT: 'present'
+            PRESENT: 'present',
             PRESENT_HASH: 'present-hash',
             REQUEST_ID: 'requestId'
         }
@@ -222,7 +222,7 @@ const MESSAGES = {
             BEFORE_HASH: 'beforeHash',
             AFTER_HASH: 'afterHash',
             SEQUENCE: 'edits',
-            PRESENT: 'present'
+            PRESENT: 'present',
             CURRENT_HASH: 'currentHash',
             PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages'
@@ -388,16 +388,16 @@ function createPoint ( x, y, pressure = 0.5, timestamp = Date.now() ) {
 }
 
 function addPointToStroke ( stroke, point ) {
-    assert( Array.isArray( stroke[STROKE.POINTS] ) )
-    stroke[STROKE.POINTS].push( point );
+    assert( Array.isArray( stroke[ELEMENT.POINTS] ) )
+    stroke[ELEMENT.POINTS].push( point );
     return stroke;
 }
 
 function applyTransformToPath( transform, path ) {
     let result = [];
-    for ( point of path ) {
+    for (const point of path) {
         let xy = applyTransform( transform, point[ POINT.X ], point[ POINT.Y ] );
-        result.push( [ xy[ POINT.X ], xy[ POINT.Y ], point[ POINT.PRESURE ], point[ POINT.TIMESTAMP ] ] );
+        result.push( [ xy.x, xy.y, point[ POINT.PRESSURE ], point[ POINT.TIMESTAMP ] ] );
     }
     return result;
 }
@@ -406,7 +406,7 @@ function applyTransformToPath( transform, path ) {
 // ==========================================
 
 const VISUAL_STATE = {
-    ELEMENT: 'element' // map edit_uuid -> element
+    ELEMENT: 'element', // map edit_uuid -> element
     VISIBLE: 'visible' // set of uuids of visible elements
 };
 
@@ -427,17 +427,19 @@ function compileVisualState ( actions ) {
 
 
 function getRenderableElements ( visualState ) {
-    for ( [ uuid, element ] of visualState.element ) {
+    const result = [];
+    for (const [uuid, element] of visualState.element) {
         if ( visualState.visible.has( uuid ) ) {
             result.push( element );
         }
     }
+    return result;
 }
 
 function render_all_visible_elements ( visualState, render ) {
     for ( const [ uuid, element ] of visualState.element ) {
         if ( visualState.visible.has( uuid ) ) {
-            reder( element );
+            render( element );
         }
     }
 };
@@ -468,7 +470,7 @@ function hideElement ( visualState, uuid ) {
     if ( ! visualState.visible.has( uuid ) ) {
         return false;
     }
-    visualState.visible.del( uuid );
+    visualState.visible.delete( uuid );
     return ( true );
 }
 
@@ -478,11 +480,11 @@ function commitEdit( visualState, action ) {
     const uuid = action.uuid;
     switch ( type ) {
     case MOD_ACTIONS.DRAW.TYPE:
-        return commitDraw( visualState, payload[MOD_ACTIONS.DRAW.STROKE], uuid );
+        return commitDraw( visualState, action[MOD_ACTIONS.DRAW.STROKE], uuid );
     case MOD_ACTIONS.ERASE.TYPE:
-        return commitErase( visualState, payload[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid );
+        return commitErase( visualState, action[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid );
     case MOD_ACTIONS.GROUP.TYPE:
-        return commitGroup( visualState, payload[MOD_ACTIONS.GROUP.ACTIONS], uuid );
+        return commitGroup( visualState, action[MOD_ACTIONS.GROUP.ACTIONS], uuid );
     }
 }
 
@@ -508,15 +510,15 @@ function commitGroup ( visualState, actions, uuid = "" ) {
     return true;
 }
 
-function revertEdit ( visualState, payload, uuid ) {
-    const type = payload.type;
+function revertEdit ( visualState, action, uuid ) {
+    const type = action.type;
     switch ( type ) {
     case MOD_ACTIONS.DRAW.TYPE:
-        return revertDraw( visualState, payload[MOD_ACTIONS.DRAW.STROKE], uuid );
+        return revertDraw( visualState, action[MOD_ACTIONS.DRAW.STROKE], uuid );
     case MOD_ACTIONS.ERASE.TYPE:
-        return revertErase( visualState, payload[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid );
+        return revertErase( visualState, action[MOD_ACTIONS.ERASE.TARGET_ACTION], uuid );
     case MOD_ACTIONS.GROUP.TYPE:
-        return revertGroup( visualState, payload[MOD_ACTIONS.GROUP.ACTIONS], uuid );
+        return revertGroup( visualState, action[MOD_ACTIONS.GROUP.ACTIONS], uuid );
     }
 }
 
@@ -532,8 +534,8 @@ function revertGroup ( visualState, actions, uuid ) {
     const previouslyVisible = structuredClone( visualState.visible );
     let flag = true;
     for ( let index = actions.length - 1; index >= 0; -- index ){
-        const edti = actions[ index ];
-        flag = flag & commitEdit( visualState, edit.payload, edit.uuid );
+        const edit = actions[ index ];
+        flag = flag & revertEdit( visualState, edit, edit.uuid );
         if ( ! flag ) {
             visualState.visible = previouslyVisible;
             return false;
@@ -630,9 +632,9 @@ function findIntersectingElements ( visualState, needle, eps, delta ) {
     let result = [];
     const true_needle = applyTransformToPath(needle[ELEMENT.TRANSFORM], needle[ELEMENT.POINTS]);
     
-    for (const hay of visualState.element) {
+    for (const [uuid, hay] of visualState.element) {
         const true_hay = applyTransformToPath(hay[ELEMENT.TRANSFORM], hay[ELEMENT.POINTS]);
-        if (visualState.visible.has(hay) && 
+        if (visualState.visible.has(uuid) && 
             pathsIntersect(true_hay, true_needle, eps, delta)) {
             result.push(hay);
         }
@@ -643,12 +645,126 @@ function findIntersectingElements ( visualState, needle, eps, delta ) {
 // Export for Node.js (server)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-// whatever is needed
+        // uuid
+        generateUuid,
+        // serialization
+        serialize,
+        deserialize,
+        // hashing
+        hashAny,
+        hashNext,
+        // value comparison
+        isEqual,
+        isNotEqual,
+        // schemas and constants
+        MOD_ACTIONS,
+        MESSAGES,
+        DRAWABLE,
+        POINT,
+        ELEMENT,
+        PEN_TYPES,
+        CAP_STYLES,
+        JOIN_STYLES,
+        PEN_TYPE_STRINGS,
+        CAP_STYLE_STRINGS,
+        JOIN_STYLE_STRINGS,
+        TRANSFORM,
+        STROKE_STYLES,
+        VISUAL_STATE,
+        // transforms
+        createIdentityTransform,
+        applyTransform,
+        compose,
+        // stroke operations
+        createStroke,
+        createPoint,
+        addPointToStroke,
+        applyTransformToPath,
+        // visual state
+        createEmptyVisualState,
+        compileVisualState,
+        getRenderableElements,
+        render_all_visible_elements,
+        addElement,
+        showElement,
+        hideElement,
+        commitEdit,
+        commitDraw,
+        commitErase,
+        commitGroup,
+        revertEdit,
+        revertDraw,
+        revertErase,
+        revertGroup,
+        // geometry
+        distSquare,
+        interpolate,
+        addGridCell,
+        tracePath,
+        pathsIntersect,
+        findIntersectingElements
     };
 }
 // Export for browsers (client)
 else if (typeof window !== 'undefined') {
     window.shared = {
-// whatever is needed
+        // uuid
+        generateUuid,
+        // serialization
+        serialize,
+        deserialize,
+        // hashing
+        hashAny,
+        hashNext,
+        // value comparison
+        isEqual,
+        isNotEqual,
+        // schemas and constants
+        MOD_ACTIONS,
+        MESSAGES,
+        DRAWABLE,
+        POINT,
+        ELEMENT,
+        PEN_TYPES,
+        CAP_STYLES,
+        JOIN_STYLES,
+        PEN_TYPE_STRINGS,
+        CAP_STYLE_STRINGS,
+        JOIN_STYLE_STRINGS,
+        TRANSFORM,
+        STROKE_STYLES,
+        VISUAL_STATE,
+        // transforms
+        createIdentityTransform,
+        applyTransform,
+        compose,
+        // stroke operations
+        createStroke,
+        createPoint,
+        addPointToStroke,
+        applyTransformToPath,
+        // visual state
+        createEmptyVisualState,
+        compileVisualState,
+        getRenderableElements,
+        render_all_visible_elements,
+        addElement,
+        showElement,
+        hideElement,
+        commitEdit,
+        commitDraw,
+        commitErase,
+        commitGroup,
+        revertEdit,
+        revertDraw,
+        revertErase,
+        revertGroup,
+        // geometry
+        distSquare,
+        interpolate,
+        addGridCell,
+        tracePath,
+        pathsIntersect,
+        findIntersectingElements
     };
 }
