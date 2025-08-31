@@ -488,7 +488,8 @@
         serverPageHash: pingPageHash, 
         serverPageNr: pingPageNr, 
         serverTotalPages: pingTotalPages,
-        currentPageUuid: currentPageUuid
+        currentPageUuid: currentPageUuid,
+        verifedHash: verifiedHash
       });
       
       // Check if we're on the wrong page
@@ -525,9 +526,10 @@
         // Remove the pending action
         const acceptedAction = pendingActions.splice(pendingActionIndex, 1)[0];
         
-        // For draw and erase actions, add to confirmed history if it's not already there
+        // For draw, erase, and group actions, add to confirmed history if it's not already there
         if (acceptedAction.type === shared.MOD_ACTIONS.DRAW.TYPE || 
-            acceptedAction.type === shared.MOD_ACTIONS.ERASE.TYPE) {
+            acceptedAction.type === shared.MOD_ACTIONS.ERASE.TYPE ||
+            acceptedAction.type === shared.MOD_ACTIONS.GROUP.TYPE) {
           
           // Add to history if not already there
           const existingIndex = history.findIndex(a => a.uuid === acceptedAction.uuid);
@@ -710,6 +712,15 @@
         case shared.MOD_ACTIONS.ERASE.TYPE:
           const targetUuid = action[shared.MOD_ACTIONS.ERASE.TARGET_ACTION] || action.targetAction;
           shared.hideElement(visualState, targetUuid);
+          break;
+          
+        case shared.MOD_ACTIONS.GROUP.TYPE:
+          const actions = action[shared.MOD_ACTIONS.GROUP.ACTIONS] || action.actions;
+          if (Array.isArray(actions)) {
+            for (const subAction of actions) {
+              applyActionToVisualState(subAction);
+            }
+          }
           break;
       }
     }
@@ -930,18 +941,24 @@
       const y = (event.clientY - rect.top) / zoomLevel;
       const pressure = event.pressure !== undefined ? event.pressure : 0.5;
       
+      // Start a new path regardless of tool
+      currentPath = [];
+      const point = shared.createPoint(x, y, pressure);
+      currentPath.push(point);
+      
       if (currentTool === 'eraser') {
         isErasing = true;
-        handleEraserDown(x, y);
+        
+        // Create a new eraser stroke for visual feedback
+        currentStroke = shared.createStroke();
+        currentStroke[shared.ELEMENT.WIDTH] = eraserRadius * 2;
+        currentStroke[shared.ELEMENT.COLOR] = '#FF0000'; // Red for visibility during erasing
+        currentStroke[shared.ELEMENT.OPACITY] = 0.3; // Transparent so we can see what's being erased
+        currentStroke[shared.ELEMENT.POINTS] = currentPath;
       } else {
         isDrawing = true;
-        currentPath = [];
         
-        // Create point
-        const point = shared.createPoint(x, y, pressure);
-        currentPath.push(point);
-        
-        // Create a new stroke based on selected tool
+        // Create a new pen/highlighter stroke based on selected tool
         currentStroke = shared.createStroke(
           currentTool === 'highlighter' ? shared.STROKE_STYLES.HIGHLIGHTER : shared.STROKE_STYLES.PEN
         );
@@ -962,25 +979,32 @@
       const y = (event.clientY - rect.top) / zoomLevel;
       const pressure = event.pressure !== undefined ? event.pressure : 0.5;
       
-      if (isErasing) {
-        handleEraserMove(x, y);
-      } else if (isDrawing) {
-        // Create point
-        const point = shared.createPoint(x, y, pressure);
-        currentPath.push(point);
-        
-        // Update current stroke
-        currentStroke[shared.ELEMENT.POINTS] = currentPath;
-        
-        // Redraw
-        redrawCanvas();
-      }
+      // Add point to current path
+      const point = shared.createPoint(x, y, pressure);
+      currentPath.push(point);
+      
+      // Update current stroke with new path
+      currentStroke[shared.ELEMENT.POINTS] = currentPath;
+      
+      // Redraw canvas to show the current stroke
+      redrawCanvas();
     }
     
     // Handle pointer up event
     function handlePointerUp() {
       if (isErasing) {
         isErasing = false;
+        
+        if (currentPath.length >= 2) {
+          // Find all elements that intersect with the eraser stroke
+          const elementsToErase = findElementsIntersectingPath(currentStroke);
+          
+          if (elementsToErase.length > 0) {
+            // Send group erase action
+            sendGroupEraseAction(elementsToErase);
+          }
+        }
+        
       } else if (isDrawing) {
         isDrawing = false;
         
@@ -988,42 +1012,18 @@
           // Send completed stroke to server
           sendDrawAction(currentStroke);
         }
-        
-        currentPath = [];
-        currentStroke = null;
       }
-    }
-    
-    // Handle eraser down
-    function handleEraserDown(x, y) {
-      const elementsToErase = findElementsToErase(x, y);
       
-      for (const elementUuid of elementsToErase) {
-        sendEraseAction(elementUuid);
-      }
+      currentPath = [];
+      currentStroke = null;
     }
     
-    // Handle eraser move
-    function handleEraserMove(x, y) {
-      const elementsToErase = findElementsToErase(x, y);
-      
-      for (const elementUuid of elementsToErase) {
-        sendEraseAction(elementUuid);
-      }
-    }
-    
-    // Find elements to erase at a position
-    function findElementsToErase(x, y) {
+    // Find elements that intersect with a complete eraser path
+    function findElementsIntersectingPath(eraserStroke) {
       const result = [];
       
-      // Create a simple erase stroke for testing intersection
-      const erasePoint = shared.createPoint(x, y);
-      const eraseStroke = shared.createStroke();
-      eraseStroke[shared.ELEMENT.POINTS] = [erasePoint];
-      eraseStroke[shared.ELEMENT.WIDTH] = eraserRadius * 2;
-      
-      // Find intersecting elements using shared geometry function
-      const intersecting = shared.findIntersectingElements(visualState, eraseStroke, eraserRadius, 10);
+      // Use the shared geometry function to find intersecting elements
+      const intersecting = shared.findIntersectingElements(visualState, eraserStroke, eraserRadius / 2, 10);
       
       for (const element of intersecting) {
         // Find the UUID for this element
@@ -1074,21 +1074,37 @@
       sendMessage(proposal);
     }
     
-    // Send an erase action to the server
-    function sendEraseAction(targetUuid) {
+    // Create a single erase action for a target
+    function createEraseAction(targetUuid) {
       const actionUuid = shared.generateUuid();
-      
-      const eraseAction = {
+      return {
         type: shared.MOD_ACTIONS.ERASE.TYPE,
         [shared.MOD_ACTIONS.UUID]: actionUuid,
         [shared.MOD_ACTIONS.ERASE.TARGET_ACTION]: targetUuid
+      };
+    }
+    
+    // Send a group of erase actions as a single group action
+    function sendGroupEraseAction(targetUuids) {
+      if (targetUuids.length === 0) return;
+      
+      const groupUuid = shared.generateUuid();
+      
+      // Create individual erase actions for each target
+      const eraseActions = targetUuids.map(targetUuid => createEraseAction(targetUuid));
+      
+      // Create a group action containing all erase actions
+      const groupAction = {
+        type: shared.MOD_ACTIONS.GROUP.TYPE,
+        [shared.MOD_ACTIONS.UUID]: groupUuid,
+        [shared.MOD_ACTIONS.GROUP.ACTIONS]: eraseActions
       };
       
       // Create proposal
       const proposal = {
         type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
-        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: eraseAction,
+        [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
         [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: verifiedHash
       };
       
@@ -1097,14 +1113,17 @@
         history = history.slice(0, present);
       }
       
-      // Add the action to pending actions
-      pendingActions.push(eraseAction);
+      // Add the group action to pending actions
+      pendingActions.push(groupAction);
       
-      // Update visual state
-      applyActionToVisualState(eraseAction);
+      // Apply each erase action to visual state
+      for (const eraseAction of eraseActions) {
+        applyActionToVisualState(eraseAction);
+      }
       
       // Update UI
       updateUndoRedoButtons();
+      redrawCanvas();
       
       // Send to server
       sendMessage(proposal);
@@ -1220,8 +1239,8 @@
       // Render all visible elements
       shared.render_all_visible_elements(visualState, renderElement);
       
-      // Draw current stroke if we're drawing
-      if (isDrawing && currentStroke) {
+      // Draw current stroke if we're drawing or erasing
+      if ((isDrawing || isErasing) && currentStroke) {
         renderElement(currentStroke);
       }
     }
