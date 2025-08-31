@@ -263,7 +263,7 @@ const ELEMENT = {
     POINTS: 2,       // Array of points
     COLOR: 3,        // Color string
     WIDTH: 4,        // Stroke width
-    TRANSFORM: 5,    // Affine transformation (at the moment the identity)
+    TRANSFORM: 5,    // Affine transformation (at the moment, always the identity)
     OPACITY: 6,      // Opacity (0-1)
     CAP_STYLE: 7,    // Cap style constant
     JOIN_STYLE: 8,   // Join style constant
@@ -393,6 +393,14 @@ function addPointToStroke ( stroke, point ) {
     return stroke;
 }
 
+function applyTransformToPath( transform, path ) {
+    let result = [];
+    for ( point of path ) {
+        let xy = applyTransform( transform, point[ POINT.X ], point[ POINT.Y ] );
+        result.push( [ xy[ POINT.X ], xy[ POINT.Y ], point[ POINT.PRESURE ], point[ POINT.TIMESTAMP ] ] );
+    }
+    return result;
+}
 
 // visual state and actions to state compiler
 // ==========================================
@@ -541,297 +549,106 @@ function revertGroup ( visualState, actions, uuid ) {
 // Helper function to determine if two elements intersect
 // used, e.g., by erase
 
-function doElementsIntersect ( element1, element2 ) {
-    if ( element1.type === VISUAL_STATE.ELEMENT_TYPES.STROKE && 
-         element2.type === VISUAL_STATE.ELEMENT_TYPES.STROKE ) {
-        
-        // Simple bounding box check first
-        const bbox1 = calculateBoundingBox( element1 );
-        const bbox2 = calculateBoundingBox( element2 );
-        
-        if ( ! doBoundingBoxesIntersect (bbox1, bbox2 ) ) {
-            return false;
-        }
-        
-        // Get the maximum width as our distance threshold
-        const threshold = Math.max(
-            getMaxWidth( element1.points ),
-            getMaxWidth( element2.points )
-        ) / 2; // Half the width is reasonable for threshold
-        
-        // Check line segments for intersection or proximity
-        for ( let i = 0; i < element1.points.length - 1; i++ ) {
-            const line1 = {
-                x1: element1.points[i].x,
-                y1: element1.points[i].y,
-                x2: element1.points[i + 1].x,
-                y2: element1.points[i + 1].y,
-                width: element1.points[i].width || 1
-            };
-            
-            for ( let j = 0; j < element2.points.length - 1; j++ ) {
-                const line2 = {
-                    x1: element2.points[j].x,
-                    y1: element2.points[j].y,
-                    x2: element2.points[j + 1].x,
-                    y2: element2.points[j + 1].y,
-                    width: element2.points[j].width || 1
-                };
-                
-                // Check if line segments intersect directly
-                if ( lineSegmentsIntersect( line1.x1, line1.y1, line1.x2, line1.y2, 
-                                            line2.x1, line2.y1, line2.x2, line2.y2 ) ) {
-                    return true;
-                }
-                
-                // If no direct intersection, check if they come within threshold distance
-                if ( minimumDistanceBetweenLineSegments(line1, line2) < threshold ) {
-                    return true;
-                }
+function distSquare ( p, q ) {
+    const dx = p[ POINT.X ] - q[ POINT.X ];
+    const dy = p[ POINT.Y ] - q[ POINT.Y ]; 
+    return dx * dx + dy * dy;
+}
+
+function interpolate ( p, q, t ) {
+    const x = ( 1 - t ) * p[ POINT.X ] + t * q[ POINT.X ];
+    const y = ( 1 - t ) * p[ POINT.Y ] + t * q[ POINT.Y ];
+    return [ x, y ];
+}
+
+// Helper function to add a grid cell and its neighbors to the locations set
+function addGridCell ( locations, x_bar, y_bar, eps, delta ) {
+    const radius = Math.ceil(eps / delta);
+    for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+            if (dx*dx + dy*dy <= radius*radius) {
+                // Use string representation since we'll use Set.prototype.isDisjointFrom
+                locations.add(`${x_bar + dx},${y_bar + dy}`);
             }
         }
     }
-    
-    return false;
 }
 
-// Check if two line segments intersect
-function lineSegmentsIntersect ( x1, y1, x2, y2, x3, y3, x4, y4 ) {
-    // Calculate direction vectors
-    const dx1 = x2 - x1;
-    const dy1 = y2 - y1;
-    const dx2 = x4 - x3;
-    const dy2 = y4 - y3;
+function tracePath ( path, eps, delta ) {
+    const locations = new Set();
     
-    // Calculate determinant
-    const determinant = dx1 * dy2 - dy1 * dx2;
-    
-    // If determinant is zero, lines are parallel
-    if (Math.abs(determinant) < 1e-6) {
-        return false;
+    // Handle the individual points first
+    for (let i = 0; i < path.length; i++) {
+        const x = path[i][POINT.X];
+        const y = path[i][POINT.Y];
+        
+        // Calculate grid cell and add to locations
+        const x_bar = Math.floor(x / delta);
+        const y_bar = Math.floor(y / delta);
+        
+        // Add current cell and neighbors to account for the epsilon radius
+        addGridCell(locations, x_bar, y_bar, eps, delta);
     }
     
-    // Calculate the parameters of intersection
-    const s = ((x3 - x1) * dy2 - (y3 - y1) * dx2) / determinant;
-    const t = ((x3 - x1) * dy1 - (y3 - y1) * dx1) / determinant;
-    
-    // Check if intersection occurs within both line segments
-    return (s >= 0 && s <= 1 && t >= 0 && t <= 1);
-}
-
-// Calculate the minimum distance between two line segments
-function minimumDistanceBetweenLineSegments(line1, line2) {
-    // Check distance from endpoints of line1 to line2
-    const d1 = pointToLineDistance(line1.x1, line1.y1, line2.x1, line2.y1, line2.x2, line2.y2);
-    const d2 = pointToLineDistance(line1.x2, line1.y2, line2.x1, line2.y1, line2.x2, line2.y2);
-    
-    // Check distance from endpoints of line2 to line1
-    const d3 = pointToLineDistance(line2.x1, line2.y1, line1.x1, line1.y1, line1.x2, line1.y2);
-    const d4 = pointToLineDistance(line2.x2, line2.y2, line1.x1, line1.y1, line1.x2, line1.y2);
-    
-    // Return minimum of all distances
-    return Math.min(d1, d2, d3, d4);
-}
-
-// Calculate distance from point (x0,y0) to line segment (x1,y1)-(x2,y2)
-function pointToLineDistance(x0, y0, x1, y1, x2, y2) {
-    // Calculate length of line segment
-    const lineLengthSquared = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
-    
-    // If line segment is just a point, return distance to that point
-    if (lineLengthSquared < 1e-6) {
-        return Math.sqrt((x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1));
-    }
-    
-    // Calculate projection of point onto line
-    const t = Math.max(0, Math.min(1, ((x0 - x1) * (x2 - x1) + (y0 - y1) * (y2 - y1)) / lineLengthSquared));
-    
-    // Calculate closest point on line segment
-    const projX = x1 + t * (x2 - x1);
-    const projY = y1 + t * (y2 - y1);
-    
-    // Return distance to closest point
-    return Math.sqrt((x0 - projX) * (x0 - projX) + (y0 - projY) * (y0 - projY));
-}
-
-
-// Helper to calculate a simple bounding box
-function calculateBoundingBox(element) {
-    if (!element.points || element.points.length === 0) {
-        return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-    }
-    
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    
-    for (const point of element.points) {
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
-    }
-    
-    // Add width to the bounding box
-    const maxWidth = getMaxWidth(element.points);
-    
-    return {
-        minX: minX - maxWidth/2,
-        minY: minY - maxWidth/2,
-        maxX: maxX + maxWidth/2,
-        maxY: maxY + maxWidth/2
-    };
-}
-
-// Helper to check if two bounding boxes intersect
-function doBoundingBoxesIntersect(bbox1, bbox2) {
-    return !(
-        bbox1.maxX < bbox2.minX ||
-            bbox1.minX > bbox2.maxX ||
-            bbox1.maxY < bbox2.minY ||
-            bbox1.minY > bbox2.maxY
-    );
-}
-
-// Helper to get maximum width in a stroke
-function getMaxWidth(points) {
-    if (!points || points.length === 0) {
-        return 0;
-    }
-    
-    let maxWidth = 0;
-    for (const point of points) {
-        if (typeof point.width === 'number') {
-            maxWidth = Math.max(maxWidth, point.width);
+    // Now handle the line segments between points
+    for (let i = 0; i < path.length - 1; i++) {
+        const p1 = path[i];
+        const p2 = path[i + 1];
+        
+        // Calculate the squared distance between points
+        const segmentLengthSquared = distSquare(p1, p2);
+        
+        // If points are far enough apart, we need to interpolate
+        if (segmentLengthSquared > delta * delta) {
+            // Calculate number of interpolation steps based on segment length
+            const steps = Math.ceil(Math.sqrt(segmentLengthSquared) / (delta * 0.5));
+            
+            for (let step = 1; step < steps; step++) {
+                // Interpolate a point along the segment
+                const t = step / steps;
+                const interpolatedPoint = interpolate(p1, p2, t);
+                
+                // Add the grid cell for this interpolated point
+                const x_bar = Math.floor(interpolatedPoint[0] / delta);
+                const y_bar = Math.floor(interpolatedPoint[1] / delta);
+                
+                addGridCell(locations, x_bar, y_bar, eps, delta);
+            }
         }
     }
-    
-    return maxWidth || 1; // Default to 1 if no width found
+    return locations;
+}
+
+function pathsIntersect (path1, path2, eps, delta ) {
+    const trace1 = tracePath(path1, eps, delta);
+    const trace2 = tracePath(path2, eps, delta);
+    return !trace1.isDisjointFrom(trace2);
 }
 
 // Helper to find elements that intersect with a given element
-function findIntersectingElements(visualState, testElement) {
-    return visualState
-        .filter(entry => isVisible(entry))
-        .filter(entry => doElementsIntersect(getElement(entry), testElement))
-        .map(entry => getCreatorId(entry));
+function findIntersectingElements ( visualState, needle, eps, delta ) {
+    let result = [];
+    const true_needle = applyTransformToPath(needle[ELEMENT.TRANSFORM], needle[ELEMENT.POINTS]);
+    
+    for (const hay of visualState.element) {
+        const true_hay = applyTransformToPath(hay[ELEMENT.TRANSFORM], hay[ELEMENT.POINTS]);
+        if (visualState.visible.has(hay) && 
+            pathsIntersect(true_hay, true_needle, eps, delta)) {
+            result.push(hay);
+        }
+    }
+    return result;
 }
-
 
 // Export for Node.js (server)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        generateUuid,
-        calculateHash,
-        calculateChainHash,
-        hashAny,
-        hashNext,
-        isEqual,
-        isNotEqual,
-        POINT,
-        STROKE,
-        PEN_TYPES,
-        CAP_STYLES,
-        JOIN_STYLES,
-        PEN_TYPE_STRINGS,
-        CAP_STYLE_STRINGS, 
-        JOIN_STYLE_STRINGS,
-        STROKE_STYLES,
-        createStroke,
-        addPointToStroke,
-        convertPointToCompact,
-        convertStrokeToCompact,
-        getPenTypeValue,
-        getCapStyleValue,
-        getJoinStyleValue,
-        getPenTypeString,
-        getCapStyleString,
-        getJoinStyleString,
-        MESSAGES,
-        MOD_ACTIONS,
-        isUndoAction,
-        isRedoAction,
-        getUndoTarget,
-        getRedoTarget,
-        isActionUndone,
-        findUndoActionFor,
-        // visual state and compiler
-        VISUAL_STATE,
-        TRANSFORM,
-        createIdentityTransform,
-        applyTransform,
-        createStrokeElement,
-        createVisualStateEntry,
-        getElement,
-        isVisible,
-        getCreatorId,
-        createEmptyVisualState,
-        applyModAction,
-        compileVisualState,
-        getRenderableElements,
-        doElementsIntersect,
-        calculateBoundingBox,
-        doBoundingBoxesIntersect,
-        getMaxWidth,
-        findIntersectingElements
+// whatever is needed
     };
 }
 // Export for browsers (client)
 else if (typeof window !== 'undefined') {
     window.shared = {
-        generateUuid,
-        calculateHash,
-        calculateChainHash,
-        hashAny,
-        hashNext,
-        isEqual,
-        isNotEqual,
-        POINT,
-        STROKE,
-        PEN_TYPES,
-        CAP_STYLES,
-        JOIN_STYLES,
-        PEN_TYPE_STRINGS,
-        CAP_STYLE_STRINGS,
-        JOIN_STYLE_STRINGS,
-        STROKE_STYLES,
-        createStroke,
-        addPointToStroke,
-        convertPointToCompact,
-        convertStrokeToCompact,
-        getPenTypeValue,
-        getCapStyleValue,
-        getJoinStyleValue,
-        getPenTypeString,
-        getCapStyleString,
-        getJoinStyleString,
-        MESSAGES,
-        MOD_ACTIONS,
-        isUndoAction,
-        isRedoAction,
-        getUndoTarget,
-        getRedoTarget,
-        isActionUndone,
-        findUndoActionFor,
-        // visual state and compiler
-        VISUAL_STATE,
-        TRANSFORM,
-        createIdentityTransform,
-        applyTransform,
-        createStrokeElement,
-        createVisualStateEntry,
-        getElement,
-        isVisible,
-        getCreatorId,
-        createEmptyVisualState,
-        applyModAction,
-        compileVisualState,
-        getRenderableElements,
-        doElementsIntersect,
-        calculateBoundingBox,
-        doBoundingBoxesIntersect,
-        getMaxWidth,
-        findIntersectingElements,
+// whatever is needed
     };
 }

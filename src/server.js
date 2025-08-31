@@ -171,13 +171,17 @@ const boardCacheMax = 10;
 const evictableBoards = new Set();
 
 function useBoard( boardId ) {
-    if ( ! boardCache.has( boardId ) ) {
-        boardCache.set( boardId, loadOrCreateBoard( boardId ) );
-    }
     if ( evictableBoards.has( boardId ) ) {
         evictableBoards.delete( boardId );
     }
-    return boardCache.get( boardId );
+    if ( boardCache.has( boardId ) {
+        return boardCache.get( boardId );
+    }
+    board = loadBoard( boardId );
+    if ( board ) {
+        boardCache.set( boardId, board );
+    }
+    return board;
 }
 
 function persistBoard( boardId ) {
@@ -389,38 +393,37 @@ const messageHandlers = {};
 
 function registerBoard ( ws, boardId, requestId ) {
     const board = useBoard( boardId );
-    ws.boardId = boardId; // Store boardId in WebSocket client
-    ws.clientId = clientId; // Store client ID for tracking
-    ws.pageId = board.pageOrder[0]; // Default to first page
-    
-    if (clientId) {
-        clients[clientId] = ws;
+    if ( board ) {
+        ws.boardId = boardId; // Store boardId in WebSocket client
+        ws.clientId = clientId; // Store client ID for tracking
+        ws.pageId = board.pageOrder[0]; // Default to first page
+        
+        if (clientId) {
+            clients[clientId] = ws;
+        }
+        
+        console.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
+        
+        const registrationResponse = {
+            type: MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE_ID]: ws.pageId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
+        };
+        ws.send( serialize( registrationResponse ) );
+        releaseBoard( boardId );
+        sendFullPage( ws, boardId, ws.pageId, requestId );
     }
-    
-    console.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
-    
-    const registrationResponse = {
-        type: MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
-        [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID]: boardId,
-        [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE_ID]: ws.pageId,
-        [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
-        [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
-    };
-    ws.send( serialize( registrationResponse ) );
-    releaseBoard( boardId );
-    sendFullPage( ws, boardId, ws.pageId, requestId );
 }
 
 // Handler for board registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
     let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID];
-    
-    // If no board ID provided, generate one
-    if (!boardId) {
-        boardId = generateUuid();
+    if ( boardId ) {
+        registerBoard( ws, boardId, reqestId );
     }
-    registerBoard( ws, boardId, reqestId );
 };
 
 // Handler for board creation
