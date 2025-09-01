@@ -278,9 +278,6 @@
     // settings
     const force_stylus = true;
     
-    // Pending requests tracking
-    let pendingRequests = {};  // Track in-flight requests
-    
     // Initialize 
     function init() {
       setupCanvas();
@@ -321,11 +318,8 @@
       errorBanner.style.display = 'none';
     }
     
-    // Generate a unique request ID and register it
     function createRequestId() {
-      const requestId = shared.generateUuid();
-      pendingRequests[requestId] = true;
-      return requestId;
+      return shared.generateUuid();
     }
     
     // Show synchronization status
