@@ -471,9 +471,7 @@
       connectionEstablished = true;
       hideError();
       
-      // Remove the request from pending
       const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID];
-      delete pendingRequests[requestId];
       
       // Reset local state
       history = [];
