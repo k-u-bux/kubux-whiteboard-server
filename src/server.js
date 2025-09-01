@@ -494,11 +494,9 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
         }
         
         const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
-        const newIndex = index + delta;
-        if (newIndex < 0 || newIndex >= board.pageOrder.length) {
-            throw new Error(`Invalid page navigation delta: ${delta}, current index: ${index}`);
-        }
-        
+        let newIndex = index + delta;
+        if ( newIndex < 0 ) { newIndex = 0; }
+        if ( newIndex >= board.pageOrder.length ) { newIndex = board.pageOrder.length - 1; }
         pageId = board.pageOrder[newIndex];
     }
     

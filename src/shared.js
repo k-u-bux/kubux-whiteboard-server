@@ -320,7 +320,7 @@ function createIdentityTransform () {
 }
 
 // Apply transform to a point
-function applyTransform ( transform, x, y ) {
+function applyTransformToPoint ( transform, x, y ) {
     return {
         x: transform[TRANSFORM.A] * x + transform[TRANSFORM.C] * y + transform[TRANSFORM.E],
         y: transform[TRANSFORM.B] * x + transform[TRANSFORM.D] * y + transform[TRANSFORM.F]
@@ -328,12 +328,12 @@ function applyTransform ( transform, x, y ) {
 }
 
 function compose ( t1, t2 ) {
-    const { x: a, y: b } = applyTransform( t2, 0, 0 );
-    const { x: c, y: d } = applyTransform( t2, 1, 0 );
-    const { x: e, y: f } = applyTransform( t2, 0, 1 );
-    const { x: A, y: B } = applyTransform( t1, a, b );
-    const { x: C, y: D } = applyTransform( t1, c, d );
-    const { x: E, y: F } = applyTransform( t1, e, f );
+    const { x: a, y: b } = applyTransformToPoint( t2, 0, 0 );
+    const { x: c, y: d } = applyTransformToPoint( t2, 1, 0 );
+    const { x: e, y: f } = applyTransformToPoint( t2, 0, 1 );
+    const { x: A, y: B } = applyTransformToPoint( t1, a, b );
+    const { x: C, y: D } = applyTransformToPoint( t1, c, d );
+    const { x: E, y: F } = applyTransformToPoint( t1, e, f );
     return [
         C - A,
         D - B,
@@ -396,7 +396,7 @@ function addPointToStroke ( stroke, point ) {
 function applyTransformToPath( transform, path ) {
     let result = [];
     for (const point of path) {
-        let xy = applyTransform( transform, point[ POINT.X ], point[ POINT.Y ] );
+        let xy = applyTransformToPoint( transform, point[ POINT.X ], point[ POINT.Y ] );
         result.push( [ xy.x, xy.y, point[ POINT.PRESSURE ], point[ POINT.TIMESTAMP ] ] );
     }
     return result;

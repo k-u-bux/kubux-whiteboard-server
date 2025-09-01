@@ -179,6 +179,9 @@
       <div class="color-swatch" style="background-color: green;" data-color="#00ff00"></div>
       <div class="color-swatch" style="background-color: blue;" data-color="#0000ff"></div>
       <div class="color-swatch" style="background-color: yellow;" data-color="#ffff00"></div>
+      <div class="color-swatch" style="background-color: cyan;" data-color="#00ffff"></div>
+      <div class="color-swatch" style="background-color: magenta;" data-color="#ff00ff"></div>
+      <div class="color-swatch" style="background-color: white;" data-color="#ffffff"></div>
     </div>
     
     <!-- Width Section -->
@@ -510,7 +513,8 @@
         serverPageHash: pingPageHash, 
         serverPageNr: pingPageNr, 
         serverTotalPages: pingTotalPages,
-        currentPageUuid: currentPageUuid
+        currentPageUuid: currentPageUuid,
+        verifiedHash: hashes[ verifiedIndex ]
       });
       
       // Check if we're on the wrong page
@@ -529,13 +533,7 @@
       
       // Check if our hash is out of sync with server
       // Look for matching hash in our hash chain
-      let matchingIndex = -1;
-      for (let i = 0; i < hashes.length; i++) {
-        if (hashes[i] === pingPageHash) {
-          matchingIndex = i;
-          break;
-        }
-      }
+      let matchingIndex = hashes.indexOf( pingPageHash );
       
       if (matchingIndex === -1) {
         // Server hash not found in our hash chain
@@ -623,17 +621,77 @@
       requestReplay();
     }
     
-    // Handle replay message from server
+// Handle replay message from server
     function handleReplayMessage(data) {
+      const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.UUID];
+      const beforeHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.BEFORE_HASH];
+      const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH];
       const replaySequence = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE];
-      const replayHashes = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.HASHES];
       const serverPresent = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PRESENT];
+      const currentHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.CURRENT_HASH];
       
-      // Reset to server state
-      history = replaySequence || [];
-      hashes = replayHashes || [];
+      // Find index where replay should start (matching beforeHash)
+      let startIndex = -1;
+      for (let i = 0; i < hashes.length; i++) {
+        if (hashes[i] === beforeHash) {
+          startIndex = i;
+          break;
+        }
+      }
+      
+      if (startIndex === -1) {
+        // Cannot find matching hash - need full page refresh
+        debugLog("Replay hash not found in our chain, requesting full page", {
+          beforeHash,
+          ourHashes: hashes
+        });
+        requestFullPage(pageUuid);
+        return;
+      }
+      
+      // Apply replay edits to the history
+      if (replaySequence && replaySequence.length > 0) {
+        // Remove any conflicting history after the replay point
+        history = history.slice(0, startIndex);
+        hashes = hashes.slice(0, startIndex + 1);
+        
+        // Add the replayed actions to history
+        for (let i = 0; i < replaySequence.length; i++) {
+          const action = replaySequence[i];
+          history.push(action);
+          
+          // Calculate new hash for each action
+          const lastHash = hashes[hashes.length - 1];
+          const newHash = shared.hashNext(lastHash, action);
+          hashes.push(newHash);
+        }
+        
+        // Verify final hash matches afterHash
+        const finalHash = hashes[hashes.length - 1];
+        if (finalHash !== afterHash) {
+          debugLog("Hash mismatch after replay", {
+            calculatedHash: finalHash,
+            expectedHash: afterHash
+          });
+          requestFullPage(pageUuid);
+          return;
+        }
+      }
+      
+      // Update present position
       present = serverPresent;
-      verifiedIndex = present; // All actions are verified after a replay
+      
+      // Update verified index to match present after replay
+      verifiedIndex = present;
+      
+      if (hashes[present] !== currentHash) {
+        debugLog("Current hash mismatch after replay", {
+          ourHash: hashes[present],
+          serverHash: currentHash
+        });
+        requestFullPage(pageUuid);
+        return;
+      }
       
       // Recompile visual state
       updateVisualState();
@@ -646,19 +704,24 @@
       // Update UI
       updateSyncStatus();
       updateUndoRedoButtons();
+      
+      debugLog("Replay applied successfully", {
+        historyLength: history.length,
+        present: present,
+        verifiedIndex: verifiedIndex
+      });
     }
-    
+        
     // Handle full page message from server
     function handleFullPageMessage(data) {
       currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID];
-      history = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY] || [];
+      history = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
       present = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
-      hashes = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASHES] || [];
-      
-      // Ensure hashes array has at least one element (initial state)
-      if (hashes.length === 0 && currentPageUuid) {
-        hashes.push(shared.hashString(currentPageUuid));
+      hashes = [ hashAny( currentPageUuid ) ];
+      for ( let i = 0; i < history.length; ++ i ) {
+          hashes.push( shared.hashNext( hashes[ i ], history[ i ] ) );
       }
+      debugLog( "hashes = ", `${hashes}`);
       
       // Set verified index to present
       verifiedIndex = present;
@@ -1008,7 +1071,7 @@
         currentStroke = shared.createStroke();
         currentStroke[shared.ELEMENT.WIDTH] = eraserRadius * 2;
         currentStroke[shared.ELEMENT.COLOR] = '#FF0000'; // Red for visibility during erasing
-        currentStroke[shared.ELEMENT.OPACITY] = 0.3; // Transparent so we can see what's being erased
+        currentStroke[shared.ELEMENT.OPACITY] = 0.3; // Transparent so we can see what is being erased
         currentStroke[shared.ELEMENT.POINTS] = currentPath;
       } else {
         isDrawing = true;
