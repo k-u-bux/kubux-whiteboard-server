@@ -1054,6 +1054,7 @@
     
     // Handle pointer down event
     function handlePointerDown(event) {
+      if ( event.pointerType === "touch" ) { return; }
       const rect = canvas.getBoundingClientRect();
       const x = (event.clientX - rect.left) / zoomLevel;
       const y = (event.clientY - rect.top) / zoomLevel;
@@ -1090,6 +1091,7 @@
     
     // Handle pointer move event
     function handlePointerMove(event) {
+      if ( event.pointerType === "touch" ) { return; }
       if (!isDrawing && !isErasing) return;
       
       const rect = canvas.getBoundingClientRect();
@@ -1110,6 +1112,7 @@
     
     // Handle pointer up event
     function handlePointerUp() {
+      if ( event.pointerType === "touch" ) { return; }
       if (isErasing) {
         isErasing = false;
         
