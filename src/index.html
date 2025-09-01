@@ -1319,10 +1319,19 @@
         if (!element) return;
         
         const points = element[shared.ELEMENT.POINTS];
-        if (!Array.isArray(points) || points.length < 2) return;
-        
+
         ctx.save();
-        
+
+        const transform = element[shared.ELEMENT.TRANSFORM];
+        ctx.transform(
+          transform[shared.TRANSFORM.A],
+          transform[shared.TRANSFORM.B],
+          transform[shared.TRANSFORM.C],
+          transform[shared.TRANSFORM.D],
+          transform[shared.TRANSFORM.E],
+          transform[shared.TRANSFORM.F]
+        );
+
         // Apply style
         ctx.strokeStyle = element[shared.ELEMENT.COLOR];
         ctx.lineWidth = element[shared.ELEMENT.WIDTH];

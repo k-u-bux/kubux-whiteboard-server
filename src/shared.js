@@ -742,6 +742,7 @@ else if (typeof window !== 'undefined') {
         createStroke,
         createPoint,
         addPointToStroke,
+        applyTransformToPoint,
         applyTransformToPath,
         // visual state
         createEmptyVisualState,
