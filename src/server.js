@@ -338,8 +338,8 @@ const wss = new WebSocket.Server({
 const PORT = 8080;
 
 httpsServer.listen(PORT, () => {
-    console.log('[SERVER] HTTPS server is running on port ${8080}');
-    console.log(`WebSocket-Server läuft auf wss://localhost:${PORT}/ws`);
+    console.log('[SERVER] HTTPS server is running on port ${PORT}');
+    console.log(`WebSocket-Server is running on wss://localhost:${PORT}/ws`);
 });
 
 

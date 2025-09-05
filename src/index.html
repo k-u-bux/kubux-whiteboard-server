@@ -1313,15 +1313,8 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
-      
-      // Custom render function for shared.render_all_visible_elements
-      function renderElement(element) {
-        if (!element) return;
-        
-        const points = element[shared.ELEMENT.POINTS];
 
-        ctx.save();
-
+      function push_settings(element) {
         const transform = element[shared.ELEMENT.TRANSFORM];
         ctx.transform(
           transform[shared.TRANSFORM.A],
@@ -1348,25 +1341,70 @@
         } else {
           ctx.setLineDash([]);
         }
-        
-        // Draw the stroke
+      }
+
+      function lay_path(element) {
+        const points = element[shared.ELEMENT.POINTS];
+        ctx.beginPath();
+        ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
+        for (let i = 1; i < points.length; i++) {
+          const point = points[i];
+          ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
+        }
+      }
+
+      function draw_open(element) {
+        const points = element[shared.ELEMENT.POINTS];
         ctx.beginPath();
         ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
         
         for (let i = 1; i < points.length; i++) {
-          const point = points[i];
-          const pressure = point[shared.POINT.PRESSURE];
-          
-          // Apply pressure sensitivity
-          if (element[shared.ELEMENT.SENSITIVITY] > 0 && pressure !== undefined) {
-            const pressureEffect = 1 + (pressure - 0.5) * element[shared.ELEMENT.SENSITIVITY];
+            ctx.beginPath();
+            ctx.moveTo(points[i-1][shared.POINT.X], points[i-1][shared.POINT.Y]);
+            const point = points[i];
+            const pressure = point[shared.POINT.PRESSURE];
+            const pressureEffect = ( 1 + pressure * element[shared.ELEMENT.SENSITIVITY] );
             ctx.lineWidth = element[shared.ELEMENT.WIDTH] * pressureEffect;
-          }
-          
-          ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
+            ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
+            ctx.stroke();
         }
-        
-        ctx.stroke();
+      }
+
+      function draw_closed(element) {
+          lay_path(element);
+          ctx.lineWidth = element[shared.ELEMENT.WIDTH];
+          ctx.stroke();
+      }
+
+     
+      // Custom render function for shared.render_all_visible_elements
+      function renderElement(element) {
+        if (!element) return;
+        ctx.save();
+        push_settings(element);
+        const type = element[ELEMENT.TYPE];
+        const path = element[ELEMENT.PATH];
+        const is_closed = ( path == DRAWABLE.CLOSED_PIECEWISE_LINEAR || path == DRAWABLE.CLOSED_BEZIER_CURVE );
+        lay_path(element);
+        if ( type == DRAWABLE.TYPE.FILL ) {
+            if ( ! is_closed ) {
+                console.error('Only closed paths can be filled.',"");
+                throw new Error('Only closed paths can be filled.');
+            }
+            lay_path(element);
+            ctx.closePath();
+            ctx.fill()
+        } else if ( type == DRAWABLE.TYPE.STROKE ) {
+            if ( is_closed ) {
+                draw_closed(element);
+            } else {
+                draw_open(element);
+            }
+        } else {
+          // If we get here, it's a bug - assertion would fail in production code
+          console.error('Unknown drawable type:', type);
+          throw new Error('Invalid drawable type');
+        }
         ctx.restore();
       }
       
