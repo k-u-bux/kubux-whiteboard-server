@@ -86,7 +86,7 @@
           -webkit-appearance: none;
           appearance: none;
           border-radius: 50%; /* Makes it a circle */
-          background: black;
+          background: var(--thumb-color, black);;
           cursor: pointer;
           /* Use the CSS variable to control the size */
           width: calc(var(--thumb-size, 2) * 2px); /* Default to 2px */
@@ -97,7 +97,7 @@
       input[type="range"]::-moz-range-thumb {
           border: none;
           border-radius: 50%;
-          background: black;
+          background: var(--thumb-color, black);
           cursor: pointer;
           width: calc(var(--thumb-size, 2) * 2px);
           height: calc(var(--thumb-size, 2) * 2px);
@@ -124,7 +124,8 @@
           border-radius: 50%;
           cursor: pointer;
           /* Control the transparency of the thumb using a CSS custom property */
-          background: rgba(0, 0, 0, var(--thumb-opacity, 1));
+          background: var(--thumb-color);
+          opacity: var(--thumb-opacity, 1));
       }
       
       #opacity-selector::-moz-range-thumb {
@@ -133,7 +134,8 @@
           height: 24px;
           border-radius: 50%;
           cursor: pointer;
-          background: rgba(0, 0, 0, var(--thumb-opacity, 1));
+          background: var(--thumb-color);
+          filter: opacity( var(--thumb-opacity, 1));
       }
       
       #debug-tools {
@@ -323,11 +325,13 @@
       // Debug logging function
       function debugLog(msg, data) {
           console.log(`[DEBUG] ${msg}`, data || '');
-      }
+      };
       
       // settings
       let eraser_settings = {
           tool: "eraser",
+          opacity: 0.3,
+          color: "#ff0000",
           width: 2
       };
       let pen_settings = {
@@ -361,12 +365,18 @@
           currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
       };
 
-      function switch_settings ( the_settings ) {
-          draw_settings = the_settings;
+      function updateKnobs () {
           widthSelector.style.setProperty('--thumb-size', draw_settings.width);
+          widthSelector.style.setProperty('--thumb-color', draw_settings.color);
           widthSelector.value = draw_settings.width;
           opacitySelector.style.setProperty('--thumb-opacity', draw_settings.opacity);
+          opacitySelector.style.setProperty('--thumb-color', draw_settings.color);
           opacitySelector.value = draw_settings.opacity * 128;
+      }
+
+      function switch_settings ( the_settings ) {
+          draw_settings = the_settings;
+          updateKnobs();
       };
 
       // Globals for board state
@@ -1025,6 +1035,7 @@
                   colorSwatches.forEach(s => s.classList.remove('active'));
                   swatch.classList.add('active');
                   draw_settings.color = swatch.dataset.color;
+                  updateKnobs();
               });
           });
           
