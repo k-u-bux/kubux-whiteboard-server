@@ -57,6 +57,14 @@
 
             src = ./.;
 
+            nativeBuildInputs = [
+              pkgs.code-cursor-fhs
+              pkgs.nodejs
+              pkgs.nodePackages.ts-node
+              pkgs.typescript
+              pkgs.jq
+            ];
+
             buildPhase = ''
               npm install
               npm run build
@@ -69,7 +77,7 @@
 
             meta = with pkgs.lib; {
               description = "WhiteboardServer";
-              license = licenses.asl2;
+              license = licenses.asl20;
               platforms = platforms.all;
             };
           };
