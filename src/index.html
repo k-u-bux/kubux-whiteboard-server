@@ -150,7 +150,7 @@
       
       canvas {
           position: absolute;
-          background-color: white;
+          background-color: #113311;
           box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
       }
       
@@ -272,6 +272,7 @@
       
       <!-- Tools Section -->
       <div class="tool-section">
+        <button class="tool-btn" id="chalk-tool" title="Chalk"><span style="filter: grayscale(100%) invert(100%);">🖍️</span></button>
         <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
         <button class="tool-btn" id="highlighter-tool" title="Highlighter">🖌️</button>
         <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
@@ -279,14 +280,14 @@
       
       <!-- Colors Section -->
       <div class="tool-section">
-        <div class="color-swatch active" style="background-color: black;" data-color="#000000"></div>
-        <div class="color-swatch" style="background-color: red;" data-color="red"></div>
-        <div class="color-swatch" style="background-color: green;" data-color="green"></div>
-        <div class="color-swatch" style="background-color: blue;" data-color="blue"></div>
-        <div class="color-swatch" style="background-color: yellow;" data-color="yellow"></div>
-        <div class="color-swatch" style="background-color: cyan;" data-color="cyan"></div>
-        <div class="color-swatch" style="background-color: magenta;" data-color="magenta"></div>
-        <div class="color-swatch" style="background-color: white;" data-color="white"></div>
+        <div class="color-swatch" style="background-color: #ffffff;" data-color="#ffffff"></div>
+        <div class="color-swatch" style="background-color: #ff0000;" data-color="#ff0000"></div>
+        <div class="color-swatch" style="background-color: #00ff00;" data-color="#00ff00"></div>
+        <div class="color-swatch" style="background-color: #0000ff;" data-color="#0000ff"></div>
+        <div class="color-swatch" style="background-color: #ff00ff;" data-color="#ff00ff"></div>
+        <div class="color-swatch" style="background-color: #ffff00;" data-color="#ffff00"></div>
+        <div class="color-swatch" style="background-color: #00ffff;" data-color="#00ffff"></div>
+        <div class="color-swatch" style="background-color: #000000;" data-color="#000000"></div>
       </div>
       
       <!-- Width Section -->
@@ -332,6 +333,7 @@
           tool: "eraser",
           opacity: 0.3,
           color: "#ff0000",
+          undo: false,
           width: 2
       };
       let pen_settings = {
@@ -339,6 +341,7 @@
           opacity: 1.0,
           width: 2,
           color: "#000000",
+          undo: false,
           stroke: shared.createStroke( STROKE_STYLES.PEN )
       };
       let chalk_settings = {
@@ -346,6 +349,7 @@
           opacity: 1.0,
           width: 3,
           color: "#000000",
+          undo: false,
           stroke: shared.createStroke( STROKE_STYLES.CHALK )
       };
       let highlighter_settings = {
@@ -353,6 +357,7 @@
           opacity: 0.2,
           width: 24,
           color: "yellow",
+          undo: true,
           stroke: shared.createStroke( STROKE_STYLES.HIGHLIGHTER )
       };
 
@@ -371,7 +376,12 @@
           widthSelector.value = draw_settings.width;
           opacitySelector.style.setProperty('--thumb-opacity', draw_settings.opacity);
           opacitySelector.style.setProperty('--thumb-color', draw_settings.color);
-          opacitySelector.value = draw_settings.opacity * 128;
+          opacitySelector.value =  draw_settings.opacity * 128;
+          if ( draw_settings.undo ) {
+              document.getElementById('timer-btn').classList.add('active');
+          } else {
+              document.getElementById('timer-btn').classList.remove('active');
+          }
       }
 
       function switch_settings ( the_settings ) {
@@ -1024,6 +1034,7 @@
           reconnectButton.addEventListener('click', reconnectWebSocket);
           
           // Tool selection
+          document.getElementById('chalk-tool').addEventListener('click', () => setTool('chalk'));
           document.getElementById('pen-tool').addEventListener('click', () => setTool('pen'));
           document.getElementById('highlighter-tool').addEventListener('click', () => setTool('highlighter'));
           document.getElementById('eraser-tool').addEventListener('click', () => setTool('eraser'));
@@ -1033,7 +1044,7 @@
           colorSwatches.forEach(swatch => {
               swatch.addEventListener('click', () => {
                   colorSwatches.forEach(s => s.classList.remove('active'));
-                  swatch.classList.add('active');
+                  // swatch.classList.add('active');
                   draw_settings.color = swatch.dataset.color;
                   updateKnobs();
               });
@@ -1041,6 +1052,11 @@
           
           widthSelector.addEventListener('input', selectWidth);
           opacitySelector.addEventListener('input', selectOpacity);
+
+          document.getElementById('timer-btn').addEventListener('click', () => {
+              draw_settings.undo = ( draw_settings.tool != "eraser" ) && ! draw_settings.undo;
+              updateKnobs();
+          });
           
           // Page navigation
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
@@ -1193,9 +1209,14 @@
           
           // Update cursor
           switch (tool) {
-          case 'pen':
+          case 'chalk':
               canvas.style.cursor = 'crosshair';
               switch_settings( chalk_settings );
+              set_pointer_handler( draw_path_pointer_handler );
+              break;
+          case 'pen':
+              canvas.style.cursor = 'crosshair';
+              switch_settings( pen_settings );
               set_pointer_handler( draw_path_pointer_handler );
               break;
           case 'highlighter':
@@ -1262,7 +1283,10 @@
               if (isDrawing) {
                   isDrawing = false;
                   if (currentPath.length >= 1) {
-                      sendDrawAction(currentStroke);
+                      const actionId = sendDrawAction(currentStroke);
+                      if ( draw_settings.undo ) {
+                          setTimeout( sendGroupEraseAction, 3000, [ actionId ] );
+                      }
                   }
               }
               currentPath = [];
@@ -1397,6 +1421,7 @@
           
           // Send to server
           sendMessage(proposal);
+          return actionUuid;
       }
       
       // Create a single erase action for a target
