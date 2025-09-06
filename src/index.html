@@ -21,11 +21,17 @@
       
       .tool-section {
           display: flex;
+          align-items: center;
           margin-right: 10px;
           padding-right: 10px;
           border-right: 1px solid #ddd;
       }
       
+      .slider-tool-section {
+          width: 15em; /* Applies only to elements with this class */
+          box-sizing: border-box;
+      }
+
       .tool-btn {
           width: 30px;
           height: 30px;
@@ -64,6 +70,72 @@
           border-width: 2px;
       }
       
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 8px;
+        background: #d3d3d3;
+        outline: none;
+        opacity: 0.7;
+        -webkit-transition: .2s;
+        transition: opacity .2s;
+      }
+      
+      /* Base style for the slider thumb */
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        border-radius: 50%; /* Makes it a circle */
+        background: black;
+        cursor: pointer;
+        /* Use the CSS variable to control the size */
+        width: calc(var(--thumb-size, 2) * 2px); /* Default to 2px */
+        height: calc(var(--thumb-size, 2) * 2px);
+      }
+      
+      /* Firefox-specific styling for the slider thumb */
+      input[type="range"]::-moz-range-thumb {
+        border: none;
+        border-radius: 50%;
+        background: black;
+        cursor: pointer;
+        width: calc(var(--thumb-size, 2) * 2px);
+        height: calc(var(--thumb-size, 2) * 2px);
+      }
+      
+      /* Style the opacity slider's track (the rail) */
+      #opacity-selector {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 8px;
+        background: #fff; /* White rail for contrast */
+        outline: none;
+        opacity: 0.7;
+        -webkit-transition: .2s;
+        transition: opacity .2s;
+      }
+      
+      /* Style the opacity slider's thumb (the knob) */
+      #opacity-selector::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 24px; /* Fixed size */
+        height: 24x;
+        border-radius: 50%;
+        cursor: pointer;
+        /* Control the transparency of the thumb using a CSS custom property */
+        background: rgba(0, 0, 0, var(--thumb-opacity, 1));
+      }
+      
+      #opacity-selector::-moz-range-thumb {
+        border: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        cursor: pointer;
+        background: rgba(0, 0, 0, var(--thumb-opacity, 1));
+      }
+      
       #debug-tools {
           margin-left: auto;
       }
@@ -84,12 +156,18 @@
           display: flex;
           height: calc(100vh - 42px);
       }
-      
+
+/*      
       #width-selector {
-          width: 100px;
+          width: 100%;
           margin: 0 10px;
       }
       
+      #opacity-selector {
+          width: 100%;
+          margin: 0 10px;
+      }
+*/    
       .page-controls {
           display: flex;
           align-items: center;
@@ -200,22 +278,32 @@
       <!-- Colors Section -->
       <div class="tool-section">
         <div class="color-swatch active" style="background-color: black;" data-color="#000000"></div>
-        <div class="color-swatch" style="background-color: red;" data-color="#ff0000"></div>
-        <div class="color-swatch" style="background-color: green;" data-color="#00ff00"></div>
-        <div class="color-swatch" style="background-color: blue;" data-color="#0000ff"></div>
-        <div class="color-swatch" style="background-color: yellow;" data-color="#ffff00"></div>
-        <div class="color-swatch" style="background-color: cyan;" data-color="#00ffff"></div>
-        <div class="color-swatch" style="background-color: magenta;" data-color="#ff00ff"></div>
-        <div class="color-swatch" style="background-color: white;" data-color="#ffffff"></div>
+        <div class="color-swatch" style="background-color: red;" data-color="red"></div>
+        <div class="color-swatch" style="background-color: green;" data-color="green"></div>
+        <div class="color-swatch" style="background-color: blue;" data-color="blue"></div>
+        <div class="color-swatch" style="background-color: yellow;" data-color="yellow"></div>
+        <div class="color-swatch" style="background-color: cyan;" data-color="cyan"></div>
+        <div class="color-swatch" style="background-color: magenta;" data-color="magenta"></div>
+        <div class="color-swatch" style="background-color: white;" data-color="white"></div>
       </div>
       
       <!-- Width Section -->
-      <div class="tool-section">
-        <label for="width-selector">Width:</label>
-        <input type="range" id="width-selector" min="1" max="10" value="2">
-        <span id="width-value">2</span>
+      <div class="tool-section slider-tool-section">
+        <!-- <label for="width-selector">Width:</label> -->
+        <input type="range" id="width-selector" min="1" max="20" value="2">
+        <!-- <span id="width-value">2</span> -->
+      </div>
+
+      <div class="tool-section slider-tool-section">
+        <!-- <label for="opacity-selector">Opacity:</label> -->
+        <input type="range" id="opacity-selector" min="0" max="100" value="100">
       </div>
       
+      <!-- Timer Toggle -->
+      <div class="tool-section" id="timer-toggle">
+        <button class="tool-btn" id="timer-btn" title="Timer">⏲</button>
+      </div>
+
       <!-- Debug Info -->
       <div class="tool-section" id="debug-tools">
         <button class="tool-btn" id="debug-btn" title="Debug">🐞</button>
@@ -269,13 +357,16 @@
       let eraserRadius = 20;
       let currentColor = '#000000';
       let currentWidth = 2;
+      let currentOpacity = 1.0;
       
       // DOM elements
       const canvas = document.getElementById('canvas');
       const ctx = canvas.getContext('2d');
       const container = document.getElementById('canvas-container');
       const widthSelector = document.getElementById('width-selector');
-      const widthValue = document.getElementById('width-value');
+      // const widthValue = document.getElementById('width-value');
+      const opacitySelector = document.getElementById('opacity-selector');
+      // const opacityValue = document.getElementById('opacity-value');
       const zoomLevelDisplay = document.getElementById('zoom-level');
       const pageInfo = document.getElementById('page-info');
       const errorBanner = document.getElementById('error-banner');
@@ -880,8 +971,17 @@
           
           // Width selection
           widthSelector.addEventListener('input', () => {
-              currentWidth = parseInt(widthSelector.value);
-              widthValue.textContent = currentWidth;
+              const penRadius = widthSelector.value;
+              currentWidth = parseInt(penRadius);
+              // widthValue.textContent = currentWidth;
+              // Update the CSS custom property on the input element
+              widthSelector.style.setProperty('--thumb-size', currentWidth);
+          });
+          
+          // Opacity selection
+          opacitySelector.addEventListener('input', () => {
+              currentOpacity = opacitySelector.value / 100;
+              opacitySelector.style.setProperty('--thumb-opacity', currentOpacity);
           });
           
           // Page navigation
@@ -1078,7 +1178,7 @@
               
               // Create a new eraser stroke for visual feedback
               currentStroke = shared.createStroke();
-              currentStroke[shared.ELEMENT.WIDTH] = eraserRadius * 2;
+              currentStroke[shared.ELEMENT.WIDTH] = currentWidth;
               currentStroke[shared.ELEMENT.COLOR] = '#FF0000'; // Red for visibility during erasing
               currentStroke[shared.ELEMENT.OPACITY] = 0.3; // Transparent so we can see what is being erased
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
@@ -1093,6 +1193,7 @@
               // Update stroke properties
               currentStroke[shared.ELEMENT.COLOR] = currentColor;
               currentStroke[shared.ELEMENT.WIDTH] = currentWidth;
+              currentStroke[shared.ELEMENT.OPACITY] = currentOpacity;
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
           }
       }
@@ -1131,6 +1232,8 @@
                   if (elementsToErase.length > 0) {
                       // Send group erase action
                       sendGroupEraseAction(elementsToErase);
+                  } else {
+                      updateVisualState();
                   }
               }
               
