@@ -1,5 +1,12 @@
 {
+  "name": "drawing-poc",
+  "version": "1.0.0",
   "dependencies": {
-    "node": "^24.6.0"
+    "ws": "^8.0.0",
+    "uuid": "^9.0.0",
+    "jspdf": "^2.5.1"
+  },
+  "scripts": {
+    "start": "node server.js"
   }
 }
