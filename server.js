@@ -275,7 +275,7 @@ const serverOptions = {
     cert: fs.readFileSync(getFilePath("server", "cert"))
 };
 
-console.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
+// console.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
 const httpsServer = https.createServer(serverOptions, (req, res) => {
     // always serve just index.html
