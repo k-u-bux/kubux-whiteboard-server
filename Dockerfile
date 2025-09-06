@@ -29,6 +29,8 @@ WORKDIR /app
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/server.js ./shared.js
+COPY --from=builder /app/server.js ./index.html
 
 # The 'start' script will execute the server.js file
 CMD ["npm", "start"]
