@@ -347,7 +347,7 @@ function compose ( t1, t2 ) {
 
 // Default stroke styles (using compact array format)
 const STROKE_STYLES = {
-    PEN: [
+    CHALK: [
         "stroke",             // type
         "opl",                // path
         [],                   // points
@@ -358,6 +358,21 @@ const STROKE_STYLES = {
         CAP_STYLES.ROUND,     // capStyle
         JOIN_STYLES.ROUND,    // joinStyle
         [0],                  // dashPattern
+        1.0,                  // pressureSensitivity
+        1,                    // layer
+        PEN_TYPES.MARKER      // penType
+    ],
+    PEN: [
+        "stroke",             // type
+        "opl",                // path
+        [],                   // points
+        "#000000",            // color
+        2.0,                  // width
+        createIdentityTransform(), // transform
+        1.0,                  // opacity
+        CAP_STYLES.ROUND,      // capStyle
+        JOIN_STYLES.BEVEL,    // joinStyle
+        [1],                  // dashPattern
         1.0,                  // pressureSensitivity
         1,                    // layer
         PEN_TYPES.MARKER      // penType
