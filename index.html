@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xournal++ Clone</title>
-    <style>
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Whiteboard%20App%22%2C%22short_name%22%3A%22Whiteboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520100%2520100%2522%253E%253Cpath%2520d%253D%2522M25%252075%2520L75%252025%2520M25%252025%2520L75%252075%2522%2520stroke%253D%2522black%2522%2520stroke-width%253D%252210%2522%2520%252F%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+      <style>
       body {
           margin: 0;
           padding: 0;
@@ -150,7 +151,8 @@
       
       canvas {
           position: absolute;
-          background-color: #113311;
+          /* background-color: #113311; */
+          background-color: white;          
           box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
       }
       
@@ -279,7 +281,19 @@
       </div>
       
       <!-- Colors Section -->
-      <div class="tool-section">
+      <div class="tool-section" id="color-selection">
+        <div class="color-swatch" style="background-color: black;" data-color="black"></div>
+        <div class="color-swatch" style="background-color: red;" data-color="red"></div>
+        <div class="color-swatch" style="background-color: green;" data-color="green"></div>
+        <div class="color-swatch" style="background-color: blue;" data-color="blue"></div>
+        <div class="color-swatch" style="background-color: yellow;" data-color="yellow"></div>
+        <div class="color-swatch" style="background-color: cyan;" data-color="cyan"></div>
+        <div class="color-swatch" style="background-color: magenta;" data-color="magenta"></div>
+        <div class="color-swatch" style="background-color: white;" data-color="white"></div>
+      </div>
+
+<!--
+      <div class="tool-section" id="color-selection">
         <div class="color-swatch" style="background-color: #ffffff;" data-color="#ffffff"></div>
         <div class="color-swatch" style="background-color: #ff0000;" data-color="#ff0000"></div>
         <div class="color-swatch" style="background-color: #00ff00;" data-color="#00ff00"></div>
@@ -289,15 +303,16 @@
         <div class="color-swatch" style="background-color: #00ffff;" data-color="#00ffff"></div>
         <div class="color-swatch" style="background-color: #000000;" data-color="#000000"></div>
       </div>
+-->
       
       <!-- Width Section -->
-      <div class="tool-section slider-tool-section">
+      <div class="tool-section slider-tool-section" id="width-selection">
         <!-- <label for="width-selector">Width:</label> -->
         <input type="range" id="width-selector" min="1" max="20">
         <!-- <span id="width-value">2</span> -->
       </div>
 
-      <div class="tool-section slider-tool-section">
+      <div class="tool-section slider-tool-section" id="opacity-selection">
         <!-- <label for="opacity-selector">Opacity:</label> -->
         <input type="range" id="opacity-selector" min="0" max="128">
       </div>
@@ -327,7 +342,27 @@
       function debugLog(msg, data) {
           console.log(`[DEBUG] ${msg}`, data || '');
       };
+
+      const manifest = {
+          "name": "Whiteboard App",
+          "short_name": "Whiteboard",
+          "start_url": ".",
+          "display": "standalone",
+          "background_color": "#ffffff",
+          "theme_color": "#000000",
+          "icons": [
+              {
+                  "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cpath%20d%3D%22M25%2075%20L75%2025%20M25%2025%20L75%2075%22%20stroke%3D%22black%22%20stroke-width%3D%2210%22%20%2F%3E%3C%2Fsvg%3E",
+                  "sizes": "192x192",
+                  "type": "image/svg+xml"
+              }
+          ]
+      };
       
+      const manifest_json = JSON.stringify(manifest);
+      const encoded_manifest = encodeURIComponent(manifest_json);
+      const data_uri = `data:application/manifest+json,${encoded_manifest}`;
+
       // settings
       let eraser_settings = {
           tool: "eraser",
@@ -387,6 +422,22 @@
       function switch_settings ( the_settings ) {
           draw_settings = the_settings;
           updateKnobs();
+          switch (draw_settings.tool) {
+          case 'pen':
+          case 'chalk':
+          case 'highlighter':
+              colorSelectionDiv.style.display = 'flex';
+              widthSelectionDiv.style.display = 'flex';
+              opacitySelectionDiv .style.display = 'flex';
+              timerToggleDiv.style.display = 'flex';
+              break;
+          case 'eraser':
+              colorSelectionDiv.style.display = 'none';
+              widthSelectionDiv.style.display = 'flex';
+              opacitySelectionDiv .style.display = 'none';
+              timerToggleDiv.style.display = 'none';
+              break;
+          }
       };
 
       // Globals for board state
@@ -439,7 +490,12 @@
       const undoBtn = document.getElementById('undo-btn');
       const redoBtn = document.getElementById('redo-btn');
       const syncStatus = document.getElementById('sync-status');
-      
+
+      const colorSelectionDiv = document.getElementById('color-selection');
+      const widthSelectionDiv = document.getElementById('width-selection');
+      const opacitySelectionDiv = document.getElementById('opacity-selection');
+      const timerToggleDiv = document.getElementById('timer-toggle');
+
       // settings
       const force_stylus = true;
       
@@ -513,13 +569,15 @@
           const urlParams = new URLSearchParams(window.location.search);
           const credential = urlParams.get('credential');
           boardId = urlParams.get('board');
-          
+          passwd = urlParams.get('passwd');
+
           // Determine if we're creating or registering
           const isCreating = !!credential;
+          const isEditing = !!passwd;
           
           // If neither board nor credential provided, show error
           if (!boardId && !isCreating) {
-              showError('Please provide either a board ID or credentials to create a new board.');
+              showError('Please provide credentials to create a new board.');
               return; // Don't attempt to connect
           }
           
