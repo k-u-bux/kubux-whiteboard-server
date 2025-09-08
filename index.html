@@ -377,7 +377,7 @@
           width: 2,
           color: "#000000",
           undo: false,
-          stroke: shared.createStroke( STROKE_STYLES.PEN )
+          stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
       };
       let chalk_settings = {
           tool: "chalk",
@@ -385,7 +385,7 @@
           width: 3,
           color: "#000000",
           undo: false,
-          stroke: shared.createStroke( STROKE_STYLES.CHALK )
+          stroke: shared.createStroke( shared.STROKE_STYLES.CHALK )
       };
       let highlighter_settings = {
           tool: "highlighter",
@@ -393,7 +393,7 @@
           width: 24,
           color: "yellow",
           undo: true,
-          stroke: shared.createStroke( STROKE_STYLES.HIGHLIGHTER )
+          stroke: shared.createStroke( shared.STROKE_STYLES.HIGHLIGHTER )
       };
 
       let draw_settings = chalk_settings;
@@ -1677,6 +1677,15 @@
                   ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
                   ctx.lineWidth = element[shared.ELEMENT.WIDTH] * ( 1 + element[shared.ELEMENT.SENSITIVITY] / 2 );
                   ctx.lineTo(points[0][shared.POINT.X]+0.0001, points[0][shared.POINT.Y]);
+                  ctx.stroke();
+              } else if ( 0.03 > element[shared.ELEMENT.SENSITIVITY] ) {
+                  ctx.beginPath();
+                  ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
+                  ctx.lineWidth = element[shared.ELEMENT.WIDTH];
+                  for (let i = 1; i < points.length; i++) {
+                      const point = points[i];
+                      ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
+                  }
                   ctx.stroke();
               } else {
                   for (let i = 1; i < points.length; i++) {
