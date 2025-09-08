@@ -1386,7 +1386,7 @@
               const point = shared.createPoint(x, y, pressure);
               currentPath.push(point);
               isErasing = true;
-              currentStroke = shared.createStroke();
+              currentStroke = shared.createStroke( shared.STROKE_STYLES.PEN );
               currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
               currentStroke[shared.ELEMENT.COLOR] = '#FF0000'; // Red for visibility during erasing
               currentStroke[shared.ELEMENT.OPACITY] = 0.3; // Transparent so we can see what is being erased
