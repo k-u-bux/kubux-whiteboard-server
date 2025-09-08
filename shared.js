@@ -7,6 +7,13 @@ function generateUuid() {
     });
 }
 
+function generatePasswd() {
+    return 'xxxxxxxxxxxx'.replace(/[x]/g, function(c) {
+        const r = Math.random() * 36 | 0;
+        return r.toString(36);
+    });
+}
+
 
 // serialization / deserialization
 const serialize = (data) => {
@@ -159,7 +166,7 @@ const MESSAGES = {
         },
         CREATE_BOARD: {
             TYPE: 'create-board',
-            PASSWD: 'passwd',
+            PASSWORD: 'passwd',
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
@@ -172,6 +179,7 @@ const MESSAGES = {
         },
         MOD_ACTION_PROPOSALS: {
             TYPE: 'mod-action-proposals',
+            PASSWORD: 'passwd',
             PAGE_UUID: 'page-uuid',
             PAYLOAD: 'payload',
             BEFORE_HASH: 'before-hash'
@@ -185,6 +193,13 @@ const MESSAGES = {
         }
     },
     SERVER_TO_CLIENT: {
+        BOARD_CREATED: {
+            TYPE: 'board-created',
+            BOARD_ID: 'boardId',
+            PASSWORD: 'passwd',
+            FIRST_PAGE_ID: 'firstPageId',
+            REQUEST_ID: 'requestId'
+        },
         BOARD_REGISTERED: {
             TYPE: 'board-registered',
             BOARD_ID: 'boardId',
@@ -662,6 +677,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         // uuid
         generateUuid,
+        generatePasswd,
         // serialization
         serialize,
         deserialize,
@@ -725,6 +741,7 @@ else if (typeof window !== 'undefined') {
     window.shared = {
         // uuid
         generateUuid,
+        generatePasswd,
         // serialization
         serialize,
         deserialize,

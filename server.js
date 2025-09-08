@@ -18,6 +18,7 @@ const {
   hashAny, 
   hashNext, 
   generateUuid, 
+  generatePasswd,
   serialize, 
   deserialize,
   createEmptyVisualState, 
@@ -107,7 +108,9 @@ const savePage = (pageId, page) => saveItem(pageId, page, 'page');
 function createBoard(boardId) {
     console.log(`[SERVER] Create a standard board.`);
     const pageId = generateUuid();
+    const password = generatePasswd();
     const board = {
+        passwd: password,
         pageOrder: [pageId]
     };
     saveBoard(boardId, board);
@@ -425,6 +428,34 @@ function sendPing() {
 const messageHandlers = {};
 
 
+function createNewBoard(ws, clientId, requestId) {
+    const boardId = generateUuid();
+    const board = createBoard(boardId);
+    if (board) {
+        ws.boardId = boardId; // Store boardId in WebSocket client
+        ws.clientId = clientId; // Store client ID for tracking
+        ws.pageId = board.pageOrder[0]; // Default to first page
+        
+        if (clientId) {
+            clients[clientId] = ws;
+        }
+        
+        console.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
+        
+        const creationResponse = {
+            type: MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD_ID]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD]: board.passwd,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE_ID]: ws.pageId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(creationResponse));
+        logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, creationResponse, requestId );
+        releaseBoard(boardId);
+        sendFullPage(ws, boardId, ws.pageId, requestId);
+    }
+}
+
 function registerBoard(ws, boardId, clientId, requestId) {
     const board = useBoard(boardId);
     if (board) {
@@ -463,14 +494,13 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
 // Handler for board creation
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, requestId) => {
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
-    let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWD];
+    let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
     if (!credentials.includes(sha256(password))) {
         console.log(`[SERVER] Client ${clientId} has tried to create a board: passwd = ${password}, sha256 = ${sha256(password)}`);
         return;
     }
     console.log(`[SERVER] Client ${clientId} is allowed to create boards`);
-    const boardId = generateUuid();
-    registerBoard(ws, boardId, clientId, requestId);
+    createNewBoard(ws, clientId, requestId);
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, requestId) => {
@@ -568,6 +598,7 @@ function sendDeclineMessage(context, reason, requestId) {
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data, requestId) => {
     try {
         const boardId = data.boardId || ws.boardId;
+        const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
         const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID];
         const action = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
         const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH];
@@ -575,6 +606,15 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         const actionId = action[MOD_ACTIONS.UUID];
 
         const board = useBoard(boardId);
+        // console.log(`password = ${password},  board.passwd = ${board.passwd}`);
+        if ( !password || password != board.passwd ) {
+            const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, "unauthorized");
+            ws.send(serialize(declineMessage));
+            logSentMessage(declineMessage.type, declineMessage, requestId);
+            releaseBoard(boardId);
+            return;
+        }
+
         const page = usePage(pageUuid);
         let accept;
         let reason;
