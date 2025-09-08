@@ -1330,8 +1330,6 @@
           pageInfo.textContent = `Page ${pageNr} of ${totalPages}`;
       }
       
-
-
       const draw_path_pointer_handler = {
           down: () => {
               if ( force_stylus && event.pointerType === "touch" ) { return; }
@@ -1343,9 +1341,7 @@
               const point = shared.createPoint(x, y, pressure);
               currentPath.push(point);
               isDrawing = true;
-              currentStroke = shared.createStroke(
-                  currentTool === 'highlighter' ? shared.STROKE_STYLES.HIGHLIGHTER : shared.STROKE_STYLES.PEN
-              );
+              currentStroke = shared.createStroke( draw_settings.stroke);
               currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
               currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
               currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
@@ -1732,7 +1728,7 @@
                       draw_open(element);
                   }
               } else {
-                  // If we get here, it's a bug - assertion would fail in production code
+                  // If we get here, it is a bug - assertion would fail in production code
                   console.error('Unknown drawable type:', type);
                   throw new Error('Invalid drawable type');
               }
