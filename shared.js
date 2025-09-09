@@ -370,10 +370,10 @@ const STROKE_STYLES = {
         2.0,                  // width
         createIdentityTransform(), // transform
         1.0,                  // opacity
-        CAP_STYLES.ROUND,     // capStyle
+        CAP_STYLES.BUTT,     // capStyle
         JOIN_STYLES.ROUND,    // joinStyle
         [0],                  // dashPattern
-        1.0,                  // pressureSensitivity
+        0,                    // pressureSensitivity
         1,                    // layer
         PEN_TYPES.MARKER      // penType
     ],
@@ -387,7 +387,7 @@ const STROKE_STYLES = {
         1.0,                  // opacity
         CAP_STYLES.ROUND,      // capStyle
         JOIN_STYLES.BEVEL,    // joinStyle
-        [1],                  // dashPattern
+        [0],                  // dashPattern
         1.0,                  // pressureSensitivity
         1,                    // layer
         PEN_TYPES.MARKER      // penType
@@ -399,17 +399,17 @@ const STROKE_STYLES = {
         "#000000",            // color
         24,                   // width
         createIdentityTransform(), // transform
-        0.2,                  // opacity
+        0.0,                  // opacity
         CAP_STYLES.SQUARE,    // capStyle
         JOIN_STYLES.ROUND,    // joinStyle
         [0],                  // dashPattern
-        0.3,                  // pressureSensitivity
+        0,                    // pressureSensitivity
         1,                    // layer
         PEN_TYPES.MARKER      // penType
     ]
 };
 
-function createStroke ( styleTemplate = STROKE_STYLES.PEN ) {
+function createStroke ( styleTemplate ) {
     return [ ... styleTemplate ];
 }
 

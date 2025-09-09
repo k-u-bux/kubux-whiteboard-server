@@ -273,14 +273,14 @@ function existingPage(pageId, board) {
 // internet
 // ========
 
-const serverOptions = {
-    key: fs.readFileSync(getFilePath("server", "key")),
-    cert: fs.readFileSync(getFilePath("server", "cert"))
-};
+// const serverOptions = {
+//     key: fs.readFileSync(getFilePath("server", "key")),
+//     cert: fs.readFileSync(getFilePath("server", "cert"))
+// };
 
 // console.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
-const httpsServer = https.createServer(serverOptions, (req, res) => {
+const httpServer = http.createServer( (req, res) => {
     // always serve just index.html
     // rationale: allowing the client to request files opens the attack surface
     // consequence: index.html will be a self contained file; thus we embed shared.js on the fly
@@ -327,7 +327,7 @@ const httpsServer = https.createServer(serverOptions, (req, res) => {
 });
 
 const wss = new WebSocket.Server({
-    server: httpsServer,
+    server: httpServer,
     path: '/ws',
     perMessageDeflate: {
         zlibDeflateOptions: { level: 6 },
@@ -340,7 +340,7 @@ const wss = new WebSocket.Server({
 
 const PORT = 8080;
 
-httpsServer.listen(PORT, () => {
+httpServer.listen(PORT, () => {
     console.log(`[SERVER] HTTPS server is running on port ${PORT}`);
     console.log(`WebSocket-Server is running on wss://0.0.0.0:${PORT}/ws`);
 });
