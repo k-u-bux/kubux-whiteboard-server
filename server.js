@@ -282,8 +282,8 @@ const serverOptions = {
 
 // console.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
-const httpServer = https.createServer( serverOptions, (req, res) => {
-// const httpServer = http.createServer( (req, res) => {
+// const httpServer = https.createServer( serverOptions, (req, res) => {
+const httpServer = http.createServer( (req, res) => {
     // always serve just index.html
     // rationale: allowing the client to request files opens the attack surface
     // consequence: index.html will be a self contained file; thus we embed shared.js on the fly
