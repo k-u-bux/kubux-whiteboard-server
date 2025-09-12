@@ -282,7 +282,7 @@ const serverOptions = {
 
 // console.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
-const httpServer = http.createServer(serverOptions, (req, res) => {
+const httpServer = https.createServer( serverOptions, (req, res) => {
 // const httpServer = http.createServer( (req, res) => {
     // always serve just index.html
     // rationale: allowing the client to request files opens the attack surface
