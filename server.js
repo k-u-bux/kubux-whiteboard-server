@@ -813,10 +813,27 @@ wss.on('connection', (ws, req) => {
     });
 });
 
-process.on('SIGINT', () => {
-    console.log('[SERVER] Shutting down gracefully...');
-    // Make sure all data is persisted before exit
+
+function periodicallyPersist () {
     persistAllBoards();
     persistAllPages();
+}
+
+const intervalPersist = setInterval( periodicallyPersist, 10000 );
+
+
+// Function to handle the shutdown logic
+function shutdown(signal) {
+  console.log(`Received ${signal}. Server is shutting down. Persisting state...`);
+  clearInterval( intervalPersist );
+  persistAllBoards();
+  persistAllPages();
+  server.close(() => {
+    console.log('Server connections closed. Exiting process.');
     process.exit(0);
-});
+  });
+}
+
+// Listen for the SIGTERM signal
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
