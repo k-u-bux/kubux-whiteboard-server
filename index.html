@@ -582,7 +582,6 @@
               return; // Don't attempt to connect
           }
           
-          // Always use secure WebSockets as required by the server
           const hostname = window.location.hostname || 'localhost';
           const wsUrl = `ws://${hostname}:8080/ws`;
           
@@ -1446,7 +1445,7 @@
           const result = [];
           
           // Use the shared geometry function to find intersecting elements
-          const intersecting = shared.findIntersectingElements(visualState, eraserStroke, eraserRadius / 2, 10);
+          const intersecting = shared.findIntersectingElements(visualState, eraserStroke, eraserRadius/2, 10);
           
           for (const element of intersecting) {
               // Find the UUID for this element
