@@ -274,14 +274,14 @@ function existingPage(pageId, board) {
 // internet
 // ========
 
-// const serverOptions = {
-//     key: fs.readFileSync(getFilePath("server", "key")),
-//     cert: fs.readFileSync(getFilePath("server", "cert"))
-// };
+const serverOptions = {
+    key: fs.readFileSync(getFilePath("server", "key")),
+    cert: fs.readFileSync(getFilePath("server", "cert"))
+};
 
 // console.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
-const httpServer = http.createServer( (req, res) => {
+const httpServer = https.createServer(serverOptions, (req, res) => {
     // always serve just index.html
     // rationale: allowing the client to request files opens the attack surface
     // consequence: index.html will be a self contained file; thus we embed shared.js on the fly
@@ -404,12 +404,16 @@ function sendPing() {
             const totalPages = board.pageOrder.length;
             const pageHash = page.hashes[page.present];
 
+            const snapshot_indices = recent_snapshots( page.present );
+            const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
+
             const message = {
                 type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
                 [MESSAGES.SERVER_TO_CLIENT.PING.UUID]: pageId,
                 [MESSAGES.SERVER_TO_CLIENT.PING.HASH]: pageHash,
                 [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR]: pageNr,
-                [MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES]: totalPages
+                [MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES]: totalPages,
+                [MESSAGES.SERVER_TO_CLIENT.PING.SNAPSHOTS]: snapshots
             };
             releasePage(pageId);
             releaseBoard(client.boardId);

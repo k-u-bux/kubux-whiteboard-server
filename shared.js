@@ -2,6 +2,40 @@
 
 const PORT=5236;
 
+
+// spaced snapshots
+
+function power_of_two ( n ) {
+  let result = 1;
+  while (n > 0 && (n & 1) === 0) {
+    n /= 2;
+    result *= 2;
+  }
+  return result;
+}
+
+function recent_snapshots ( n ) {
+  if ( n <= 1 ) { return []; }
+  n = n - 1;
+  let result = [];
+  let powers = [];
+  for (let j = 1; j < n; j *= 2) {
+    powers.push( j );
+  }
+  while ( powers.length > 0 ) {
+    let next = n - powers[ 0 ];
+    let m = power_of_two( n );
+    const where = powers.indexOf( m );
+    if ( where !== -1 ) {
+      result.push( n );
+      powers.splice( where, 1 );
+    }
+    n = next;
+  }
+  return result.reverse();
+}
+
+
 // uuid
 function generateUuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -251,7 +285,8 @@ const MESSAGES = {
             UUID: 'uuid',
             HASH: 'hash',
             PAGE_NR: 'pageNr',
-            TOTAL_PAGES: 'totalPages'
+            TOTAL_PAGES: 'totalPages',
+            SNAPSHOTS: 'snapshots'
         }
     }
 };
@@ -680,6 +715,7 @@ function findIntersectingElements ( visualState, needle, eps, delta ) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         PORT,
+        recent_snapshots,
         // uuid
         generateUuid,
         generatePasswd,
@@ -745,6 +781,7 @@ if (typeof module !== 'undefined' && module.exports) {
 else if (typeof window !== 'undefined') {
     window.shared = {
         PORT,
+        recent_snapshots,
         // uuid
         generateUuid,
         generatePasswd,
