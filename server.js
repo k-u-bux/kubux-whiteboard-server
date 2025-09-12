@@ -16,6 +16,7 @@ function sha256(inputString) {
 
 const { 
   PORT,
+  recent_snapshots,
   hashAny, 
   hashNext, 
   generateUuid, 
