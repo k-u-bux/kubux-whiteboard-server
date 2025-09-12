@@ -32,7 +32,7 @@ function recent_snapshots ( n ) {
     }
     n = next;
   }
-  return result.reverse();
+  return result;
 }
 
 
