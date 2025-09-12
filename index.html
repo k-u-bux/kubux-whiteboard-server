@@ -739,7 +739,7 @@
               window.history.replaceState(null, null, `?board=${boardId}`);
           }
           
-          // The server will send a full page message next, so we don't need
+          // The server will send a full page message next, so we do not need
           // to request one explicitly
       }
       
@@ -749,6 +749,7 @@
           const pingPageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH];
           const pingPageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR];
           const pingTotalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES];
+          const pingSnapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.SNAPSHOTS];
           
           debugLog('Received ping', {
               serverPageUuid: pingPageUuid, 
@@ -759,7 +760,7 @@
               verifiedHash: hashes[ verifiedIndex ]
           });
           
-          // Check if we're on the wrong page
+          // Check if we are on the wrong page
           if (currentPageUuid !== pingPageUuid) {
               debugLog('Server indicates we should be on a different page');
               requestFullPage(pingPageUuid);

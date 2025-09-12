@@ -425,8 +425,6 @@ function sendPing() {
 }
 
 
-
-
 // Message handlers
 const messageHandlers = {};
 
