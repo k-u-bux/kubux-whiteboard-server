@@ -1,3 +1,7 @@
+// PORT
+
+const PORT=5236;
+
 // uuid
 function generateUuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -675,6 +679,7 @@ function findIntersectingElements ( visualState, needle, eps, delta ) {
 // Export for Node.js (server)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        PORT,
         // uuid
         generateUuid,
         generatePasswd,
@@ -739,6 +744,7 @@ if (typeof module !== 'undefined' && module.exports) {
 // Export for browsers (client)
 else if (typeof window !== 'undefined') {
     window.shared = {
+        PORT,
         // uuid
         generateUuid,
         generatePasswd,
