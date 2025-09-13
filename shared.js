@@ -556,6 +556,7 @@ function commitEdit( visualState, action ) {
     case MOD_ACTIONS.GROUP.TYPE:
         return commitGroup( visualState, action[MOD_ACTIONS.GROUP.ACTIONS], uuid );
     }
+    assert( false );
 }
 
 function commitDraw ( visualState, stroke, uuid ) {
