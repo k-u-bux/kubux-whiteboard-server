@@ -735,7 +735,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     }
 
     const replayActions = [];
-    for (let time = present; time < page.present; ++time) {
+    for (let time = present; time < page.history.length; ++time) {
         replayActions.push(page.history[time]);
     }
     const replayMessage = {
