@@ -770,7 +770,7 @@ function routeMessage(ws, message) {
             ws.boardId = data.boardId;
         }
         
-        console.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client on board '${boardId}':`, data);
+        console.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}':`, data);
         
         const handler = messageHandlers[data.type];
         if (handler) {
