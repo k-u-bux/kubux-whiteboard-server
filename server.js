@@ -542,7 +542,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
 };
 
 function handleEditAction(page, action) {
-    page.state = compileVisualState( page.history.splice( 0, page.present ) );
+    page.state = compileVisualState( page.history.splice( 0, page.present + 1 ) );
     if ( commitEdit( page.state, action ) ) {
         const future_size = page.history.length - page.present;
         page.history.splice(page.present, future_size);
