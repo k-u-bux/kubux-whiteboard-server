@@ -547,7 +547,7 @@ function handleEditAction(page, action) {
     const lhs = serialize( page.state.visible );
     const rhs = serialize( current_visible );
     if ( lhs != rhs ) {
-        console.log("visible set BAD",`${lhs} vs ${rhs}`);
+        console.log("visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
         process.exit( 1 );
     } else {
         console.log("visible set OK","!");
