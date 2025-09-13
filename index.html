@@ -1070,7 +1070,7 @@
       // Apply a single action to the visual state
       function applyActionToVisualState(action) {
           if (!action) return;
-          shared.commitEdit(action);
+          shared.commitEdit( visualState, action );
           return;
           
           switch (action.type) {
