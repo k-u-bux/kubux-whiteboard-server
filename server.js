@@ -543,7 +543,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
 };
 
 function handleEditAction(page, action) {
-    const current_visible = compileVisualState( page.history.splice( 0, page.present ) ).visible;
+    const current_visible = compileVisualState( page.history.slice( 0, page.present ) ).visible;
     const lhs = serialize( page.state.visible );
     const rhs = serialize( current_visible );
     if ( lhs != rhs ) {
