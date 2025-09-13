@@ -558,7 +558,7 @@ function handleUndoAction(page, action) {
     if (page.present > 0) {
         const currentAction = page.history[page.present - 1];
         if (currentAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.UNDO.TARGET_ACTION]) {
-            revertEdit( page.visualState, currentAction, currentAction.uuid );
+            // revertEdit( page.visualState, currentAction, currentAction.uuid );
             page.present -= 1;
             return true;
         }
@@ -570,7 +570,7 @@ function handleRedoAction(page, action) {
     if (page.present < page.history.length) {
         const nextAction = page.history[page.present];
         if (nextAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.REDO.TARGET_ACTION]) {
-            commitEdit( page.visualState, nextAction );
+            // commitEdit( page.visualState, nextAction );
             page.present += 1;
             return true;
         }
