@@ -801,7 +801,7 @@
           if (matchingIndex === -1) {
               // Server hash not found in our hash chain
               debugLog('Hash not found in our chain, requesting replay');
-              adjustVerfiedIndex( pingSnapshots );
+              // adjustVerfiedIndex( pingSnapshots );
               requestReplay();
           } else if (matchingIndex !== present) {
               debugLog(`Server is at position ${matchingIndex}, we're at ${present}`);
