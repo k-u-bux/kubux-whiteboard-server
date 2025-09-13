@@ -567,12 +567,12 @@ function commitErase ( visualState, target, uuid ) {
 }
 
 function commitGroup ( visualState, actions, uuid = "" ) {
-    const previouslyVisible = structuredClone( visualState.visible );
+    const previousState = structuredClone( visualState );
     let flag = true;
     for ( const edit of actions ) {
         flag = flag & commitEdit( visualState, edit );
         if (!flag) {
-            visualState.visible = previouslyVisible;
+            Object.assign( visualState, previousState );
             return false;
         }
     }
