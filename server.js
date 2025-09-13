@@ -544,8 +544,10 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
 
 function handleEditAction(page, action) {
     const current_visible = compileVisualState( page.history.splice( 0, page.present ) ).visible;
-    if ( serialize( page.state.visible ) != serialize( current_visible ) ) {
-        console.log("visible set BAD","!");
+    const lhs = serialize( page.state.visible );
+    const rhs = serialize( current_visible );
+    if ( lhs != rhs ) {
+        console.log("visible set BAD",`${lhs} vs ${rhs}`);
         process.exit( 1 );
     } else {
         console.log("visible set OK","!");
