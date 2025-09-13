@@ -528,9 +528,9 @@ function addElement ( visualState, uuid, element ) {
 }
 
 function showElement ( visualState, uuid ) {
-    // if ( visualState.visible.has( uuid ) ) {
-    //     return false;
-    // }
+    if ( visualState.visible.has( uuid ) ) {
+        return false;
+    }
     visualState.visible.add( uuid );
     return ( true );
 }
