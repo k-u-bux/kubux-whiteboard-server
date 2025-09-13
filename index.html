@@ -1070,6 +1070,8 @@
       // Apply a single action to the visual state
       function applyActionToVisualState(action) {
           if (!action) return;
+          shared.commitEdit(action);
+          return;
           
           switch (action.type) {
           case shared.MOD_ACTIONS.DRAW.TYPE:
