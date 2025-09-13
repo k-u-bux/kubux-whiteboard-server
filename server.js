@@ -24,6 +24,7 @@ const {
   serialize, 
   deserialize,
   createEmptyVisualState, 
+  compileVisualState,
   commitEdit, 
   commitGroup, 
   MESSAGES, 
