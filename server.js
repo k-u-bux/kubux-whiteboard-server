@@ -552,7 +552,7 @@ function handleEditAction(page, action) {
     // } else {
     //     console.log("visible set OK","!");
     // }
-    page.state = current_visible;
+    page.state.visible = current_visible;
     if ( commitEdit( page.state, action ) ) {
         const future_size = page.history.length - page.present;
         page.history.splice(page.present, future_size);
