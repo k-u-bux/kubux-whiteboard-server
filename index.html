@@ -744,6 +744,26 @@
       }
       
       // Handle ping message from server
+
+      function adjustVerfiedIndex ( snapshots ) {
+          index = 0;
+          the_index = 0;
+          alt_index = 0;
+          the_hash = hashed[ the_index ];
+          alt_hash = snapshots[ alt_index ];
+          while ( the_index < hashes.length && alt_index < snapshots.length ) {
+              if ( the_hash != alt_hash ) {
+                  ++ the_index;
+                  the_hash = hashed[ the_index ];
+              } else {
+                  index = the_index;
+                  ++ alt_index;
+                  ++ the_index;
+              }
+          }
+          verifiedIndex = index;
+      }
+
       function handlePingMessage(data) {
           const pingPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.UUID];
           const pingPageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH];
@@ -781,12 +801,12 @@
           if (matchingIndex === -1) {
               // Server hash not found in our hash chain
               debugLog('Hash not found in our chain, requesting replay');
+              adjustVerfiedIndex( pingSnapshots );
               requestReplay();
           } else if (matchingIndex !== present) {
               debugLog(`Server is at position ${matchingIndex}, we're at ${present}`);
-              // If server is ahead or behind us, we could adjust
-              // For now, just request a replay to ensure full sync
-              requestReplay();
+              present = matchingIndex;
+              verifiedIndex = present;
           } else {
               // We're in sync with server
               verifiedIndex = matchingIndex;
