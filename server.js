@@ -542,6 +542,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
 };
 
 function handleEditAction(page, action) {
+    compileVisualState( page.state, page.history.splice(0, page.present) );
     if (commitEdit(page.state, action)) {
         const future_size = page.history.length - page.present;
         page.history.splice(page.present, future_size);
@@ -558,7 +559,6 @@ function handleUndoAction(page, action) {
     if (page.present > 0) {
         const currentAction = page.history[page.present - 1];
         if (currentAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.UNDO.TARGET_ACTION]) {
-            revertEdit( page.state, currentAction, currentAction.uuid );
             page.present -= 1;
             return true;
         }
@@ -570,7 +570,6 @@ function handleRedoAction(page, action) {
     if (page.present < page.history.length) {
         const nextAction = page.history[page.present];
         if (nextAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.REDO.TARGET_ACTION]) {
-            commitEdit( page.state, nextAction );
             page.present += 1;
             return true;
         }
