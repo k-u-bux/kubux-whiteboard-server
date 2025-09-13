@@ -545,7 +545,10 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
 function handleEditAction(page, action) {
     const current_visible = compileVisualState( page.history.splice( 0, page.present ) ).visible;
     if ( serialize( page.state.visible ) != serialize( current_visible ) ) {
+        console.log("visible set BAD","!");
         process.exit( 1 );
+    } else {
+        console.log("visible set OK","!");
     }
     if ( commitEdit( page.state, action ) ) {
         const future_size = page.history.length - page.present;
