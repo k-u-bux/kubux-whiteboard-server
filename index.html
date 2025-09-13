@@ -1465,22 +1465,7 @@
       
       // Find elements that intersect with a complete eraser path
       function findElementsIntersectingPath(eraserStroke) {
-          const result = [];
-          
-          // Use the shared geometry function to find intersecting elements
-          const intersecting = shared.findIntersectingElements(visualState, eraserStroke, eraserRadius/2, 10);
-          
-          for (const element of intersecting) {
-              // Find the UUID for this element
-              for (const [uuid, el] of visualState.element) {
-                  if (el === element && visualState.visible.has(uuid)) {
-                      result.push(uuid);
-                      break;
-                  }
-              }
-          }
-          
-          return result;
+          return shared.findIntersectingElements(visualState, eraserStroke, eraserRadius/2, 10);
       }
       
       // Send a draw action to the server

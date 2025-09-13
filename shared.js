@@ -705,7 +705,7 @@ function findIntersectingElements ( visualState, needle, eps, delta ) {
         const true_hay = applyTransformToPath(hay[ELEMENT.TRANSFORM], hay[ELEMENT.POINTS]);
         if (visualState.visible.has(uuid) && 
             pathsIntersect(true_hay, true_needle, eps, delta)) {
-            result.push(hay);
+            result.push( uuid );
         }
     }
     return result;
