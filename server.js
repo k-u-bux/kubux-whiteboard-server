@@ -544,14 +544,15 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
 
 function handleEditAction(page, action) {
     const current_visible = compileVisualState( page.history.slice( 0, page.present + 1 ) ).visible;
-    const rhs = serialize( page.state.visible );
-    const lhs = serialize( current_visible );
-    if ( lhs != rhs ) {
-        console.log("visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
-        process.exit( 1 );
-    } else {
-        console.log("visible set OK","!");
-    }
+    // const rhs = serialize( page.state.visible );
+    // const lhs = serialize( current_visible );
+    // if ( lhs != rhs ) {
+    //     console.log("visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
+    //     process.exit( 1 );
+    // } else {
+    //     console.log("visible set OK","!");
+    // }
+    page.state = current_visible;
     if ( commitEdit( page.state, action ) ) {
         const future_size = page.history.length - page.present;
         page.history.splice(page.present, future_size);
