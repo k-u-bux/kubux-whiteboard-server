@@ -537,7 +537,7 @@ function showElement ( visualState, uuid ) {
 
 function hideElement ( visualState, uuid ) {
     if ( ! visualState.visible.has( uuid ) ) {
-        console.log("element not visible:", serialze( uuid ) );
+        console.log("element not visible:", serialize( uuid ) );
         return false;
     }
     visualState.visible.delete( uuid );
