@@ -1465,7 +1465,9 @@
       
       // Find elements that intersect with a complete eraser path
       function findElementsIntersectingPath(eraserStroke) {
-          return shared.findIntersectingElements(visualState, eraserStroke, eraserRadius/2, 10);
+          const result = shared.findIntersectingElements(visualState, eraserStroke, eraserRadius/2, 10);
+          console.log("erasing:", serialize( result ) );
+          return result;
       }
       
       // Send a draw action to the server

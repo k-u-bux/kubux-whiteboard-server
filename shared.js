@@ -699,12 +699,12 @@ function pathsIntersect (path1, path2, eps, delta ) {
 // Helper to find elements that intersect with a given element
 function findIntersectingElements ( visualState, needle, eps, delta ) {
     let result = [];
-    const true_needle = applyTransformToPath(needle[ELEMENT.TRANSFORM], needle[ELEMENT.POINTS]);
+    const true_needle = applyTransformToPath( needle[ELEMENT.TRANSFORM], needle[ELEMENT.POINTS] );
     
-    for (const [uuid, hay] of visualState.element) {
-        const true_hay = applyTransformToPath(hay[ELEMENT.TRANSFORM], hay[ELEMENT.POINTS]);
-        if (visualState.visible.has(uuid) && 
-            pathsIntersect(true_hay, true_needle, eps, delta)) {
+    for ( const [uuid, hay] of visualState.element ) {
+        const true_hay = applyTransformToPath( hay[ELEMENT.TRANSFORM], hay[ELEMENT.POINTS] );
+        if (visualState.visible.has( uuid ) && 
+            pathsIntersect( true_hay, true_needle, eps, delta) ) {
             result.push( uuid );
         }
     }
