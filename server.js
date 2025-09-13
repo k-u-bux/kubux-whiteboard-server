@@ -406,7 +406,7 @@ function sendPing() {
             const totalPages = board.pageOrder.length;
             const pageHash = page.hashes[page.present];
 
-            const snapshot_indices = recent_snapshots( page.present );
+            const snapshot_indices = recent_snapshots( page.history.length );
             const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
 
             const message = {
