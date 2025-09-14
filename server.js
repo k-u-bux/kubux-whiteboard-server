@@ -33,6 +33,14 @@ const {
   POINT 
 } = require('./shared');
 
+
+// Logs storage configuration
+const LOGS_DIR = './logs';
+const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
+const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
+const debug = new Console({ stdout: debugOutput, stderr: debugOutput });
+
+
 // Data storage configuration
 const DATA_DIR = './data';
 
@@ -42,17 +50,11 @@ if (!fs.existsSync(DATA_DIR)) {
     debug.log(`[SERVER] Created data directory: ${DATA_DIR}`);
 }
 
-// Logs storage configuration
-const LOGS_DIR = './logs';
-
 // Path helpers
 const getPasswdFilePath = () => path.join(DATA_DIR, 'passwd.json');
 const getRemovalLogPath = () => path.join(DATA_DIR, 'to_be_removed.json');
 const getFilePath = (uuid,ext) => path.join(DATA_DIR, `${uuid}.${ext}`);
 
-const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
-const debugOutput = fs.createWriteStream(getDebugLogPath, { flags: 'a' });
-const debug = new Console({ stdout: debugOutput, stderr: debugOutput });
 
 // Server state structures
 const credentials = [];
