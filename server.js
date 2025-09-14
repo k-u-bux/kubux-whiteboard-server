@@ -35,6 +35,7 @@ const {
 
 
 // Logs storage configuration
+const { Console } = require('console');
 const LOGS_DIR = './logs';
 const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
 const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
