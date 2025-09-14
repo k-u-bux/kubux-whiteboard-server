@@ -39,13 +39,20 @@ const DATA_DIR = './data';
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    console.log(`[SERVER] Created data directory: ${DATA_DIR}`);
+    debug.log(`[SERVER] Created data directory: ${DATA_DIR}`);
 }
+
+// Logs storage configuration
+const LOGS_DIR = './logs';
 
 // Path helpers
 const getPasswdFilePath = () => path.join(DATA_DIR, 'passwd.json');
 const getRemovalLogPath = () => path.join(DATA_DIR, 'to_be_removed.json');
 const getFilePath = (uuid,ext) => path.join(DATA_DIR, `${uuid}.${ext}`);
+
+const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
+const debugOutput = fs.createWriteStream(getDebugLogPath, { flags: 'a' });
+const debug = new Console({ stdout: debugOutput, stderr: debugOutput });
 
 // Server state structures
 const credentials = [];
@@ -60,14 +67,14 @@ function initializeGlobals() {
         const itemText = fs.readFileSync(filePath, 'utf8');
         const parsed = JSON.parse(itemText);
         Object.assign(credentials, parsed);
-        console.log(`[SERVER] Loaded ${credentials.length} passwords`);
+        debug.log(`[SERVER] Loaded ${credentials.length} passwords`);
     }
     const removalLogPath = getRemovalLogPath();
     if (fs.existsSync(removalLogPath)) {
         const itemText = fs.readFileSync(removalLogPath, 'utf8');
         const parsedMap = JSON.parse(itemText);
         Object.assign(deletionMap, parsedMap);
-        console.log(`[SERVER] Loaded ${Object.keys(deletionMap).length} deletion mappings`);
+        debug.log(`[SERVER] Loaded ${Object.keys(deletionMap).length} deletion mappings`);
     }
 }
 
@@ -91,7 +98,7 @@ function loadItem(itemId, ext) {
             if (item) { return item; }
         }
     }
-    console.log(`[SERVER] Error loading ${ext} from disk: ${itemId}`);
+    debug.log(`[SERVER] Error loading ${ext} from disk: ${itemId}`);
     return null;
 }
 
@@ -109,7 +116,7 @@ const savePage = (pageId, page) => saveItem(pageId, page, 'page');
 
 
 function createBoard(boardId) {
-    console.log(`[SERVER] Create a standard board.`);
+    debug.log(`[SERVER] Create a standard board.`);
     const pageId = generateUuid();
     const password = generatePasswd();
     const board = {
@@ -121,7 +128,7 @@ function createBoard(boardId) {
 }
 
 function createPage(pageId) {
-    console.log(`[SERVER] Create an empty page.`);
+    debug.log(`[SERVER] Create an empty page.`);
     const page = { 
         history: [], // array of edit-ops
         present: 0, // int
@@ -281,7 +288,7 @@ const serverOptions = {
     cert: fs.readFileSync(getFilePath("server", "cert"))
 };
 
-// console.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
+// debug.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
 // const httpServer = https.createServer( serverOptions, (req, res) => {
 const httpServer = http.createServer( (req, res) => {
@@ -343,13 +350,13 @@ const wss = new WebSocket.Server({
 });
 
 httpServer.listen(PORT, () => {
-    console.log(`[SERVER] HTTP server is running on port ${PORT}`);
-    console.log(`WebSocket-Server is running on wss://0.0.0.0:${PORT}/ws`);
+    debug.log(`[SERVER] HTTP server is running on port ${PORT}`);
+    debug.log(`WebSocket-Server is running on wss://0.0.0.0:${PORT}/ws`);
 });
 
 
 function logSentMessage(type, payload, requestId = 'N/A') {
-    console.log(`[SERVER > CLIENT] Sending message of type '${type}' in response to '${requestId}' with payload:`, payload);
+    debug.log(`[SERVER > CLIENT] Sending message of type '${type}' in response to '${requestId}' with payload:`, payload);
 }
 
 function broadcastMessageToBoard(message, boardId, excludeWs = null) {
@@ -444,7 +451,7 @@ function createNewBoard(ws, clientId, requestId) {
             clients[clientId] = ws;
         }
         
-        console.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
+        debug.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
         
         const creationResponse = {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE,
@@ -471,7 +478,7 @@ function registerBoard(ws, boardId, clientId, requestId) {
             clients[clientId] = ws;
         }
         
-        console.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
+        debug.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
         
         const registrationResponse = {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
@@ -500,10 +507,10 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
     if (!credentials.includes(sha256(password))) {
-        console.log(`[SERVER] Client ${clientId} has tried to create a board: passwd = ${password}, sha256 = ${sha256(password)}`);
+        debug.log(`[SERVER] Client ${clientId} has tried to create a board: passwd = ${password}, sha256 = ${sha256(password)}`);
         return;
     }
-    console.log(`[SERVER] Client ${clientId} is allowed to create boards`);
+    debug.log(`[SERVER] Client ${clientId} is allowed to create boards`);
     createNewBoard(ws, clientId, requestId);
 };
 
@@ -547,10 +554,10 @@ function handleEditAction(page, action) {
     // const rhs = serialize( page.state.visible );
     // const lhs = serialize( current_visible );
     // if ( lhs != rhs ) {
-    //     console.log("visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
+    //     debug.log("visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
     //     process.exit( 1 );
     // } else {
-    //     console.log("visible set OK","!");
+    //     debug.log("visible set OK","!");
     // }
     page.state.visible = current_visible;
     if ( commitEdit( page.state, action ) ) {
@@ -620,7 +627,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         const actionId = action[MOD_ACTIONS.UUID];
 
         const board = useBoard(boardId);
-        // console.log(`password = ${password},  board.passwd = ${board.passwd}`);
+        // debug.log(`password = ${password},  board.passwd = ${board.passwd}`);
         if ( !password || password != board.passwd ) {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, "unauthorized");
             ws.send(serialize(declineMessage));
@@ -730,7 +737,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const board = useBoard(boardId);
     const pageId = existingPage(pageUuid, board);
     if (pageId !== pageUuid) {
-        console.log(`[SERVER] Hash ${pageUuid} has been replaced, sending full page`);
+        debug.log(`[SERVER] Hash ${pageUuid} has been replaced, sending full page`);
         sendFullPage(ws, boardId, pageId, requestId);
         releaseBoard(boardId);
         return;
@@ -738,7 +745,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     
     const page = usePage(pageId);
     if (page.hashes[present] !== presentHash) {
-        console.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending full page`);
+        debug.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending full page`);
         sendFullPage(ws, boardId, pageId, requestId);
         releaseBoard(boardId);
         releasePage(pageId);
@@ -781,7 +788,7 @@ function routeMessage(ws, message) {
             ws.boardId = data.boardId;
         }
         
-        console.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}':`, serialize( data ) );
+        debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}':`, serialize( data ) );
         
         const handler = messageHandlers[data.type];
         if (handler) {
@@ -804,7 +811,7 @@ function routeMessage(ws, message) {
 }
 
 wss.on('connection', (ws, req) => {
-    console.log(`[SERVER] New WebSocket connection established`);
+    debug.log(`[SERVER] New WebSocket connection established`);
     
     if (!pingTimer) {
         pingTimer = setInterval(() => {
@@ -815,7 +822,7 @@ wss.on('connection', (ws, req) => {
     ws.on('message', message => routeMessage(ws, message));
     
     ws.on('close', () => {
-        console.log(`[SERVER] Client disconnected from board: ${ws.boardId || 'unknown'}`);
+        debug.log(`[SERVER] Client disconnected from board: ${ws.boardId || 'unknown'}`);
         
         // Clean up client reference if client ID was stored
         if (ws.clientId && clients[ws.clientId] === ws) {
@@ -835,12 +842,12 @@ const intervalPersist = setInterval( periodicallyPersist, 10000 );
 
 // Function to handle the shutdown logic
 function shutdown(signal) {
-  console.log(`Received ${signal}. Server is shutting down. Persisting state...`);
+  debug.log(`Received ${signal}. Server is shutting down. Persisting state...`);
   clearInterval( intervalPersist );
   persistAllBoards();
   persistAllPages();
   server.close(() => {
-    console.log('Server connections closed. Exiting process.');
+    debug.log('Server connections closed. Exiting process.');
     process.exit(0);
   });
 }
