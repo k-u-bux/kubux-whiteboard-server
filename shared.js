@@ -541,7 +541,7 @@ function hideElement ( visualState, uuid ) {
         return false;
     }
     visualState.visible.delete( uuid );
-    return ( true );
+    return true;
 }
 
 
@@ -581,8 +581,9 @@ function commitGroup ( visualState, actions, uuid = "" ) {
     return true;
 }
 
-function revertEdit ( visualState, action, uuid ) {
-    const type = action.type;
+function revertEdit ( visualState, action ) {
+    const type = action[MOD_ACTIONS.TYPE];
+    const uuid = action[MOD_ACTIONS.UUID];
     switch ( type ) {
     case MOD_ACTIONS.DRAW.TYPE:
         return revertDraw( visualState, action[MOD_ACTIONS.DRAW.STROKE], uuid );
