@@ -553,7 +553,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
     sendFullPage(ws, boardId, pageId, requestId);
 };
 
-function handleEditAction(page, action) {
+function flag_and_fix_inconsistent_state( page, msg ) {
     const current_visible = compileVisualState( page.history.slice( 0, page.present ) ).visible;
     const visible = page.state.visible;
     if ( 
@@ -562,9 +562,13 @@ function handleEditAction(page, action) {
             [...visible].every( (element) => current_visible.has(element) ) ) ) {
         const rhs = serialize( visible );
         const lhs = serialize( current_visible );
-        debug.log("visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
+        debug.log( msg, "visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
         page.state.visible = current_visible;
     }
+}
+
+function handleEditAction(page, action) {
+    flag_and_fix_inconsistent_state( page, "edit" );
     if ( commitEdit( page.state, action ) ) {
         const future_size = page.history.length - page.present;
         page.history.splice(page.present, future_size);
@@ -578,6 +582,7 @@ function handleEditAction(page, action) {
 }
 
 function handleUndoAction(page, action) {
+    flag_and_fix_inconsistent_state( page, "undo" );
     if (page.present > 0) {
         const currentAction = page.history[page.present - 1];
         if (currentAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.UNDO.TARGET_ACTION]) {
@@ -592,6 +597,7 @@ function handleUndoAction(page, action) {
 }
 
 function handleRedoAction(page, action) {
+    flag_and_fix_inconsistent_state( page, "redo" );
     if (page.present < page.history.length) {
         const nextAction = page.history[page.present];
         if (nextAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.REDO.TARGET_ACTION]) {
