@@ -183,7 +183,7 @@ const MOD_ACTIONS = {
     },
     REDO: {
         TYPE: 'redo',
-        TARGET_ACTION: 'targetUndoActionUuid'
+        TARGET_ACTION: 'targetActionUuid'
     },
     // board ops
     NEW_PAGE: {
