@@ -554,15 +554,16 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
 
 function handleEditAction(page, action) {
     const current_visible = compileVisualState( page.history.slice( 0, page.present ) ).visible;
-    // const rhs = serialize( page.state.visible );
-    // const lhs = serialize( current_visible );
-    // if ( lhs != rhs ) {
-    //     debug.log("visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
-    //     process.exit( 1 );
-    // } else {
-    //     debug.log("visible set OK","!");
-    // }
-    page.state.visible = current_visible;
+    const visible = page.state.visible;
+    if ( 
+        ! ( [...current_visible].every( (element) => visible.has(element) )
+            &&
+            [...visible].every( (element) => current_visible.has(element) ) ) ) {
+        const rhs = serialize( visible );
+        const lhs = serialize( current_visible );
+        debug.log("visible set BAD",`time = ${page.present}, actual = ${lhs} vs predicted = ${rhs}`);
+        page.state.visible = current_visible;
+    }
     if ( commitEdit( page.state, action ) ) {
         const future_size = page.history.length - page.present;
         page.history.splice(page.present, future_size);
