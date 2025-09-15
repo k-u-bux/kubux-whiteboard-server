@@ -589,7 +589,8 @@ function handleUndoAction(page, action) {
         const currentAction = page.history[page.present - 1];
         if (currentAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.UNDO.TARGET_ACTION]) {
             if ( ! revertEdit( page.state, currentAction ) ) {
-                debug.log( `BAD: cannot undo action ${currentAction.uuid}` );
+                debug.log( `BAD: cannot undo action ${currentAction[MOD_ACTIONS.UUID]}` );
+                debug.log( `currentAction = ${serialize( currentAction )}` );
             }
             page.present -= 1;
             flag_and_fix_inconsistent_state( page, "undo exit" );
@@ -605,7 +606,7 @@ function handleRedoAction(page, action) {
         const nextAction = page.history[page.present];
         if (nextAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.REDO.TARGET_ACTION]) {
             if ( ! commitEdit( page.state, nextAction ) ) {
-                debug.log( `BAD: cannot redo action ${nextAction.uuid}` );
+                debug.log( `BAD: cannot redo action ${nextAction[MOD_ACTIONS.UUID]}` );
             }
             page.present += 1;
             flag_and_fix_inconsistent_state( page, "redo exit" );
