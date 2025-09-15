@@ -576,8 +576,10 @@ function handleEditAction(page, action) {
         page.hashes.splice(page.present + 1, future_size);
         page.hashes.push(hashNext(page.hashes[page.present], action));
         page.present = page.history.length;
+        flag_and_fix_inconsistent_state( page, "edit exit" );
         return true;
     }
+    flag_and_fix_inconsistent_state( page, "edit 2nd exit" );
     return false;
 }
 
@@ -590,6 +592,7 @@ function handleUndoAction(page, action) {
                 debug.log( `BAD: cannot undo action ${currentAction.uuid}` );
             }
             page.present -= 1;
+            flag_and_fix_inconsistent_state( page, "undo exit" );
             return true;
         }
     }
@@ -605,6 +608,7 @@ function handleRedoAction(page, action) {
                 debug.log( `BAD: cannot redo action ${nextAction.uuid}` );
             }
             page.present += 1;
+            flag_and_fix_inconsistent_state( page, "redo exit" );
             return true;
         }
     }
