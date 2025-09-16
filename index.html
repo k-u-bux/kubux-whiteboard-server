@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xournal++ Clone</title>
     <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Whiteboard%20App%22%2C%22short_name%22%3A%22Whiteboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520100%2520100%2522%253E%253Cpath%2520d%253D%2522M25%252075%2520L75%252025%2520M25%252025%2520L75%252075%2522%2520stroke%253D%2522black%2522%2520stroke-width%253D%252210%2522%2520%252F%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
-      <style>
+    <style>
       body {
           margin: 0;
           padding: 0;
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           overflow: hidden;
+          display: flex; /* Make body a flex container */
+          flex-direction: column; /* Stack children vertically */
+          height: 100vh;
       }
       
       .toolbar {
@@ -26,11 +29,6 @@
           margin-right: 10px;
           padding-right: 10px;
           border-right: 1px solid #ddd;
-      }
-      
-      .slider-tool-section {
-          width: 15em; /* Applies only to elements with this class */
-          box-sizing: border-box;
       }
 
       .tool-btn {
@@ -82,19 +80,16 @@
           transition: opacity .2s;
       }
       
-      /* Base style for the slider thumb */
       input[type="range"]::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          border-radius: 50%; /* Makes it a circle */
-          background: var(--thumb-color, black);;
+          border-radius: 50%;
+          background: var(--thumb-color, black);
           cursor: pointer;
-          /* Use the CSS variable to control the size */
-          width: calc(var(--thumb-size, 2) * 2px); /* Default to 2px */
+          width: calc(var(--thumb-size, 2) * 2px);
           height: calc(var(--thumb-size, 2) * 2px);
       }
       
-      /* Firefox-specific styling for the slider thumb */
       input[type="range"]::-moz-range-thumb {
           border: none;
           border-radius: 50%;
@@ -104,29 +99,26 @@
           height: calc(var(--thumb-size, 2) * 2px);
       }
       
-      /* Style the opacity slider's track (the rail) */
       #opacity-selector {
           -webkit-appearance: none;
           width: 100%;
           height: 8px;
-          background: #fff; /* White rail for contrast */
+          background: #fff;
           outline: none;
           opacity: 0.7;
           -webkit-transition: .2s;
           transition: opacity .2s;
       }
       
-      /* Style the opacity slider's thumb (the knob) */
       #opacity-selector::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 24px; /* Fixed size */
-          height: 24x;
+          width: 24px;
+          height: 24px;
           border-radius: 50%;
           cursor: pointer;
-          /* Control the transparency of the thumb using a CSS custom property */
           background: var(--thumb-color);
-          opacity: var(--thumb-opacity, 1));
+          opacity: var(--thumb-opacity, 1);
       }
       
       #opacity-selector::-moz-range-thumb {
@@ -143,35 +135,66 @@
           margin-left: auto;
       }
 
-      #canvas-container {
-          position: relative;
+      .app-container {
+          display: flex; /* New flex container for sidebar and main content */
+          flex-grow: 1; /* Allows it to fill the remaining vertical space */
+      }
+      
+      .sidebar {
+          width: 200px; /* Adjust width as needed */
+          background-color: #f0f0f0;
+          border-right: 1px solid #ccc;
+          padding: 10px;
+          display: flex;
+          flex-direction: column; /* Stack sections vertically */
+      }
+
+      .sidebar-section {
+          flex-direction: column;
+          align-items: flex-start;
+          padding: 10px 0;
+          margin-bottom: 10px;
+          border-bottom: 1px solid #ddd;
+          width: 100%;
+          box-sizing: border-box;
+      }
+      
+      .sidebar-section:last-child {
+          border-bottom: none;
+      }
+      
+      .sidebar-section p {
+          margin: 0 0 5px 0;
+          font-weight: bold;
+      }
+      
+      #color-selection {
+          display: flex;
+          flex-wrap: wrap; /* Allow colors to wrap to the next line */
+          justify-content: flex-start;
+      }
+
+      .main-content {
           flex-grow: 1;
           overflow: hidden;
       }
       
+      #canvas-container {
+          position: relative;
+          width: 100%;
+          height: 100%;
+      }
+      
       canvas {
           position: absolute;
-          /* background-color: #113311; */
-          background-color: white;          
+          background-color: white;
           box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-      }
-      
-      .main-content {
-          display: flex;
-          height: calc(100vh - 42px);
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
       }
 
-      /*      
-      #width-selector {
-          width: 100%;
-          margin: 0 10px;
-      }
-      
-      #opacity-selector {
-          width: 100%;
-          margin: 0 10px;
-      }
-     */    
       .page-controls {
           display: flex;
           align-items: center;
@@ -204,7 +227,6 @@
           border-radius: 4px;
       }
 
-      /* Add tooltips for buttons */
       .tooltip {
           position: relative;
           display: inline-block;
@@ -241,12 +263,10 @@
     </div>
     
     <div class="toolbar">
-      <!-- Export PDF -->
       <div class="tool-section" id="export-pdf">
         <button class="tool-btn" id="pdf-btn" title="export-pdf">📃</button>
       </div>
 
-      <!-- Page Controls -->
       <div class="tool-section page-controls">
         <button class="tool-btn" id="prev-page">◀️</button>
         <span id="page-info">Page 1 of 1</span>
@@ -255,14 +275,12 @@
         <button class="tool-btn" id="delete-page">➖</button>
       </div>
       
-      <!-- Zoom Controls -->
       <div class="tool-section">
         <button class="tool-btn" id="zoom-out">-</button>
         <span id="zoom-level">100%</span>
         <button class="tool-btn" id="zoom-in">+</button>
       </div>
       
-      <!-- Undo/Redo Section -->
       <div class="tool-section">
         <button class="tool-btn tooltip" id="undo-btn" title="Undo" disabled>↩
           <span class="tooltiptext">Undo (Ctrl+Z)</span>
@@ -272,7 +290,6 @@
         </button>
       </div>
       
-      <!-- Tools Section -->
       <div class="tool-section">
         <button class="tool-btn" id="chalk-tool" title="Chalk"><span style="filter: grayscale(100%) invert(100%);">🖍️</span></button>
         <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
@@ -280,58 +297,42 @@
         <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
       </div>
       
-      <!-- Colors Section -->
-      <div class="tool-section" id="color-selection">
-        <div class="color-swatch" style="background-color: black;" data-color="black"></div>
-        <div class="color-swatch" style="background-color: red;" data-color="red"></div>
-        <div class="color-swatch" style="background-color: green;" data-color="green"></div>
-        <div class="color-swatch" style="background-color: blue;" data-color="blue"></div>
-        <div class="color-swatch" style="background-color: yellow;" data-color="yellow"></div>
-        <div class="color-swatch" style="background-color: cyan;" data-color="cyan"></div>
-        <div class="color-swatch" style="background-color: magenta;" data-color="magenta"></div>
-        <div class="color-swatch" style="background-color: white;" data-color="white"></div>
-      </div>
-
-<!--
-      <div class="tool-section" id="color-selection">
-        <div class="color-swatch" style="background-color: #ffffff;" data-color="#ffffff"></div>
-        <div class="color-swatch" style="background-color: #ff0000;" data-color="#ff0000"></div>
-        <div class="color-swatch" style="background-color: #00ff00;" data-color="#00ff00"></div>
-        <div class="color-swatch" style="background-color: #0000ff;" data-color="#0000ff"></div>
-        <div class="color-swatch" style="background-color: #ff00ff;" data-color="#ff00ff"></div>
-        <div class="color-swatch" style="background-color: #ffff00;" data-color="#ffff00"></div>
-        <div class="color-swatch" style="background-color: #00ffff;" data-color="#00ffff"></div>
-        <div class="color-swatch" style="background-color: #000000;" data-color="#000000"></div>
-      </div>
--->
-      
-      <!-- Width Section -->
-      <div class="tool-section slider-tool-section" id="width-selection">
-        <!-- <label for="width-selector">Width:</label> -->
-        <input type="range" id="width-selector" min="1" max="20">
-        <!-- <span id="width-value">2</span> -->
-      </div>
-
-      <div class="tool-section slider-tool-section" id="opacity-selection">
-        <!-- <label for="opacity-selector">Opacity:</label> -->
-        <input type="range" id="opacity-selector" min="0" max="128">
-      </div>
-      
-      <!-- Timer Toggle -->
       <div class="tool-section" id="timer-toggle">
         <button class="tool-btn" id="timer-btn" title="Timer">⏲</button>
       </div>
 
-      <!-- Debug Info -->
       <div class="tool-section" id="debug-tools">
         <button class="tool-btn" id="debug-btn" title="Debug">🐞</button>
         <span id="sync-status">✓</span>
       </div>
     </div>
     
-    <div class="main-content">
-      <div id="canvas-container">
-        <canvas id="canvas"></canvas>
+    <div class="app-container">
+      <div class="sidebar">
+        <div class="tool-section sidebar-section" id="color-selection">
+          <div class="color-swatch" style="background-color: black;" data-color="black"></div>
+          <div class="color-swatch" style="background-color: red;" data-color="red"></div>
+          <div class="color-swatch" style="background-color: green;" data-color="green"></div>
+          <div class="color-swatch" style="background-color: blue;" data-color="blue"></div>
+          <div class="color-swatch" style="background-color: yellow;" data-color="yellow"></div>
+          <div class="color-swatch" style="background-color: cyan;" data-color="cyan"></div>
+          <div class="color-swatch" style="background-color: magenta;" data-color="magenta"></div>
+          <div class="color-swatch" style="background-color: white;" data-color="white"></div>
+        </div>
+        <div class="tool-section sidebar-section" id="width-selection">
+          <p>Width</p>
+          <input type="range" id="width-selector" min="1" max="20">
+        </div>
+        <div class="tool-section sidebar-section" id="opacity-selection">
+          <p>Opacity</p>
+          <input type="range" id="opacity-selector" min="0" max="128">
+        </div>
+      </div>
+      
+      <div class="main-content">
+        <div id="canvas-container">
+          <canvas id="canvas"></canvas>
+        </div>
       </div>
     </div>
 
@@ -1133,7 +1134,7 @@
           opacitySelector.style.setProperty('--thumb-opacity', draw_settings.opacity);
       };
       
-     // Set up event listeners
+      // Set up event listeners
       function setupEventListeners() {
           // Reconnect button
           reconnectButton.addEventListener('click', reconnectWebSocket);
