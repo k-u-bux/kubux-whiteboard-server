@@ -69,17 +69,16 @@
           border-width: 2px;
       }
       
+      /* Horizontal sliders */
       input[type="range"] {
           -webkit-appearance: none;
-          width: 20px;
-          height: 60px;
+          width: 100%;
+          height: 8px;
           background: #d3d3d3;
           outline: none;
           opacity: 0.7;
           -webkit-transition: .2s;
           transition: opacity .2s;
-          transform: rotate(270deg);
-          transform-origin: 50% 50%;
       }
       
       input[type="range"]::-webkit-slider-thumb {
@@ -132,33 +131,85 @@
           background: var(--thumb-color);
           filter: opacity( var(--thumb-opacity, 1));
       }
+
+      /* Vertical sliders */
+      .vertical-slider-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-bottom: 20px;
+      }
+
+      .vertical-slider-container p {
+          margin-bottom: 10px;
+          font-weight: bold;
+      }
+
+      .vertical-slider {
+          -webkit-appearance: none;
+          width: 8px; /* Fixed width for the track */
+          height: 100px; /* Fixed height for the track */
+          background: #d3d3d3;
+          outline: none;
+          opacity: 0.7;
+          -webkit-transition: .2s;
+          transition: opacity .2s;
+          transform: rotate(270deg); /* Rotate the slider */
+          transform-origin: 50% 50%;
+      }
       
+      .vertical-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          border-radius: 50%;
+          background: var(--thumb-color, black);
+          cursor: pointer;
+          width: 24px; /* Fixed size for vertical thumb */
+          height: 24px;
+      }
+
+      .vertical-slider::-moz-range-thumb {
+          border: none;
+          border-radius: 50%;
+          background: var(--thumb-color, black);
+          cursor: pointer;
+          width: 24px;
+          height: 24px;
+      }
+
+      /* Opacity-specific vertical slider */
+      #opacity-selector.vertical-slider {
+          background: #fff;
+      }
+
       #debug-tools {
           margin-left: auto;
       }
 
       .app-container {
-          display: flex; /* New flex container for sidebar and main content */
-          flex-grow: 1; /* Allows it to fill the remaining vertical space */
+          display: flex;
+          flex-grow: 1;
       }
       
       .sidebar {
-          width: 200px; /* Adjust width as needed */
+          width: 200px;
           background-color: #f0f0f0;
           border-right: 1px solid #ccc;
           padding: 10px;
           display: flex;
-          flex-direction: column; /* Stack sections vertically */
+          flex-direction: column;
+          align-items: center;
       }
 
       .sidebar-section {
+          width: 100%;
+          box-sizing: border-box;
+          display: flex;
           flex-direction: column;
           align-items: flex-start;
           padding: 10px 0;
           margin-bottom: 10px;
           border-bottom: 1px solid #ddd;
-          width: 100%;
-          box-sizing: border-box;
       }
       
       .sidebar-section:last-child {
@@ -171,11 +222,10 @@
       }
       
       #color-selection {
-          display: flex;
-          flex-wrap: wrap; /* Allow colors to wrap to the next line */
+          flex-wrap: wrap;
           justify-content: flex-start;
       }
-
+      
       .main-content {
           flex-grow: 1;
           overflow: hidden;
@@ -321,13 +371,15 @@
           <div class="color-swatch" style="background-color: magenta;" data-color="magenta"></div>
           <div class="color-swatch" style="background-color: white;" data-color="white"></div>
         </div>
-        <div class="tool-section sidebar-section" id="width-selection">
-          <p>Width</p>
-          <input type="range" id="width-selector" min="1" max="20">
-        </div>
-        <div class="tool-section sidebar-section" id="opacity-selection">
-          <p>Opacity</p>
-          <input type="range" id="opacity-selector" min="0" max="128">
+        <div class="tool-section sidebar-section" id="sliders-section">
+          <div class="vertical-slider-container">
+            <p>Width</p>
+            <input type="range" class="vertical-slider" id="width-selector" min="1" max="20">
+          </div>
+          <div class="vertical-slider-container">
+            <p>Opacity</p>
+            <input type="range" class="vertical-slider" id="opacity-selector" min="0" max="128">
+          </div>
         </div>
       </div>
       
