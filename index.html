@@ -738,12 +738,12 @@
           index = 0;
           the_index = 0;
           alt_index = 0;
-          the_hash = hashed[ the_index ];
+          the_hash = hashes[ the_index ];
           alt_hash = snapshots[ alt_index ];
           while ( the_index <= verifiedHash && alt_index < snapshots.length ) {
               if ( the_hash != alt_hash ) {
                   ++ the_index;
-                  the_hash = hashed[ the_index ];
+                  the_hash = hashes[ the_index ];
               } else {
                   index = the_index;
                   ++ alt_index;
