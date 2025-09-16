@@ -69,15 +69,14 @@
           border-width: 2px;
       }
       
-      /* Horizontal sliders */
+      /* Base slider styles */
       input[type="range"] {
           -webkit-appearance: none;
-          width: 100%;
+          width: 100px; /* Swap width and height for vertical layout */
           height: 8px;
           background: #d3d3d3;
           outline: none;
           opacity: 0.7;
-          -webkit-transition: .2s;
           transition: opacity .2s;
       }
       
@@ -87,8 +86,8 @@
           border-radius: 50%;
           background: var(--thumb-color, black);
           cursor: pointer;
-          width: calc(var(--thumb-size, 2) * 2px);
-          height: calc(var(--thumb-size, 2) * 2px);
+          width: 20px; /* Size of the thumb */
+          height: 20px;
       }
       
       input[type="range"]::-moz-range-thumb {
@@ -96,92 +95,29 @@
           border-radius: 50%;
           background: var(--thumb-color, black);
           cursor: pointer;
-          width: calc(var(--thumb-size, 2) * 2px);
-          height: calc(var(--thumb-size, 2) * 2px);
+          width: 20px;
+          height: 20px;
       }
       
+      /* Specific styles for the opacity slider */
       #opacity-selector {
-          -webkit-appearance: none;
-          width: 100%;
-          height: 8px;
           background: #fff;
-          outline: none;
-          opacity: 0.7;
-          -webkit-transition: .2s;
-          transition: opacity .2s;
       }
       
       #opacity-selector::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
           width: 24px;
           height: 24px;
-          border-radius: 50%;
-          cursor: pointer;
           background: var(--thumb-color);
           opacity: var(--thumb-opacity, 1);
       }
       
       #opacity-selector::-moz-range-thumb {
-          border: none;
           width: 24px;
           height: 24px;
-          border-radius: 50%;
-          cursor: pointer;
           background: var(--thumb-color);
           filter: opacity( var(--thumb-opacity, 1));
       }
-
-      /* Vertical sliders */
-      .vertical-slider-container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          margin-bottom: 20px;
-      }
-
-      .vertical-slider-container p {
-          margin-bottom: 10px;
-          font-weight: bold;
-      }
-
-      .vertical-slider {
-          -webkit-appearance: none;
-          width: 8px; /* Fixed width for the track */
-          height: 100px; /* Fixed height for the track */
-          background: #d3d3d3;
-          outline: none;
-          opacity: 0.7;
-          -webkit-transition: .2s;
-          transition: opacity .2s;
-          transform: rotate(270deg); /* Rotate the slider */
-          transform-origin: 50% 50%;
-      }
       
-      .vertical-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          border-radius: 50%;
-          background: var(--thumb-color, black);
-          cursor: pointer;
-          width: 24px; /* Fixed size for vertical thumb */
-          height: 24px;
-      }
-
-      .vertical-slider::-moz-range-thumb {
-          border: none;
-          border-radius: 50%;
-          background: var(--thumb-color, black);
-          cursor: pointer;
-          width: 24px;
-          height: 24px;
-      }
-
-      /* Opacity-specific vertical slider */
-      #opacity-selector.vertical-slider {
-          background: #fff;
-      }
-
       #debug-tools {
           margin-left: auto;
       }
@@ -192,7 +128,7 @@
       }
       
       .sidebar {
-          width: 200px;
+          width: 60px; /* Reduced width for a more compact sidebar */
           background-color: #f0f0f0;
           border-right: 1px solid #ccc;
           padding: 10px;
@@ -206,7 +142,7 @@
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
-          align-items: flex-start;
+          align-items: center; /* Center content within each section */
           padding: 10px 0;
           margin-bottom: 10px;
           border-bottom: 1px solid #ddd;
@@ -215,17 +151,18 @@
       .sidebar-section:last-child {
           border-bottom: none;
       }
-      
-      .sidebar-section p {
-          margin: 0 0 5px 0;
-          font-weight: bold;
+
+      #width-selection, #opacity-selection {
+          /* Apply styles to the individual slider sections */
+          height: 150px; /* Give the containers enough space to hold the rotated sliders */
+          justify-content: center;
       }
       
-      #color-selection {
-          flex-wrap: wrap;
-          justify-content: flex-start;
+      #width-selector, #opacity-selector {
+          transform: rotate(270deg); /* Rotate the sliders */
+          transform-origin: 50% 50%; /* Ensure rotation is centered */
       }
-      
+
       .main-content {
           flex-grow: 1;
           overflow: hidden;
@@ -371,15 +308,11 @@
           <div class="color-swatch" style="background-color: magenta;" data-color="magenta"></div>
           <div class="color-swatch" style="background-color: white;" data-color="white"></div>
         </div>
-        <div class="tool-section sidebar-section" id="sliders-section">
-          <div class="vertical-slider-container">
-            <p>Width</p>
-            <input type="range" class="vertical-slider" id="width-selector" min="1" max="20">
-          </div>
-          <div class="vertical-slider-container">
-            <p>Opacity</p>
-            <input type="range" class="vertical-slider" id="opacity-selector" min="0" max="128">
-          </div>
+        <div class="tool-section sidebar-section" id="width-selection">
+          <input type="range" id="width-selector" min="1" max="20">
+        </div>
+        <div class="tool-section sidebar-section" id="opacity-selection">
+          <input type="range" id="opacity-selector" min="0" max="128">
         </div>
       </div>
       
@@ -389,6 +322,12 @@
         </div>
       </div>
     </div>
+
+
+
+
+
+
 
     <script src="shared.js"></script>
     <script src="https://www.kubux.net/files/nodejs-libs/jspdf.umd.min.js"></script>
