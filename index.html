@@ -820,19 +820,14 @@
               return;
           }
           
-          // Check if the before hash matches
-          if (beforeHash !== hashes[actionIndex]) {
+          if (afterHash !== hashes[actionIndex+1]) {
               // Hash mismatch - request replay
               debugLog(`Hash mismatch for action ${acceptedActionUuid}`);
               requestReplay();
               return;
           }
-          
-          // Update hash for this action
-          hashes[actionIndex + 1] = afterHash;
-          
-          // Update verified index if this is the next action to be verified
-          if (actionIndex === verifiedIndex) {
+
+          if (verifiedIndex <= actionIndex) {
               verifiedIndex = actionIndex + 1;
           }
           
