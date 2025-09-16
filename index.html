@@ -324,10 +324,6 @@
 
 
 
-
-
-
-
     <script src="shared.js"></script>
     <script src="https://www.kubux.net/files/nodejs-libs/jspdf.umd.min.js"></script>
     <script>
@@ -800,6 +796,7 @@
               debugLog(`Server is at position ${matchingIndex}, we're at ${present}`);
               present = matchingIndex;
               verifiedIndex = present;
+              updateVisualState();
           } else {
               // We're in sync with server
               verifiedIndex = matchingIndex;
