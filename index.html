@@ -86,8 +86,8 @@
           border-radius: 50%;
           background: var(--thumb-color, black);
           cursor: pointer;
-          width: 20px; /* Size of the thumb */
-          height: 20px;
+          width: calc(var(--thumb-size, 2) * 2px); 
+          height: calc(var(--thumb-size, 2) * 2px);
       }
       
       input[type="range"]::-moz-range-thumb {
@@ -95,8 +95,8 @@
           border-radius: 50%;
           background: var(--thumb-color, black);
           cursor: pointer;
-          width: 20px;
-          height: 20px;
+          width: calc(var(--thumb-size, 2) * 2px);
+          height: calc(var(--thumb-size, 2) * 2px);
       }
       
       /* Specific styles for the opacity slider */
