@@ -323,7 +323,6 @@
         </div>
       </div>
     </div>
-    <div id="color-picker-container"></div>
 
 
 
@@ -1135,9 +1134,8 @@
           // Color selection
           const colorSwatches = document.querySelectorAll('.color-swatch');
           colorSwatches.forEach(swatch => {
-              swatch.addEventListener('click', (e) => handleColorSwatchEvent(e, false));
-              swatch.addEventListener('pointerdown', (e) => handleColorSwatchEvent(e, true));
-              swatch.addEventListener('pointerup', (e) => handleColorSwatchEvent(e, false));
+              swatch.addEventListener('pointerdown', (e) => handleColorSwatchEvent(e));
+              swatch.addEventListener('pointerup', (e) => handleColorSwatchEvent(e));
           });
           
           widthSelector.addEventListener('input', selectWidth);
@@ -1186,10 +1184,11 @@
       let pressTimer;
       let isLongPress = false;
 
-      function handleColorSwatchEvent(event, isPointerDown) {
+      function handleColorSwatchEvent(event) {
           const swatch = event.currentTarget;
-          if (isPointerDown) {
+          if (event.type === 'pointerdown') {
               isLongPress = false;
+              clearTimeout(pressTimer);
               pressTimer = setTimeout(() => {
                   isLongPress = true;
                   event.preventDefault();
@@ -1201,11 +1200,6 @@
                   selectColor(swatch);
               }
               isLongPress = false;
-          } else if (event.type === 'click') {
-              // Only handle click if not a long press
-              if (!isLongPress) {
-                  selectColor(swatch);
-              }
           }
       }
 
@@ -1220,17 +1214,8 @@
           const colorPicker = document.createElement('input');
           colorPicker.type = 'color';
           colorPicker.value = swatchElement.dataset.color;
-
-          // Position the color picker (example)
-          const rect = swatchElement.getBoundingClientRect();
-          colorPicker.style.position = 'absolute';
-          colorPicker.style.top = `${rect.bottom}px`;
-          colorPicker.style.left = `${rect.left}px`;
-          colorPicker.style.opacity = 0;
-          colorPicker.style.pointerEvents = 'none';
-
-          document.body.appendChild(colorPicker);
-
+          
+          // Listen for a change to the color
           colorPicker.addEventListener('change', (e) => {
               const newColor = e.target.value;
               swatchElement.style.backgroundColor = newColor;
@@ -1238,7 +1223,14 @@
               selectColor(swatchElement);
               colorPicker.remove();
           });
+          
+          // Remove the color picker when it loses focus (e.g., dialog is closed)
+          colorPicker.addEventListener('blur', () => {
+              colorPicker.remove();
+          });
 
+          // Append to the body and immediately click to show the native color picker dialog
+          document.body.appendChild(colorPicker);
           colorPicker.click();
       }
       
