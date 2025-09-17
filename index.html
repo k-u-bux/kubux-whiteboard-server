@@ -1136,7 +1136,7 @@
           colorSwatches.forEach(swatch => {
               swatch.addEventListener('click', () => {
                   colorSwatches.forEach(s => s.classList.remove('active'));
-                  // swatch.classList.add('active');
+                  swatch.classList.add('active');
                   draw_settings.color = swatch.dataset.color;
                   updateKnobs();
               });
