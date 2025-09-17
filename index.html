@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xournal++ Clone</title>
-    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Whiteboard%20App%22%2C%22short_name%22%3A%22Whiteboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520100%2520100%2522%253E%253Cpath%2520d%253D%2522M25%252075%2520L75%252025%2520M25%252025%2520L75%252075%2522%2520stroke%253D%2522black%2522%2520stroke-width%253D%252210%2522%2520%252F%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Whiteboard%20App%22%2C%22short_name%22%3A%22Whiteboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520100%2520100%2522%253E%253Cpath%2520d%253D%2522M25%252075%2520L75%252025%2520M25%252025%2520L75%252075%22%2520stroke%253D%2522black%2522%2520stroke-width%253D%252210%2522%2520%252F%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
     <style>
       body {
           margin: 0;
@@ -323,6 +323,7 @@
         </div>
       </div>
     </div>
+    <div id="color-picker-container"></div>
 
 
 
@@ -1134,12 +1135,9 @@
           // Color selection
           const colorSwatches = document.querySelectorAll('.color-swatch');
           colorSwatches.forEach(swatch => {
-              swatch.addEventListener('click', () => {
-                  colorSwatches.forEach(s => s.classList.remove('active'));
-                  swatch.classList.add('active');
-                  draw_settings.color = swatch.dataset.color;
-                  updateKnobs();
-              });
+              swatch.addEventListener('click', (e) => handleColorSwatchEvent(e, false));
+              swatch.addEventListener('pointerdown', (e) => handleColorSwatchEvent(e, true));
+              swatch.addEventListener('pointerup', (e) => handleColorSwatchEvent(e, false));
           });
           
           widthSelector.addEventListener('input', selectWidth);
@@ -1183,6 +1181,65 @@
           
           // Keyboard shortcuts
           document.addEventListener('keydown', handleKeyDown);
+      }
+      
+      let pressTimer;
+      let isLongPress = false;
+
+      function handleColorSwatchEvent(event, isPointerDown) {
+          const swatch = event.currentTarget;
+          if (isPointerDown) {
+              isLongPress = false;
+              pressTimer = setTimeout(() => {
+                  isLongPress = true;
+                  event.preventDefault();
+                  showColorPicker(swatch);
+              }, 500); // 500ms delay for long press
+          } else if (event.type === 'pointerup') {
+              clearTimeout(pressTimer);
+              if (!isLongPress) {
+                  selectColor(swatch);
+              }
+              isLongPress = false;
+          } else if (event.type === 'click') {
+              // Only handle click if not a long press
+              if (!isLongPress) {
+                  selectColor(swatch);
+              }
+          }
+      }
+
+      function selectColor(swatch) {
+          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+          swatch.classList.add('active');
+          draw_settings.color = swatch.dataset.color;
+          updateKnobs();
+      }
+
+      function showColorPicker(swatchElement) {
+          const colorPicker = document.createElement('input');
+          colorPicker.type = 'color';
+          colorPicker.value = swatchElement.dataset.color;
+
+          // Position the color picker (example)
+          const rect = swatchElement.getBoundingClientRect();
+          colorPicker.style.position = 'absolute';
+          colorPicker.style.top = `${rect.bottom}px`;
+          colorPicker.style.left = `${rect.left}px`;
+          colorPicker.style.opacity = 0;
+          colorPicker.style.pointerEvents = 'none';
+
+          document.body.appendChild(colorPicker);
+
+          colorPicker.addEventListener('change', (e) => {
+              const newColor = e.target.value;
+              swatchElement.style.backgroundColor = newColor;
+              swatchElement.dataset.color = newColor;
+              selectColor(swatchElement);
+              colorPicker.remove();
+          });
+
+          colorPicker.click();
       }
       
       // Show debug information
