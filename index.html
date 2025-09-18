@@ -587,7 +587,7 @@
           width: 24,
           color: "yellow",
           undo: true,
-          fill: true,
+          fill: false,
           stroke: shared.createStroke( shared.STROKE_STYLES.HIGHLIGHTER )
       };
 
@@ -1509,7 +1509,7 @@
           });
           
           document.getElementById('fill-btn').addEventListener('click', () => {
-              draw_settings.fill = true;
+              draw_settings.fill = ( ! draw_settings.fill );
               updateKnobs();
           });
           
