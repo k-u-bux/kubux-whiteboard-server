@@ -2100,7 +2100,7 @@
               push_settings(element);
               const type = element[ELEMENT.TYPE];
               const path = element[ELEMENT.PATH];
-              const is_closed = ( path == DRAWABLE.CLOSED_PIECEWISE_LINEAR || path == DRAWABLE.CLOSED_BEZIER_CURVE );
+              const is_closed = ( path == DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
               lay_path(element);
               if ( type == DRAWABLE.TYPE.FILL ) {
                   if ( ! is_closed ) {
