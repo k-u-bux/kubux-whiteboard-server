@@ -598,17 +598,17 @@
           if (activeToolButton && draw_settings != eraser_settings ) {
               activeToolButton.style.backgroundColor = draw_settings.color;
           }
-          // widthSelector.style.setProperty('--thumb-size', draw_settings.width);
+          widthSelector.style.setProperty('--thumb-size', draw_settings.width);
           // widthSelector.style.setProperty('--thumb-color', draw_settings.color);
-          // widthSelector.value = draw_settings.width;
-          // opacitySelector.style.setProperty('--thumb-opacity', draw_settings.opacity);
+          widthSelector.value = draw_settings.width;
+          opacitySelector.style.setProperty('--thumb-opacity', draw_settings.opacity);
           // opacitySelector.style.setProperty('--thumb-color', draw_settings.color);
-          // opacitySelector.value =  draw_settings.opacity * 128;
-          // if ( draw_settings.undo ) {
-          //     document.getElementById('timer-btn').classList.add('active');
-          // } else {
-          //     document.getElementById('timer-btn').classList.remove('active');
-          // }
+          opacitySelector.value =  draw_settings.opacity * 128;
+          if ( draw_settings.undo ) {
+              document.getElementById('timer-btn').classList.add('active');
+          } else {
+              document.getElementById('timer-btn').classList.remove('active');
+          }
       }
 
       function switch_settings ( the_settings ) {
