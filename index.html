@@ -246,192 +246,112 @@
           opacity: 1;
       }
 
-      /* Custom Color Picker Styles */
-      #color-picker-overlay {
+      /* Simple Color Picker Styles */
+      #simple-color-picker {
           position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background-color: rgba(0, 0, 0, 0.5);
           z-index: 1000;
-          display: none;
-          justify-content: center;
-          align-items: center;
-      }
-
-      #color-picker {
-          background-color: white;
+          background: white;
+          border: 1px solid #ccc;
           border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-          padding: 16px;
-          width: 300px;
-          max-width: 90vw;
-          display: flex;
-          flex-direction: column;
-          position: relative;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+          padding: 10px;
+          width: 260px;
+          display: none;
       }
-
-      #color-picker-header {
+      
+      #simple-color-picker-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
+          border-bottom: 1px solid #eee;
+          padding-bottom: 5px;
       }
-
-      #color-picker-title {
+      
+      #simple-color-picker-title {
           font-weight: bold;
           margin: 0;
       }
-
-      #color-picker-close {
+      
+      #simple-color-picker-close {
           background: none;
           border: none;
           font-size: 18px;
           cursor: pointer;
-          padding: 4px;
+          padding: 2px 5px;
       }
-
+      
+      #color-grid {
+          display: grid;
+          grid-template-columns: repeat(8, 1fr);
+          gap: 4px;
+          margin-bottom: 10px;
+      }
+      
+      .color-cell {
+          width: 25px;
+          height: 25px;
+          border-radius: 3px;
+          cursor: pointer;
+          border: 1px solid #ccc;
+      }
+      
+      .color-cell:hover {
+          transform: scale(1.1);
+      }
+      
       #color-preview {
-          display: flex;
-          margin-bottom: 12px;
-          height: 40px;
+          height: 30px;
           border-radius: 4px;
-          overflow: hidden;
+          border: 1px solid #ccc;
+          margin-bottom: 10px;
+          display: flex;
       }
-
-      #new-color-preview {
+      
+      #new-color {
           flex: 3;
+          height: 100%;
       }
-
-      #original-color-preview {
+      
+      #original-color {
           flex: 1;
+          height: 100%;
           border-left: 1px solid #ccc;
       }
-
-      .color-selection-area {
-          margin-bottom: 16px;
-      }
-
-      #hue-canvas, #saturation-canvas {
-          width: 100%;
-          border-radius: 4px;
-          cursor: crosshair;
-      }
-
-      #hue-canvas {
-          height: 20px;
-          margin-bottom: 12px;
-      }
-
-      #saturation-canvas {
-          height: 150px;
-      }
-
-      .color-input-group {
+      
+      #color-controls {
           display: flex;
-          margin-bottom: 12px;
+          justify-content: space-between;
+          margin-top: 10px;
       }
-
-      .color-input {
-          display: flex;
-          flex-direction: column;
-          margin-right: 8px;
-          flex: 1;
-      }
-
-      .color-input:last-child {
-          margin-right: 0;
-      }
-
-      .color-input label {
-          font-size: 12px;
-          margin-bottom: 4px;
-      }
-
-      .color-input input {
-          width: 100%;
-          padding: 4px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-      }
-
+      
       #color-picker-actions {
           display: flex;
-          justify-content: flex-end;
+          gap: 5px;
       }
-
+      
       #color-picker-actions button {
-          padding: 8px 16px;
+          padding: 5px 10px;
           border-radius: 4px;
           cursor: pointer;
-          margin-left: 8px;
       }
-
+      
+      #color-picker-apply {
+          background-color: #4CAF50;
+          color: white;
+          border: none;
+      }
+      
       #color-picker-cancel {
           background-color: #f1f1f1;
           border: 1px solid #ccc;
       }
-
-      #color-picker-apply {
-          background-color: #3498db;
-          color: white;
-          border: none;
-      }
-
-      /* Opacity slider in color picker */
-      #opacity-container {
-          margin-bottom: 12px;
-      }
-
-      #opacity-slider {
-          width: 100%;
-          height: 20px;
-          background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAGUlEQVQYV2M4gwH+YwCGIasIUwhT25BVBADtzYNYrHvv4gAAAABJRU5ErkJggg==');
-          background-repeat: repeat;
-          border-radius: 4px;
-          position: relative;
-      }
-
-      #opacity-gradient {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          border-radius: 4px;
-      }
-
-      #opacity-input {
-          -webkit-appearance: none;
-          width: 100%;
-          height: 20px;
-          background: transparent;
-          outline: none;
-          margin: 0;
-          padding: 0;
-          position: relative;
-          z-index: 2;
-      }
-
-      #opacity-input::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 20px;
-          height: 20px;
-          background: white;
-          cursor: pointer;
+      
+      #hex-input {
+          padding: 5px;
+          width: 80px;
           border: 1px solid #ccc;
-          border-radius: 50%;
-      }
-
-      #opacity-input::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
-          background: white;
-          cursor: pointer;
-          border: 1px solid #ccc;
-          border-radius: 50%;
+          border-radius: 4px;
       }
     </style>
   </head>
@@ -512,53 +432,92 @@
       </div>
     </div>
 
-    <!-- Custom Color Picker -->
-    <div id="color-picker-overlay">
-      <div id="color-picker">
-        <div id="color-picker-header">
-          <h3 id="color-picker-title">Color Picker</h3>
-          <button id="color-picker-close">×</button>
-        </div>
+    <!-- Simple Color Picker -->
+    <div id="simple-color-picker">
+      <div id="simple-color-picker-header">
+        <h4 id="simple-color-picker-title">Color Picker</h4>
+        <button id="simple-color-picker-close">×</button>
+      </div>
+      
+      <div id="color-preview">
+        <div id="new-color"></div>
+        <div id="original-color"></div>
+      </div>
+      
+      <div id="color-grid">
+        <!-- Standard Colors: First Row -->
+        <div class="color-cell" style="background-color: #000000" data-color="#000000"></div>
+        <div class="color-cell" style="background-color: #808080" data-color="#808080"></div>
+        <div class="color-cell" style="background-color: #800000" data-color="#800000"></div>
+        <div class="color-cell" style="background-color: #808000" data-color="#808000"></div>
+        <div class="color-cell" style="background-color: #008000" data-color="#008000"></div>
+        <div class="color-cell" style="background-color: #008080" data-color="#008080"></div>
+        <div class="color-cell" style="background-color: #000080" data-color="#000080"></div>
+        <div class="color-cell" style="background-color: #800080" data-color="#800080"></div>
         
-        <div id="color-preview">
-          <div id="new-color-preview"></div>
-          <div id="original-color-preview"></div>
-        </div>
+        <!-- Standard Colors: Second Row -->
+        <div class="color-cell" style="background-color: #FFFFFF" data-color="#FFFFFF"></div>
+        <div class="color-cell" style="background-color: #C0C0C0" data-color="#C0C0C0"></div>
+        <div class="color-cell" style="background-color: #FF0000" data-color="#FF0000"></div>
+        <div class="color-cell" style="background-color: #FFFF00" data-color="#FFFF00"></div>
+        <div class="color-cell" style="background-color: #00FF00" data-color="#00FF00"></div>
+        <div class="color-cell" style="background-color: #00FFFF" data-color="#00FFFF"></div>
+        <div class="color-cell" style="background-color: #0000FF" data-color="#0000FF"></div>
+        <div class="color-cell" style="background-color: #FF00FF" data-color="#FF00FF"></div>
         
-        <div class="color-selection-area">
-          <canvas id="hue-canvas" height="20"></canvas>
-          <canvas id="saturation-canvas" height="150"></canvas>
-        </div>
+        <!-- More Blues -->
+        <div class="color-cell" style="background-color: #000033" data-color="#000033"></div>
+        <div class="color-cell" style="background-color: #003399" data-color="#003399"></div>
+        <div class="color-cell" style="background-color: #0066CC" data-color="#0066CC"></div>
+        <div class="color-cell" style="background-color: #0099FF" data-color="#0099FF"></div>
+        <div class="color-cell" style="background-color: #66CCFF" data-color="#66CCFF"></div>
+        <div class="color-cell" style="background-color: #99FFFF" data-color="#99FFFF"></div>
+        <div class="color-cell" style="background-color: #CCFFFF" data-color="#CCFFFF"></div>
+        <div class="color-cell" style="background-color: #EFFFFF" data-color="#EFFFFF"></div>
         
-        <div id="opacity-container">
-          <div id="opacity-slider">
-            <div id="opacity-gradient"></div>
-            <input type="range" id="opacity-input" min="0" max="100" value="100">
-          </div>
-        </div>
+        <!-- More Greens -->
+        <div class="color-cell" style="background-color: #003300" data-color="#003300"></div>
+        <div class="color-cell" style="background-color: #009933" data-color="#009933"></div>
+        <div class="color-cell" style="background-color: #33CC33" data-color="#33CC33"></div>
+        <div class="color-cell" style="background-color: #66FF66" data-color="#66FF66"></div>
+        <div class="color-cell" style="background-color: #99FF99" data-color="#99FF99"></div>
+        <div class="color-cell" style="background-color: #CCFFCC" data-color="#CCFFCC"></div>
+        <div class="color-cell" style="background-color: #EFFFEF" data-color="#EFFFEF"></div>
+        <div class="color-cell" style="background-color: #F5FFF5" data-color="#F5FFF5"></div>
         
-        <div class="color-input-group">
-          <div class="color-input">
-            <label for="hex-input">Hex</label>
-            <input type="text" id="hex-input" maxlength="9">
-          </div>
-        </div>
+        <!-- More Reds -->
+        <div class="color-cell" style="background-color: #330000" data-color="#330000"></div>
+        <div class="color-cell" style="background-color: #990000" data-color="#990000"></div>
+        <div class="color-cell" style="background-color: #CC3333" data-color="#CC3333"></div>
+        <div class="color-cell" style="background-color: #FF6666" data-color="#FF6666"></div>
+        <div class="color-cell" style="background-color: #FF9999" data-color="#FF9999"></div>
+        <div class="color-cell" style="background-color: #FFCCCC" data-color="#FFCCCC"></div>
+        <div class="color-cell" style="background-color: #FFEFEF" data-color="#FFEFEF"></div>
+        <div class="color-cell" style="background-color: #FFF5F5" data-color="#FFF5F5"></div>
+
+        <!-- Yellows and Browns -->
+        <div class="color-cell" style="background-color: #333300" data-color="#333300"></div>
+        <div class="color-cell" style="background-color: #999900" data-color="#999900"></div>
+        <div class="color-cell" style="background-color: #CCCC33" data-color="#CCCC33"></div>
+        <div class="color-cell" style="background-color: #FFFF66" data-color="#FFFF66"></div>
+        <div class="color-cell" style="background-color: #FFFF99" data-color="#FFFF99"></div>
+        <div class="color-cell" style="background-color: #FFFFCC" data-color="#FFFFCC"></div>
+        <div class="color-cell" style="background-color: #FFFFEF" data-color="#FFFFEF"></div>
+        <div class="color-cell" style="background-color: #FFFFF5" data-color="#FFFFF5"></div>
         
-        <div class="color-input-group">
-          <div class="color-input">
-            <label for="r-input">R</label>
-            <input type="number" id="r-input" min="0" max="255">
-          </div>
-          <div class="color-input">
-            <label for="g-input">G</label>
-            <input type="number" id="g-input" min="0" max="255">
-          </div>
-          <div class="color-input">
-            <label for="b-input">B</label>
-            <input type="number" id="b-input" min="0" max="255">
-          </div>
-        </div>
-        
+        <!-- Browns and Oranges -->
+        <div class="color-cell" style="background-color: #663300" data-color="#663300"></div>
+        <div class="color-cell" style="background-color: #996633" data-color="#996633"></div>
+        <div class="color-cell" style="background-color: #CC9933" data-color="#CC9933"></div>
+        <div class="color-cell" style="background-color: #FFCC66" data-color="#FFCC66"></div>
+        <div class="color-cell" style="background-color: #FF9933" data-color="#FF9933"></div>
+        <div class="color-cell" style="background-color: #FF6600" data-color="#FF6600"></div>
+        <div class="color-cell" style="background-color: #FF3300" data-color="#FF3300"></div>
+        <div class="color-cell" style="background-color: #CC3300" data-color="#CC3300"></div>
+      </div>
+      
+      <div id="color-controls">
+        <input type="text" id="hex-input" placeholder="#RRGGBB">
         <div id="color-picker-actions">
           <button id="color-picker-cancel">Cancel</button>
           <button id="color-picker-apply">Apply</button>
@@ -728,22 +687,20 @@
       const opacitySelectionDiv = document.getElementById('opacity-selection');
       const timerToggleDiv = document.getElementById('timer-toggle');
 
-      // Custom Color Picker Elements
-      const colorPickerOverlay = document.getElementById('color-picker-overlay');
-      const colorPicker = document.getElementById('color-picker');
-      const hueCanvas = document.getElementById('hue-canvas');
-      const saturationCanvas = document.getElementById('saturation-canvas');
-      const opacityInput = document.getElementById('opacity-input');
-      const opacityGradient = document.getElementById('opacity-gradient');
+      // Simple Color Picker elements
+      const colorPicker = document.getElementById('simple-color-picker');
+      const closeColorPickerBtn = document.getElementById('simple-color-picker-close');
+      const applyColorBtn = document.getElementById('color-picker-apply');
+      const cancelColorBtn = document.getElementById('color-picker-cancel');
+      const newColorPreview = document.getElementById('new-color');
+      const originalColorPreview = document.getElementById('original-color');
       const hexInput = document.getElementById('hex-input');
-      const rInput = document.getElementById('r-input');
-      const gInput = document.getElementById('g-input');
-      const bInput = document.getElementById('b-input');
-      const newColorPreview = document.getElementById('new-color-preview');
-      const originalColorPreview = document.getElementById('original-color-preview');
-      const applyButton = document.getElementById('color-picker-apply');
-      const cancelButton = document.getElementById('color-picker-cancel');
-      const closeButton = document.getElementById('color-picker-close');
+      const colorCells = document.querySelectorAll('.color-cell');
+
+      // Color picker state
+      let currentEditingSwatch = null;
+      let currentSelectedColor = '#000000';
+      let originalColor = '#000000';
 
       // settings
       const force_stylus = true;
@@ -1378,6 +1335,113 @@
           opacitySelector.style.setProperty('--thumb-opacity', draw_settings.opacity);
       };
       
+      // Setup Simple Color Picker
+      function setupColorPicker() {
+          // Setup color cell click events
+          colorCells.forEach(cell => {
+              cell.addEventListener('click', () => {
+                  const color = cell.getAttribute('data-color');
+                  selectColorInPicker(color);
+              });
+          });
+          
+          // Setup hex input
+          hexInput.addEventListener('input', function() {
+              let hex = this.value;
+              if (hex.charAt(0) !== '#') {
+                  hex = '#' + hex;
+              }
+              
+              // Basic validation for hex format
+              if (/^#([0-9A-F]{3}){1,2}$/i.test(hex)) {
+                  selectColorInPicker(hex);
+              }
+          });
+          
+          // Setup buttons
+          closeColorPickerBtn.addEventListener('click', closeColorPicker);
+          cancelColorBtn.addEventListener('click', closeColorPicker);
+          applyColorBtn.addEventListener('click', applySelectedColor);
+          
+          // Close picker when clicking outside
+          document.addEventListener('mousedown', function(e) {
+              if (colorPicker.style.display === 'block') {
+                  const isClickInside = colorPicker.contains(e.target);
+                  if (!isClickInside && e.target.className !== 'color-swatch') {
+                      closeColorPicker();
+                  }
+              }
+          });
+      }
+      
+      function selectColorInPicker(color) {
+          currentSelectedColor = color;
+          newColorPreview.style.backgroundColor = color;
+          
+          // Update hex input without triggering the input event
+          hexInput.value = color.toUpperCase();
+      }
+      
+      function openColorPicker(swatch) {
+          currentEditingSwatch = swatch;
+          originalColor = swatch.style.backgroundColor;
+          
+          // Set original color preview
+          originalColorPreview.style.backgroundColor = originalColor;
+          
+          // Set initial selected color to match the swatch
+          currentSelectedColor = swatch.dataset.color;
+          newColorPreview.style.backgroundColor = currentSelectedColor;
+          
+          // Set hex input value
+          hexInput.value = currentSelectedColor;
+          
+          // Position the picker near the swatch
+          const swatchRect = swatch.getBoundingClientRect();
+          colorPicker.style.left = (swatchRect.right + 10) + 'px';
+          colorPicker.style.top = swatchRect.top + 'px';
+          
+          // Show the picker
+          colorPicker.style.display = 'block';
+          
+          // Make sure the picker is fully visible
+          const pickerRect = colorPicker.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          
+          // Adjust horizontal position if needed
+          if (pickerRect.right > viewportWidth) {
+              colorPicker.style.left = (swatchRect.left - pickerRect.width - 10) + 'px';
+          }
+          
+          // Adjust vertical position if needed
+          if (pickerRect.bottom > viewportHeight) {
+              colorPicker.style.top = (viewportHeight - pickerRect.height - 10) + 'px';
+          }
+      }
+      
+      function closeColorPicker() {
+          colorPicker.style.display = 'none';
+          currentEditingSwatch = null;
+      }
+      
+      function applySelectedColor() {
+          if (currentEditingSwatch) {
+              // Update the swatch with the new color
+              currentEditingSwatch.style.backgroundColor = currentSelectedColor;
+              currentEditingSwatch.dataset.color = currentSelectedColor;
+              
+              // If this is the active swatch, update the current tool settings
+              if (currentEditingSwatch.classList.contains('active')) {
+                  draw_settings.color = currentSelectedColor;
+                  updateKnobs();
+              }
+              
+              // Close the picker
+              closeColorPicker();
+          }
+      }
+      
       // Set up event listeners
       function setupEventListeners() {
           // Reconnect button
@@ -1392,7 +1456,29 @@
           // Color selection
           const colorSwatches = document.querySelectorAll('.color-swatch');
           colorSwatches.forEach(swatch => {
-              swatch.addEventListener('pointerdown', (e) => handleColorSwatchEvent(e));
+              // For normal click - select color
+              swatch.addEventListener('click', function() {
+                  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                  this.classList.add('active');
+                  draw_settings.color = this.dataset.color;
+                  updateKnobs();
+              });
+              
+              // For long press - open color picker
+              let pressTimer;
+              swatch.addEventListener('pointerdown', function(e) {
+                  pressTimer = setTimeout(() => {
+                      openColorPicker(this);
+                  }, 500); // 500ms for long press
+              });
+              
+              swatch.addEventListener('pointerup', function() {
+                  clearTimeout(pressTimer);
+              });
+              
+              swatch.addEventListener('pointerleave', function() {
+                  clearTimeout(pressTimer);
+              });
           });
           
           widthSelector.addEventListener('input', selectWidth);
@@ -1436,473 +1522,8 @@
           
           // Keyboard shortcuts
           document.addEventListener('keydown', handleKeyDown);
-
-          // Close color picker when clicking outside
-          colorPickerOverlay.addEventListener('click', (e) => {
-              if (e.target === colorPickerOverlay) {
-                  closeColorPicker();
-              }
-          });
       }
       
-      // Color swatch handling
-      let currentEditingSwatch = null;
-      let colorPickerState = {
-          hue: 0,
-          saturation: 100,
-          lightness: 50,
-          opacity: 100,
-          rgbColor: { r: 0, g: 0, b: 0 },
-          originalColor: '#000000'
-      };
-
-      function handleColorSwatchEvent(event) {
-          const swatch = event.currentTarget;
-          
-          // Set the current swatch as active
-          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-          swatch.classList.add('active');
-          
-          // Set the current color
-          draw_settings.color = swatch.dataset.color;
-          updateKnobs();
-          
-          // Long press detection - open color picker after 500ms
-          if (event.type === 'pointerdown') {
-              currentEditingSwatch = swatch;
-              colorPickerState.originalColor = swatch.dataset.color;
-              
-              // Create a timer for long press
-              setTimeout(() => {
-                  if (currentEditingSwatch === swatch) {
-                      openColorPicker(swatch);
-                  }
-              }, 500);
-              
-              // Add listeners to detect if the pointer is released or moved away
-              document.addEventListener('pointerup', clearSwatchLongPress);
-              document.addEventListener('pointermove', clearSwatchLongPress);
-          }
-      }
-
-      function clearSwatchLongPress() {
-          currentEditingSwatch = null;
-          document.removeEventListener('pointerup', clearSwatchLongPress);
-          document.removeEventListener('pointermove', clearSwatchLongPress);
-      }
-
-      // Custom Color Picker Implementation
-      function setupColorPicker() {
-          // Set up color picker canvases
-          initializeHueCanvas();
-          initializeSaturationCanvas();
-          
-          // Set up color picker inputs
-          hexInput.addEventListener('input', handleHexInput);
-          rInput.addEventListener('input', handleRgbInput);
-          gInput.addEventListener('input', handleRgbInput);
-          bInput.addEventListener('input', handleRgbInput);
-          opacityInput.addEventListener('input', handleOpacityInput);
-          
-          // Set up color picker buttons
-          applyButton.addEventListener('click', applyColorSelection);
-          cancelButton.addEventListener('click', closeColorPicker);
-          closeButton.addEventListener('click', closeColorPicker);
-      }
-
-      function initializeHueCanvas() {
-          const ctx = hueCanvas.getContext('2d');
-          const width = hueCanvas.width;
-          const height = hueCanvas.height;
-          
-          // Create hue gradient
-          const gradient = ctx.createLinearGradient(0, 0, width, 0);
-          for (let i = 0; i <= 360; i += 60) {
-              gradient.addColorStop(i / 360, `hsl(${i}, 100%, 50%)`);
-          }
-          
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, width, height);
-          
-          // Add event listeners for hue selection
-          hueCanvas.addEventListener('pointerdown', handleHueSelection);
-          hueCanvas.addEventListener('pointermove', (e) => {
-              if (e.buttons > 0) {
-                  handleHueSelection(e);
-              }
-          });
-      }
-
-      function initializeSaturationCanvas() {
-          // This will be updated dynamically based on the selected hue
-          updateSaturationCanvas(0); // Default hue is red (0°)
-          
-          // Add event listeners for saturation-lightness selection
-          saturationCanvas.addEventListener('pointerdown', handleSaturationSelection);
-          saturationCanvas.addEventListener('pointermove', (e) => {
-              if (e.buttons > 0) {
-                  handleSaturationSelection(e);
-              }
-          });
-      }
-
-      function updateSaturationCanvas(hue) {
-          const ctx = saturationCanvas.getContext('2d');
-          const width = saturationCanvas.width;
-          const height = saturationCanvas.height;
-          
-          // Clear canvas
-          ctx.clearRect(0, 0, width, height);
-          
-          // Create saturation gradient (horizontal, from white to full color)
-          const saturationGradient = ctx.createLinearGradient(0, 0, width, 0);
-          saturationGradient.addColorStop(0, `hsl(${hue}, 0%, 50%)`);
-          saturationGradient.addColorStop(1, `hsl(${hue}, 100%, 50%)`);
-          ctx.fillStyle = saturationGradient;
-          ctx.fillRect(0, 0, width, height);
-          
-          // Create lightness gradient (vertical, from black to transparent to white)
-          const lightnessGradient = ctx.createLinearGradient(0, 0, 0, height);
-          lightnessGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-          lightnessGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
-          lightnessGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
-          ctx.fillStyle = lightnessGradient;
-          ctx.fillRect(0, 0, width, height);
-      }
-
-      function handleHueSelection(e) {
-          const rect = hueCanvas.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const width = hueCanvas.width;
-          
-          // Calculate hue (0-360)
-          colorPickerState.hue = Math.round((x / width) * 360);
-          if (colorPickerState.hue < 0) colorPickerState.hue = 0;
-          if (colorPickerState.hue > 360) colorPickerState.hue = 360;
-          
-          // Update saturation canvas with new hue
-          updateSaturationCanvas(colorPickerState.hue);
-          
-          // Update color display
-          updateColorFromHSL();
-      }
-
-      function handleSaturationSelection(e) {
-          const rect = saturationCanvas.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          const width = saturationCanvas.width;
-          const height = saturationCanvas.height;
-          
-          // Calculate saturation (0-100)
-          colorPickerState.saturation = Math.round((x / width) * 100);
-          if (colorPickerState.saturation < 0) colorPickerState.saturation = 0;
-          if (colorPickerState.saturation > 100) colorPickerState.saturation = 100;
-          
-          // Calculate lightness (0-100, inverted because 0,0 is top-left)
-          // Map from 0-100 to 100-0 for lightness (0% at bottom = black, 100% at top = white)
-          colorPickerState.lightness = Math.round(100 - (y / height) * 100);
-          if (colorPickerState.lightness < 0) colorPickerState.lightness = 0;
-          if (colorPickerState.lightness > 100) colorPickerState.lightness = 100;
-          
-          // Update color display
-          updateColorFromHSL();
-      }
-
-      function handleOpacityInput() {
-          colorPickerState.opacity = parseInt(opacityInput.value);
-          updateColorDisplay();
-      }
-
-      function handleHexInput() {
-          let hex = hexInput.value.trim();
-          
-          // Add # if missing
-          if (hex.charAt(0) !== '#') {
-              hex = '#' + hex;
-          }
-          
-          // Validate hex format
-          const validHex = /^#([0-9A-F]{3}){1,2}$/i;
-          if (!validHex.test(hex)) {
-              return;
-          }
-          
-          // Convert hex to RGB
-          const rgb = hexToRgb(hex);
-          if (!rgb) return;
-          
-          colorPickerState.rgbColor = rgb;
-          
-          // Update RGB inputs
-          rInput.value = rgb.r;
-          gInput.value = rgb.g;
-          bInput.value = rgb.b;
-          
-          // Convert to HSL and update state
-          const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-          colorPickerState.hue = hsl.h;
-          colorPickerState.saturation = hsl.s;
-          colorPickerState.lightness = hsl.l;
-          
-          // Update saturation canvas
-          updateSaturationCanvas(colorPickerState.hue);
-          
-          // Update color display
-          updateColorDisplay();
-      }
-
-      function handleRgbInput() {
-          const r = parseInt(rInput.value) || 0;
-          const g = parseInt(gInput.value) || 0;
-          const b = parseInt(bInput.value) || 0;
-          
-          // Clamp values
-          const rgb = {
-              r: Math.max(0, Math.min(255, r)),
-              g: Math.max(0, Math.min(255, g)),
-              b: Math.max(0, Math.min(255, b))
-          };
-          
-          colorPickerState.rgbColor = rgb;
-          
-          // Update hex input
-          hexInput.value = rgbToHex(rgb.r, rgb.g, rgb.b);
-          
-          // Convert to HSL and update state
-          const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-          colorPickerState.hue = hsl.h;
-          colorPickerState.saturation = hsl.s;
-          colorPickerState.lightness = hsl.l;
-          
-          // Update saturation canvas
-          updateSaturationCanvas(colorPickerState.hue);
-          
-          // Update color display
-          updateColorDisplay();
-      }
-
-      function updateColorFromHSL() {
-          // Convert HSL to RGB
-          const rgb = hslToRgb(
-              colorPickerState.hue, 
-              colorPickerState.saturation, 
-              colorPickerState.lightness
-          );
-          
-          colorPickerState.rgbColor = rgb;
-          
-          // Update RGB inputs
-          rInput.value = rgb.r;
-          gInput.value = rgb.g;
-          bInput.value = rgb.b;
-          
-          // Update hex input
-          hexInput.value = rgbToHex(rgb.r, rgb.g, rgb.b);
-          
-          // Update color display
-          updateColorDisplay();
-      }
-
-      function updateColorDisplay() {
-          const { r, g, b } = colorPickerState.rgbColor;
-          const { opacity } = colorPickerState;
-          
-          // Update color preview
-          newColorPreview.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
-          
-          // Update opacity gradient
-          opacityGradient.style.background = `linear-gradient(to right, rgba(${r}, ${g}, ${b}, 0), rgba(${r}, ${g}, ${b}, 1))`;
-      }
-
-      function openColorPicker(swatch) {
-          currentEditingSwatch = swatch;
-          
-          // Parse the current color
-          const currentColor = swatch.dataset.color;
-          let rgb;
-          
-          // Handle named colors
-          if (currentColor.indexOf('#') !== 0) {
-              // Create a temporary element to get the computed color
-              const tempEl = document.createElement('div');
-              tempEl.style.color = currentColor;
-              document.body.appendChild(tempEl);
-              const computedColor = window.getComputedStyle(tempEl).color;
-              document.body.removeChild(tempEl);
-              
-              // Parse the computed color (format: "rgb(r, g, b)" or "rgba(r, g, b, a)")
-              const match = computedColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/);
-              if (match) {
-                  rgb = {
-                      r: parseInt(match[1]),
-                      g: parseInt(match[2]),
-                      b: parseInt(match[3])
-                  };
-                  colorPickerState.opacity = match[4] ? Math.round(parseFloat(match[4]) * 100) : 100;
-              } else {
-                  // Default to black if parsing fails
-                  rgb = { r: 0, g: 0, b: 0 };
-                  colorPickerState.opacity = 100;
-              }
-          } else {
-              // Handle hex colors
-              rgb = hexToRgb(currentColor);
-              colorPickerState.opacity = 100; // Assume full opacity for hex colors
-          }
-          
-          // Update color picker state
-          colorPickerState.rgbColor = rgb;
-          const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-          colorPickerState.hue = hsl.h;
-          colorPickerState.saturation = hsl.s;
-          colorPickerState.lightness = hsl.l;
-          colorPickerState.originalColor = currentColor;
-          
-          // Update UI elements
-          originalColorPreview.style.backgroundColor = currentColor;
-          rInput.value = rgb.r;
-          gInput.value = rgb.g;
-          bInput.value = rgb.b;
-          hexInput.value = rgbToHex(rgb.r, rgb.g, rgb.b);
-          opacityInput.value = colorPickerState.opacity;
-          
-          // Update saturation canvas and color display
-          updateSaturationCanvas(colorPickerState.hue);
-          updateColorDisplay();
-          
-          // Show the color picker
-          colorPickerOverlay.style.display = 'flex';
-      }
-
-      function closeColorPicker() {
-          colorPickerOverlay.style.display = 'none';
-          currentEditingSwatch = null;
-      }
-
-      function applyColorSelection() {
-          if (!currentEditingSwatch) {
-              closeColorPicker();
-              return;
-          }
-          
-          const { r, g, b } = colorPickerState.rgbColor;
-          const { opacity } = colorPickerState;
-          
-          // Format the color based on opacity
-          let colorValue;
-          if (opacity < 100) {
-              colorValue = `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
-          } else {
-              colorValue = rgbToHex(r, g, b);
-          }
-          
-          // Update the swatch
-          currentEditingSwatch.style.backgroundColor = colorValue;
-          currentEditingSwatch.dataset.color = colorValue;
-          
-          // Update the current tool if this swatch is active
-          if (currentEditingSwatch.classList.contains('active')) {
-              draw_settings.color = colorValue;
-              updateKnobs();
-          }
-          
-          closeColorPicker();
-      }
-
-      // Color conversion utilities
-      function hexToRgb(hex) {
-          // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
-          const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-          hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
-          
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-          return result ? {
-              r: parseInt(result[1], 16),
-              g: parseInt(result[2], 16),
-              b: parseInt(result[3], 16)
-          } : null;
-      }
-
-      function rgbToHex(r, g, b) {
-          return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
-      }
-
-      function rgbToHsl(r, g, b) {
-          r /= 255;
-          g /= 255;
-          b /= 255;
-          
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          let h, s, l = (max + min) / 2;
-          
-          if (max === min) {
-              h = s = 0; // achromatic
-          } else {
-              const d = max - min;
-              s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-              
-              switch (max) {
-              case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-              case g: h = (b - r) / d + 2; break;
-              case b: h = (r - g) / d + 4; break;
-              }
-              
-              h /= 6;
-          }
-          
-          return {
-              h: Math.round(h * 360),
-              s: Math.round(s * 100),
-              l: Math.round(l * 100)
-          };
-      }
-
-      function hslToRgb(h, s, l) {
-          h /= 360;
-          s /= 100;
-          l /= 100;
-          
-          let r, g, b;
-          
-          if (s === 0) {
-              r = g = b = l; // achromatic
-          } else {
-              const hue2rgb = (p, q, t) => {
-                  if (t < 0) t += 1;
-                  if (t > 1) t -= 1;
-                  if (t < 1/6) return p + (q - p) * 6 * t;
-                  if (t < 1/2) return q;
-                  if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                  return p;
-              };
-              
-              const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-              const p = 2 * l - q;
-              
-              r = hue2rgb(p, q, h + 1/3);
-              g = hue2rgb(p, q, h);
-              b = hue2rgb(p, q, h - 1/3);
-          }
-          
-          return {
-              r: Math.round(r * 255),
-              g: Math.round(g * 255),
-              b: Math.round(b * 255)
-          };
-      }
-      
-      let pressTimer;
-      let isLongPress = false;
-
-      function selectColor(swatch) {
-          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-          swatch.classList.add('active');
-          draw_settings.color = swatch.dataset.color;
-          updateKnobs();
-      }
-
       // Show debug information
       function showDebugInfo() {
           console.log('=== DEBUG INFO ===');
