@@ -1523,12 +1523,17 @@
               updateKnobs();
           });
           
+          document.getElementById('loop-btn').addEventListener('click', () => {
+              draw_settings.loop = ( ! draw_settings.loop );
+              updateKnobs();
+          });
+          
           document.getElementById('fill-btn').addEventListener('click', () => {
               draw_settings.fill = ( ! draw_settings.fill );
               updateKnobs();
           });
           
-          // Page navigation
+        // Page navigation
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
           document.getElementById('next-page').addEventListener('click', () => navigatePage(1));
           document.getElementById('add-page').addEventListener('click', addNewPage);
