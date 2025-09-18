@@ -593,6 +593,10 @@
       };
 
       function updateKnobs () {
+          const activeToolButton = document.querySelector('.tool-btn.active');
+          if (activeToolButton) {
+              activeToolButton.style.backgroundColor = draw_settings.color;
+          }
           widthSelector.style.setProperty('--thumb-size', draw_settings.width);
           widthSelector.style.setProperty('--thumb-color', draw_settings.color);
           widthSelector.value = draw_settings.width;
