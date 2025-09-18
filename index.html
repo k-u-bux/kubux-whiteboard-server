@@ -421,8 +421,11 @@
         <div class="tool-section sidebar-section" id="timer-toggle">
           <button class="tool-btn" id="timer-btn" title="Timer">⏲</button>
         </div>
+        <div class="tool-section sidebar-section" id="loop-toggle">
+          <button class="tool-btn" id="loop-btn" title="open stroke / closed loop">◯</button>
+        </div>
         <div class="tool-section sidebar-section" id="fill-toggle">
-          <button class="tool-btn" id="fill-btn" title="open stroke / closed loop">◯</button>
+          <button class="tool-btn" id="fill-btn" title="draw / fill">◯</button>
         </div>
       </div>
       
@@ -561,6 +564,7 @@
           color: "#ff0000",
           undo: false,
           fill: false,
+          loop: false,
           width: 2
       };
       let pen_settings = {
@@ -570,6 +574,7 @@
           color: "#000000",
           undo: false,
           fill: false,
+          loop: false,
           stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
       };
       let chalk_settings = {
@@ -579,6 +584,7 @@
           color: "#000000",
           undo: false,
           fill: false,
+          loop: false,
           stroke: shared.createStroke( shared.STROKE_STYLES.CHALK )
       };
       let highlighter_settings = {
@@ -588,6 +594,7 @@
           color: "yellow",
           undo: true,
           fill: false,
+          loop: false,
           stroke: shared.createStroke( shared.STROKE_STYLES.HIGHLIGHTER )
       };
 
@@ -621,6 +628,11 @@
           } else {
               document.getElementById('fill-btn').innerHTML = '◯';
           }
+          if ( draw_settings.loop ) { 
+              document.getElementById('loop-btn').innerHTML = '◿';
+          } else {
+              document.getElementById('loop-btn').innerHTML = '⯾';
+          }
       }
       
       // updateKnobs();
@@ -637,6 +649,7 @@
               opacitySelectionDiv .style.display = 'flex';
               timerToggleDiv.style.display = 'flex';
               fillToggleDiv.style.display = 'flex';
+              loopToggleDiv.style.display = 'flex';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
@@ -644,6 +657,7 @@
               opacitySelectionDiv .style.display = 'none';
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
+              loopToggleDiv.style.display = 'none';
               break;
           }
       };
@@ -705,6 +719,7 @@
       const opacitySelectionDiv = document.getElementById('opacity-selection');
       const timerToggleDiv = document.getElementById('timer-toggle');
       const fillToggleDiv = document.getElementById('fill-toggle');
+      const loopToggleDiv = document.getElementById('loop-toggle');
 
       // Simple Color Picker elements
       const colorPicker = document.getElementById('simple-color-picker');
