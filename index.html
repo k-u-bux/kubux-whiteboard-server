@@ -1733,7 +1733,17 @@
               const point = shared.createPoint(x, y, pressure);
               currentPath.push(point);
               isDrawing = true;
-              currentStroke = shared.createStroke( draw_settings.stroke);
+              currentStroke = shared.createStroke( draw_settings.stroke );
+              if ( draw_settings.loop ) {
+                  currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
+              } else {
+                  currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.OPEN_PIECEWISE_LINEAR;
+              }
+              if ( draw_settings.fill ) {
+                  currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.FILL;
+              } else {
+                  currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
+              }
               currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
               currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
               currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
