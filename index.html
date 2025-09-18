@@ -2026,8 +2026,9 @@
                   transform[shared.TRANSFORM.F]
               );
 
-              // Apply style
+              // style
               ctx.strokeStyle = element[shared.ELEMENT.COLOR];
+              ctx.fillStyle = element[shared.ELEMENT.COLOR];
               ctx.lineWidth = element[shared.ELEMENT.WIDTH];
               ctx.globalAlpha = element[shared.ELEMENT.OPACITY];
               
@@ -2089,7 +2090,7 @@
           function draw_closed(element) {
               lay_path(element);
               ctx.closePath();
-ctx.lineWidth = element[shared.ELEMENT.WIDTH];
+              ctx.lineWidth = element[shared.ELEMENT.WIDTH];
               ctx.stroke();
           }
 
