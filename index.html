@@ -1184,6 +1184,7 @@
       let pressTimer;
       let isLongPress = false;
 
+/*
       function handleColorSwatchEvent(event) {
           const swatch = event.currentTarget;
           if (event.type === 'pointerdown') {
@@ -1202,6 +1203,51 @@
               isLongPress = false;
           }
       }
+*/
+
+function handleColorSwatchEvent(event) {
+    const swatch = event.currentTarget;
+    if (event.type === 'pointerdown') {
+        isLongPress = false;
+        clearTimeout(pressTimer);
+        pressTimer = setTimeout(() => {
+            isLongPress = true;
+            event.preventDefault();
+            // Create and click the picker directly within the long press event chain
+            const container = document.createElement('div');
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            container.style.top = '-9999px';
+
+            const colorPicker = document.createElement('input');
+            colorPicker.type = 'color';
+            colorPicker.value = swatch.dataset.color;
+            
+            colorPicker.addEventListener('change', (e) => {
+                const newColor = e.target.value;
+                swatch.style.backgroundColor = newColor;
+                swatch.dataset.color = newColor;
+                selectColor(swatch);
+                container.remove();
+            });
+            
+            colorPicker.addEventListener('blur', () => {
+                container.remove();
+            });
+
+            container.appendChild(colorPicker);
+            document.body.appendChild(container);
+            colorPicker.click();
+        }, 500); // 500ms delay for long press
+    } else if (event.type === 'pointerup') {
+        clearTimeout(pressTimer);
+        if (!isLongPress) {
+            selectColor(swatch);
+        }
+        isLongPress = false;
+    }
+}
+
 
       function selectColor(swatch) {
           document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
