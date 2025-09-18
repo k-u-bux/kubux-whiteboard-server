@@ -421,6 +421,9 @@
         <div class="tool-section sidebar-section" id="timer-toggle">
           <button class="tool-btn" id="timer-btn" title="Timer">⏲</button>
         </div>
+        <div class="tool-section sidebar-section" id="fill-toggle">
+          <button class="tool-btn" id="fill-btn" title="Timer"></button>
+        </div>
       </div>
       
       <div class="main-content">
@@ -565,6 +568,7 @@
           width: 2,
           color: "#000000",
           undo: false,
+          fill: false,
           stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
       };
       let chalk_settings = {
@@ -573,6 +577,7 @@
           width: 3,
           color: "#000000",
           undo: false,
+          fill: false,
           stroke: shared.createStroke( shared.STROKE_STYLES.CHALK )
       };
       let highlighter_settings = {
@@ -581,6 +586,7 @@
           width: 24,
           color: "yellow",
           undo: true,
+          fill: false,
           stroke: shared.createStroke( shared.STROKE_STYLES.HIGHLIGHTER )
       };
 
@@ -609,7 +615,14 @@
           } else {
               document.getElementById('timer-btn').classList.remove('active');
           }
+          if ( draw_settings.fill ) { 
+              document.getElementById('fill-btn').innerHtml('⬤');
+          } else {
+              document.getElementById('fill-btn').innerHtml('◯)');
+          }
       }
+      
+      updateKnobs();
 
       function switch_settings ( the_settings ) {
           draw_settings = the_settings;
@@ -688,6 +701,7 @@
       const widthSelectionDiv = document.getElementById('width-selection');
       const opacitySelectionDiv = document.getElementById('opacity-selection');
       const timerToggleDiv = document.getElementById('timer-toggle');
+      const fillToggleDiv = document.getElementById('fill-toggle');
 
       // Simple Color Picker elements
       const colorPicker = document.getElementById('simple-color-picker');
@@ -1488,6 +1502,11 @@
 
           document.getElementById('timer-btn').addEventListener('click', () => {
               draw_settings.undo = ( draw_settings.tool != "eraser" ) && ! draw_settings.undo;
+              updateKnobs();
+          });
+          
+          document.getElementById('fill-btn').addEventListener('click', () => {
+              draw_settings.fill = ! draw_settings.fill;
               updateKnobs();
           });
           
