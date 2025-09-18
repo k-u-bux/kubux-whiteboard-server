@@ -595,7 +595,7 @@
 
       function updateKnobs () {
           const activeToolButton = document.querySelector('.tool-btn.active');
-          if (activeToolButton && ! draw_settings === eraser_settings ) {
+          if (activeToolButton && draw_settings != eraser_settings ) {
               activeToolButton.style.backgroundColor = draw_settings.color;
           }
           // widthSelector.style.setProperty('--thumb-size', draw_settings.width);
