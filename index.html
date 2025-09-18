@@ -2088,7 +2088,8 @@
 
           function draw_closed(element) {
               lay_path(element);
-              ctx.lineWidth = element[shared.ELEMENT.WIDTH];
+              ctx.closePath();
+ctx.lineWidth = element[shared.ELEMENT.WIDTH];
               ctx.stroke();
           }
 
