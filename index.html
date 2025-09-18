@@ -1211,6 +1211,12 @@
       }
 
       function showColorPicker(swatchElement) {
+          // Create an off-screen container for the color picker
+          const container = document.createElement('div');
+          container.style.position = 'absolute';
+          container.style.left = '-9999px';
+          container.style.top = '-9999px';
+
           const colorPicker = document.createElement('input');
           colorPicker.type = 'color';
           colorPicker.value = swatchElement.dataset.color;
@@ -1221,16 +1227,17 @@
               swatchElement.style.backgroundColor = newColor;
               swatchElement.dataset.color = newColor;
               selectColor(swatchElement);
-              colorPicker.remove();
+              container.remove();
           });
           
           // Remove the color picker when it loses focus (e.g., dialog is closed)
           colorPicker.addEventListener('blur', () => {
-              colorPicker.remove();
+              container.remove();
           });
 
-          // Append to the body and immediately click to show the native color picker dialog
-          document.body.appendChild(colorPicker);
+          // Append to the off-screen container and then the body, then simulate click
+          container.appendChild(colorPicker);
+          document.body.appendChild(container);
           colorPicker.click();
       }
       
