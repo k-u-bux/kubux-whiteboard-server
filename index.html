@@ -742,7 +742,7 @@
 
       // settings
       const force_stylus = true;
-      
+
       // Initialize 
       function init() {
           setupCanvas();
@@ -1537,6 +1537,10 @@
               updateKnobs();
           });
           
+          document.getElementById('rectangle-btn').addEventListener('click', () => {
+              toggle_shape_tool( 'rectangle' );
+          });
+          
           // Page navigation
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
           document.getElementById('next-page').addEventListener('click', () => navigatePage(1));
@@ -1915,6 +1919,30 @@
       function handlePointerUp() {
           pointer_handler.up();
       }
+
+
+      // drawing helpers
+      let shape_tool = 'simple';
+
+      function toggle_shape_tool ( btn ) {
+          if ( btn == shape_tool ) {
+              shape_tool = 'simple';
+          } else {
+              shape_tool = btn;
+          }
+          switch ( shape_tool ) {
+          case 'simple':
+              set_pointer_handler( draw_path_pointer_handler );
+              break;
+          case 'rectangle':
+              set_pointer_handler( draw_rectangle_pointer_handler );
+              break;
+          }
+      }
+
+      
+
+
       
       // Find elements that intersect with a complete eraser path
       function findElementsIntersectingPath(eraserStroke) {
