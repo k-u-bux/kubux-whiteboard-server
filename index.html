@@ -450,6 +450,9 @@
         <div class="tool-section sidebar-section" id="fill-toggle">
           <button class="tool-btn" id="fill-btn" title="draw / fill"></button>
         </div>
+        <div class="tool-section sidebar-section" id="curve-selection">
+          <button class="shape-btn" id="curve-btn" title="rectangle path">⚡</button>
+        </div>
         <div class="tool-section sidebar-section" id="rectangle-selection">
           <button class="shape-btn" id="rectangle-btn" title="rectangle path">▭</button>
         </div>
@@ -681,6 +684,7 @@
               timerToggleDiv.style.display = 'flex';
               fillToggleDiv.style.display = 'flex';
               loopToggleDiv.style.display = 'flex';
+              curveSelectionDiv.style.display = 'flex';
               rectangleSelectionDiv.style.display = 'flex';
               break;
           case 'eraser':
@@ -690,6 +694,7 @@
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
+              curveSelectionDiv.style.display = 'none';
               rectangleSelectionDiv.style.display = 'none';
               break;
           }
@@ -753,6 +758,7 @@
       const timerToggleDiv = document.getElementById('timer-toggle');
       const fillToggleDiv = document.getElementById('fill-toggle');
       const loopToggleDiv = document.getElementById('loop-toggle');
+      const curveSelectionDiv = document.getElementById('curve-selection');
       const rectangleSelectionDiv = document.getElementById('rectangle-selection');
 
       // Simple Color Picker elements
@@ -1567,6 +1573,11 @@
               updateKnobs();
           });
           
+          document.getElementById('curve-btn').addEventListener('click', () => {
+              toggle_shape_tool( 'curve' );
+              update_shape_buttons();
+          });
+          
           document.getElementById('rectangle-btn').addEventListener('click', () => {
               toggle_shape_tool( 'rectangle' );
               update_shape_buttons();
@@ -1746,7 +1757,6 @@
               set_pointer_handler( erase_path_pointer_handler );
               break;
           }
-          update_shape_buttons();
       }
       
       // Adjust zoom level
