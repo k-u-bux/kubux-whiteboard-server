@@ -1937,7 +1937,8 @@
       }
 
       function straight_path ( A, B ) {
-          return [ A, B ];
+          return [ shared.createPoint( A[0], A[1], A[2] ),
+                   shared.createPoint( B[0], B[1], B[2] ) ];
       }
 
       function draw_shape_pointer_handler ( make_path ) {
