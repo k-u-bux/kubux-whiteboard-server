@@ -54,7 +54,7 @@
           border: 3px solid transparent;
       }
       
-       .shape-btn {
+      .shape-btn {
           width: 30px;
           height: 30px;
           margin: 0 2px;
@@ -591,6 +591,7 @@
           undo: false,
           fill: false,
           loop: false,
+          shape: 'curve',
           width: 2
       };
       let pen_settings = {
@@ -601,6 +602,7 @@
           undo: false,
           fill: false,
           loop: false,
+          shape: 'curve',
           stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
       };
       let chalk_settings = {
@@ -611,6 +613,7 @@
           undo: false,
           fill: false,
           loop: false,
+          shape: 'curve',
           stroke: shared.createStroke( shared.STROKE_STYLES.CHALK )
       };
       let highlighter_settings = {
@@ -621,6 +624,7 @@
           undo: true,
           fill: false,
           loop: false,
+          shape: 'curve',
           stroke: shared.createStroke( shared.STROKE_STYLES.HIGHLIGHTER )
       };
 
@@ -1722,17 +1726,17 @@
           case 'chalk':
               canvas.style.cursor = 'crosshair';
               switch_settings( chalk_settings );
-              set_pointer_handler( draw_path_pointer_handler );
+              set_pointer_handler( shape_to_ph( chalk_settings.shape ) );
               break;
           case 'pen':
               canvas.style.cursor = 'crosshair';
               switch_settings( pen_settings );
-              set_pointer_handler( draw_path_pointer_handler );
+              set_pointer_handler( shape_to_ph( pen_settings.shape );
               break;
           case 'highlighter':
               canvas.style.cursor = 'crosshair';
               switch_settings( highlighter_settings );
-              set_pointer_handler( draw_path_pointer_handler );
+              set_pointer_handler( shape_to_ph( highlighter_settings.shape ) );
               break;
           case 'eraser':
               canvas.style.cursor = 'cell';
@@ -1944,30 +1948,35 @@
           pointer_handler.up();
       }
 
-
-      // drawing helpers
-      let shape_tool = 'simple';
-
-      function toggle_shape_tool ( btn ) {
-          if ( btn === shape_tool ) {
-              shape_tool = 'simple';
-          } else {
-              shape_tool = btn;
-          }
-          switch ( shape_tool ) {
-          case 'simple':
-              set_pointer_handler( draw_path_pointer_handler );
-              document.getElementById('rectangle-btn').classList.remove('active');
-              break;
+      function shape_to_ph ( shape ) {
+          switch ( shape ) {
+          case 'curve':
+              return draw_path_pointer_handler;
           case 'rectangle':
-              set_pointer_handler( draw_rectangle_pointer_handler );
-              document.getElementById('rectangle-btn').classList.add('active');
-              break;
+              return draw_rectangle_pointer_handler;
           }
       }
 
-      
 
+      function toggle_shape_tool ( shape ) {
+          if ( draw_settings === eraser_settings ) {
+              return;
+          }
+          if ( shape === draw_settings.shape ) {
+              draw_settings.shape = 'curve';
+          } else {
+              draw_settings.shape = shape;
+          }
+          switch ( draw_settings.shape ) {
+          case 'simple':
+              document.getElementById('rectangle-btn').classList.remove('active');
+              break;
+          case 'rectangle':
+              document.getElementById('rectangle-btn').classList.add('active');
+              break;
+          }
+          set_pointer_handler( shape_to_ph( draw_settings.shape ) );
+      }
 
       
       // Find elements that intersect with a complete eraser path
