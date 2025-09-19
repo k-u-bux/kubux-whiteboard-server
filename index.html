@@ -457,7 +457,13 @@
         <div class="tool-section sidebar-section" id="rectangle-selection">
           <button class="shape-btn" id="rectangle-btn" title="rectangle path">▭</button>
         </div>
-       </div>
+        <div class="tool-section sidebar-section" id="horizontal-selection">
+          <button class="shape-btn" id="horizontal-btn" title="horizontal line">⎯</button>
+        </div>
+        <div class="tool-section sidebar-section" id="vertical-selection">
+          <button class="shape-btn" id="vertical-btn" title="vertical line">⏐</button>
+        </div>
+      </div>
       
       <div class="main-content">
         <div id="canvas-container">
@@ -687,6 +693,8 @@
               loopToggleDiv.style.display = 'flex';
               curveSelectionDiv.style.display = 'flex';
               rectangleSelectionDiv.style.display = 'flex';
+              horizontalSelectionDiv.style.display = 'flex';
+              verticalSelectionDiv.style.display = 'flex';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
@@ -697,6 +705,8 @@
               loopToggleDiv.style.display = 'none';
               curveSelectionDiv.style.display = 'none';
               rectangleSelectionDiv.style.display = 'none';
+              horizontalSelectionDiv.style.display = 'none';
+              verticalSelectionDiv.style.display = 'none';
               break;
           }
       };
@@ -761,6 +771,8 @@
       const loopToggleDiv = document.getElementById('loop-toggle');
       const curveSelectionDiv = document.getElementById('curve-selection');
       const rectangleSelectionDiv = document.getElementById('rectangle-selection');
+      const horizontelSelectionDiv = document.getElementById('horizontal-selection');
+      const verticalSelectionDiv = document.getElementById('vertical-selection');
 
       // Simple Color Picker elements
       const colorPicker = document.getElementById('simple-color-picker');
