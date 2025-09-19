@@ -75,7 +75,7 @@
       
       .shape-btn.active {
           border: 3px solid transparent;
-          background-color: #000000;
+          background-color: #808080;
       }
       
      .color-swatch {
@@ -1969,10 +1969,12 @@
       function update_shape_buttons () {
           switch ( draw_settings.shape ) {
           case 'curve':
+              document.getElementById('curve-btn').classList.add('active');
               document.getElementById('rectangle-btn').classList.remove('active');
               break;
           case 'rectangle':
               document.getElementById('rectangle-btn').classList.add('active');
+              document.getElementById('curve-btn').classList.remove('active');
               break;
           }
       }
