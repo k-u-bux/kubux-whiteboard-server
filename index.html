@@ -655,9 +655,9 @@
           // if (activeToolButton && draw_settings != eraser_settings ) {
           //     activeToolButton.style.backgroundColor = draw_settings.color;
           // }
-          document.getElementById('chalk-tool').backgroundColor = chalk_settings.color;
-          document.getElementById('pen-tool').backgroundColor = pen_settings.color;
-          document.getElementById('highlighter-tool').backgroundColor = highlighter_settings.color;
+          document.getElementById('chalk-tool').style.backgroundColor = chalk_settings.color;
+          document.getElementById('pen-tool').style.backgroundColor = pen_settings.color;
+          document.getElementById('highlighter-tool').style.backgroundColor = highlighter_settings.color;
 
           widthSelector.style.setProperty('--thumb-size', draw_settings.width);
           // widthSelector.style.setProperty('--thumb-color', draw_settings.color);
