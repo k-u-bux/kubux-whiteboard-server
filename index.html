@@ -54,7 +54,30 @@
           border: 3px solid transparent;
       }
       
-      .color-swatch {
+       .shape-btn {
+          width: 30px;
+          height: 30px;
+          margin: 0 2px;
+          cursor: pointer;
+          border: 3px solid #f0f0f0;
+          background-color: #f0f0f0;
+          border-radius: 4px;
+      }
+      
+      .shape-btn:hover {
+          background-color: #e0e0e0;
+      }
+
+      .shape-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+      }
+      
+      .shape-btn.active {
+          border: 3px solid transparent;
+      }
+      
+     .color-swatch {
           width: 12px;
           height: 12px;
           border-radius: 50%;
@@ -428,7 +451,7 @@
           <button class="tool-btn" id="fill-btn" title="draw / fill"></button>
         </div>
         <div class="tool-section sidebar-section" id="rectangle-selection">
-          <button class="tool-btn" id="rectangle-btn" title="rectangle path">▭</button>
+          <button class="shape-btn" id="rectangle-btn" title="rectangle path">▭</button>
         </div>
        </div>
       
@@ -653,6 +676,7 @@
               timerToggleDiv.style.display = 'flex';
               fillToggleDiv.style.display = 'flex';
               loopToggleDiv.style.display = 'flex';
+              rectangleSelectionDiv.style.display = 'flex';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
@@ -661,6 +685,7 @@
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
+              rectangleSelectionDiv.style.display = 'none';
               break;
           }
       };
