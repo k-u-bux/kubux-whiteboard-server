@@ -641,7 +641,7 @@
           stroke: shared.createStroke( shared.STROKE_STYLES.HIGHLIGHTER )
       };
 
-      let draw_settings = pen_settings;
+      let draw_settings = chalk_settings;
 
       function stroke_from_settings () {
           currentStroke = [...draw_settings.stroke];
@@ -745,7 +745,7 @@
       let zoomLevel = 1;
       
       // Tool state
-      let currentTool = 'pen';
+      let currentTool = 'chalk';
       let eraserRadius = 20;
       let currentColor = '#000000';
       let currentWidth = 2;
