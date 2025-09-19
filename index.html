@@ -463,6 +463,9 @@
         <div class="tool-section sidebar-section" id="vertical-selection">
           <button class="shape-btn" id="vertical-btn" title="vertical line">⏐</button>
         </div>
+        <div class="tool-section sidebar-section" id="line-selection">
+          <button class="shape-btn" id="line-btn" title="straight line">⚞</button>
+        </div>
       </div>
       
       <div class="main-content">
@@ -773,6 +776,7 @@
       const rectangleSelectionDiv = document.getElementById('rectangle-selection');
       const horizontelSelectionDiv = document.getElementById('horizontal-selection');
       const verticalSelectionDiv = document.getElementById('vertical-selection');
+      const lineSelectionDiv = document.getElementById('line-selection');
 
       // Simple Color Picker elements
       const colorPicker = document.getElementById('simple-color-picker');
@@ -1983,12 +1987,39 @@
           case 'curve':
               document.getElementById('curve-btn').classList.add('active');
               document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('horizontal-btn').classList.remove('active');
+              document.getElementById('vertical-btn').classList.remove('active');
+              document.getElementById('line-btn').classList.remove('active');
               break;
           case 'rectangle':
               document.getElementById('curve-btn').classList.remove('active');
               document.getElementById('rectangle-btn').classList.add('active');
+              document.getElementById('horizontal-btn').classList.remove('active');
+              document.getElementById('vertical-btn').classList.remove('active');
+              document.getElementById('line-btn').classList.remove('active');
+                break;
+          case 'horizontal':
+              document.getElementById('curve-btn').classList.remove('active');
+              document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('horizontal-btn').classList.add('active');
+              document.getElementById('vertical-btn').classList.remove('active');
+              document.getElementById('line-btn').classList.remove('active');
               break;
-          }
+           case 'vertical':
+              document.getElementById('curve-btn').classList.remove('active');
+              document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('horizontal-btn').classList.remove('active');
+              document.getElementById('vertical-btn').classList.add('active');
+              document.getElementById('line-btn').classList.remove('active');
+              break;
+           case 'line':
+              document.getElementById('curve-btn').classList.remove('active');
+              document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('horizontal-btn').classList.remove('active');
+              document.getElementById('vertical-btn').classList.remove('active');
+              document.getElementById('line-btn').classList.add('active');
+              break;
+           }
       }
 
       function shape_to_ph ( shape ) {
