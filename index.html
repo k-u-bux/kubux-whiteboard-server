@@ -27,356 +27,356 @@
           display: flex;
           align-items: center;
           margin-right: 10px;
-          padding-right: 10px;
-          border-right: 1px solid #ddd;
+      padding-right: 10px;
+      border-right: 1px solid #ddd;
       }
 
       .tool-btn {
-          width: 30px;
-          height: 30px;
-          margin: 0 2px;
-          cursor: pointer;
-          border: 3px solid #f0f0f0;
-          background-color: #f0f0f0;
-          border-radius: 4px;
+      width: 30px;
+      height: 30px;
+      margin: 0 2px;
+      cursor: pointer;
+      border: 3px solid #f0f0f0;
+      background-color: #f0f0f0;
+      border-radius: 4px;
       }
       
       .tool-btn:hover {
-          background-color: #e0e0e0;
+      background-color: #e0e0e0;
       }
 
       .tool-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
+      opacity: 0.5;
+      cursor: not-allowed;
       }
       
       .tool-btn.active {
-          border: 3px solid transparent;
+      border: 3px solid transparent;
       }
       
       .shape-btn {
-          width: 30px;
-          height: 30px;
-          margin: 0 2px;
-          cursor: pointer;
-          border: 3px solid #f0f0f0;
-          background-color: #f0f0f0;
-          border-radius: 4px;
+      width: 30px;
+      height: 30px;
+      margin: 0 2px;
+      cursor: pointer;
+      border: 3px solid #f0f0f0;
+      background-color: #f0f0f0;
+      border-radius: 4px;
       }
       
       .shape-btn:hover {
-          background-color: #e0e0e0;
+      background-color: #e0e0e0;
       }
 
       .shape-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
+      opacity: 0.5;
+      cursor: not-allowed;
       }
       
       .shape-btn.active {
-          border: 3px solid transparent;
-          background-color: #808080;
+      border: 3px solid transparent;
+      background-color: #808080;
       }
       
-     .color-swatch {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          margin: 3px;
-          cursor: pointer;
-          border: 1px solid #ccc;
+      .color-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin: 3px;
+      cursor: pointer;
+      border: 1px solid #ccc;
       }
       
       .color-swatch.active {
-          width: 12px;
-          height: 12px;
-          /* border-color: #333; */
-          /* border-width: 6px; */
+      width: 12px;
+      height: 12px;
+      /* border-color: #333; */
+      /* border-width: 6px; */
       }
       
       /* Base slider styles */
       input[type="range"] {
-          -webkit-appearance: none;
-          width: 100px; /* Swap width and height for vertical layout */
-          height: 8px;
-          background: #d3d3d3;
-          outline: none;
-          opacity: 0.7;
-          transition: opacity .2s;
+      -webkit-appearance: none;
+      width: 100px; /* Swap width and height for vertical layout */
+      height: 8px;
+      background: #d3d3d3;
+      outline: none;
+      opacity: 0.7;
+      transition: opacity .2s;
       }
       
       input[type="range"]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          border-radius: 50%;
-          background: var(--thumb-color, black);
-          cursor: pointer;
-          width: calc(var(--thumb-size, 2) * 2px); 
-          height: calc(var(--thumb-size, 2) * 2px);
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 50%;
+      background: var(--thumb-color, black);
+      cursor: pointer;
+      width: calc(var(--thumb-size, 2) * 2px); 
+      height: calc(var(--thumb-size, 2) * 2px);
       }
       
       input[type="range"]::-moz-range-thumb {
-          border: none;
-          border-radius: 50%;
-          background: var(--thumb-color, black);
-          cursor: pointer;
-          width: calc(var(--thumb-size, 2) * 2px);
-          height: calc(var(--thumb-size, 2) * 2px);
+      border: none;
+      border-radius: 50%;
+      background: var(--thumb-color, black);
+      cursor: pointer;
+      width: calc(var(--thumb-size, 2) * 2px);
+      height: calc(var(--thumb-size, 2) * 2px);
       }
       
       /* Specific styles for the opacity slider */
       #opacity-selector {
-          background: #fff;
+      background: #fff;
       }
       
       #opacity-selector::-webkit-slider-thumb {
-          width: 24px;
-          height: 24px;
-          backgroungd: #black;
-          /* background: var(--thumb-color); */
-          opacity: var(--thumb-opacity, 1);
+      width: 24px;
+      height: 24px;
+      backgroungd: #black;
+      /* background: var(--thumb-color); */
+      opacity: var(--thumb-opacity, 1);
       }
       
       #opacity-selector::-moz-range-thumb {
-          width: 24px;
-          height: 24px;
-          backgroungd: #black;
-          /* background: var(--thumb-color); */
-          filter: opacity( var(--thumb-opacity, 1));
+      width: 24px;
+      height: 24px;
+      backgroungd: #black;
+      /* background: var(--thumb-color); */
+      filter: opacity( var(--thumb-opacity, 1));
       }
       
       #debug-tools {
-          margin-left: auto;
+      margin-left: auto;
       }
 
       .app-container {
-          display: flex;
-          flex-grow: 1;
+      display: flex;
+      flex-grow: 1;
       }
       
       .sidebar {
-          width: 50px; /* Reduced width for a more compact sidebar */
-          background-color: #f0f0f0;
-          /* border-right: 0px solid #ccc; */
-          padding: 4px 0px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
+      width: 50px; /* Reduced width for a more compact sidebar */
+      background-color: #f0f0f0;
+      /* border-right: 0px solid #ccc; */
+      padding: 4px 0px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       }
 
       .sidebar-section {
-          width: 100%;
-          box-sizing: border-box;
-          display: flex;
-          flex-direction: column;
-          align-items: center; /* Center content within each section */
-          padding: 4px 0px;
-          margin-bottom: 1px;
-          border-bottom: 1px solid #ddd;
+      width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* Center content within each section */
+      padding: 4px 0px;
+      margin-bottom: 1px;
+      border-bottom: 1px solid #ddd;
       }
       
       .sidebar-section:last-child {
-          border-bottom: none;
+      border-bottom: none;
       }
 
       #width-selection, #opacity-selection {
-          /* Apply styles to the individual slider sections */
-          height: 120px; /* Give the containers enough space to hold the rotated sliders */
-          justify-content: center;
+      /* Apply styles to the individual slider sections */
+      height: 120px; /* Give the containers enough space to hold the rotated sliders */
+      justify-content: center;
       }
       
       #width-selector, #opacity-selector {
-          transform: rotate(90deg); /* Rotate the sliders */
-          transform-origin: 50% 50%; /* Ensure rotation is centered */
+      transform: rotate(90deg); /* Rotate the sliders */
+      transform-origin: 50% 50%; /* Ensure rotation is centered */
       }
 
       .main-content {
-          flex-grow: 1;
-          overflow: hidden;
+      flex-grow: 1;
+      overflow: hidden;
       }
       
       #canvas-container {
-          position: relative;
-          width: 100%;
-          height: 100%;
+      position: relative;
+      width: 100%;
+      height: 100%;
       }
       
       canvas {
-          position: absolute;
-          background-color: white;
-          box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
+      position: absolute;
+      background-color: white;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       }
 
       .page-controls {
-          display: flex;
-          align-items: center;
+      display: flex;
+      align-items: center;
       }
       
       #page-info {
-          margin: 0 10px;
+      margin: 0 10px;
       }
       
       .error-banner {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          background-color: #f44336;
-          color: white;
-          padding: 15px;
-          text-align: center;
-          z-index: 1000;
-          display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: #f44336;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      z-index: 1000;
+      display: none;
       }
       
       .error-banner button {
-          margin-left: 15px;
-          background-color: white;
-          color: #f44336;
-          border: none;
-          padding: 5px 10px;
-          cursor: pointer;
-          border-radius: 4px;
+      margin-left: 15px;
+      background-color: white;
+      color: #f44336;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 4px;
       }
 
       .tooltip {
-          position: relative;
-          display: inline-block;
+      position: relative;
+      display: inline-block;
       }
 
       .tooltip .tooltiptext {
-          visibility: hidden;
-          width: 120px;
-          background-color: #555;
-          color: #fff;
-          text-align: center;
-          border-radius: 6px;
-          padding: 5px;
-          position: absolute;
-          z-index: 1;
-          bottom: 125%;
-          left: 50%;
-          margin-left: -60px;
-          opacity: 0;
-          transition: opacity 0.3s;
-          font-size: 12px;
+      visibility: hidden;
+      width: 120px;
+      background-color: #555;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -60px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 12px;
       }
 
       .tooltip:hover .tooltiptext {
-          visibility: visible;
-          opacity: 1;
+      visibility: visible;
+      opacity: 1;
       }
 
       /* Simple Color Picker Styles */
       #simple-color-picker {
-          position: fixed;
-          z-index: 1000;
-          background: white;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-          padding: 10px;
-          width: 260px;
-          display: none;
+      position: fixed;
+      z-index: 1000;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      padding: 10px;
+      width: 260px;
+      display: none;
       }
       
       #simple-color-picker-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 10px;
-          border-bottom: 1px solid #eee;
-          padding-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 5px;
       }
       
       #simple-color-picker-title {
-          font-weight: bold;
-          margin: 0;
+      font-weight: bold;
+      margin: 0;
       }
       
       #simple-color-picker-close {
-          background: none;
-          border: none;
-          font-size: 18px;
-          cursor: pointer;
-          padding: 2px 5px;
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 2px 5px;
       }
       
       #color-grid {
-          display: grid;
-          grid-template-columns: repeat(8, 1fr);
-          gap: 4px;
-          margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+      margin-bottom: 10px;
       }
       
       .color-cell {
-          width: 25px;
-          height: 25px;
-          border-radius: 3px;
-          cursor: pointer;
-          border: 1px solid #ccc;
+      width: 25px;
+      height: 25px;
+      border-radius: 3px;
+      cursor: pointer;
+      border: 1px solid #ccc;
       }
       
       .color-cell:hover {
-          transform: scale(1.1);
+      transform: scale(1.1);
       }
       
       #color-preview {
-          height: 30px;
-          border-radius: 4px;
-          border: 1px solid #ccc;
-          margin-bottom: 10px;
-          display: flex;
+      height: 30px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      margin-bottom: 10px;
+      display: flex;
       }
       
       #new-color {
-          flex: 3;
-          height: 100%;
+      flex: 3;
+      height: 100%;
       }
       
       #original-color {
-          flex: 1;
-          height: 100%;
-          border-left: 1px solid #ccc;
+      flex: 1;
+      height: 100%;
+      border-left: 1px solid #ccc;
       }
       
       #color-controls {
-          display: flex;
-          justify-content: space-between;
-          margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
       }
       
       #color-picker-actions {
-          display: flex;
-          gap: 5px;
+      display: flex;
+      gap: 5px;
       }
       
       #color-picker-actions button {
-          padding: 5px 10px;
-          border-radius: 4px;
-          cursor: pointer;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
       }
       
       #color-picker-apply {
-          background-color: #4CAF50;
-          color: white;
-          border: none;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
       }
       
       #color-picker-cancel {
-          background-color: #f1f1f1;
-          border: 1px solid #ccc;
+      background-color: #f1f1f1;
+      border: 1px solid #ccc;
       }
       
       #hex-input {
-          padding: 5px;
-          width: 80px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
+      padding: 5px;
+      width: 80px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
       }
     </style>
   </head>
@@ -1600,6 +1600,21 @@
               update_shape_buttons();
           });
           
+          document.getElementById('horizontal-btn').addEventListener('click', () => {
+              set_shape_tool( 'horizontal' );
+              update_shape_buttons();
+          });
+          
+          document.getElementById('vertical-btn').addEventListener('click', () => {
+              set_shape_tool( 'vertical' );
+              update_shape_buttons();
+          });
+          
+          document.getElementById('line-btn').addEventListener('click', () => {
+              set_shape_tool( 'line' );
+              update_shape_buttons();
+          });
+          
           // Page navigation
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
           document.getElementById('next-page').addEventListener('click', () => navigatePage(1));
@@ -1909,59 +1924,80 @@
                    shared.createPoint( xmax, ymax, 0.5 ) ];                   
       }
 
-      const draw_rectangle_pointer_handler = {
-          down: () => {
-              if ( force_stylus && event.pointerType === "touch" ) { return; }
-              const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
-              const pressure = event.pressure !== undefined ? event.pressure : 0.5;
-              currentPath = [];
-              const point = shared.createPoint(x, y, pressure);
-              currentPath.push(point);
-              isDrawing = true;
-              currentStroke = shared.createStroke( draw_settings.stroke );
-              currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
-              if ( draw_settings.fill ) {
-                  currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.FILL;
-              } else {
-                  currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
-              }
-              currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
-              currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
-              currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
-              currentStroke[shared.ELEMENT.POINTS] = [ point, point, point, point ];
-              A = point;
-          },
-          move: () => {
-              if ( force_stylus && event.pointerType === "touch" ) { return; }
-              if (!isDrawing) return;
-              const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
-              const pressure = event.pressure !== undefined ? event.pressure : 0.5;
-              const point = shared.createPoint(x, y, pressure);
-              B = point;
-              currentPath = bbox_path( A, B );
-              currentStroke[shared.ELEMENT.POINTS] = currentPath;
-              redrawCanvas();
-          },
-          up: () => {
-              if ( force_stylus && event.pointerType === "touch" ) { return; }
-              if (isDrawing) {
-                  isDrawing = false;
-                  if (currentPath.length >= 1) {
-                      const actionId = sendDrawAction(currentStroke);
-                      if ( draw_settings.undo ) {
-                          setTimeout( sendGroupEraseAction, 3000, [ actionId ] );
+      function vertical_path ( A, B ) {
+          return [ shared.createPoint( B[0], A[1], 0.5 ),
+                   shared.createPoint( B[0], B[1], 0.5 ) ];
+      }
+
+      function horizontal_path ( A, B ) {
+          return [ shared.createPoint( A[0], B[1], 0.5 ),
+                   shared.createPoint( B[0], B[1], 0.5 ) ];
+      }
+
+      function straight_path ( A, B ) {
+          return [ A, B ];
+      }
+
+      function draw_shape_pointer_handler ( make_path ) {
+          const result = {
+              down: () => {
+                  if ( force_stylus && event.pointerType === "touch" ) { return; }
+                  const rect = canvas.getBoundingClientRect();
+                  const x = (event.clientX - rect.left) / zoomLevel;
+                  const y = (event.clientY - rect.top) / zoomLevel;
+                  const pressure = event.pressure !== undefined ? event.pressure : 0.5;
+                  currentPath = [];
+                  const point = shared.createPoint(x, y, pressure);
+                  currentPath.push(point);
+                  isDrawing = true;
+                  currentStroke = shared.createStroke( draw_settings.stroke );
+                  currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
+                  if ( draw_settings.fill ) {
+                      currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.FILL;
+                  } else {
+                      currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
+                  }
+                  currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
+                  currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
+                  currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
+                  currentStroke[shared.ELEMENT.POINTS] = [ point, point, point, point ];
+                  A = point;
+              },
+              move: () => {
+                  if ( force_stylus && event.pointerType === "touch" ) { return; }
+                  if (!isDrawing) return;
+                  const rect = canvas.getBoundingClientRect();
+                  const x = (event.clientX - rect.left) / zoomLevel;
+                  const y = (event.clientY - rect.top) / zoomLevel;
+                  const pressure = event.pressure !== undefined ? event.pressure : 0.5;
+                  const point = shared.createPoint(x, y, pressure);
+                  B = point;
+                  currentPath = make_path( A, B );
+                  currentStroke[shared.ELEMENT.POINTS] = currentPath;
+                  redrawCanvas();
+              },
+              up: () => {
+                  if ( force_stylus && event.pointerType === "touch" ) { return; }
+                  if (isDrawing) {
+                      isDrawing = false;
+                      if (currentPath.length >= 1) {
+                          const actionId = sendDrawAction(currentStroke);
+                          if ( draw_settings.undo ) {
+                              setTimeout( sendGroupEraseAction, 3000, [ actionId ] );
+                          }
                       }
                   }
+                  currentPath = [];
+                  currentStroke = null;
               }
-              currentPath = [];
-              currentStroke = null;
-          }
-      };
+          };
+          return result;
+      }
 
+      const draw_rectangle_pointer_handler = draw_shape_pointer_handler( bbox_path );
+      const draw_horizontal_pointer_handler = draw_shape_pointer_handler( horizontal_path );
+      const draw_vertical_pointer_handler = draw_shape_pointer_handler( vertical_path );
+      const draw_line_pointer_handler = draw_shape_pointer_handler( straight_path );
 
       let pointer_handler = draw_path_pointer_handler;
 
@@ -1997,7 +2033,7 @@
               document.getElementById('horizontal-btn').classList.remove('active');
               document.getElementById('vertical-btn').classList.remove('active');
               document.getElementById('line-btn').classList.remove('active');
-                break;
+              break;
           case 'horizontal':
               document.getElementById('curve-btn').classList.remove('active');
               document.getElementById('rectangle-btn').classList.remove('active');
@@ -2005,21 +2041,21 @@
               document.getElementById('vertical-btn').classList.remove('active');
               document.getElementById('line-btn').classList.remove('active');
               break;
-           case 'vertical':
+          case 'vertical':
               document.getElementById('curve-btn').classList.remove('active');
               document.getElementById('rectangle-btn').classList.remove('active');
               document.getElementById('horizontal-btn').classList.remove('active');
               document.getElementById('vertical-btn').classList.add('active');
               document.getElementById('line-btn').classList.remove('active');
               break;
-           case 'line':
+          case 'line':
               document.getElementById('curve-btn').classList.remove('active');
               document.getElementById('rectangle-btn').classList.remove('active');
               document.getElementById('horizontal-btn').classList.remove('active');
               document.getElementById('vertical-btn').classList.remove('active');
               document.getElementById('line-btn').classList.add('active');
               break;
-           }
+          }
       }
 
       function shape_to_ph ( shape ) {
@@ -2028,6 +2064,15 @@
               return draw_path_pointer_handler;
           case 'rectangle':
               return draw_rectangle_pointer_handler;
+          }
+          case 'horizontal':
+              return draw_horizontal_pointer_handler;
+          }
+          case 'vertical':
+              return draw_vertical_pointer_handler;
+          }
+          case 'line':
+              return draw_line_pointer_handler;
           }
       }
 
