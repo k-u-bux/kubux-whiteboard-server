@@ -626,11 +626,6 @@
           } else {
               document.getElementById('timer-btn').classList.remove('active');
           }
-          if ( shape_tool === 'rectangle' ) {
-              document.getElementById('rectangle-btn').classList.add('active');
-          } else {
-              document.getElementById('rectangle-btn').classList.remove('active');
-          }
           if ( draw_settings.fill ) { 
               document.getElementById('fill-btn').innerHTML = '⬤';
           } else {
@@ -1938,9 +1933,11 @@
           switch ( shape_tool ) {
           case 'simple':
               set_pointer_handler( draw_path_pointer_handler );
+              document.getElementById('rectangle-btn').classList.remove('active');
               break;
           case 'rectangle':
               set_pointer_handler( draw_rectangle_pointer_handler );
+              document.getElementById('rectangle-btn').classList.add('active');
               break;
           }
       }
