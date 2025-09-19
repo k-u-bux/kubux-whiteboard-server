@@ -651,10 +651,14 @@
       };
 
       function updateKnobs () {
-          const activeToolButton = document.querySelector('.tool-btn.active');
-          if (activeToolButton && draw_settings != eraser_settings ) {
-              activeToolButton.style.backgroundColor = draw_settings.color;
-          }
+          // const activeToolButton = document.querySelector('.tool-btn.active');
+          // if (activeToolButton && draw_settings != eraser_settings ) {
+          //     activeToolButton.style.backgroundColor = draw_settings.color;
+          // }
+          document.getElementById('chalk-tool').backgroundColor = chalk_settings.color;
+          document.getElementById('pen-tool').backgroundColor = pen_settings.color;
+          document.getElementById('highlighter-tool').backgroundColor = highlighter_settings.color;
+
           widthSelector.style.setProperty('--thumb-size', draw_settings.width);
           // widthSelector.style.setProperty('--thumb-color', draw_settings.color);
           widthSelector.value = draw_settings.width;
