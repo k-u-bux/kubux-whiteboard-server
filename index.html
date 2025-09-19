@@ -427,7 +427,10 @@
         <div class="tool-section sidebar-section" id="fill-toggle">
           <button class="tool-btn" id="fill-btn" title="draw / fill"></button>
         </div>
-      </div>
+        <div class="tool-section sidebar-section" id="rectangle-selection">
+          <button class="tool-btn" id="rectangle-btn" title="rectangle path"></button>
+        </div>
+       </div>
       
       <div class="main-content">
         <div id="canvas-container">
@@ -720,6 +723,7 @@
       const timerToggleDiv = document.getElementById('timer-toggle');
       const fillToggleDiv = document.getElementById('fill-toggle');
       const loopToggleDiv = document.getElementById('loop-toggle');
+      const rectangleSelectionDiv = document.getElementById('rectangle-selection');
 
       // Simple Color Picker elements
       const colorPicker = document.getElementById('simple-color-picker');
@@ -1533,7 +1537,7 @@
               updateKnobs();
           });
           
-        // Page navigation
+          // Page navigation
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
           document.getElementById('next-page').addEventListener('click', () => navigatePage(1));
           document.getElementById('add-page').addEventListener('click', addNewPage);
@@ -1823,6 +1827,75 @@
               currentStroke = null;
           }
       };
+
+      let A = [ 0, 0, 0, 0 ];
+      let B = [ 0, 0, 0, 0 ];
+      let a = 0;
+      let b = 0;
+      let c = 0;
+      let d = 0;
+
+      function down_left ( A, B ) {
+          return shared.createPoint( Math.min( A[0], B[0] ), Math.min( A[1], B[1] ), A[2] );
+      }
+
+      function up_right ( A, B ) {
+          return shared.createPoint( Math.max( A[0], B[0] ), Math.max( A[1], B[1] ), A[2] );
+      }
+
+      const draw_rectangle_pointer_handler = {
+          down: () => {
+              if ( force_stylus && event.pointerType === "touch" ) { return; }
+              const rect = canvas.getBoundingClientRect();
+              const x = (event.clientX - rect.left) / zoomLevel;
+              const y = (event.clientY - rect.top) / zoomLevel;
+              const pressure = event.pressure !== undefined ? event.pressure : 0.5;
+              currentPath = [];
+              const point = shared.createPoint(x, y, pressure);
+              currentPath.push(point);
+              isDrawing = true;
+              currentStroke = shared.createStroke( draw_settings.stroke );
+              currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
+              if ( draw_settings.fill ) {
+                  currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.FILL;
+              } else {
+                  currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
+              }
+              currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
+              currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
+              currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
+              currentStroke[shared.ELEMENT.POINTS] = [ point, point, point, point ];
+              A = point;
+          },
+          move: () => {
+              if ( force_stylus && event.pointerType === "touch" ) { return; }
+              if (!isDrawing) return;
+              const rect = canvas.getBoundingClientRect();
+              const x = (event.clientX - rect.left) / zoomLevel;
+              const y = (event.clientY - rect.top) / zoomLevel;
+              const pressure = event.pressure !== undefined ? event.pressure : 0.5;
+              const point = shared.createPoint(x, y, pressure);
+              B = point;
+              currentPath = [ A, down_left(A,B), B, up_right(A,B) ];
+              currentStroke[shared.ELEMENT.POINTS] = currentPath;
+              redrawCanvas();
+          },
+          up: () => {
+              if ( force_stylus && event.pointerType === "touch" ) { return; }
+              if (isDrawing) {
+                  isDrawing = false;
+                  if (currentPath.length >= 1) {
+                      const actionId = sendDrawAction(currentStroke);
+                      if ( draw_settings.undo ) {
+                          setTimeout( sendGroupEraseAction, 3000, [ actionId ] );
+                      }
+                  }
+              }
+              currentPath = [];
+              currentStroke = null;
+          }
+      };
+
 
       let pointer_handler = draw_path_pointer_handler;
 
