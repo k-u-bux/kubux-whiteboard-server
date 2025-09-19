@@ -2217,19 +2217,11 @@
       
       // Delete current page
       function deletePage() {
-          if (totalPages <= 1) {
-              alert("Cannot delete the only page");
-              return;
-          }
-          
           const actionUuid = shared.generateUuid();
-          
           const deletePageAction = {
               type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
               [shared.MOD_ACTIONS.UUID]: actionUuid
           };
-          
-          // Create proposal
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
@@ -2237,8 +2229,6 @@
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deletePageAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
           };
-          
-          // Send to server - no optimistic update for page operations
           sendMessage(proposal);
       }
       
