@@ -707,7 +707,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 releasePage( newPageId );
                 board.pageOrder[ index ] = newPageId;
                 releaseBoard( boardId );
-                sendFullPage( ws, boardIf, newPageId, requestId );
+                sendFullPage( ws, boardId, newPageId, requestId );
             }
             return;
         default:
