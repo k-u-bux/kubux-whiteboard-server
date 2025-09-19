@@ -1731,7 +1731,11 @@
           currentTool = tool;
           
           // Update UI
-          document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+          // document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+          document.getElementById('chalk-tool').classList.remove('active');
+          document.getElementById('pen-tool').classList.remove('active');
+          document.getElementById('highlighter-tool').classList.remove('active');
+          document.getElementById('eraser-tool').classList.remove('active');
           document.getElementById(`${tool}-tool`).classList.add('active');
           
           // Update cursor
