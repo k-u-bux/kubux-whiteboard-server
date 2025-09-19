@@ -312,8 +312,8 @@ const POINT = {
 };
 
 const ELEMENT = {
-    TYPE: 0,         // At the moment always DRAWABLE.STROKE
-    PATH: 1,         // At the moment always DRAWABLE.OPEN_PIECEWISE_LINEAR
+    TYPE: 0,         // DRAWABLE.TYPE
+    PATH: 1,         // DRAWABLE.PATH
     POINTS: 2,       // Array of points
     COLOR: 3,        // Color string
     WIDTH: 4,        // Stroke width

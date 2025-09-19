@@ -700,12 +700,16 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 const newPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 1)];
                 releaseBoard(boardId);
                 sendFullPage(ws, boardId, newPageId, requestId);
-                return;
+            } else {
+                const index = board.pageOrder.indexOf(pageUuid);                
+                const newPageId = generateUuid();
+                const newPage = createPage(newPageId);
+                releasePage( newPageId );
+                board.pageOrder[ index ] = newPageId;
+                releaseBoard( boardId );
+                sendFullPage( ws, boardIf, newPageId, requestId );
             }
-            releaseBoard(boardId);
-            accept = false;
-            reason = "cannot delete last page of a board";
-            break;
+            return;
         default:
             accept = false;
             reason = "unknown action type";
