@@ -1574,12 +1574,12 @@
           });
           
           document.getElementById('curve-btn').addEventListener('click', () => {
-              toggle_shape_tool( 'curve' );
+              set_shape_tool( 'curve' );
               update_shape_buttons();
           });
           
           document.getElementById('rectangle-btn').addEventListener('click', () => {
-              toggle_shape_tool( 'rectangle' );
+              set_shape_tool( 'rectangle' );
               update_shape_buttons();
           });
           
@@ -1981,15 +1981,8 @@
           }
       }
 
-      function toggle_shape_tool ( shape ) {
-          if ( draw_settings === eraser_settings ) {
-              return;
-          }
-          if ( shape === draw_settings.shape ) {
-              draw_settings.shape = 'curve';
-          } else {
-              draw_settings.shape = shape;
-          }
+      function set_shape_tool ( shape ) {
+          draw_settings.shape = shape;
           set_pointer_handler( shape_to_ph( draw_settings.shape ) );
           update_shape_buttons();
       }
