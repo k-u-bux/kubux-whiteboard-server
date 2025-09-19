@@ -1731,7 +1731,7 @@
           case 'pen':
               canvas.style.cursor = 'crosshair';
               switch_settings( pen_settings );
-              set_pointer_handler( shape_to_ph( pen_settings.shape );
+              set_pointer_handler( shape_to_ph( pen_settings.shape ) );
               break;
           case 'highlighter':
               canvas.style.cursor = 'crosshair';
@@ -1948,6 +1948,7 @@
           pointer_handler.up();
       }
 
+
       function shape_to_ph ( shape ) {
           switch ( shape ) {
           case 'curve':
@@ -1956,7 +1957,6 @@
               return draw_rectangle_pointer_handler;
           }
       }
-
 
       function toggle_shape_tool ( shape ) {
           if ( draw_settings === eraser_settings ) {
