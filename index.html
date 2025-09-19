@@ -443,13 +443,13 @@
           <input type="range" id="opacity-selector" min="0" max="128">
         </div>
         <div class="tool-section sidebar-section" id="timer-toggle">
-          <button class="tool-btn" id="timer-btn" title="Timer">⏲</button>
+          <button class="shape-btn" id="timer-btn" title="Timer">⏲</button>
         </div>
         <div class="tool-section sidebar-section" id="loop-toggle">
-          <button class="tool-btn" id="loop-btn" title="open stroke / closed loop"></button>
+          <button class="shape-btn" id="loop-btn" title="open stroke / closed loop"></button>
         </div>
         <div class="tool-section sidebar-section" id="fill-toggle">
-          <button class="tool-btn" id="fill-btn" title="draw / fill"></button>
+          <button class="shape-btn" id="fill-btn" title="draw / fill"></button>
         </div>
         <div class="tool-section sidebar-section" id="curve-selection">
           <button class="shape-btn" id="curve-btn" title="rectangle path">⚡</button>
@@ -1973,8 +1973,8 @@
               document.getElementById('rectangle-btn').classList.remove('active');
               break;
           case 'rectangle':
-              document.getElementById('rectangle-btn').classList.add('active');
               document.getElementById('curve-btn').classList.remove('active');
+              document.getElementById('rectangle-btn').classList.add('active');
               break;
           }
       }
