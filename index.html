@@ -663,6 +663,7 @@
           } else {
               document.getElementById('loop-btn').innerHTML = 'S';
           }
+          update_shape_buttons();
       }
       
       // updateKnobs();
@@ -1568,6 +1569,7 @@
           
           document.getElementById('rectangle-btn').addEventListener('click', () => {
               toggle_shape_tool( 'rectangle' );
+              update_shape_buttons();
           });
           
           // Page navigation
@@ -1948,6 +1950,16 @@
           pointer_handler.up();
       }
 
+      function update_shape_buttons () {
+          switch ( draw_settings.shape ) {
+          case 'curve':
+              document.getElementById('rectangle-btn').classList.remove('active');
+              break;
+          case 'rectangle':
+              document.getElementById('rectangle-btn').classList.add('active');
+              break;
+          }
+      }
 
       function shape_to_ph ( shape ) {
           switch ( shape ) {
@@ -1967,15 +1979,8 @@
           } else {
               draw_settings.shape = shape;
           }
-          switch ( draw_settings.shape ) {
-          case 'curve':
-              document.getElementById('rectangle-btn').classList.remove('active');
-              break;
-          case 'rectangle':
-              document.getElementById('rectangle-btn').classList.add('active');
-              break;
-          }
           set_pointer_handler( shape_to_ph( draw_settings.shape ) );
+          update_shape_buttons();
       }
 
       
