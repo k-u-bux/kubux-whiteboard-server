@@ -2419,9 +2419,7 @@
           context.lineWidth = element[shared.ELEMENT.WIDTH];
           context.stroke();
       }
-
       
-      // Custom render function for shared.render_all_visible_elements
       function renderElement(context, element) {
           if (!element) return;
           context.save();
@@ -2452,6 +2450,7 @@
           context.restore();
       }
       
+      // Custom render function for shared.render_all_visible_elements
       function renderElementToScreen( element ) {
           renderElement( ctx, element );
       }
@@ -2473,11 +2472,9 @@
       }
 
       
-      /**
-       * Generates a timestamp string suitable for a filename.
-       * Format: YYYY-MM-DD_HH-MM-SS
-       * @returns {string} The formatted timestamp string.
-       */
+
+      // export current page to pdf
+
       function getTimestampForFilename() {
           const now = new Date();
           const year = now.getFullYear();
@@ -2485,13 +2482,9 @@
           const day = now.getDate().toString().padStart(2, '0');
           const hours = now.getHours().toString().padStart(2, '0');
           const minutes = now.getMinutes().toString().padStart(2, '0');
-          const seconds = now.getSeconds().toString().padStart(2, '0');
-          
+          const seconds = now.getSeconds().toString().padStart(2, '0');          
           return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
       }
-      
-
-      // export current page to pdf
 
       function exportPageToPDF () {
           try {
