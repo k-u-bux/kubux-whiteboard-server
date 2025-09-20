@@ -769,6 +769,7 @@ if (typeof module !== 'undefined' && module.exports) {
         // transforms
         createIdentityTransform,
         applyTransform,
+        bbox,
         compose,
         // stroke operations
         createStroke,
