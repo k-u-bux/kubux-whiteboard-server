@@ -2282,6 +2282,7 @@
           const bbox1 = bounding_box( elem1 );
           const bbox2 = bounding_box( elem2 );
           const bbox = intersect_boxes( bbox1, bbox2 );
+          console.log("do_intersect: bbox check");
           if ( bbox.length == 0 ) {
               return false;
           }
