@@ -2285,6 +2285,7 @@
           if ( bbox.length == 0 ) {
               return false;
           }
+          console.log("do_intersect: passed bbox check");
           const [ xmin, ymin, xmax, ymax ] = bbox;
           const width = xmax - xmin;
           const height = ymax - ymin;
@@ -2324,7 +2325,7 @@
               const alpha2 = data2[i + 3];
               
               // If a pixel is opaque on both canvases, they intersect
-              if (alpha1 > 0 || alpha2 > 0) {
+              if (alpha1 > 0 && alpha2 > 0) {
                   return true;
               }
           }
