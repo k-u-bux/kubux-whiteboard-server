@@ -536,7 +536,7 @@ function render_all_visible_elements ( visualState, render ) {
 
 function applyTransform ( element, transform ) {
     let result = { ... element };
-    result.transform = compose( transform, result.transform );
+    result.transform = compose( transform, result[ ELEMENT.TRANSFORM ] );
     return Object.freeze( result );
 }
 
