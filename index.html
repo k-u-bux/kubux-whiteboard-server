@@ -2259,7 +2259,7 @@
       // box = [ xmin, ymin, xmax, ymax ]
 
       function bounding_box ( element ) {
-          const path = shared.applyTransformToPath( element[ shared.ELEMENT.TRANSFORM ], element[ shared.ELEMENT.PATH ] );
+          const path = shared.applyTransformToPath( element[ shared.ELEMENT.TRANSFORM ], element[ shared.ELEMENT.POINTS ] );
           console.log(`path = ${path}`);
           const boundaries = shared.bbox( path );
           const radius = element[ shared.ELEMENT.WIDTH ] / 2;
