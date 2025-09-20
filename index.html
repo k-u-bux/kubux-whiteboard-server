@@ -1446,16 +1446,6 @@
           // Apply all actions to visual state
           for (const action of activeActions) {
               applyActionToVisualState(action);
-              // if (action.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-              //     const stroke = action[shared.MOD_ACTIONS.DRAW.STROKE];
-              //     const layer = stroke[shared.ELEMENT.LAYER];
-              //     if (visibleLayers.has(layer)) {
-              //         applyActionToVisualState(action);
-              //     }
-              // } else {
-              //     // For other actions (erase, group, etc.), always apply
-              //     applyActionToVisualState(action);
-              // }
           }
           
           // Redraw the canvas
