@@ -554,7 +554,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
 };
 
 function flag_and_fix_inconsistent_state( page, msg ) {
-    // return;
+    return;
     const current_visible = compileVisualState( page.history.slice( 0, page.present ) ).visible;
     const visible = page.state.visible;
     if ( 
