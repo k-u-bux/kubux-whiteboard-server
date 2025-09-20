@@ -2089,15 +2089,15 @@
           console.log("erasing:", serialize( result ) );
           return result;
 
-          let result = [];
-          for ( const [ uuid, hay ] of visualState.element ) {
-              if ( visualState.visible.has( uuid ) 
-                   &&
-                   do_intersect( hay, eraserStroke ) ) {
-                  result.push( uuid );
-              }
-          }
-          return result;
+          // let result = [];
+          // for ( const [ uuid, hay ] of visualState.element ) {
+          //     if ( visualState.visible.has( uuid ) 
+          //          &&
+          //          do_intersect( hay, eraserStroke ) ) {
+          //         result.push( uuid );
+          //     }
+          // }
+          // return result;
       }
       
       // Send a draw action to the server
