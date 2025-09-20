@@ -2416,7 +2416,7 @@
                   console.error('Only closed paths can be filled.',"");
                   throw new Error('Only closed paths can be filled.');
               }
-              lay_path(element);
+              lay_path(context, element);
               context.closePath();
               context.fill()
           } else if ( type == DRAWABLE.TYPE.STROKE ) {
