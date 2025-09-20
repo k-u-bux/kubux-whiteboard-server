@@ -1442,7 +1442,7 @@
           for (const action of activeActions) {
               if (action.type === shared.MOD_ACTIONS.DRAW.TYPE) {
                   const stroke = action[shared.MOD_ACTIONS.DRAW.STROKE];
-                  const layer = stroke[shared.ELEMENT.LAYER] || 0; // Default to layer 0
+                  const layer = stroke[shared.ELEMENT.LAYER];
                   if (visibleLayers.has(layer)) {
                       applyActionToVisualState(action);
                   }
