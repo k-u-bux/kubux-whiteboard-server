@@ -2084,20 +2084,23 @@
 
       
       // Find elements that intersect with a complete eraser path
-      function findElementsIntersectingPath(eraserStroke) {
+      function findElementsIntersectingPathOld(eraserStroke) {
           const result = shared.findIntersectingElements(visualState, eraserStroke, eraserRadius/2, 10);
           console.log("erasing:", serialize( result ) );
           return result;
+      }
 
-          // let result = [];
-          // for ( const [ uuid, hay ] of visualState.element ) {
-          //     if ( visualState.visible.has( uuid ) 
-          //          &&
-          //          do_intersect( hay, eraserStroke ) ) {
-          //         result.push( uuid );
-          //     }
-          // }
-          // return result;
+      // Find elements that intersect with a complete eraser path
+      function findElementsIntersectingPath(eraserStroke) {
+          let result = [];
+          for ( const [ uuid, hay ] of visualState.element ) {
+              if ( visualState.visible.has( uuid ) 
+                   &&
+                   do_intersect( hay, eraserStroke ) ) {
+                  result.push( hay );
+              }
+          }
+          return result;
       }
       
       // Send a draw action to the server
