@@ -2238,6 +2238,156 @@
           requestFullPage(currentPageUuid, delta);
       }
       
+
+      // drawing / rendering
+      // ===================
+
+      // boxes
+      // box = [ xmin, ymin, xmax, ymax ]
+
+      function bounding_box ( element ) {
+          const path = shared.applyTransform( element[ ELEMENT.TRANSFORM ], element[ ELEMENT.PATH ] );
+          const boundaries = shared.bbox( path );
+          const radius = element[ ELEMENT.WIDTH ] / 2;
+          return [ boundaries[ 0 ] - radius, boundaries[ 1 ] - radius,
+                   boundaries[ 2 ] + radius, boundaries[ 3 ] + radius ];
+      }
+
+      function intersect_boxes ( bbox1, bbox2 ) {
+          const xmin = Math.max( bbox1[0], bbox2[0] );
+          const ymin = Math.max( bbox1[1], bbox2[1] );
+          const xmax = Math.min( bbox1[2], bbox2[2] );
+          const ymax = Math.min( bbox1[3], bbox2[3] );
+          if ( xmin < xmax && ymin < ymax ) {
+              return [ xmin, ymin, xmax, ymax ];
+          } else {
+              return [];
+          }
+      }
+
+      function do_intersect ( elem1, elem2 ) {
+          const bbox1 = bounding_box( elem1 );
+          const bbox2 = bounding_box( elem2 );
+          const bbox = intersect_boxes( bbox1, bbox2 );
+          if ( bbox.length == 0 ) {
+              return false;
+          }
+          
+      }
+
+
+      function push_settings(context, element) {
+          const transform = element[shared.ELEMENT.TRANSFORM];
+          context.transform(
+              transform[shared.TRANSFORM.A],
+              transform[shared.TRANSFORM.B],
+              transform[shared.TRANSFORM.C],
+              transform[shared.TRANSFORM.D],
+              transform[shared.TRANSFORM.E],
+              transform[shared.TRANSFORM.F]
+          );
+
+          // style
+          context.strokeStyle = element[shared.ELEMENT.COLOR];
+          context.fillStyle = element[shared.ELEMENT.COLOR];
+          context.lineWidth = element[shared.ELEMENT.WIDTH];
+          context.globalAlpha = element[shared.ELEMENT.OPACITY];
+          
+          // Cap and join styles
+          context.lineCap = shared.CAP_STYLE_STRINGS[element[shared.ELEMENT.CAP_STYLE]];
+          context.lineJoin = shared.JOIN_STYLE_STRINGS[element[shared.ELEMENT.JOIN_STYLE]];
+          
+          // Dash pattern
+          const dashPattern = element[shared.ELEMENT.DASH_PATTERN];
+          if (dashPattern && dashPattern.length > 1) {
+              context.setLineDash(dashPattern);
+          } else {
+              context.setLineDash([]);
+          }
+      }
+
+      function lay_path(context, element) {
+          const points = element[shared.ELEMENT.POINTS];
+          context.beginPath();
+          context.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
+          for (let i = 1; i < points.length; i++) {
+              const point = points[i];
+              context.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
+          }
+      }
+
+      function draw_open(context, element) {
+          const points = element[shared.ELEMENT.POINTS];
+          context.miterLimit = 2;
+          if ( 1 == points.length ) {
+              context.beginPath();
+              context.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
+              context.lineWidth = element[shared.ELEMENT.WIDTH] * ( 1 + element[shared.ELEMENT.SENSITIVITY] / 2 );
+              context.lineTo(points[0][shared.POINT.X]+0.0001, points[0][shared.POINT.Y]);
+              context.stroke();
+          } else if ( 0.03 > element[shared.ELEMENT.SENSITIVITY] ) {
+              context.beginPath();
+              context.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
+              context.lineWidth = element[shared.ELEMENT.WIDTH];
+              for (let i = 1; i < points.length; i++) {
+                  const point = points[i];
+                  context.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
+              }
+              context.stroke();
+          } else {
+              for (let i = 1; i < points.length; i++) {
+                  context.beginPath();
+                  context.moveTo(points[i-1][shared.POINT.X], points[i-1][shared.POINT.Y]);
+                  const point = points[i];
+                  const pressure = point[shared.POINT.PRESSURE];
+                  const pressureEffect = ( 1 + pressure * element[shared.ELEMENT.SENSITIVITY] );
+                  context.lineWidth = element[shared.ELEMENT.WIDTH] * pressureEffect;
+                  context.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
+                  context.stroke();
+              }
+          }
+      }
+
+      function draw_closed(context, element) {
+          lay_path(element);
+          context.closePath();
+          context.lineWidth = element[shared.ELEMENT.WIDTH];
+          context.stroke();
+      }
+
+      
+      // Custom render function for shared.render_all_visible_elements
+      function renderElement(context, element) {
+          if (!element) return;
+          context.save();
+          push_settings(element);
+          const type = element[ELEMENT.TYPE];
+          const path = element[ELEMENT.PATH];
+          const is_closed = ( path == DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
+          lay_path(context, element);
+          if ( type == DRAWABLE.TYPE.FILL ) {
+              if ( ! is_closed ) {
+                  console.error('Only closed paths can be filled.',"");
+                  throw new Error('Only closed paths can be filled.');
+              }
+              lay_path(element);
+              context.closePath();
+              context.fill()
+          } else if ( type == DRAWABLE.TYPE.STROKE ) {
+              if ( is_closed ) {
+                  draw_closed(context, element);
+              } else {
+                  draw_open(context, element);
+              }
+          } else {
+              // If we get here, it is a bug - assertion would fail in production code
+              console.error('Unknown drawable type:', type);
+              throw new Error('Invalid drawable type');
+          }
+          context.restore();
+      }
+      
+
       // Redraw the canvas
       function redrawCanvas() {
           ctx.save();
@@ -2245,119 +2395,8 @@
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.restore();
 
-          function push_settings(element) {
-              const transform = element[shared.ELEMENT.TRANSFORM];
-              ctx.transform(
-                  transform[shared.TRANSFORM.A],
-                  transform[shared.TRANSFORM.B],
-                  transform[shared.TRANSFORM.C],
-                  transform[shared.TRANSFORM.D],
-                  transform[shared.TRANSFORM.E],
-                  transform[shared.TRANSFORM.F]
-              );
-
-              // style
-              ctx.strokeStyle = element[shared.ELEMENT.COLOR];
-              ctx.fillStyle = element[shared.ELEMENT.COLOR];
-              ctx.lineWidth = element[shared.ELEMENT.WIDTH];
-              ctx.globalAlpha = element[shared.ELEMENT.OPACITY];
-              
-              // Cap and join styles
-              ctx.lineCap = shared.CAP_STYLE_STRINGS[element[shared.ELEMENT.CAP_STYLE]];
-              ctx.lineJoin = shared.JOIN_STYLE_STRINGS[element[shared.ELEMENT.JOIN_STYLE]];
-              
-              // Dash pattern
-              const dashPattern = element[shared.ELEMENT.DASH_PATTERN];
-              if (dashPattern && dashPattern.length > 1) {
-                  ctx.setLineDash(dashPattern);
-              } else {
-                  ctx.setLineDash([]);
-              }
-          }
-
-          function lay_path(element) {
-              const points = element[shared.ELEMENT.POINTS];
-              ctx.beginPath();
-              ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
-              for (let i = 1; i < points.length; i++) {
-                  const point = points[i];
-                  ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
-              }
-          }
-
-          function draw_open(element) {
-              const points = element[shared.ELEMENT.POINTS];
-              ctx.miterLimit = 2;
-              if ( 1 == points.length ) {
-                  ctx.beginPath();
-                  ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
-                  ctx.lineWidth = element[shared.ELEMENT.WIDTH] * ( 1 + element[shared.ELEMENT.SENSITIVITY] / 2 );
-                  ctx.lineTo(points[0][shared.POINT.X]+0.0001, points[0][shared.POINT.Y]);
-                  ctx.stroke();
-              } else if ( 0.03 > element[shared.ELEMENT.SENSITIVITY] ) {
-                  ctx.beginPath();
-                  ctx.moveTo(points[0][shared.POINT.X], points[0][shared.POINT.Y]);
-                  ctx.lineWidth = element[shared.ELEMENT.WIDTH];
-                  for (let i = 1; i < points.length; i++) {
-                      const point = points[i];
-                      ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
-                  }
-                  ctx.stroke();
-              } else {
-                  for (let i = 1; i < points.length; i++) {
-                      ctx.beginPath();
-                      ctx.moveTo(points[i-1][shared.POINT.X], points[i-1][shared.POINT.Y]);
-                      const point = points[i];
-                      const pressure = point[shared.POINT.PRESSURE];
-                      const pressureEffect = ( 1 + pressure * element[shared.ELEMENT.SENSITIVITY] );
-                      ctx.lineWidth = element[shared.ELEMENT.WIDTH] * pressureEffect;
-                      ctx.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
-                      ctx.stroke();
-                  }
-              }
-          }
-
-          function draw_closed(element) {
-              lay_path(element);
-              ctx.closePath();
-              ctx.lineWidth = element[shared.ELEMENT.WIDTH];
-              ctx.stroke();
-          }
-
-          
-          // Custom render function for shared.render_all_visible_elements
-          function renderElement(element) {
-              if (!element) return;
-              ctx.save();
-              push_settings(element);
-              const type = element[ELEMENT.TYPE];
-              const path = element[ELEMENT.PATH];
-              const is_closed = ( path == DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
-              lay_path(element);
-              if ( type == DRAWABLE.TYPE.FILL ) {
-                  if ( ! is_closed ) {
-                      console.error('Only closed paths can be filled.',"");
-                      throw new Error('Only closed paths can be filled.');
-                  }
-                  lay_path(element);
-                  ctx.closePath();
-                  ctx.fill()
-              } else if ( type == DRAWABLE.TYPE.STROKE ) {
-                  if ( is_closed ) {
-                      draw_closed(element);
-                  } else {
-                      draw_open(element);
-                  }
-              } else {
-                  // If we get here, it is a bug - assertion would fail in production code
-                  console.error('Unknown drawable type:', type);
-                  throw new Error('Invalid drawable type');
-              }
-              ctx.restore();
-          }
-          
           // Render all visible elements
-          shared.render_all_visible_elements(visualState, renderElement);
+          shared.render_all_visible_elements(visualState, element => renderElement(ctx, element) );
           
           // Draw current stroke if we're drawing or erasing
           if ((isDrawing || isErasing) && currentStroke) {

@@ -471,6 +471,26 @@ function applyTransformToPath( transform, path ) {
     return result;
 }
 
+
+function bbox ( path ) {
+    if ( path.length > 0 ) {
+        const P = path[0];
+        let xmin = P[ POINT.X ];
+        let xmax = xmin;
+        let ymin = P[ POINT.Y ];
+        let ymax = ymin;
+        for ( const point of path ) {
+            xmin = Math.min( xmin, point[ POINT.X ] );
+            xmax = Math.max( xmax, point[ POINT.X ] );
+            ymin = Math.min( ymin, point[ POINT.Y ] );
+            ymax = Math.max( ymax, point[ POINT.Y ] );
+        }
+        return [ xmin, ymin, xmax, ymax ];
+    } else {
+        return [];
+    }
+}
+
 // visual state and actions to state compiler
 // ==========================================
 
@@ -815,6 +835,7 @@ else if (typeof window !== 'undefined') {
         // transforms
         createIdentityTransform,
         applyTransform,
+        bbox,
         compose,
         // stroke operations
         createStroke,
