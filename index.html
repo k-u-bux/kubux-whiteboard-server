@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8">
@@ -722,12 +722,13 @@
 
       let draw_settings = chalk_settings;
 
-      function stroke_from_settings () {
-          currentStroke = [...draw_settings.stroke];
-          currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
-          currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
-          currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
-          currentStroke[shared.ELEMENT.LAYER] = Number(activeLayer);
+      function createStroke ( settings ) {
+          const result = shared.createStroke( settings.stroke );
+          result[shared.ELEMENT.WIDTH] = settings.width;
+          result[shared.ELEMENT.COLOR] = settings.color;
+          result[shared.ELEMENT.OPACITY] = settings.opacity;
+          result[shared.ELEMENT.LAYER] = Number(activeLayer);
+          return result;
       };
 
       function updateKnobs () {
@@ -1958,7 +1959,7 @@
               const point = shared.createPoint(x, y, pressure);
               currentPath.push(point);
               isDrawing = true;
-              currentStroke = shared.createStroke( draw_settings.stroke );
+              currentStroke = createStroke( draw_settings );
               if ( draw_settings.loop ) {
                   currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
               } else {
@@ -2017,6 +2018,7 @@
               currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
               currentStroke[shared.ELEMENT.COLOR] = '#FF0000'; // Red for visibility during erasing
               currentStroke[shared.ELEMENT.OPACITY] = 0.3; // Transparent so we can see what is being erased
+              currentStroke[shared.ELEMENT.LAYER] = activeLayer;
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
           },
           move: () => {
@@ -2090,7 +2092,7 @@
                   const point = shared.createPoint(x, y, pressure);
                   currentPath.push(point);
                   isDrawing = true;
-                  currentStroke = shared.createStroke( draw_settings.stroke );
+                  currentStroke = createStroke( draw_settings );
                   currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
                   if ( draw_settings.fill ) {
                       currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.FILL;
