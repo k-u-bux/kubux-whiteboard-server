@@ -2097,9 +2097,10 @@
               if ( visualState.visible.has( uuid ) 
                    &&
                    do_intersect( hay, eraserStroke ) ) {
-                  result.push( hay );
+                  result.push( uuid );
               }
           }
+          console.log("erasing:", serialize( result ) );
           return result;
       }
       
