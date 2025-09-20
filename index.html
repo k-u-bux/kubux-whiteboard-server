@@ -727,6 +727,7 @@
           currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
           currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
           currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
+          currentStroke[shared.ELEMENT.LAYER] = activeLayer;
       };
 
       function updateKnobs () {
@@ -822,6 +823,10 @@
       
       // Zoom state
       let zoomLevel = 1;
+
+      // Layer state
+      let activeLayer = 0;
+      let visibleLayers = new Set([0, 1, 2, 3, 4, 5, 6, 7]); // All layers visible by default
       
       // Tool state
       let currentTool = 'chalk';
@@ -883,6 +888,7 @@
           setupWebSocket();
           setupEventListeners();
           setupColorPicker();
+          setupLayerControls();
           debugStylusEvents(); // Add stylus debugging
       }
       
@@ -1434,7 +1440,16 @@
           
           // Apply all actions to visual state
           for (const action of activeActions) {
-              applyActionToVisualState(action);
+              if (action.type === shared.MOD_ACTIONS.DRAW.TYPE) {
+                  const stroke = action[shared.MOD_ACTIONS.DRAW.STROKE];
+                  const layer = stroke[shared.ELEMENT.LAYER] || 0; // Default to layer 0
+                  if (visibleLayers.has(layer)) {
+                      applyActionToVisualState(action);
+                  }
+              } else {
+                  // For other actions (erase, group, etc.), always apply
+                  applyActionToVisualState(action);
+              }
           }
           
           // Redraw the canvas
@@ -1730,6 +1745,49 @@
           // Keyboard shortcuts
           document.addEventListener('keydown', handleKeyDown);
       }
+
+      function setupLayerControls() {
+          // Visibility toggle buttons
+          document.querySelectorAll('.layer-visibility-btn').forEach(btn => {
+              btn.addEventListener('click', function() {
+                  const layer = parseInt(this.getAttribute('data-layer'));
+                  
+                  if (visibleLayers.has(layer)) {
+                      visibleLayers.delete(layer);
+                      this.classList.remove('active');
+                  } else {
+                      visibleLayers.add(layer);
+                      this.classList.add('active');
+                  }
+                  
+                  updateVisualState();
+              });
+          });
+          
+          // Active layer selection buttons
+          document.querySelectorAll('.layer-active-btn').forEach(btn => {
+              btn.addEventListener('click', function() {
+                  const layer = parseInt(this.getAttribute('data-layer'));
+                  
+                  // Update active layer
+                  activeLayer = layer;
+                  
+                  // Update UI
+                  document.querySelectorAll('.layer-active-btn').forEach(b => {
+                      b.classList.remove('active');
+                  });
+                  this.classList.add('active');
+                  
+                  // Ensure this layer is visible
+                  if (!visibleLayers.has(layer)) {
+                      visibleLayers.add(layer);
+                      document.querySelector(`.layer-visibility-btn[data-layer="${layer}"]`).classList.add('active');
+                      updateVisualState();
+                  }
+              });
+          });
+      }
+
       
       // Show debug information
       function showDebugInfo() {
