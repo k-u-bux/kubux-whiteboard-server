@@ -2255,9 +2255,9 @@
       // box = [ xmin, ymin, xmax, ymax ]
 
       function bounding_box ( element ) {
-          const path = shared.applyTransform( element[ ELEMENT.TRANSFORM ], element[ ELEMENT.PATH ] );
+          const path = shared.applyTransform( element[ shared.ELEMENT.TRANSFORM ], element[ shared.ELEMENT.PATH ] );
           const boundaries = shared.bbox( path );
-          const radius = element[ ELEMENT.WIDTH ] / 2;
+          const radius = element[ shared.ELEMENT.WIDTH ] / 2;
           return [ boundaries[ 0 ] - radius, boundaries[ 1 ] - radius,
                    boundaries[ 2 ] + radius, boundaries[ 3 ] + radius ];
       }
