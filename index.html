@@ -2272,8 +2272,54 @@
           if ( bbox.length == 0 ) {
               return false;
           }
+          const [ xmin, ymin, xmax, ymax ] = bbox;
+          const width = xmax - xmin;
+          const height = ymax - ymin;
+
+          const offCanvas1 = document.createElement('canvas');
+          offCanvas1.width = width;
+          offCanvas1.height = height;
+          const ctx1 = offCanvas1.getContext('2d');
+          ctx1.translate( -xmin, -ymin );
+          renderElement( ctx1, elem1 );
+
+          const offCanvas2 = document.createElement('canvas');
+          offCanvas2.width = width;
+          offCanvas2.height = height;
+          const ctx2 = offCanvas2.getContext('2d');
+          ctx2.translate( -xmin, -ymin );
+          renderElement( ctx2, elem2 );
+
+          //  const offCanvas3 = document.createElement('canvas');
+          //  offCanvas3.width = width;
+          //  offCanvas3.height = height;
+          //  const ctx3 = offCanvas3.getContext('2d');
+          //  ctx3.translate( -xmin, -ymin );
+          //  renderElement( ctx3, elem1 );
+          //  renderElement( ctx3, elem2 );
+
+          // Get the pixel data for both canvases
+          const imageData1 = ctx1.getImageData(0, 0, width, height);
+          const data1 = imageData1.data;
           
+          const imageData2 = ctx2.getImageData(0, 0, width, height);
+          const data2 = imageData2.data;
+          
+          // Compare pixel data to find overlap
+          for (let i = 0; i < data1.length; i += 4) {
+              const alpha1 = data1[i + 3];
+              const alpha2 = data2[i + 3];
+              
+              // If a pixel is opaque on both canvases, they intersect
+              if (alpha1 > 0 && alpha2 > 0) {
+                  return true;
+              }
+          }
+          
+          // No overlapping opaque pixels were found
+          return false;
       }
+
 
 
       function push_settings(context, element) {
