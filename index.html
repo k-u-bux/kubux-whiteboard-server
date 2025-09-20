@@ -2395,7 +2395,7 @@
       }
 
       function draw_closed(context, element) {
-          lay_path(element);
+          lay_path(context, element);
           context.closePath();
           context.lineWidth = element[shared.ELEMENT.WIDTH];
           context.stroke();
