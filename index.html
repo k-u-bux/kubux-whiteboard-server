@@ -378,6 +378,57 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       }
+
+      /* layers */
+      .layer-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      }
+
+      .visibility-row, .active-row {
+      display: flex;
+      gap: 2px;
+      }
+
+      .layer-visibility-btn, .layer-active-btn {
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      font-size: 10px;
+      border: 1px solid #ccc;
+      background-color: #f0f0f0;
+      cursor: pointer;
+      border-radius: 3px;
+      }
+
+      /* Visibility button styling */
+      .layer-visibility-btn {
+      opacity: 0.5;
+      }
+
+      .layer-visibility-btn.active {
+      opacity: 1;
+      background-color: #e6e6e6;
+      border-color: #999;
+      }
+
+      /* Active layer button styling */
+      .layer-active-btn {
+      background-color: #f0f0f0;
+      }
+
+      .layer-active-btn.active {
+      background-color: #3498db;
+      color: white;
+      border-color: #2980b9;
+      }
+
+      /* Visual indicator to distinguish rows */
+      .visibility-row {
+      border-bottom: 1px dotted #ccc;
+      padding-bottom: 2px;
+      }
     </style>
   </head>
   <body>
@@ -420,7 +471,34 @@
         <button class="tool-btn" id="highlighter-tool" title="Highlighter">🖌️</button>
         <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
       </div>
-      
+
+      <div class="tool-section" id="layer-controls">
+        <div class="layer-grid">
+          <!-- Visibility Row -->
+          <div class="visibility-row">
+            <button class="layer-visibility-btn active" data-layer="0" title="Toggle Layer 1 Visibility">1</button>
+            <button class="layer-visibility-btn active" data-layer="1" title="Toggle Layer 2 Visibility">2</button>
+            <button class="layer-visibility-btn active" data-layer="2" title="Toggle Layer 3 Visibility">3</button>
+            <button class="layer-visibility-btn active" data-layer="3" title="Toggle Layer 4 Visibility">4</button>
+            <button class="layer-visibility-btn active" data-layer="4" title="Toggle Layer 5 Visibility">5</button>
+            <button class="layer-visibility-btn active" data-layer="5" title="Toggle Layer 6 Visibility">6</button>
+            <button class="layer-visibility-btn active" data-layer="6" title="Toggle Layer 7 Visibility">7</button>
+            <button class="layer-visibility-btn active" data-layer="7" title="Toggle Layer 8 Visibility">8</button>
+          </div>
+          <!-- Active Layer Row -->
+          <div class="active-row">
+            <button class="layer-active-btn active" data-layer="0" title="Draw on Layer 1">1</button>
+            <button class="layer-active-btn" data-layer="1" title="Draw on Layer 2">2</button>
+            <button class="layer-active-btn" data-layer="2" title="Draw on Layer 3">3</button>
+            <button class="layer-active-btn" data-layer="3" title="Draw on Layer 4">4</button>
+            <button class="layer-active-btn" data-layer="4" title="Draw on Layer 5">5</button>
+            <button class="layer-active-btn" data-layer="5" title="Draw on Layer 6">6</button>
+            <button class="layer-active-btn" data-layer="6" title="Draw on Layer 7">7</button>
+            <button class="layer-active-btn" data-layer="7" title="Draw on Layer 8">8</button>
+          </div>
+        </div>
+      </div>      
+
       <div class="tool-section" id="debug-tools">
         <button class="tool-btn" id="debug-btn" title="Debug">🐞</button>
         <span id="sync-status">✓</span>
