@@ -430,11 +430,11 @@
     <div class="app-container">
       <div class="sidebar">
         <div class="tool-section sidebar-section" id="color-selection">
-          <div class="color-swatch" style="background-color: black;" data-color="black"></div>
-          <div class="color-swatch" style="background-color: red;" data-color="red"></div>
-          <div class="color-swatch" style="background-color: green;" data-color="green"></div>
-          <div class="color-swatch" style="background-color: blue;" data-color="blue"></div>
-          <div class="color-swatch" style="background-color: yellow;" data-color="yellow"></div>
+          <div class="color-swatch" title="Press and hold to open color picker" style="background-color: black;" data-color="black"></div>
+          <div class="color-swatch" title="Press and hold to open color picker" style="background-color: red;" data-color="red"></div>
+          <div class="color-swatch" title="Press and hold to open color picker" style="background-color: green;" data-color="green"></div>
+          <div class="color-swatch" title="Press and hold to open color picker" style="background-color: blue;" data-color="blue"></div>
+          <div class="color-swatch" title="Press and hold to open color picker" style="background-color: yellow;" data-color="yellow"></div>
         </div>
         <div class="tool-section sidebar-section" id="width-selection">
           <input type="range" id="width-selector" min="1" max="20">
@@ -474,6 +474,33 @@
         </div>
       </div>
     </div>
+
+
+    <div id="image-color-picker">
+      <div id="picker-header">
+        <h4>Color Picker</h4>
+        <button id="picker-close">×</button>
+      </div>
+      
+      <div id="palette-container">
+        <img id="palette-image" src="color-palette.png" alt="Color Palette">
+        <canvas id="palette-canvas"></canvas>
+      </div>
+      
+      <div id="color-preview-panel">
+        <div id="color-preview-box"></div>
+        <div id="color-info">
+          <span id="hex-value">#000000</span>
+          <span id="rgb-value">rgb(0,0,0)</span>
+        </div>
+      </div>
+      
+      <div id="picker-actions">
+        <button id="picker-cancel">Cancel</button>
+        <button id="picker-apply">Apply</button>
+      </div>
+    </div>
+
 
     <!-- Simple Color Picker -->
     <div id="simple-color-picker">
