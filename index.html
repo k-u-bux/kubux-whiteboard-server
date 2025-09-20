@@ -727,7 +727,7 @@
           currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
           currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
           currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
-          currentStroke[shared.ELEMENT.LAYER] = activeLayer;
+          currentStroke[shared.ELEMENT.LAYER] = Number(activeLayer);
       };
 
       function updateKnobs () {
@@ -1770,7 +1770,7 @@
                   const layer = parseInt(this.getAttribute('data-layer'));
                   
                   // Update active layer
-                  activeLayer = layer;
+                  activeLayer = Number(layer);
                   
                   // Update UI
                   document.querySelectorAll('.layer-active-btn').forEach(b => {
