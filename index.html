@@ -2360,7 +2360,7 @@
       function renderElement(context, element) {
           if (!element) return;
           context.save();
-          push_settings(element);
+          push_settings(context, element);
           const type = element[ELEMENT.TYPE];
           const path = element[ELEMENT.PATH];
           const is_closed = ( path == DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
