@@ -2284,6 +2284,8 @@
           const bbox = intersect_boxes( bbox1, bbox2 );
           console.log("do_intersect: bbox check");
           if ( bbox.length == 0 ) {
+              console.log(`bbox1 = ${bbox1}`);
+              console.log(`bbox2 = ${bbox2}`);
               return false;
           }
           console.log("do_intersect: passed bbox check");
