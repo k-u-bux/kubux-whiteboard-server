@@ -355,7 +355,7 @@ const wss = new WebSocket.Server({
 
 httpServer.listen(PORT, () => {
     debug.log(`[SERVER] HTTP server is running on port ${PORT}`);
-    debug.log(`WebSocket-Server is running on wss://0.0.0.0:${PORT}/ws`);
+    debug.log(`WebSocket-Server is running on ws://0.0.0.0:${PORT}/ws`);
 });
 
 
