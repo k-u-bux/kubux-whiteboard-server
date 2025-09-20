@@ -2420,6 +2420,9 @@
       }
 
       function do_intersect ( elem1, elem2 ) {
+          if ( elem1[ shared.ELEMENT.LAYER ] != elem2[ shared.ELEMENT.LAYER ] ) {
+              return false;
+          }
           const bbox1 = bounding_box( elem1 );
           const bbox2 = bounding_box( elem2 );
           const bbox = intersect_boxes( bbox1, bbox2 );
