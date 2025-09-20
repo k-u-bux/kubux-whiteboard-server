@@ -2324,7 +2324,7 @@
               const alpha2 = data2[i + 3];
               
               // If a pixel is opaque on both canvases, they intersect
-              if (alpha1 > 0 && alpha2 > 0) {
+              if (alpha1 > 0 || alpha2 > 0) {
                   return true;
               }
           }
