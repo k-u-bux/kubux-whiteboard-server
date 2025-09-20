@@ -1445,16 +1445,17 @@
           
           // Apply all actions to visual state
           for (const action of activeActions) {
-              if (action.type === shared.MOD_ACTIONS.DRAW.TYPE) {
-                  const stroke = action[shared.MOD_ACTIONS.DRAW.STROKE];
-                  const layer = stroke[shared.ELEMENT.LAYER];
-                  if (visibleLayers.has(layer)) {
-                      applyActionToVisualState(action);
-                  }
-              } else {
-                  // For other actions (erase, group, etc.), always apply
-                  applyActionToVisualState(action);
-              }
+              applyActionToVisualState(action);
+              // if (action.type === shared.MOD_ACTIONS.DRAW.TYPE) {
+              //     const stroke = action[shared.MOD_ACTIONS.DRAW.STROKE];
+              //     const layer = stroke[shared.ELEMENT.LAYER];
+              //     if (visibleLayers.has(layer)) {
+              //         applyActionToVisualState(action);
+              //     }
+              // } else {
+              //     // For other actions (erase, group, etc.), always apply
+              //     applyActionToVisualState(action);
+              // }
           }
           
           // Redraw the canvas
@@ -2598,7 +2599,9 @@
       
       // Custom render function for shared.render_all_visible_elements
       function renderElementToScreen( element ) {
-          renderElement( ctx, element );
+          if ( visibleLayers.has( element[ shared.ELEMENT.LAYER ] ) ) {
+              renderElement( ctx, element );
+          }
       }
 
       // Redraw the canvas
