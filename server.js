@@ -689,7 +689,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             const newPageId = generateUuid();
             const newPage = createPage(newPageId);
             releasePage(newPageId);
-            board.pageOrder.splice(board.pageOrder.indexOf(pageUuid) + 1, 0, newPageId);
+            board.pageOrder.splice(board.pageOrder.indexOf(pageUuid), 0, newPageId);
             releaseBoard(boardId);
             sendFullPage(ws, boardId, newPageId, requestId);
             return;
