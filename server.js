@@ -699,11 +699,13 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 const index = board.pageOrder.indexOf(pageUuid);
                 board.pageOrder.splice(index, 1);
                 const newPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 1)];
+                deletionMap[pageUuid] = newPageId;
                 releaseBoard(boardId);
                 sendFullPage(ws, boardId, newPageId, requestId);
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
                 const newPageId = generateUuid();
+                deletionMap[pageUuid] = newPageId;
                 const newPage = createPage(newPageId);
                 releasePage( newPageId );
                 board.pageOrder[ index ] = newPageId;
