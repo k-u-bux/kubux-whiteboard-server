@@ -442,7 +442,7 @@ function sendPing() {
     });
 }
 
-function sendPingtoBoard( boardId ) {
+function sendPingtoBaord( boardId ) {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && boardId === client.boardId && client.pageId) {
             sendPing_guts();
