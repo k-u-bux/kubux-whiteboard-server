@@ -1268,7 +1268,7 @@
           // stay on the last page
           if ( pageNr == totalPages && totalPages < pingTotalPages ) {
               debugLog('Server indicates the board has grown. Stay on the last page');
-              requestFullPage( pageId, pingTotalPages - totalPages );
+              requestFullPage( currentPageUuid, pingTotalPages - totalPages );
               return;
           }
 
