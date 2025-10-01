@@ -1258,12 +1258,6 @@
               verifiedHash: hashes[ verifiedIndex ]
           });
           
-          if ( pageNr == totalPages && totalPages < pingTotalPages ) {
-              debugLog('Server indicates the board has grown. Stay on the last page');
-              requestFullPage( pageId, pingTotalPages - totalPages );
-              return;
-          }
-
           // Check if we are on the wrong page
           if (currentPageUuid !== pingPageUuid) {
               debugLog('Server indicates we should be on a different page');
@@ -1271,7 +1265,14 @@
               return;
           }
           
-          // Update page info if needed
+          // stay on the last page
+          if ( pageNr == totalPages && totalPages < pingTotalPages ) {
+              debugLog('Server indicates the board has grown. Stay on the last page');
+              requestFullPage( pageId, pingTotalPages - totalPages );
+              return;
+          }
+
+         // Update page info if needed
           if (pageNr !== pingPageNr || totalPages !== pingTotalPages) {
               pageNr = pingPageNr;
               totalPages = pingTotalPages;
