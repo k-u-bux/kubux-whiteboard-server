@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xournal++ Clone</title>
-    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Whiteboard%20App%22%2C%22short_name%22%3A%22Whiteboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520100%2520100%2522%253E%253Cpath%2520d%253D%2522M25%252075%2520L75%252025%2520M25%252025%2520L75%252075%22%2520stroke%253D%2522black%2522%2520stroke-width%253D%252210%2522%2520%252F%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Whiteboard%20App%22%2C%22short_name%22%3A%22Whiteboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520100%2520100%2522%253E%253Cpath%2520d%253D%2522M25%252075%2520L75%252025%20M25%252025%20L75%252075%22%2520stroke%253D%2522black%2522%2520stroke-width%253D%252210%2522%2520%252F%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
     <style>
       body {
           margin: 0;
@@ -132,7 +132,7 @@
       #opacity-selector::-webkit-slider-thumb {
       width: 24px;
       height: 24px;
-      backgroungd: #black;
+      background: black;
       /* background: var(--thumb-color); */
       opacity: var(--thumb-opacity, 1);
       }
@@ -140,7 +140,7 @@
       #opacity-selector::-moz-range-thumb {
       width: 24px;
       height: 24px;
-      backgroungd: #black;
+      background: black;
       /* background: var(--thumb-color); */
       filter: opacity( var(--thumb-opacity, 1));
       }
@@ -443,36 +443,6 @@
         position: absolute;
         cursor: pointer;
       }
-
-      #selection-actions {
-        position: absolute;
-        display: none;
-        background-color: white;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        padding: 5px;
-        z-index: 100;
-      }
-
-      #selection-actions button {
-        background-color: #f0f0f0;
-        border: 1px solid #ccc;
-        border-radius: 3px;
-        padding: 5px 8px;
-        margin: 2px;
-        cursor: pointer;
-      }
-
-      #selection-actions button:hover {
-        background-color: #e0e0e0;
-      }
-
-      #selection-info {
-        font-size: 12px;
-        margin-bottom: 5px;
-        color: #555;
-      }
     </style>
   </head>
   <body>
@@ -514,7 +484,12 @@
         <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
         <button class="tool-btn" id="highlighter-tool" title="Highlighter">🖌️</button>
         <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
-        <button class="tool-btn" id="selection-tool" title="Selection">🔍</button>
+      </div>
+
+      <div class="tool-section">
+        <button class="tool-btn" id="selection-rectangle-tool" title="Rectangle Selection">⬚</button>
+        <button class="tool-btn" id="selection-lasso-tool" title="Lasso Selection">⭕</button>
+        <button class="tool-btn" id="selection-stroke-tool" title="Stroke Selection">〰️</button>
       </div>
 
       <div class="tool-section" id="layer-controls">
@@ -589,18 +564,28 @@
         <div class="tool-section sidebar-section" id="line-selection">
           <button class="shape-btn" id="line-btn" title="straight line">⚞</button>
         </div>
+        
+        <!-- Selection action buttons (shown when selection tool is active) -->
+        <div class="tool-section sidebar-section" id="selection-actions-sidebar" style="display: none;">
+          <button class="shape-btn" id="cut-btn" title="Cut">✂️</button>
+        </div>
+        <div class="tool-section sidebar-section" id="selection-copy-sidebar" style="display: none;">
+          <button class="shape-btn" id="copy-btn" title="Copy">📋</button>
+        </div>
+        <div class="tool-section sidebar-section" id="selection-delete-sidebar" style="display: none;">
+          <button class="shape-btn" id="delete-btn" title="Delete">🗑️</button>
+        </div>
+        <div class="tool-section sidebar-section" id="selection-layer-sidebar" style="display: none;">
+          <button class="shape-btn" id="move-layer-btn" title="Move to Layer">📑</button>
+        </div>
+        <div class="tool-section sidebar-section" id="selection-deselect-sidebar" style="display: none;">
+          <button class="shape-btn" id="deselect-toggle-btn" title="Deselect Mode">➖</button>
+        </div>
       </div>
       
       <div class="main-content">
         <div id="canvas-container">
           <canvas id="canvas"></canvas>
-          <div id="selection-actions">
-            <div id="selection-info">0 elements selected</div>
-            <button id="cut-btn">Cut</button>
-            <button id="copy-btn">Copy</button>
-            <button id="delete-btn">Delete</button>
-            <button id="move-layer-btn">Move to Layer</button>
-          </div>
         </div>
       </div>
     </div>
@@ -771,15 +756,37 @@
           shape: 'curve',
           stroke: shared.createStroke( shared.STROKE_STYLES.HIGHLIGHTER )
       };
-      let selection_settings = {
-          tool: "selection",
+      let selection_rectangle_settings = {
+          tool: "selection-rectangle",
           opacity: 0.3,
           width: 2,
           color: "#0078d7", // Selection blue
           undo: false,
-          fill: true,
+          fill: false,
           loop: true,
           shape: 'rectangle',
+          stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
+      };
+      let selection_lasso_settings = {
+          tool: "selection-lasso",
+          opacity: 0.3,
+          width: 2,
+          color: "#0078d7",
+          undo: false,
+          fill: false,
+          loop: true,
+          shape: 'curve',
+          stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
+      };
+      let selection_stroke_settings = {
+          tool: "selection-stroke",
+          opacity: 0.3,
+          width: 20,
+          color: "#0078d7",
+          undo: false,
+          fill: false,
+          loop: false,
+          shape: 'curve',
           stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
       };
 
@@ -798,7 +805,6 @@
           document.getElementById('chalk-tool').style.backgroundColor = chalk_settings.color;
           document.getElementById('pen-tool').style.backgroundColor = pen_settings.color;
           document.getElementById('highlighter-tool').style.backgroundColor = highlighter_settings.color;
-          document.getElementById('selection-tool').style.backgroundColor = selection_settings.color;
 
           widthSelector.style.setProperty('--thumb-size', draw_settings.width);
           // widthSelector.style.setProperty('--thumb-color', draw_settings.color);
@@ -829,11 +835,21 @@
       function switch_settings ( the_settings ) {
           draw_settings = the_settings;
           updateKnobs();
+          
+          // Hide/show selection action buttons
+          const isSelectionTool = (draw_settings.tool === 'selection-rectangle' || 
+                                    draw_settings.tool === 'selection-lasso' || 
+                                    draw_settings.tool === 'selection-stroke');
+          selectionActionsSidebar.style.display = isSelectionTool ? 'flex' : 'none';
+          selectionCopySidebar.style.display = isSelectionTool ? 'flex' : 'none';
+          selectionDeleteSidebar.style.display = isSelectionTool ? 'flex' : 'none';
+          selectionLayerSidebar.style.display = isSelectionTool ? 'flex' : 'none';
+          selectionDeselectSidebar.style.display = isSelectionTool ? 'flex' : 'none';
+          
           switch (draw_settings.tool) {
           case 'pen':
           case 'chalk':
           case 'highlighter':
-          case 'selection':
               colorSelectionDiv.style.display = 'flex';
               widthSelectionDiv.style.display = 'flex';
               opacitySelectionDiv .style.display = 'flex';
@@ -845,13 +861,33 @@
               horizontalSelectionDiv.style.display = 'flex';
               verticalSelectionDiv.style.display = 'flex';
               lineSelectionDiv.style.display = 'flex';
-              
-              // For selection tool, adjust display of some controls
-              if (draw_settings.tool === 'selection') {
-                  colorSelectionDiv.style.display = 'none';
-                  opacitySelectionDiv.style.display = 'none';
-                  timerToggleDiv.style.display = 'none';
-              }
+              break;
+          case 'selection-rectangle':
+          case 'selection-lasso':
+              colorSelectionDiv.style.display = 'none';
+              widthSelectionDiv.style.display = 'none';
+              opacitySelectionDiv.style.display = 'none';
+              timerToggleDiv.style.display = 'none';
+              fillToggleDiv.style.display = 'none';
+              loopToggleDiv.style.display = 'none';
+              curveSelectionDiv.style.display = 'none';
+              rectangleSelectionDiv.style.display = 'none';
+              horizontalSelectionDiv.style.display = 'none';
+              verticalSelectionDiv.style.display = 'none';
+              lineSelectionDiv.style.display = 'none';
+              break;
+          case 'selection-stroke':
+              colorSelectionDiv.style.display = 'none';
+              widthSelectionDiv.style.display = 'flex'; // For stroke width
+              opacitySelectionDiv.style.display = 'none';
+              timerToggleDiv.style.display = 'none';
+              fillToggleDiv.style.display = 'none';
+              loopToggleDiv.style.display = 'none';
+              curveSelectionDiv.style.display = 'none';
+              rectangleSelectionDiv.style.display = 'none';
+              horizontalSelectionDiv.style.display = 'none';
+              verticalSelectionDiv.style.display = 'none';
+              lineSelectionDiv.style.display = 'none';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
@@ -889,6 +925,8 @@
       let selectedElements = [];
       let isDraggingSelection = false;
       let selectionStartPoint = null;
+      let selectionOriginalPoint = null; // Track original position for drag
+      let isDeselectMode = false; // Toggle for removing from selection
       
       // Clipboard for copy/paste
       let clipboard = {
@@ -949,13 +987,17 @@
       const verticalSelectionDiv = document.getElementById('vertical-selection');
       const lineSelectionDiv = document.getElementById('line-selection');
       
-      // Selection actions UI
-      const selectionActions = document.getElementById('selection-actions');
-      const selectionInfo = document.getElementById('selection-info');
+      // Selection actions UI (sidebar)
+      const selectionActionsSidebar = document.getElementById('selection-actions-sidebar');
+      const selectionCopySidebar = document.getElementById('selection-copy-sidebar');
+      const selectionDeleteSidebar = document.getElementById('selection-delete-sidebar');
+      const selectionLayerSidebar = document.getElementById('selection-layer-sidebar');
+      const selectionDeselectSidebar = document.getElementById('selection-deselect-sidebar');
       const cutBtn = document.getElementById('cut-btn');
       const copyBtn = document.getElementById('copy-btn');
       const deleteBtn = document.getElementById('delete-btn');
       const moveLayerBtn = document.getElementById('move-layer-btn');
+      const deselectToggleBtn = document.getElementById('deselect-toggle-btn');
 
       // Simple Color Picker elements
       const colorPicker = document.getElementById('simple-color-picker');
@@ -1732,54 +1774,13 @@
           deleteBtn.addEventListener('click', deleteSelectedElements);
           moveLayerBtn.addEventListener('click', showMoveToLayerDialog);
           
-          // Close selection actions when clicking outside
-          document.addEventListener('mousedown', function(e) {
-              if (selectionActions.style.display === 'flex') {
-                  const isClickInside = selectionActions.contains(e.target);
-                  if (!isClickInside && !isSelecting && !isDraggingSelection) {
-                      // Only clear if we're not in the middle of selecting or dragging
-                      const clickedCanvas = e.target === canvas;
-                      if (clickedCanvas) {
-                          // If clicked on canvas, let the handlers manage selection
-                          // Don't clear here to avoid interfering with selection start
-                      } else {
-                          clearSelection();
-                      }
-                  }
-              }
-          });
-          
-          // Keyboard shortcuts
-          document.addEventListener('keydown', function(e) {
-              if (selectedElements.length > 0) {
-                  // Delete key
-                  if (e.key === 'Delete' || e.key === 'Backspace') {
-                      e.preventDefault();
-                      deleteSelectedElements();
-                  }
-                  
-                  // Ctrl+X (Cut)
-                  if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-                      e.preventDefault();
-                      cutSelectedElements();
-                  }
-                  
-                  // Ctrl+C (Copy)
-                  if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-                      e.preventDefault();
-                      copySelectedElements();
-                  }
-              }
-              
-              // Ctrl+V (Paste)
-              if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-                  if (clipboard.elements.length > 0) {
-                      e.preventDefault();
-                      const canvasRect = canvas.getBoundingClientRect();
-                      const x = (canvasRect.width / 2) / zoomLevel;
-                      const y = (canvasRect.height / 2) / zoomLevel;
-                      pasteElements(x, y);
-                  }
+          // Deselect toggle button
+          deselectToggleBtn.addEventListener('click', function() {
+              isDeselectMode = !isDeselectMode;
+              if (isDeselectMode) {
+                  deselectToggleBtn.classList.add('active');
+              } else {
+                  deselectToggleBtn.classList.remove('active');
               }
           });
       }
@@ -1787,53 +1788,7 @@
       // Selection Functions
       function clearSelection() {
           selectedElements = [];
-          hideSelectionActions();
           redrawCanvas();
-      }
-
-      function showSelectionActions(x, y) {
-          if (selectedElements.length === 0) {
-              hideSelectionActions();
-              return;
-          }
-          
-          selectionActions.style.display = 'flex';
-          selectionInfo.textContent = `${selectedElements.length} element(s) selected`;
-          
-          // Position near the selection
-          const bounds = calculateSelectionBounds();
-          if (bounds) {
-              const canvasRect = canvas.getBoundingClientRect();
-              const actionsX = (bounds.x + bounds.width/2) * zoomLevel;
-              const actionsY = (bounds.y - 40) * zoomLevel;
-              
-              selectionActions.style.left = `${actionsX}px`;
-              selectionActions.style.top = `${actionsY}px`;
-          } else if (x !== undefined && y !== undefined) {
-              selectionActions.style.left = `${x}px`;
-              selectionActions.style.top = `${y}px`;
-          }
-          
-          // Ensure it's fully visible
-          const rect = selectionActions.getBoundingClientRect();
-          const containerRect = container.getBoundingClientRect();
-          
-          if (rect.right > containerRect.right) {
-              selectionActions.style.left = `${containerRect.right - rect.width - 10}px`;
-          }
-          if (rect.left < containerRect.left) {
-              selectionActions.style.left = `${containerRect.left + 10}px`;
-          }
-          if (rect.bottom > containerRect.bottom) {
-              selectionActions.style.top = `${containerRect.bottom - rect.height - 10}px`;
-          }
-          if (rect.top < containerRect.top) {
-              selectionActions.style.top = `${containerRect.top + 10}px`;
-          }
-      }
-
-      function hideSelectionActions() {
-          selectionActions.style.display = 'none';
       }
 
       function calculateSelectionBounds() {
@@ -1894,29 +1849,24 @@
       function startDragSelectedElements(x, y) {
           isDraggingSelection = true;
           selectionStartPoint = { x, y };
+          selectionOriginalPoint = { x, y };
       }
 
       function dragSelectedElements(x, y) {
           if (!isDraggingSelection || !selectionStartPoint) return;
           
-          const dx = x - selectionStartPoint.x;
-          const dy = y - selectionStartPoint.y;
-          
-          // You could implement real-time preview of the drag here
-          // For simplicity, we'll just move the selection action UI
-          const rect = selectionActions.getBoundingClientRect();
-          selectionActions.style.left = `${rect.left + dx}px`;
-          selectionActions.style.top = `${rect.top + dy}px`;
-          
+          // Update selection start point for calculating final movement
           selectionStartPoint = { x, y };
+          
+          // TODO: Could implement real-time preview of the drag here
       }
 
       function finishDragSelectedElements(x, y) {
           if (!isDraggingSelection) return;
           
-          // Calculate total movement
-          const dx = x - selectionStartPoint.x;
-          const dy = y - selectionStartPoint.y;
+          // Calculate total movement from original point
+          const dx = x - selectionOriginalPoint.x;
+          const dy = y - selectionOriginalPoint.y;
           
           // Apply movement to all selected elements
           if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
@@ -1925,6 +1875,7 @@
           
           isDraggingSelection = false;
           selectionStartPoint = null;
+          selectionOriginalPoint = null;
       }
 
       function moveSelectedElements(dx, dy) {
@@ -2017,25 +1968,6 @@
                   clipboard.elements.push(elementCopy);
               }
           });
-          
-          // Show feedback
-          if (clipboard.elements.length > 0) {
-              const feedback = document.createElement('div');
-              feedback.textContent = `Copied ${clipboard.elements.length} element(s)`;
-              feedback.style.position = 'absolute';
-              feedback.style.background = 'rgba(0,0,0,0.7)';
-              feedback.style.color = 'white';
-              feedback.style.padding = '5px 10px';
-              feedback.style.borderRadius = '3px';
-              feedback.style.zIndex = '1000';
-              feedback.style.left = `${selectionActions.offsetLeft}px`;
-              feedback.style.top = `${selectionActions.offsetTop + selectionActions.offsetHeight}px`;
-              
-              document.body.appendChild(feedback);
-              setTimeout(() => {
-                  document.body.removeChild(feedback);
-              }, 1500);
-          }
       }
 
       function cutSelectedElements() {
@@ -2256,7 +2188,9 @@
           document.getElementById('pen-tool').addEventListener('click', () => setTool('pen'));
           document.getElementById('highlighter-tool').addEventListener('click', () => setTool('highlighter'));
           document.getElementById('eraser-tool').addEventListener('click', () => setTool('eraser'));
-          document.getElementById('selection-tool').addEventListener('click', () => setTool('selection'));
+          document.getElementById('selection-rectangle-tool').addEventListener('click', () => setTool('selection-rectangle'));
+          document.getElementById('selection-lasso-tool').addEventListener('click', () => setTool('selection-lasso'));
+          document.getElementById('selection-stroke-tool').addEventListener('click', () => setTool('selection-stroke'));
           
           // Color selection
           const colorSwatches = document.querySelectorAll('.color-swatch');
@@ -2519,18 +2453,22 @@
       function setTool(tool) {
           currentTool = tool;
           
-          // Update UI
-          // document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+          // Update UI - remove active from all tools
           document.getElementById('chalk-tool').classList.remove('active');
           document.getElementById('pen-tool').classList.remove('active');
           document.getElementById('highlighter-tool').classList.remove('active');
           document.getElementById('eraser-tool').classList.remove('active');
-          document.getElementById('selection-tool').classList.remove('active');
+          document.getElementById('selection-rectangle-tool').classList.remove('active');
+          document.getElementById('selection-lasso-tool').classList.remove('active');
+          document.getElementById('selection-stroke-tool').classList.remove('active');
           document.getElementById(`${tool}-tool`).classList.add('active');
           
-          // Clear selection when switching tools
-          if (tool !== 'selection') {
+          // Clear selection when switching away from selection tools
+          const isSelectionTool = (tool === 'selection-rectangle' || tool === 'selection-lasso' || tool === 'selection-stroke');
+          if (!isSelectionTool) {
               clearSelection();
+              isDeselectMode = false;
+              deselectToggleBtn.classList.remove('active');
           }
           
           // Update cursor
@@ -2555,9 +2493,19 @@
               switch_settings( eraser_settings );
               set_pointer_handler( erase_path_pointer_handler );
               break;
-          case 'selection':
+          case 'selection-rectangle':
               canvas.style.cursor = 'crosshair';
-              switch_settings( selection_settings );
+              switch_settings( selection_rectangle_settings );
+              set_pointer_handler( selection_pointer_handler );
+              break;
+          case 'selection-lasso':
+              canvas.style.cursor = 'crosshair';
+              switch_settings( selection_lasso_settings );
+              set_pointer_handler( selection_pointer_handler );
+              break;
+          case 'selection-stroke':
+              canvas.style.cursor = 'crosshair';
+              switch_settings( selection_stroke_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           }
@@ -2700,34 +2648,31 @@
               currentPath.push(point);
               
               // Create selection stroke based on current shape settings
-              selectionStroke = createStroke(selection_settings);
+              selectionStroke = createStroke(draw_settings);
               
               // Apply the current shape settings
-              if (selection_settings.loop) {
+              if (draw_settings.loop) {
                   selectionStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
               } else {
                   selectionStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.OPEN_PIECEWISE_LINEAR;
               }
               
-              if (selection_settings.fill) {
+              if (draw_settings.fill) {
                   selectionStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.FILL;
               } else {
                   selectionStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
               }
               
               // For rectangle selection, initialize with 4 points
-              if (selection_settings.shape === 'rectangle') {
+              if (draw_settings.shape === 'rectangle') {
                   selectionStroke[shared.ELEMENT.POINTS] = [point, point, point, point];
               } else {
                   selectionStroke[shared.ELEMENT.POINTS] = [point];
               }
               
-              // Clear selection if not holding shift
-              if (!event.shiftKey) {
-                  selectedElements = [];
-              }
+              // Selection is always cumulative - no need to clear
+              // (unless in deselect mode which is handled on pointer up)
               
-              hideSelectionActions();
               redrawCanvas();
           },
           
@@ -2751,7 +2696,7 @@
               const y = (event.clientY - rect.top) / zoomLevel;
               
               // Update selection shape based on the shape type
-              if (selection_settings.shape === 'rectangle') {
+              if (draw_settings.shape === 'rectangle') {
                   // Rectangle selection
                   const startPoint = currentPath[0];
                   selectionStroke[shared.ELEMENT.POINTS] = [
@@ -2760,23 +2705,23 @@
                       shared.createPoint(x, y, 0.5),
                       shared.createPoint(x, startPoint[shared.POINT.Y], 0.5)
                   ];
-              } else if (selection_settings.shape === 'curve') {
-                  // Freeform/lasso selection
+              } else if (draw_settings.shape === 'curve') {
+                  // Freeform/lasso or stroke selection
                   const point = shared.createPoint(x, y, 0.5);
                   currentPath.push(point);
                   selectionStroke[shared.ELEMENT.POINTS] = currentPath;
-              } else if (selection_settings.shape === 'line' || 
-                         selection_settings.shape === 'horizontal' || 
-                         selection_settings.shape === 'vertical') {
+              } else if (draw_settings.shape === 'line' || 
+                         draw_settings.shape === 'horizontal' || 
+                         draw_settings.shape === 'vertical') {
                   // Line-based selection
                   const startPoint = currentPath[0];
                   
-                  if (selection_settings.shape === 'horizontal') {
+                  if (draw_settings.shape === 'horizontal') {
                       selectionStroke[shared.ELEMENT.POINTS] = [
                           startPoint,
                           shared.createPoint(x, startPoint[shared.POINT.Y], 0.5)
                       ];
-                  } else if (selection_settings.shape === 'vertical') {
+                  } else if (draw_settings.shape === 'vertical') {
                       selectionStroke[shared.ELEMENT.POINTS] = [
                           startPoint,
                           shared.createPoint(startPoint[shared.POINT.X], y, 0.5)
@@ -2807,7 +2752,7 @@
               isSelecting = false;
               
               // For freeform selection, close the path if loop is true
-              if (selection_settings.shape === 'curve' && selection_settings.loop && currentPath.length > 2) {
+              if (draw_settings.shape === 'curve' && draw_settings.loop && currentPath.length > 2) {
                   // Add the first point again to close the path
                   currentPath.push(currentPath[0]);
                   selectionStroke[shared.ELEMENT.POINTS] = currentPath;
@@ -2816,22 +2761,21 @@
               // Finalize selection
               const finalIntersecting = findElementsIntersectingSelection(selectionStroke);
               
-              if (event.shiftKey) {
-                  // Add to existing selection
+              if (isDeselectMode) {
+                  // Remove from selection
+                  finalIntersecting.forEach(uuid => {
+                      const index = selectedElements.indexOf(uuid);
+                      if (index > -1) {
+                          selectedElements.splice(index, 1);
+                      }
+                  });
+              } else {
+                  // Add to selection (cumulative)
                   finalIntersecting.forEach(uuid => {
                       if (!selectedElements.includes(uuid)) {
                           selectedElements.push(uuid);
                       }
                   });
-              } else {
-                  // Replace selection
-                  selectedElements = finalIntersecting;
-              }
-              
-              // Show selection actions if elements are selected
-              if (selectedElements.length > 0) {
-                  const rect = canvas.getBoundingClientRect();
-                  showSelectionActions(event.clientX, event.clientY);
               }
               
               // Clear temporary selection stroke
@@ -2992,17 +2936,21 @@
       }
 
       function shape_to_ph ( shape ) {
+          const isSelectionTool = (currentTool === 'selection-rectangle' || 
+                                    currentTool === 'selection-lasso' || 
+                                    currentTool === 'selection-stroke');
+          
           switch ( shape ) {
           case 'curve':
-              return currentTool === 'selection' ? selection_pointer_handler : draw_path_pointer_handler;
+              return isSelectionTool ? selection_pointer_handler : draw_path_pointer_handler;
           case 'rectangle':
-              return currentTool === 'selection' ? selection_pointer_handler : draw_rectangle_pointer_handler;
+              return isSelectionTool ? selection_pointer_handler : draw_rectangle_pointer_handler;
           case 'horizontal':
-              return currentTool === 'selection' ? selection_pointer_handler : draw_horizontal_pointer_handler;
+              return isSelectionTool ? selection_pointer_handler : draw_horizontal_pointer_handler;
           case 'vertical':
-              return currentTool === 'selection' ? selection_pointer_handler : draw_vertical_pointer_handler;
+              return isSelectionTool ? selection_pointer_handler : draw_vertical_pointer_handler;
           case 'line':
-              return currentTool === 'selection' ? selection_pointer_handler : draw_line_pointer_handler;
+              return isSelectionTool ? selection_pointer_handler : draw_line_pointer_handler;
           }
       }
 
