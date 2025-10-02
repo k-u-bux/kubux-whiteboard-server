@@ -3446,34 +3446,34 @@
       }
 
 
-      canvasCache_is_tainted = false;
-      canvasCache_canvas = document.createElement('canvas');
-      canvasCache_present = 0;
-
-      function canvas_from_scratch() {
-          ctx.save();
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.restore();
-
-          // Render all visible elements
-          shared.render_all_visible_elements(visualState, renderElementToScreen);
-          canvasCache_canvas = document.createElement('canvas');
-          canvasCache_canvas.width = canvas.width;
-          canvasCache_canvas.height = canvas.height;
-          const canvasCache_ctx = canvasCache_canvas.getContext('2d');
-          canvasCache_ctx.drawImage( canvas, 0, 0 );
-
-          canvasCache_is_tainted = false;
-          canvasCache_present = present;
-      }
-
-      function canvas_increment() {
-          if ( canvasCache_is_tainted ) {
-              canvas_from_scratch();
-              return;
-          }          
-      }
+      // canvasCache_is_tainted = false;
+      // canvasCache_canvas = document.createElement('canvas');
+      // canvasCache_present = 0;
+      // 
+      // function canvas_from_scratch() {
+      //     ctx.save();
+      //     ctx.setTransform(1, 0, 0, 1, 0, 0);
+      //     ctx.clearRect(0, 0, canvas.width, canvas.height);
+      //     ctx.restore();
+      // 
+      //     // Render all visible elements
+      //     shared.render_all_visible_elements(visualState, renderElementToScreen);
+      //     canvasCache_canvas = document.createElement('canvas');
+      //     canvasCache_canvas.width = canvas.width;
+      //     canvasCache_canvas.height = canvas.height;
+      //     const canvasCache_ctx = canvasCache_canvas.getContext('2d');
+      //     canvasCache_ctx.drawImage( canvas, 0, 0 );
+      // 
+      //     canvasCache_is_tainted = false;
+      //     canvasCache_present = present;
+      // }
+      // 
+      // function canvas_increment() {
+      //     if ( canvasCache_is_tainted ) {
+      //         canvas_from_scratch();
+      //         return;
+      //     }          
+      // }
 
 
       // Redraw the canvas
