@@ -4022,7 +4022,26 @@
                   
                   shared.render_all_visible_elements(pageVisualState, (element) => {
                       if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
-                          renderElement(pdfCtx, element);
+                          // Validate element has valid points before rendering
+                          const points = element[shared.ELEMENT.POINTS];
+                          if (points && points.length > 0) {
+                              const allPointsValid = points.every(p => 
+                                  Array.isArray(p) && 
+                                  p.length >= 2 && 
+                                  typeof p[0] === 'number' && 
+                                  typeof p[1] === 'number' &&
+                                  !isNaN(p[0]) && 
+                                  !isNaN(p[1])
+                              );
+                              
+                              if (allPointsValid) {
+                                  try {
+                                      renderElement(pdfCtx, element);
+                                  } catch (err) {
+                                      console.error('Error rendering element to PDF:', err, element);
+                                  }
+                              }
+                          }
                       }
                   });
                   
