@@ -979,9 +979,9 @@
       function affineFromControls() {
           return [ 
               ( controlTriangle.east.x - controlTriangle.center.x ) / initialTriangle.radius,
-              ( controlTriangle.east.y - controlTriangle.center.y ) / initialTriangle.radius,
+              - ( controlTriangle.east.y - controlTriangle.center.y ) / initialTriangle.radius,
               ( controlTriangle.north.x - controlTriangle.center.x ) / initialTriangle.radius,
-              ( controlTriangle.north.y - controlTriangle.center.y ) / initialTriangle.radius,
+              - ( controlTriangle.north.y - controlTriangle.center.y ) / initialTriangle.radius,
               ( controlTriangle.center.x - initialTriangle.center.x ),
               ( controlTriangle.center.y - initialTriangle.center.y )
           ];
