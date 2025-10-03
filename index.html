@@ -919,6 +919,9 @@
       let totalPages = 1;
       let connectionEstablished = false;
       
+      // Page cache using sessionStorage
+      const PAGE_CACHE_PREFIX = 'whiteboard_page_';
+      
       // Two-canvas optimization: cache static background
       let backgroundCanvas = null;
       let backgroundCtx = null;
@@ -1538,29 +1541,72 @@
       
       // Handle full page message from server
       function handleFullPageMessage(data) {
-          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID];
-          history = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
-          present = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
-          hashes = [ hashAny( currentPageUuid ) ];
-          for ( let i = 0; i < history.length; ++ i ) {
-              hashes.push( shared.hashNext( hashes[ i ], history[ i ] ) );
+          const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID];
+          
+          // Check if we have this page cached
+          const cachedPage = loadPageFromCache(pageUuid);
+          
+          if (cachedPage && cachedPage.hash === data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]) {
+              // We have valid cached data - use it and request only updates via replay
+              debugLog('Using cached page data, requesting replay for updates');
+              
+              currentPageUuid = pageUuid;
+              history = cachedPage.history;
+              present = cachedPage.present;
+              hashes = [ shared.hashAny( currentPageUuid ) ];
+              for ( let i = 0; i < history.length; ++ i ) {
+                  hashes.push( shared.hashNext( hashes[ i ], history[ i ] ) );
+              }
+              
+              verifiedIndex = present;
+              
+              // Update page info
+              pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
+              totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
+              updatePageInfo();
+              
+              // Recompile visual state
+              updateVisualState();
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              
+              // Request replay to get any updates since we last visited
+              requestReplay();
+          } else {
+              // No cache or hash mismatch - use full page data
+              debugLog('No cache available or hash mismatch, using full page data');
+              
+              currentPageUuid = pageUuid;
+              history = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
+              present = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
+              hashes = [ shared.hashAny( currentPageUuid ) ];
+              for ( let i = 0; i < history.length; ++ i ) {
+                  hashes.push( shared.hashNext( hashes[ i ], history[ i ] ) );
+              }
+              debugLog( "hashes = ", `${hashes}`);
+              
+              // Set verified index to present
+              verifiedIndex = present;
+              
+              // Recompile visual state
+              updateVisualState();
+              
+              // Update page info
+              pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
+              totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
+              updatePageInfo();
+              
+              // Update UI
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              
+              // Save this page to cache
+              savePageToCache(pageUuid, {
+                  history: history,
+                  present: present,
+                  hash: hashes[present]
+              });
           }
-          debugLog( "hashes = ", `${hashes}`);
-          
-          // Set verified index to present
-          verifiedIndex = present;
-          
-          // Recompile visual state
-          updateVisualState();
-          
-          // Update page info
-          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
-          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
-          updatePageInfo();
-          
-          // Update UI
-          updateSyncStatus();
-          updateUndoRedoButtons();
       }
       
       // Request a full page from the server
@@ -3404,8 +3450,53 @@
           sendMessage(proposal);
       }
       
+      // Page cache functions
+      function getCacheKey(pageUuid) {
+          return PAGE_CACHE_PREFIX + boardId + '_' + pageUuid;
+      }
+      
+      function savePageToCache(pageUuid, pageData) {
+          try {
+              const cacheKey = getCacheKey(pageUuid);
+              const cacheData = {
+                  uuid: pageUuid,
+                  history: pageData.history,
+                  present: pageData.present,
+                  hash: pageData.hash,
+                  timestamp: Date.now()
+              };
+              sessionStorage.setItem(cacheKey, shared.serialize(cacheData));
+              debugLog('Page cached', { pageUuid, historyLength: pageData.history.length });
+          } catch (err) {
+              console.warn('Failed to cache page:', err);
+              // Continue without caching - not critical
+          }
+      }
+      
+      function loadPageFromCache(pageUuid) {
+          try {
+              const cacheKey = getCacheKey(pageUuid);
+              const cached = sessionStorage.getItem(cacheKey);
+              if (cached) {
+                  const cacheData = shared.deserialize(cached);
+                  debugLog('Page loaded from cache', { pageUuid });
+                  return cacheData;
+              }
+          } catch (err) {
+              console.warn('Failed to load page from cache:', err);
+          }
+          return null;
+      }
+      
       // Navigate to next/previous page
       function navigatePage(delta) {
+          // Save current page to cache before navigating
+          savePageToCache(currentPageUuid, {
+              history: history,
+              present: present,
+              hash: hashes[present]
+          });
+          
           // Request full page with delta
           requestFullPage(currentPageUuid, delta);
       }
