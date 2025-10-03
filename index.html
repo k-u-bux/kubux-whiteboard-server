@@ -931,12 +931,14 @@
       
       // Paste mode state
       let pasteMode = false;
-      let pastedElements = [];
-      let pasteStartPoint = null;
-      let pasteOriginalPoint = null;
+      let pastedElements = []; // Array of {uuid, originalElement, transform}
+      let pasteBounds = null;
+      let pasteTransform = null; // Current transform being applied to paste group
       let isDraggingPaste = false;
       let isResizingPaste = false;
-      let resizeHandle = null;
+      let resizeHandle = null; // Which handle is being dragged
+      let dragStartPoint = null;
+      let initialTransform = null;
       
       // Clipboard for copy/paste
       let clipboard = {
@@ -2049,17 +2051,144 @@
           }
       }
 
-      // Handle paste button click - simplified immediate paste at canvas center
+      // Handle paste button click - enter interactive paste mode
       function handlePasteClick() {
           if (!clipboard.elements.length) {
               return; // Button should be disabled, but just in case
           }
           
-          // Paste at center of visible canvas area
-          const centerX = canvas.width / (2 * zoomLevel);
-          const centerY = canvas.height / (2 * zoomLevel);
+          // Enter paste mode
+          enterPasteMode();
+      }
+      
+      // Enter interactive paste mode
+      function enterPasteMode() {
+          // Create preview elements at original coordinates
+          pasteMode = true;
+          pastedElements = [];
           
-          pasteElements(centerX, centerY);
+          // Create identity transform initially (elements at original position)
+          pasteTransform = shared.createIdentityTransform();
+          
+          // Store elements with their UUIDs
+          clipboard.elements.forEach(element => {
+              const uuid = shared.generateUuid();
+              pastedElements.push({
+                  uuid: uuid,
+                  originalElement: element
+              });
+          });
+          
+          // Calculate bounds of pasted elements
+          pasteBounds = calculatePasteBounds();
+          
+          // Redraw to show pasted elements
+          redrawCanvas();
+      }
+      
+      // Calculate bounds of pasted elements with current transform
+      function calculatePasteBounds() {
+          if (pastedElements.length === 0) return null;
+          
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          
+          pastedElements.forEach(({originalElement}) => {
+              // Apply paste transform to get current bounds
+              const transform = shared.compose(pasteTransform, originalElement[shared.ELEMENT.TRANSFORM]);
+              const transformedPath = shared.applyTransformToPath(transform, originalElement[shared.ELEMENT.POINTS]);
+              const boundaries = shared.bbox(transformedPath);
+              const radius = originalElement[shared.ELEMENT.WIDTH] / 2;
+              
+              minX = Math.min(minX, boundaries[0] - radius);
+              minY = Math.min(minY, boundaries[1] - radius);
+              maxX = Math.max(maxX, boundaries[2] + radius);
+              maxY = Math.max(maxY, boundaries[3] + radius);
+          });
+          
+          return {
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY
+          };
+      }
+      
+      // Exit paste mode and commit the paste
+      function commitPaste() {
+          if (!pasteMode || pastedElements.length === 0) return;
+          
+          const actions = pastedElements.map(({uuid, originalElement}) => {
+              const newElement = JSON.parse(JSON.stringify(originalElement));
+              
+              // Compose the paste transform with original transform
+              newElement[shared.ELEMENT.TRANSFORM] = shared.compose(pasteTransform, originalElement[shared.ELEMENT.TRANSFORM]);
+              
+              // Set layer to current active layer
+              newElement[shared.ELEMENT.LAYER] = Number(activeLayer);
+              
+              // Create a draw action
+              return {
+                  type: shared.MOD_ACTIONS.DRAW.TYPE,
+                  [shared.MOD_ACTIONS.UUID]: uuid,
+                  [shared.MOD_ACTIONS.DRAW.STROKE]: newElement
+              };
+          });
+          
+          // Group all paste actions
+          const groupUuid = shared.generateUuid();
+          const groupAction = {
+              type: shared.MOD_ACTIONS.GROUP.TYPE,
+              [shared.MOD_ACTIONS.UUID]: groupUuid,
+              [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
+          };
+          
+          // If we're in the middle of history (after undoing), truncate future actions
+          if (present < history.length) {
+              history = history.slice(0, present);
+              hashes = hashes.slice(0, present + 1);
+          }
+          
+          // Add to history and advance present
+          history.push(groupAction);
+          present++;
+          
+          // Calculate placeholder hash
+          const placeholderHash = shared.generateUuid();
+          hashes.push(placeholderHash);
+          
+          // Create proposal
+          const proposal = {
+              type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
+          };
+          
+          // Exit paste mode
+          exitPasteMode();
+          
+          // Update visual state and UI
+          updateVisualState();
+          updateUndoRedoButtons();
+          updateSyncStatus();
+          
+          // Send to server
+          sendMessage(proposal);
+      }
+      
+      // Exit paste mode without committing
+      function exitPasteMode() {
+          pasteMode = false;
+          pastedElements = [];
+          pasteBounds = null;
+          pasteTransform = null;
+          isDraggingPaste = false;
+          isResizingPaste = false;
+          resizeHandle = null;
+          dragStartPoint = null;
+          initialTransform = null;
+          redrawCanvas();
       }
 
       function pasteElements(x, y) {
@@ -2490,6 +2619,11 @@
       
       // Set current tool
       function setTool(tool) {
+          // Commit paste if switching tools while in paste mode
+          if (pasteMode) {
+              commitPaste();
+          }
+          
           currentTool = tool;
           
           // Update UI - remove active from all tools
@@ -2915,6 +3049,61 @@
       const draw_vertical_pointer_handler = draw_shape_pointer_handler( vertical_path );
       const draw_line_pointer_handler = draw_shape_pointer_handler( straight_path );
 
+      // Paste mode pointer handler
+      const paste_pointer_handler = {
+          down: () => {
+              if (force_stylus && event.pointerType === "touch") return;
+              
+              const rect = canvas.getBoundingClientRect();
+              const x = (event.clientX - rect.left) / zoomLevel;
+              const y = (event.clientY - rect.top) / zoomLevel;
+              
+              // Check if clicking inside paste bounds
+              if (pasteBounds && 
+                  x >= pasteBounds.x && x <= pasteBounds.x + pasteBounds.width &&
+                  y >= pasteBounds.y && y <= pasteBounds.y + pasteBounds.height) {
+                  isDraggingPaste = true;
+                  dragStartPoint = { x, y };
+                  initialTransform = [...pasteTransform];
+              } else {
+                  // Click outside bounds - commit the paste
+                  commitPaste();
+              }
+          },
+          
+          move: () => {
+              if (force_stylus && event.pointerType === "touch") return;
+              
+              if (!isDraggingPaste || !dragStartPoint) return;
+              
+              const rect = canvas.getBoundingClientRect();
+              const x = (event.clientX - rect.left) / zoomLevel;
+              const y = (event.clientY - rect.top) / zoomLevel;
+              
+              // Calculate translation from drag start
+              const dx = x - dragStartPoint.x;
+              const dy = y - dragStartPoint.y;
+              
+              // Update paste transform with translation
+              pasteTransform = [...initialTransform];
+              pasteTransform[shared.TRANSFORM.E] += dx;
+              pasteTransform[shared.TRANSFORM.F] += dy;
+              
+              // Recalculate bounds
+              pasteBounds = calculatePasteBounds();
+              
+              // Redraw
+              redrawCanvas();
+          },
+          
+          up: () => {
+              if (force_stylus && event.pointerType === "touch") return;
+              
+              isDraggingPaste = false;
+              dragStartPoint = null;
+          }
+      };
+
       let pointer_handler = draw_path_pointer_handler;
 
       function set_pointer_handler ( ph ) {
@@ -2923,15 +3112,30 @@
 
 
       function handlePointerDown(event) {
-          pointer_handler.down();
+          // Override with paste handler if in paste mode
+          if (pasteMode) {
+              paste_pointer_handler.down();
+          } else {
+              pointer_handler.down();
+          }
       }
       
       function handlePointerMove(event) {
-          pointer_handler.move();
+          // Override with paste handler if in paste mode
+          if (pasteMode) {
+              paste_pointer_handler.move();
+          } else {
+              pointer_handler.move();
+          }
       }
 
       function handlePointerUp() {
-          pointer_handler.up();
+          // Override with paste handler if in paste mode
+          if (pasteMode) {
+              paste_pointer_handler.up();
+          } else {
+              pointer_handler.up();
+          }
       }
 
       function update_shape_buttons () {
@@ -3463,6 +3667,54 @@
       // }
 
 
+      // Render pasted elements with orange highlight
+      function renderPasteHighlight() {
+          if (!pasteMode || pastedElements.length === 0) return;
+          
+          ctx.save();
+          
+          // Draw each pasted element with orange tint
+          pastedElements.forEach(({originalElement}) => {
+              const element = JSON.parse(JSON.stringify(originalElement));
+              
+              // Apply paste transform
+              element[shared.ELEMENT.TRANSFORM] = shared.compose(pasteTransform, originalElement[shared.ELEMENT.TRANSFORM]);
+              
+              // Render element normally
+              renderElement(ctx, element);
+              
+              // Draw orange outline
+              const highlightElement = JSON.parse(JSON.stringify(element));
+              highlightElement[shared.ELEMENT.COLOR] = '#ff8c00'; // Dark orange
+              highlightElement[shared.ELEMENT.OPACITY] = 0.4;
+              highlightElement[shared.ELEMENT.WIDTH] += 3;
+              renderElement(ctx, highlightElement);
+          });
+          
+          // Draw bounding box if we have bounds
+          if (pasteBounds) {
+              ctx.setLineDash([5, 5]);
+              ctx.strokeStyle = '#ff8c00';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(pasteBounds.x, pasteBounds.y, pasteBounds.width, pasteBounds.height);
+              
+              // Draw center handle for dragging
+              const centerX = pasteBounds.x + pasteBounds.width / 2;
+              const centerY = pasteBounds.y + pasteBounds.height / 2;
+              const handleSize = 12 / zoomLevel;
+              
+              ctx.fillStyle = 'white';
+              ctx.strokeStyle = '#ff8c00';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.arc(centerX, centerY, handleSize/2, 0, 2 * Math.PI);
+              ctx.fill();
+              ctx.stroke();
+          }
+          
+          ctx.restore();
+      }
+
       // Redraw the canvas
       function redrawCanvas() {
           ctx.save();
@@ -3486,6 +3738,11 @@
           // Draw selection highlights if elements are selected
           if (selectedElements.length > 0) {
               renderSelectionHighlight();
+          }
+          
+          // Draw paste highlights if in paste mode
+          if (pasteMode) {
+              renderPasteHighlight();
           }
       }
 
