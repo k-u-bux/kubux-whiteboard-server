@@ -979,8 +979,8 @@
       function affineFromControls() {
           return [ 
               ( controlTriangle.east.x - controlTriangle.center.x ) / initialTriangle.radius,
-              - ( controlTriangle.east.y - controlTriangle.center.y ) / initialTriangle.radius,
               ( controlTriangle.north.x - controlTriangle.center.x ) / initialTriangle.radius,
+              - ( controlTriangle.east.y - controlTriangle.center.y ) / initialTriangle.radius,
               - ( controlTriangle.north.y - controlTriangle.center.y ) / initialTriangle.radius,
               ( controlTriangle.center.x - initialTriangle.center.x ),
               ( controlTriangle.center.y - initialTriangle.center.y )
@@ -1310,7 +1310,7 @@
           boardId = urlParams.get('board');
           passwd = urlParams.get('passwd');
 
-          // Determine if we're creating or registering
+          // Determine if we are creating or registering
           const isCreating = !!credential;
           const isEditing = !!passwd;
           
@@ -1549,7 +1549,7 @@
               adjustVerfiedIndex( pingSnapshots );
               requestReplay();
           } else if (matchingIndex !== present) {
-              debugLog(`Server is at position ${matchingIndex}, we're at ${present}`);
+              debugLog(`Server is at position ${matchingIndex}, we are at ${present}`);
               present = matchingIndex;
               verifiedIndex = present;
               updateVisualState();
@@ -1729,7 +1729,7 @@
           });
       }
       
-      // Track if we're in a cache verification cycle to avoid infinite loops
+      // Track if we are in a cache verification cycle to avoid infinite loops
       let cacheVerificationInProgress = false;
       
       // Handle full page message from server
@@ -1742,7 +1742,7 @@
           if (cachedPage && cachedPage.hash === data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]) {
               // We have valid cached data - use it and request only updates via replay
               debugLog('Using cached page data, requesting replay for updates');
-              cacheVerificationInProgress = true; // Mark that we're in verification
+              cacheVerificationInProgress = true; // Mark that we are in verification
               
               currentPageUuid = pageUuid;
               history = cachedPage.history;
@@ -2189,7 +2189,7 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
           
-          // If we're in the middle of history (after undoing), truncate future actions
+          // If we are in the middle of history (after undoing), truncate future actions
           if (present < history.length) {
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
@@ -2260,7 +2260,7 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: eraseActions
           };
           
-          // If we're in the middle of history (after undoing), truncate future actions
+          // If we are in the middle of history (after undoing), truncate future actions
           if (present < history.length) {
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
@@ -2396,7 +2396,7 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
           
-          // If we're in the middle of history (after undoing), truncate future actions
+          // If we are in the middle of history (after undoing), truncate future actions
           if (present < history.length) {
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
@@ -2487,7 +2487,7 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
           
-          // If we're in the middle of history (after undoing), truncate future actions
+          // If we are in the middle of history (after undoing), truncate future actions
           if (present < history.length) {
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
@@ -2568,7 +2568,7 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
           
-          // If we're in the middle of history (after undoing), truncate future actions
+          // If we are in the middle of history (after undoing), truncate future actions
           if (present < history.length) {
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
@@ -3562,7 +3562,7 @@
               [shared.MOD_ACTIONS.DRAW.STROKE]: stroke
           };
           
-          // If we're in the middle of history (after undoing), truncate future actions
+          // If we are in the middle of history (after undoing), truncate future actions
           if (present < history.length) {
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
@@ -3623,7 +3623,7 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: eraseActions
           };
           
-          // If we're in the middle of history (after undoing), truncate future actions
+          // If we are in the middle of history (after undoing), truncate future actions
           if (present < history.length) {
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
@@ -4240,10 +4240,10 @@
       
       // Redraw the canvas - optimized with background caching
       function redrawCanvas() {
-          // Check if we're in an interactive mode (drawing, erasing, selecting, pasting)
+          // Check if we are in an interactive mode (drawing, erasing, selecting, pasting)
           const isInteractive = isDrawing || isErasing || isSelecting || pasteMode;
           
-          // If background is invalid or we're not in interactive mode, render fresh background
+          // If background is invalid or we are not in interactive mode, render fresh background
           if (!backgroundValid || !isInteractive) {
               renderBackground();
           }
