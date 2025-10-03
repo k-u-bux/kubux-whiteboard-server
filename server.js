@@ -404,8 +404,8 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
 }
 
 
-function ping_client_with_page ( client, page_uuid ) {
-    client.pageId = page_uuid;
+function ping_client_with_page ( client, pageId ) {
+    client.pageId = pageId;
     const page = usePage(pageId);
     assert(page);
     assert(board.pageOrder.includes(pageId));
