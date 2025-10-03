@@ -1061,17 +1061,7 @@
           if (!controlTriangle) return;
           
           // Compute transform from standard triangle to current triangle
-          const transform = affineFromControls();
-          
-          // Scale by original radius to get correct sizing
-          const scale = controlTriangle.radius / (pasteBounds ? Math.max(pasteBounds.width, pasteBounds.height) / 2 : 1);
-          const scaledTransform = [
-              transform[0] * scale, transform[1] * scale,
-              transform[2] * scale, transform[3] * scale,
-              transform[4], transform[5]
-          ];
-          
-          pasteTransform = scaledTransform;
+          pasteTransform = affineFromControls();
           pasteBounds = calculatePasteBounds();
       }
       
