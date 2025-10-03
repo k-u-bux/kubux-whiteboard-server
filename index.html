@@ -1785,14 +1785,7 @@
       // Move selected elements - cut + immediate paste mode
       function moveSelectedElements() {
           if (selectedElements.length === 0) return;
-          
-          // Copy to clipboard
-          copySelectedElements();
-          
-          // Delete from current location
-          deleteSelectedElements();
-          
-          // Enter paste mode immediately
+          cutSelectedElements();
           enterPasteMode();
       }
 
@@ -1995,6 +1988,8 @@
               const element = visualState.element.get(uuid);
               if (element) {
                   // Create a deep copy of the element
+                  // Note: Elements don't contain UUIDs - UUIDs are only used as Map keys and in actions
+                  // The element structure only contains drawable data (type, path, points, color, etc.)
                   const elementCopy = JSON.parse(JSON.stringify(element));
                   clipboard.elements.push(elementCopy);
               }
