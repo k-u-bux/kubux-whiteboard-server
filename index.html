@@ -457,11 +457,13 @@
       </div>
 
       <div class="tool-section page-controls">
-        <button class="tool-btn" id="prev-page">◀️</button>
+        <button class="tool-btn" id="first-page" title="First Page">⏮️</button>
+        <button class="tool-btn" id="prev-page" title="Previous Page">◀️</button>
         <span id="page-info">Page 1 of 1</span>
-        <button class="tool-btn" id="next-page">▶️</button>
-        <button class="tool-btn" id="add-page">➕</button>
-        <button class="tool-btn" id="delete-page">➖</button>
+        <button class="tool-btn" id="next-page" title="Next Page">▶️</button>
+        <button class="tool-btn" id="last-page" title="Last Page">⏭️</button>
+        <button class="tool-btn" id="add-page" title="Add Page">➕</button>
+        <button class="tool-btn" id="delete-page" title="Delete Page">➖</button>
       </div>
       
       <div class="tool-section">
@@ -2460,8 +2462,10 @@
           });
           
           // Page navigation
+          document.getElementById('first-page').addEventListener('click', () => navigateToPage(1));
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
           document.getElementById('next-page').addEventListener('click', () => navigatePage(1));
+          document.getElementById('last-page').addEventListener('click', () => navigateToPage(totalPages));
           document.getElementById('add-page').addEventListener('click', addNewPage);
           document.getElementById('delete-page').addEventListener('click', deletePage);
           
