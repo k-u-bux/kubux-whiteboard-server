@@ -971,6 +971,7 @@
       
       // Paste mode control triangle state
       let controlTriangle = null; // { center, north, east, radius }
+      let initialControlTriangle = null; // Initial state for computing relative transforms
       let draggedHandle = null; // 'center', 'north', 'east', 'circle', or null
       let transformMode = 'translate'; // 'translate', 'rotate', 'scale', 'affine'
       
@@ -1009,6 +1010,9 @@
               east: { x: centerX + radius, y: centerY },
               radius: radius
           };
+          
+          // Store initial state for computing relative transforms
+          initialControlTriangle = JSON.parse(JSON.stringify(controlTriangle));
       }
       
       // Check if point is near a control handle
@@ -1060,24 +1064,47 @@
       
       // Update paste transform from control triangle
       function updatePasteTransformFromControls() {
-          if (!controlTriangle) return;
+          if (!controlTriangle || !initialControlTriangle) return;
           
-          // Compute transform from standard triangle to current triangle
-          const transform = affineFromControls(
+          // Compute transform FROM initial triangle TO current triangle
+          const initialTransform = affineFromControls(
+              initialControlTriangle.center,
+              initialControlTriangle.north,
+              initialControlTriangle.east
+          );
+          
+          const currentTransform = affineFromControls(
               controlTriangle.center,
               controlTriangle.north,
               controlTriangle.east
           );
           
-          // Scale by original radius to get correct sizing
-          const scale = controlTriangle.radius / (pasteBounds ? Math.max(pasteBounds.width, pasteBounds.height) / 2 : 1);
-          const scaledTransform = [
-              transform[0] * scale, transform[1] * scale,
-              transform[2] * scale, transform[3] * scale,
-              transform[4], transform[5]
-          ];
+          // Compute relative transform: current * inverse(initial)
+          // For affine transforms, we can compute this directly
+          const relativeTransform = shared.compose(
+              currentTransform,
+              shared.createIdentityTransform() // Placeholder - need proper inverse
+          );
           
-          pasteTransform = scaledTransform;
+          // Actually, simpler approach: the relative transform maps initial -> current
+          // We want T such that T(initial) = current
+          // Since initial and current are both defined by their triangle vertices,
+          // we can use the fact that affineFromControls gives us the mapping from
+          // (0,0), (0,1), (1,0) to the triangle vertices.
+          
+          // The transform from initial to current is:
+          // current * inv(initial)
+          // But for our use case, we need to think differently:
+          
+          // The paste elements are positioned relative to a standard coordinate system
+          // Initial triangle represents their first placement
+          // Current triangle represents where they should be now
+          
+          // So we want: pasteTransform = how to get from original paste position to current triangle
+          
+          // Simpler: just use the current triangle directly, which maps the standard
+          // unit triangle to the current position
+          pasteTransform = currentTransform;
           pasteBounds = calculatePasteBounds();
       }
       
