@@ -920,6 +920,7 @@
       let backgroundCanvas = null;
       let backgroundCtx = null;
       let backgroundValid = false;
+      let backgroundRenderedUpTo = 0; // Last present index rendered to background
       
       // Drawing state
       let isDrawing = false;
@@ -3742,11 +3743,48 @@
           ctx.restore();
       }
 
+      // Check if we can incrementally update background
+      function canIncrementallyUpdate() {
+          if (!backgroundValid || backgroundRenderedUpTo >= present) {
+              return false;
+          }
+          
+          // Check if all actions since last render are DRAW actions
+          for (let i = backgroundRenderedUpTo; i < present; i++) {
+              const action = history[i];
+              if (action.type !== shared.MOD_ACTIONS.DRAW.TYPE) {
+                  return false; // Non-draw action requires full re-render
+              }
+          }
+          
+          return true;
+      }
+      
       // Render static background (all committed elements)
       function renderBackground() {
           if (!backgroundCanvas || !backgroundCtx) return;
           
-          // Clear background canvas
+          // Try incremental update if possible
+          if (canIncrementallyUpdate()) {
+              // Incremental update: only render new DRAW actions
+              backgroundCtx.save();
+              backgroundCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+              
+              for (let i = backgroundRenderedUpTo; i < present; i++) {
+                  const action = history[i];
+                  const stroke = action[shared.MOD_ACTIONS.DRAW.STROKE];
+                  if (stroke && visibleLayers.has(stroke[shared.ELEMENT.LAYER])) {
+                      renderElement(backgroundCtx, stroke);
+                  }
+              }
+              
+              backgroundCtx.restore();
+              backgroundRenderedUpTo = present;
+              backgroundValid = true;
+              return;
+          }
+          
+          // Full re-render: clear and render everything
           backgroundCtx.save();
           backgroundCtx.setTransform(1, 0, 0, 1, 0, 0);
           backgroundCtx.clearRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
@@ -3767,6 +3805,7 @@
               renderSelectionHighlightToContext(backgroundCtx);
           }
           
+          backgroundRenderedUpTo = present;
           backgroundValid = true;
       }
       
