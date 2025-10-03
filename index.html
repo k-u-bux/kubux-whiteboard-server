@@ -1001,7 +1001,12 @@
               east: { x: centerX + radius, y: centerY },
               radius: radius
           };
-          initialTriangle = [ ... controlTriangle ];
+          initialTriangle = {
+              center: { ...controlTriangle.center },
+              north: { ...controlTriangle.north },
+              east: { ...controlTriangle.east },
+              radius: controlTriangle.radius
+          };
       }
       
       // Check if point is near a control handle
