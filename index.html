@@ -2701,17 +2701,17 @@
           // Update cursor
           switch (tool) {
           case 'chalk':
-              canvas.style.cursor = 'crosshair';
+              canvas.style.cursor = 'auto';
               switch_settings( chalk_settings );
               set_pointer_handler( shape_to_ph( chalk_settings.shape ) );
               break;
           case 'pen':
-              canvas.style.cursor = 'crosshair';
+              canvas.style.cursor = 'auto';
               switch_settings( pen_settings );
               set_pointer_handler( shape_to_ph( pen_settings.shape ) );
               break;
           case 'highlighter':
-              canvas.style.cursor = 'crosshair';
+              canvas.style.cursor = 'auto';
               switch_settings( highlighter_settings );
               set_pointer_handler( shape_to_ph( highlighter_settings.shape ) );
               break;
@@ -2721,17 +2721,17 @@
               set_pointer_handler( erase_path_pointer_handler );
               break;
           case 'selection-rectangle':
-              canvas.style.cursor = 'crosshair';
+              canvas.style.cursor = 'auto';
               switch_settings( selection_rectangle_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           case 'selection-lasso':
-              canvas.style.cursor = 'crosshair';
+              canvas.style.cursor = 'auto';
               switch_settings( selection_lasso_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           case 'selection-stroke':
-              canvas.style.cursor = 'crosshair';
+              canvas.style.cursor = 'auto';
               switch_settings( selection_stroke_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
