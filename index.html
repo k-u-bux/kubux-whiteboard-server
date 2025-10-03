@@ -1394,7 +1394,7 @@
           
           if (afterHash !== hashes[actionIndex+1]) {
               // Hash mismatch - request replay
-              debugLog(`Hash mismatch for action ${acceptedActionUuid}`);
+              debugLog(`Hash mismatch for action ${acceptedActionUuid}: {hashes[actionIndex]} vs {beforeHash} and {hashes[actionIndex+1]} vs {afterHash}`);
               requestReplay();
               return;
           }
