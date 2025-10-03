@@ -787,8 +787,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const pageId = existingPage(pageUuid, board);
     if (pageId !== pageUuid) {
         debug.log(`[SERVER] Hash ${pageUuid} has been replaced, sending full page`);
-        // sendFullPage(ws, boardId, pageId, requestId);
-        ping_client_with_page( ws, pageId );
+        sendFullPage(ws, boardId, pageId, requestId);
+        // ping_client_with_page( ws, pageId );
         releaseBoard(boardId);
         return;
     }
@@ -796,8 +796,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const page = usePage(pageId);
     if (page.hashes[present] !== presentHash) {
         debug.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending full page`);
-        // sendFullPage(ws, boardId, pageId, requestId);
-        ping_client_with_page( ws, pageId );
+        sendFullPage(ws, boardId, pageId, requestId);
+        // ping_client_with_page( ws, pageId );
         releaseBoard(boardId);
         releasePage(pageId);
         return;
