@@ -477,6 +477,7 @@
         <button class="tool-btn tooltip" id="redo-btn" title="Redo" disabled>↪
           <span class="tooltiptext">Redo (Ctrl+Y)</span>
         </button>
+        <button class="tool-btn" id="paste-btn" title="Paste">📌</button>
       </div>
       
       <div class="tool-section">
@@ -928,12 +929,24 @@
       let selectionOriginalPoint = null; // Track original position for drag
       let isDeselectMode = false; // Toggle for removing from selection
       
+      // Paste mode state
+      let pasteMode = false;
+      let pastedElements = [];
+      let pasteStartPoint = null;
+      let pasteOriginalPoint = null;
+      let isDraggingPaste = false;
+      let isResizingPaste = false;
+      let resizeHandle = null;
+      
       // Clipboard for copy/paste
       let clipboard = {
         elements: [],
         sourceLayer: null,
         bounds: null
       };
+      
+      // Paste button
+      const pasteBtn = document.getElementById('paste-btn');
       
       // Timeline state with complete hash chain
       let history = [];          // All actions in timeline
@@ -1025,6 +1038,7 @@
           setupColorPicker();
           setupLayerControls();
           setupSelectionControls();
+          updatePasteButton(); // Initialize paste button state
           debugStylusEvents(); // Add stylus debugging
       }
       
@@ -1771,6 +1785,7 @@
           // Set up action buttons
           cutBtn.addEventListener('click', cutSelectedElements);
           copyBtn.addEventListener('click', copySelectedElements);
+          pasteBtn.addEventListener('click', handlePasteClick);
           deleteBtn.addEventListener('click', deleteSelectedElements);
           moveLayerBtn.addEventListener('click', showMoveToLayerDialog);
           
@@ -1968,11 +1983,15 @@
                   clipboard.elements.push(elementCopy);
               }
           });
+          
+          // Update paste button state
+          updatePasteButton();
       }
 
       function cutSelectedElements() {
           copySelectedElements();
           deleteSelectedElements();
+          // updatePasteButton() already called by copySelectedElements()
       }
 
       function deleteSelectedElements() {
@@ -2021,6 +2040,26 @@
           
           // Send to server
           sendMessage(proposal);
+      }
+
+      // Update paste button state based on clipboard
+      function updatePasteButton() {
+          if (pasteBtn) {
+              pasteBtn.disabled = clipboard.elements.length === 0;
+          }
+      }
+
+      // Handle paste button click - simplified immediate paste at canvas center
+      function handlePasteClick() {
+          if (!clipboard.elements.length) {
+              return; // Button should be disabled, but just in case
+          }
+          
+          // Paste at center of visible canvas area
+          const centerX = canvas.width / (2 * zoomLevel);
+          const centerY = canvas.height / (2 * zoomLevel);
+          
+          pasteElements(centerX, centerY);
       }
 
       function pasteElements(x, y) {
