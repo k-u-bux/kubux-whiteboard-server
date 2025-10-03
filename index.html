@@ -1437,7 +1437,7 @@
               }
           }
           
-          // Request replay to ensure we're in sync
+          // Request replay to ensure we are in sync
           requestReplay();
       }
       
@@ -1526,6 +1526,7 @@
           updateUndoRedoButtons();
           
           debugLog("Replay applied successfully", {
+              replay length: replaySequence.length,
               historyLength: history.length,
               present: present,
               verifiedIndex: verifiedIndex
