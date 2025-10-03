@@ -3,8 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Xournal++ Clone</title>
-    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Whiteboard%20App%22%2C%22short_name%22%3A%22Whiteboard%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520100%2520100%2522%253E%253Cpath%2520d%253D%2522M25%252075%2520L75%252025%20M25%252025%20L75%252075%22%2520stroke%253D%2522black%2522%2520stroke-width%253D%252210%2522%2520%252F%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+    <title>Whiteboard App</title>
     <style>
       body {
           margin: 0;
@@ -694,26 +693,6 @@
       function debugLog(msg, data) {
           console.log(`[DEBUG] ${msg}`, data || '');
       }
-
-      const manifest = {
-          "name": "Whiteboard App",
-          "short_name": "Whiteboard",
-          "start_url": ".",
-          "display": "standalone",
-          "background_color": "#ffffff",
-          "theme_color": "#000000",
-          "icons": [
-              {
-                  "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cpath%20d%3D%22M25%2075%20L75%2025%20M25%2025%20L75%2075%22%20stroke%3D%22black%22%20stroke-width%3D%2210%22%20%2F%3E%3C%2Fsvg%3E",
-                  "sizes": "192x192",
-                  "type": "image/svg+xml"
-              }
-          ]
-      };
-      
-      const manifest_json = JSON.stringify(manifest);
-      const encoded_manifest = encodeURIComponent(manifest_json);
-      const data_uri = `data:application/manifest+json,${encoded_manifest}`;
 
       // settings
       let eraser_settings = {
