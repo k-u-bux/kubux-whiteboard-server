@@ -1392,13 +1392,15 @@
               return;
           }
           
-          if (afterHash !== hashes[actionIndex+1]) {
-              // Hash mismatch - request replay
-              debugLog(`Hash mismatch for action ${acceptedActionUuid}: ${hashes[actionIndex]} vs ${beforeHash} and ${hashes[actionIndex+1]} vs ${afterHash}`);
+          // Verify our computed hashes match the server's
+          if (hashes[actionIndex] !== beforeHash || hashes[actionIndex + 1] !== afterHash) {
+              // Hash mismatch - action was applied at different point in history
+              debugLog(`Hash mismatch for action ${acceptedActionUuid}: client=${hashes[actionIndex]}/${hashes[actionIndex+1]} vs server=${beforeHash}/${afterHash}`);
               requestReplay();
               return;
           }
 
+          // Hashes match - update verified index
           if (verifiedIndex <= actionIndex) {
               verifiedIndex = actionIndex + 1;
           }
@@ -3278,9 +3280,9 @@
           history.push(drawAction);
           present++;
           
-          // Calculate placeholder hash
-          const placeholderHash = shared.generateUuid(); // Will be replaced with server hash when confirmed
-          hashes.push(placeholderHash);
+          // Compute hash based on previous hash and current action
+          const newHash = shared.hashNext(hashes[present - 1], drawAction);
+          hashes.push(newHash);
           
           // Create proposal
           const proposal = {
@@ -3339,9 +3341,9 @@
           history.push(groupAction);
           present++;
           
-          // Calculate placeholder hash
-          const placeholderHash = shared.generateUuid(); // Will be replaced with server hash when confirmed
-          hashes.push(placeholderHash);
+          // Compute hash based on previous hash and current action
+          const newHash = shared.hashNext(hashes[present - 1], groupAction);
+          hashes.push(newHash);
           
           // Create proposal
           const proposal = {
