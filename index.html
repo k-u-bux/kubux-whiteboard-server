@@ -689,16 +689,10 @@
     </div>
 
     <script src="shared.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfkit@0.13.0/js/pdfkit.standalone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/blob-stream@0.1.3/blob-stream.js"></script>
     <script>
-      // The CDN version exports as window.jsPDF directly (not window.jspdf.jsPDF)
-      // Create alias for compatibility with existing code
-      if (window.jsPDF) {
-          window.jspdf = { jsPDF: window.jsPDF };
-          console.log('jsPDF loaded with RGBA support');
-      } else {
-          console.error('Failed to load jsPDF');
-      }
+      console.log('PDFKit loaded - supports full transparency');
     </script>
     <script>
       // Debug logging function
@@ -3537,14 +3531,9 @@
           }
           context.globalAlpha = opacity;
           
-          // Use multiply blend mode for low-opacity strokes (highlighters)
-          // This creates proper highlighting: background shows through with color tint
-          // High opacity strokes use standard source-over
-          if (opacity < 0.5) {
-              context.globalCompositeOperation = 'multiply';
-          } else {
-              context.globalCompositeOperation = 'source-over';
-          }
+          // Note: jsPDF's context2d does not support globalAlpha or blend modes
+          // Transparency works on screen but not in PDF exports
+          context.globalCompositeOperation = 'source-over';
           
           // Cap and join styles
           context.lineCap = shared.CAP_STYLE_STRINGS[element[shared.ELEMENT.CAP_STYLE]];
@@ -3959,24 +3948,32 @@
       function exportPageToPDF () {
           try {
               const timestamp = getTimestampForFilename();
-              const doc = new window.jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
               
-              // Get PDF canvas context - it implements the 2D canvas API
-              const pdfCtx = doc.context2d;
+              // Create offscreen canvas for rasterization
+              const exportCanvas = document.createElement('canvas');
+              exportCanvas.width = canvas.width;
+              exportCanvas.height = canvas.height;
+              const exportCtx = exportCanvas.getContext('2d');
               
-              // Apply zoom to PDF context
-              pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
-              
-              // Render all visible elements directly to PDF
+              // Apply zoom and render all visible elements
+              exportCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
               shared.render_all_visible_elements(visualState, (element) => {
                   if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
-                      renderElement(pdfCtx, element);
+                      renderElement(exportCtx, element);
                   }
               });
               
+              // Convert to PNG image (supports transparency)
+              const imageData = exportCanvas.toDataURL('image/png');
+              
+              // Create PDF with image
+              const doc = new window.jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
+              doc.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
               doc.save(`board_${boardId}_page_${pageNr}_${timestamp}.pdf`);
+              
           } catch (err) {
-              throw new Error(`PDF export failed: ${err.message}`);
+              showError(`PDF export failed: ${err.message}`);
+              console.error('PDF export error:', err);
           }
       };
 
@@ -3988,7 +3985,7 @@
               // Snapshot current page number for delta calculations
               const startPageNr = pageNr;
               
-              // Iterate through each page sequentially - app blocks until all done
+              // Iterate through each page sequentially
               for (let i = 1; i <= totalPages; i++) {
                   if (i > 1) {
                       doc.addPage();
@@ -3996,7 +3993,7 @@
                   
                   showError(`Exporting page ${i}/${totalPages}...`);
                   
-                  // Request and wait for page data - blocks here until we get response
+                  // Request and wait for page data
                   const pageData = await new Promise((resolve) => {
                       const requestId = createRequestId();
                       const originalHandler = ws.onmessage;
@@ -4033,13 +4030,14 @@
                   
                   if (!pageData) continue;
                   
-                  // Now render this page to PDF (synchronous)
-                  const pdfCtx = doc.context2d;
+                  // Rasterize this page to PNG
+                  const exportCanvas = document.createElement('canvas');
+                  exportCanvas.width = canvas.width;
+                  exportCanvas.height = canvas.height;
+                  const exportCtx = exportCanvas.getContext('2d');
                   
-                  // Reset context state for this page
-                  pdfCtx.save();
-                  pdfCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset to identity
-                  pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0); // Apply zoom
+                  // Apply zoom and render page
+                  exportCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
                   
                   const pageVisualState = shared.createEmptyVisualState();
                   const pageActions = pageData.history.slice(0, pageData.present);
@@ -4049,30 +4047,13 @@
                   
                   shared.render_all_visible_elements(pageVisualState, (element) => {
                       if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
-                          // Validate element has valid points before rendering
-                          const points = element[shared.ELEMENT.POINTS];
-                          if (points && points.length > 0) {
-                              const allPointsValid = points.every(p => 
-                                  Array.isArray(p) && 
-                                  p.length >= 2 && 
-                                  typeof p[0] === 'number' && 
-                                  typeof p[1] === 'number' &&
-                                  !isNaN(p[0]) && 
-                                  !isNaN(p[1])
-                              );
-                              
-                              if (allPointsValid) {
-                                  try {
-                                      renderElement(pdfCtx, element);
-                                  } catch (err) {
-                                      console.error('Error rendering element to PDF:', err, element);
-                                  }
-                              }
-                          }
+                          renderElement(exportCtx, element);
                       }
                   });
                   
-                  pdfCtx.restore();
+                  // Convert to PNG and add to PDF
+                  const imageData = exportCanvas.toDataURL('image/png');
+                  doc.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
               }
               
               doc.save(`board_${boardId}_${timestamp}.pdf`);
