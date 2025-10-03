@@ -1533,6 +1533,16 @@
           updateSyncStatus();
           updateUndoRedoButtons();
           
+          // Cache verification successful - reset flag
+          cacheVerificationInProgress = false;
+          
+          // Update cache with new state
+          savePageToCache(pageUuid, {
+              history: history,
+              present: present,
+              hash: hashes[present]
+          });
+          
           debugLog("Replay applied successfully", {
               replaySequenceLength: replaySequence.length,
               historyLength: history.length,
@@ -1541,16 +1551,20 @@
           });
       }
       
+      // Track if we're in a cache verification cycle to avoid infinite loops
+      let cacheVerificationInProgress = false;
+      
       // Handle full page message from server
       function handleFullPageMessage(data) {
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID];
           
-          // Check if we have this page cached
-          const cachedPage = loadPageFromCache(pageUuid);
+          // Check if we have this page cached (but only if not already in verification cycle)
+          const cachedPage = !cacheVerificationInProgress ? loadPageFromCache(pageUuid) : null;
           
           if (cachedPage && cachedPage.hash === data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]) {
               // We have valid cached data - use it and request only updates via replay
               debugLog('Using cached page data, requesting replay for updates');
+              cacheVerificationInProgress = true; // Mark that we're in verification
               
               currentPageUuid = pageUuid;
               history = cachedPage.history;
@@ -1577,6 +1591,7 @@
           } else {
               // No cache or hash mismatch - use full page data
               debugLog('No cache available or hash mismatch, using full page data');
+              cacheVerificationInProgress = false; // Reset flag
               
               currentPageUuid = pageUuid;
               history = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
