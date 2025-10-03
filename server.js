@@ -743,8 +743,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 type: MESSAGES.SERVER_TO_CLIENT.ACCEPT.TYPE,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.UUID]: pageUuid,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.ACTION_UUID]: actionId,
-                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.BEFORE_HASH]: beforeHash,
-                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.AFTER_HASH]: page.hashes[page.present],
+                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.BEFORE_HASH]: page.hashes[page.present],
+                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.AFTER_HASH]: page.hashes[page.present+1],
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_TOTAL_PAGES]: board.pageOrder.length
             };
