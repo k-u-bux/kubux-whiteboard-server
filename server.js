@@ -404,7 +404,7 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
 }
 
 
-function ping_client_with_page ( client, pageId ) {
+function ping_client_with_page ( client, pageId, board ) {
     client.pageId = pageId;
     const page = usePage(pageId);
     assert(page);
@@ -436,7 +436,7 @@ function ping_client( client ) {
     const board = useBoard(client.boardId);
     assert(board);
     const pageId = existingPage(client.pageId, board);
-    ping_client_with_page( client, pageId );
+    ping_client_with_page( client, pageId, board );
 }
 
 function sendPing() {
