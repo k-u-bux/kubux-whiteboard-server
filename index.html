@@ -453,7 +453,8 @@
     
     <div class="toolbar">
       <div class="tool-section" id="export-pdf">
-        <button class="tool-btn" id="pdf-btn" title="export-pdf">📃</button>
+        <button class="tool-btn" id="pdf-btn" title="Export Current Page to PDF">📃</button>
+        <button class="tool-btn" id="pdf-board-btn" title="Export Entire Board to PDF">📚</button>
       </div>
 
       <div class="tool-section page-controls">
@@ -2483,8 +2484,9 @@
           // Debug button
           document.getElementById('debug-btn').addEventListener('click', showDebugInfo);
           
-          // Export PDF button
+          // Export PDF buttons
           document.getElementById('pdf-btn').addEventListener('click', exportPageToPDF);
+          document.getElementById('pdf-board-btn').addEventListener('click', exportBoardToPDF);
           
           // Canvas events
           canvas.addEventListener('pointerdown', handlePointerDown);
@@ -3931,12 +3933,138 @@
           try {
               const timestamp = getTimestampForFilename();
               const doc = new window.jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
-              doc.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, canvas.width, canvas.height);
+              
+              // Get PDF canvas context - it implements the 2D canvas API
+              const pdfCtx = doc.context2d;
+              
+              // Apply zoom to PDF context
+              pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+              
+              // Render all visible elements directly to PDF
+              shared.render_all_visible_elements(visualState, (element) => {
+                  if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
+                      renderElement(pdfCtx, element);
+                  }
+              });
+              
               doc.save(`board_${boardId}_page_${pageNr}_${timestamp}.pdf`);
           } catch (err) {
               throw new Error(`PDF export failed: ${err.message}`);
           }
       };
+
+      async function exportBoardToPDF() {
+          try {
+              const timestamp = getTimestampForFilename();
+              
+              // Save current state
+              const originalPageUuid = currentPageUuid;
+              const originalPageNr = pageNr;
+              const originalHistory = [...history];
+              const originalPresent = present;
+              const originalHashes = [...hashes];
+              const originalVisualState = JSON.parse(JSON.stringify({
+                  element: Array.from(visualState.element.entries()),
+                  visible: Array.from(visualState.visible)
+              }));
+              
+              // Create PDF document
+              const doc = new window.jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
+              
+              showError(`Exporting board (0/${totalPages} pages)...`);
+              
+              // Render each page
+              for (let i = 1; i <= totalPages; i++) {
+                  // Add new page to PDF (except for first page)
+                  if (i > 1) {
+                      doc.addPage();
+                  }
+                  
+                  // Get PDF canvas context for this page
+                  const pdfCtx = doc.context2d;
+                  
+                  // Request page data
+                  await new Promise((resolve) => {
+                      const requestId = createRequestId();
+                      const originalHandler = ws.onmessage;
+                      
+                      ws.onmessage = (event) => {
+                          try {
+                              const data = shared.deserialize(event.data);
+                              if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE) {
+                                  // Process page data
+                                  const pageHistory = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
+                                  const pagePresent = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
+                                  
+                                  // Apply zoom to PDF context
+                                  pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+                                  
+                                  // Compile visual state for this page
+                                  const pageVisualState = shared.createEmptyVisualState();
+                                  const pageActions = pageHistory.slice(0, pagePresent);
+                                  for (const action of pageActions) {
+                                      shared.commitEdit(pageVisualState, action);
+                                  }
+                                  
+                                  // Render elements directly to PDF
+                                  shared.render_all_visible_elements(pageVisualState, (element) => {
+                                      if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
+                                          renderElement(pdfCtx, element);
+                                      }
+                                  });
+                                  
+                                  showError(`Exporting board (${i}/${totalPages} pages)...`);
+                                  
+                                  // Restore original handler and resolve
+                                  ws.onmessage = originalHandler;
+                                  resolve();
+                              } else {
+                                  // Pass other messages to original handler
+                                  originalHandler.call(ws, event);
+                              }
+                          } catch (error) {
+                              ws.onmessage = originalHandler;
+                              console.error('Error processing page:', error);
+                              resolve();
+                          }
+                      };
+                      
+                      // Request the page
+                      const request = {
+                          type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: boardId,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: i - pageNr,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
+                      };
+                      
+                      ws.send(shared.serialize(request));
+                  });
+              }
+              
+              // Save PDF
+              doc.save(`board_${boardId}_${timestamp}.pdf`);
+              hideError();
+              
+              // Restore original state
+              currentPageUuid = originalPageUuid;
+              pageNr = originalPageNr;
+              history = originalHistory;
+              present = originalPresent;
+              hashes = originalHashes;
+              visualState = shared.createEmptyVisualState();
+              visualState.element = new Map(originalVisualState.element);
+              visualState.visible = new Set(originalVisualState.visible);
+              
+              // Redraw canvas
+              backgroundValid = false;
+              redrawCanvas();
+              
+          } catch (err) {
+              hideError();
+              showError(`PDF export failed: ${err.message}`);
+              console.error('PDF export error:', err);
+          }
+      }
 
       
       // Initialize the app
