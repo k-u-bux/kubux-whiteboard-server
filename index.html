@@ -573,8 +573,8 @@
         <div class="tool-section sidebar-section" id="selection-copy-sidebar" style="display: none;">
           <button class="shape-btn" id="copy-btn" title="Copy">📋</button>
         </div>
-        <div class="tool-section sidebar-section" id="selection-delete-sidebar" style="display: none;">
-          <button class="shape-btn" id="delete-btn" title="Delete">🗑️</button>
+        <div class="tool-section sidebar-section" id="selection-move-sidebar" style="display: none;">
+          <button class="shape-btn" id="move-btn" title="Move">🔄</button>
         </div>
         <div class="tool-section sidebar-section" id="selection-layer-sidebar" style="display: none;">
           <button class="shape-btn" id="move-layer-btn" title="Move to Layer">📑</button>
@@ -843,7 +843,7 @@
                                     draw_settings.tool === 'selection-stroke');
           selectionActionsSidebar.style.display = isSelectionTool ? 'flex' : 'none';
           selectionCopySidebar.style.display = isSelectionTool ? 'flex' : 'none';
-          selectionDeleteSidebar.style.display = isSelectionTool ? 'flex' : 'none';
+          selectionMoveSidebar.style.display = isSelectionTool ? 'flex' : 'none';
           selectionLayerSidebar.style.display = isSelectionTool ? 'flex' : 'none';
           selectionDeselectSidebar.style.display = isSelectionTool ? 'flex' : 'none';
           
@@ -1005,12 +1005,12 @@
       // Selection actions UI (sidebar)
       const selectionActionsSidebar = document.getElementById('selection-actions-sidebar');
       const selectionCopySidebar = document.getElementById('selection-copy-sidebar');
-      const selectionDeleteSidebar = document.getElementById('selection-delete-sidebar');
+      const selectionMoveSidebar = document.getElementById('selection-move-sidebar');
       const selectionLayerSidebar = document.getElementById('selection-layer-sidebar');
       const selectionDeselectSidebar = document.getElementById('selection-deselect-sidebar');
       const cutBtn = document.getElementById('cut-btn');
       const copyBtn = document.getElementById('copy-btn');
-      const deleteBtn = document.getElementById('delete-btn');
+      const moveBtn = document.getElementById('move-btn');
       const moveLayerBtn = document.getElementById('move-layer-btn');
       const deselectToggleBtn = document.getElementById('deselect-toggle-btn');
 
@@ -1782,13 +1782,27 @@
           }
       }
       
+      // Move selected elements - cut + immediate paste mode
+      function moveSelectedElements() {
+          if (selectedElements.length === 0) return;
+          
+          // Copy to clipboard
+          copySelectedElements();
+          
+          // Delete from current location
+          deleteSelectedElements();
+          
+          // Enter paste mode immediately
+          enterPasteMode();
+      }
+
       // Setup selection controls
       function setupSelectionControls() {
           // Set up action buttons
           cutBtn.addEventListener('click', cutSelectedElements);
           copyBtn.addEventListener('click', copySelectedElements);
+          moveBtn.addEventListener('click', moveSelectedElements);
           pasteBtn.addEventListener('click', handlePasteClick);
-          deleteBtn.addEventListener('click', deleteSelectedElements);
           moveLayerBtn.addEventListener('click', showMoveToLayerDialog);
           
           // Deselect toggle button
