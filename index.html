@@ -3996,6 +3996,7 @@
                       const request = {
                           type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: boardId,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageUuid,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: i - startPageNr,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
                       };
