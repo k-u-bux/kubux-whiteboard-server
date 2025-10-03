@@ -403,11 +403,9 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
     logSentMessage(message.type, message, requestId);
 }
 
-function ping_client( client ) {
-    const board = useBoard(client.boardId);
-    assert(board);
-    const pageId = existingPage(client.pageId, board);
-    client.pageId = pageId;
+
+function ping_client_with_page ( client, page_uuid ) {
+    client.pageId = page_uuid;
     const page = usePage(pageId);
     assert(page);
     assert(board.pageOrder.includes(pageId));
@@ -432,6 +430,13 @@ function ping_client( client ) {
     
     client.send(serialize(message));
     logSentMessage(message.type, message, 'N/A');
+}
+
+function ping_client( client ) {
+    const board = useBoard(client.boardId);
+    assert(board);
+    const pageId = existingPage(client.pageId, board);
+    ping_client_with_page( client, pageId );
 }
 
 function sendPing() {
@@ -782,7 +787,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const pageId = existingPage(pageUuid, board);
     if (pageId !== pageUuid) {
         debug.log(`[SERVER] Hash ${pageUuid} has been replaced, sending full page`);
-        sendFullPage(ws, boardId, pageId, requestId);
+        // sendFullPage(ws, boardId, pageId, requestId);
+        ping_client_with_page( ws, pageId );
         releaseBoard(boardId);
         return;
     }
@@ -790,7 +796,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const page = usePage(pageId);
     if (page.hashes[present] !== presentHash) {
         debug.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending full page`);
-        sendFullPage(ws, boardId, pageId, requestId);
+        // sendFullPage(ws, boardId, pageId, requestId);
+        ping_client_with_page( ws, pageId );
         releaseBoard(boardId);
         releasePage(pageId);
         return;
