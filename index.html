@@ -3396,8 +3396,8 @@
                       newNorth.x - controlTriangle.center.x
                   );
                   controlTriangle.east = {
-                      x: controlTriangle.center.x + controlTriangle.radius * Math.cos(angle - Math.PI/2),
-                      y: controlTriangle.center.y + controlTriangle.radius * Math.sin(angle - Math.PI/2)
+                      x: controlTriangle.center.x - controlTriangle.radius * Math.cos(angle - Math.PI/2),
+                      y: controlTriangle.center.y - controlTriangle.radius * Math.sin(angle - Math.PI/2)
                   };
                   
               } else if (draggedHandle === 'circle') {
