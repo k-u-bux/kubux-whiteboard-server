@@ -970,28 +970,20 @@
       let initialTransform = null;
       
       // Paste mode control triangle state
+      let initialTriangle = null; // { center, north, east, radius }
       let controlTriangle = null; // { center, north, east, radius }
       let draggedHandle = null; // 'center', 'north', 'east', 'circle', or null
       let transformMode = 'translate'; // 'translate', 'rotate', 'scale', 'affine'
       
       // Compute affine transformation from control triangle positions
-      function affineFromControls(center, north, east) {
-          // We want transform T such that:
-          // T(0, 0) = center
-          // T(0, 1) = north  
-          // T(1, 0) = east
-          
-          const { x: a, y: b } = center;  // Image of (0, 0)
-          const { x: c, y: d } = east;    // Image of (1, 0)
-          const { x: e, y: f } = north;   // Image of (0, 1)
-          
-          return [
-              c - a,  // a coefficient
-              d - b,  // b coefficient
-              e - a,  // c coefficient
-              f - b,  // d coefficient
-              a,      // e coefficient (x translation)
-              b       // f coefficient (y translation)
+      function affineFromControls() {
+          return [ 
+              ( controlTriangle.east.x - controlTriangle.center.x ) / initialTriangle.radius,
+              ( controlTriangle.east.y - controlTriangle.center.y ) / initialTriangle.radius,
+              ( controlTriangle.north.x - controlTriangle.center.x ) / initialTriangle.radius,
+              ( controlTriangle.north.y - controlTriangle.center.y ) / initialTriangle.radius,
+              ( controlTriangle.center.x - initialTriangle.center.x ),
+              ( controlTriangle.center.y - initialTriangle.center.y )
           ];
       }
       
@@ -1009,6 +1001,7 @@
               east: { x: centerX + radius, y: centerY },
               radius: radius
           };
+          initialTriangle = controlTriangle;
       }
       
       // Check if point is near a control handle
@@ -1063,11 +1056,7 @@
           if (!controlTriangle) return;
           
           // Compute transform from standard triangle to current triangle
-          const transform = affineFromControls(
-              controlTriangle.center,
-              controlTriangle.north,
-              controlTriangle.east
-          );
+          const transform = affineFromControls();
           
           // Scale by original radius to get correct sizing
           const scale = controlTriangle.radius / (pasteBounds ? Math.max(pasteBounds.width, pasteBounds.height) / 2 : 1);
