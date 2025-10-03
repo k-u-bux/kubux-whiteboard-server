@@ -403,37 +403,49 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
     logSentMessage(message.type, message, requestId);
 }
 
+function ping_client( client ) {
+    const board = useBoard(client.boardId);
+    assert(board);
+    const pageId = existingPage(client.pageId, board);
+    client.pageId = pageId;
+    const page = usePage(pageId);
+    assert(page);
+    assert(board.pageOrder.includes(pageId));
+    
+    const pageNr = board.pageOrder.indexOf(pageId) + 1;
+    const totalPages = board.pageOrder.length;
+    const pageHash = page.hashes[page.present];
+    
+    const snapshot_indices = recent_snapshots( page.history.length );
+    const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
+    
+    const message = {
+        type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
+        [MESSAGES.SERVER_TO_CLIENT.PING.UUID]: pageId,
+        [MESSAGES.SERVER_TO_CLIENT.PING.HASH]: pageHash,
+        [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR]: pageNr,
+        [MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES]: totalPages,
+        [MESSAGES.SERVER_TO_CLIENT.PING.SNAPSHOTS]: snapshots
+    };
+    releasePage(pageId);
+    releaseBoard(client.boardId);
+    
+    client.send(serialize(message));
+    logSentMessage(message.type, message, 'N/A');
+}
+
 function sendPing() {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && client.boardId && client.pageId) {
-            const board = useBoard(client.boardId);
-            assert(board);
-            const pageId = existingPage(client.pageId, board);
-            client.pageId = pageId;
-            const page = usePage(pageId);
-            assert(page);
-            assert(board.pageOrder.includes(pageId));
+            ping_client( client );
+        }
+    });
+}
 
-            const pageNr = board.pageOrder.indexOf(pageId) + 1;
-            const totalPages = board.pageOrder.length;
-            const pageHash = page.hashes[page.present];
-
-            const snapshot_indices = recent_snapshots( page.history.length );
-            const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
-
-            const message = {
-                type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.PING.UUID]: pageId,
-                [MESSAGES.SERVER_TO_CLIENT.PING.HASH]: pageHash,
-                [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR]: pageNr,
-                [MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES]: totalPages,
-                [MESSAGES.SERVER_TO_CLIENT.PING.SNAPSHOTS]: snapshots
-            };
-            releasePage(pageId);
-            releaseBoard(client.boardId);
-
-            client.send(serialize(message));
-            logSentMessage(message.type, message, 'N/A');
+function sendPingToBoard ( boardId ) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN && boardId === client.boardId && client.pageId) {
+            ping_client( client );
         }
     });
 }
@@ -692,6 +704,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             board.pageOrder.splice(board.pageOrder.indexOf(pageUuid) + 1, 0, newPageId);
             releaseBoard(boardId);
             sendFullPage(ws, boardId, newPageId, requestId);
+            sendPingToBoard( boardId );
             return;
         case MOD_ACTIONS.DELETE_PAGE.TYPE:
             releasePage(pageUuid);
@@ -702,6 +715,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 deletionMap[pageUuid] = newPageId;
                 releaseBoard(boardId);
                 sendFullPage(ws, boardId, newPageId, requestId);
+                sendPingToBoard( boardId );
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
                 const newPageId = generateUuid();
@@ -711,6 +725,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 board.pageOrder[ index ] = newPageId;
                 releaseBoard( boardId );
                 sendFullPage( ws, boardId, newPageId, requestId );
+                sendPingToBoard( boardId );
             }
             return;
         default:
