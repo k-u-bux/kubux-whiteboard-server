@@ -969,6 +969,182 @@
       let dragStartPoint = null;
       let initialTransform = null;
       
+      // Paste mode control triangle state
+      let controlTriangle = null; // { center, north, east, radius }
+      let draggedHandle = null; // 'center', 'north', 'east', 'circle', or null
+      let transformMode = 'translate'; // 'translate', 'rotate', 'scale', 'affine'
+      
+      // Compute affine transformation from control triangle positions
+      function affineFromControls(center, north, east) {
+          // We want transform T such that:
+          // T(0, 0) = center
+          // T(0, 1) = north  
+          // T(1, 0) = east
+          
+          const { x: a, y: b } = center;  // Image of (0, 0)
+          const { x: c, y: d } = east;    // Image of (1, 0)
+          const { x: e, y: f } = north;   // Image of (0, 1)
+          
+          return [
+              c - a,  // a coefficient
+              d - b,  // b coefficient
+              e - a,  // c coefficient
+              f - b,  // d coefficient
+              a,      // e coefficient (x translation)
+              b       // f coefficient (y translation)
+          ];
+      }
+      
+      // Initialize control triangle from paste bounds
+      function initializeControlTriangle() {
+          if (!pasteBounds) return;
+          
+          const centerX = pasteBounds.x + pasteBounds.width / 2;
+          const centerY = pasteBounds.y + pasteBounds.height / 2;
+          const radius = Math.max(pasteBounds.width, pasteBounds.height) / 2;
+          
+          controlTriangle = {
+              center: { x: centerX, y: centerY },
+              north: { x: centerX, y: centerY - radius },
+              east: { x: centerX + radius, y: centerY },
+              radius: radius
+          };
+      }
+      
+      // Check if point is near a control handle
+      function getControlHandleAt(x, y) {
+          if (!controlTriangle) return null;
+          
+          const threshold = 15 / zoomLevel; // 15 pixel hit radius
+          
+          const distToCenter = Math.sqrt(
+              Math.pow(x - controlTriangle.center.x, 2) + 
+              Math.pow(y - controlTriangle.center.y, 2)
+          );
+          if (distToCenter < threshold) return 'center';
+          
+          const distToNorth = Math.sqrt(
+              Math.pow(x - controlTriangle.north.x, 2) + 
+              Math.pow(y - controlTriangle.north.y, 2)
+          );
+          if (distToNorth < threshold) return 'north';
+          
+          const distToEast = Math.sqrt(
+              Math.pow(x - controlTriangle.east.x, 2) + 
+              Math.pow(y - controlTriangle.east.y, 2)
+          );
+          if (distToEast < threshold) return 'east';
+          
+          // Check if on circle (for uniform scale)
+          const distToCircle = Math.abs(
+              Math.sqrt(Math.pow(x - controlTriangle.center.x, 2) + 
+                        Math.pow(y - controlTriangle.center.y, 2)) - 
+              controlTriangle.radius
+          );
+          if (distToCircle < threshold) return 'circle';
+          
+          return null;
+      }
+      
+      // Constrain north point to circle
+      function constrainNorthToCircle(north) {
+          const dx = north.x - controlTriangle.center.x;
+          const dy = north.y - controlTriangle.center.y;
+          const angle = Math.atan2(dy, dx);
+          
+          return {
+              x: controlTriangle.center.x + controlTriangle.radius * Math.cos(angle),
+              y: controlTriangle.center.y + controlTriangle.radius * Math.sin(angle)
+          };
+      }
+      
+      // Update paste transform from control triangle
+      function updatePasteTransformFromControls() {
+          if (!controlTriangle) return;
+          
+          // Compute transform from standard triangle to current triangle
+          const transform = affineFromControls(
+              controlTriangle.center,
+              controlTriangle.north,
+              controlTriangle.east
+          );
+          
+          // Scale by original radius to get correct sizing
+          const scale = controlTriangle.radius / (pasteBounds ? Math.max(pasteBounds.width, pasteBounds.height) / 2 : 1);
+          const scaledTransform = [
+              transform[0] * scale, transform[1] * scale,
+              transform[2] * scale, transform[3] * scale,
+              transform[4], transform[5]
+          ];
+          
+          pasteTransform = scaledTransform;
+          pasteBounds = calculatePasteBounds();
+      }
+      
+      // Render control triangle overlay
+      function renderControlTriangle() {
+          if (!controlTriangle) return;
+          
+          ctx.save();
+          ctx.setLineDash([]);
+          ctx.lineWidth = 2 / zoomLevel;
+          
+          // Draw circle
+          ctx.strokeStyle = '#888';
+          ctx.beginPath();
+          ctx.arc(
+              controlTriangle.center.x, 
+              controlTriangle.center.y, 
+              controlTriangle.radius, 
+              0, 2 * Math.PI
+          );
+          ctx.stroke();
+          
+          // Draw crosshair lines
+          ctx.strokeStyle = '#666';
+          ctx.lineWidth = 1 / zoomLevel;
+          
+          // Center to north
+          ctx.beginPath();
+          ctx.moveTo(controlTriangle.center.x, controlTriangle.center.y);
+          ctx.lineTo(controlTriangle.north.x, controlTriangle.north.y);
+          ctx.stroke();
+          
+          // Center to east
+          ctx.beginPath();
+          ctx.moveTo(controlTriangle.center.x, controlTriangle.center.y);
+          ctx.lineTo(controlTriangle.east.x, controlTriangle.east.y);
+          ctx.stroke();
+          
+          // Draw control handles
+          const handleSize = 10 / zoomLevel;
+          
+          // Center handle (translation - blue)
+          ctx.fillStyle = '#0078d7';
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 2 / zoomLevel;
+          ctx.beginPath();
+          ctx.arc(controlTriangle.center.x, controlTriangle.center.y, handleSize/2, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+          
+          // North handle (rotation - brown)
+          ctx.fillStyle = '#8B4513';
+          ctx.beginPath();
+          ctx.arc(controlTriangle.north.x, controlTriangle.north.y, handleSize/2, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+          
+          // East handle (affine - green)
+          ctx.fillStyle = '#228B22';
+          ctx.beginPath();
+          ctx.arc(controlTriangle.east.x, controlTriangle.east.y, handleSize/2, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+          
+          ctx.restore();
+      }
+      
       // Clipboard for copy/paste
       let clipboard = {
         elements: [],
@@ -2173,6 +2349,9 @@
           // Calculate bounds of pasted elements
           pasteBounds = calculatePasteBounds();
           
+          // Initialize control triangle
+          initializeControlTriangle();
+          
           // Redraw to show pasted elements
           redrawCanvas();
       }
@@ -2279,6 +2458,9 @@
           resizeHandle = null;
           dragStartPoint = null;
           initialTransform = null;
+          controlTriangle = null;
+          draggedHandle = null;
+          transformMode = 'translate';
           redrawCanvas();
       }
 
@@ -3143,7 +3325,7 @@
       const draw_vertical_pointer_handler = draw_shape_pointer_handler( vertical_path );
       const draw_line_pointer_handler = draw_shape_pointer_handler( straight_path );
 
-      // Paste mode pointer handler
+      // Paste mode pointer handler with affine controls
       const paste_pointer_handler = {
           down: () => {
               if (force_stylus && event.pointerType === "touch") return;
@@ -3152,15 +3334,36 @@
               const x = (event.clientX - rect.left) / zoomLevel;
               const y = (event.clientY - rect.top) / zoomLevel;
               
-              // Check if clicking inside paste bounds
-              if (pasteBounds && 
-                  x >= pasteBounds.x && x <= pasteBounds.x + pasteBounds.width &&
-                  y >= pasteBounds.y && y <= pasteBounds.y + pasteBounds.height) {
+              // Initialize control triangle if not yet done
+              if (!controlTriangle) {
+                  initializeControlTriangle();
+              }
+              
+              // Check if clicking on a control handle
+              draggedHandle = getControlHandleAt(x, y);
+              
+              if (draggedHandle) {
                   isDraggingPaste = true;
                   dragStartPoint = { x, y };
                   initialTransform = [...pasteTransform];
+                  
+                  // Store initial triangle state for constrained operations
+                  if (draggedHandle === 'north' || draggedHandle === 'circle') {
+                      // Store angle for rotation
+                      const dx = controlTriangle.north.x - controlTriangle.center.x;
+                      const dy = controlTriangle.north.y - controlTriangle.center.y;
+                      dragStartPoint.initialAngle = Math.atan2(dy, dx);
+                  }
+              } else if (pasteBounds && 
+                         x >= pasteBounds.x && x <= pasteBounds.x + pasteBounds.width &&
+                         y >= pasteBounds.y && y <= pasteBounds.y + pasteBounds.height) {
+                  // Click inside bounds but not on handle - start translation
+                  isDraggingPaste = true;
+                  draggedHandle = 'center';
+                  dragStartPoint = { x, y };
+                  initialTransform = [...pasteTransform];
               } else {
-                  // Click outside bounds - commit the paste
+                  // Click outside - commit paste
                   commitPaste();
               }
           },
@@ -3168,23 +3371,75 @@
           move: () => {
               if (force_stylus && event.pointerType === "touch") return;
               
-              if (!isDraggingPaste || !dragStartPoint) return;
+              if (!isDraggingPaste || !dragStartPoint || !draggedHandle) return;
               
               const rect = canvas.getBoundingClientRect();
               const x = (event.clientX - rect.left) / zoomLevel;
               const y = (event.clientY - rect.top) / zoomLevel;
               
-              // Calculate translation from drag start
               const dx = x - dragStartPoint.x;
               const dy = y - dragStartPoint.y;
               
-              // Update paste transform with translation
-              pasteTransform = [...initialTransform];
-              pasteTransform[shared.TRANSFORM.E] += dx;
-              pasteTransform[shared.TRANSFORM.F] += dy;
+              if (draggedHandle === 'center') {
+                  // Translation: move center point
+                  controlTriangle.center.x += dx;
+                  controlTriangle.center.y += dy;
+                  controlTriangle.north.x += dx;
+                  controlTriangle.north.y += dy;
+                  controlTriangle.east.x += dx;
+                  controlTriangle.east.y += dy;
+                  
+                  dragStartPoint = { x, y };
+                  
+              } else if (draggedHandle === 'north') {
+                  // Rotation: constrain north to circle
+                  const newNorth = constrainNorthToCircle({ x, y });
+                  controlTriangle.north = newNorth;
+                  
+                  // Update east to maintain perpendicularity
+                  const angle = Math.atan2(
+                      newNorth.y - controlTriangle.center.y,
+                      newNorth.x - controlTriangle.center.x
+                  );
+                  controlTriangle.east = {
+                      x: controlTriangle.center.x + controlTriangle.radius * Math.cos(angle - Math.PI/2),
+                      y: controlTriangle.center.y + controlTriangle.radius * Math.sin(angle - Math.PI/2)
+                  };
+                  
+              } else if (draggedHandle === 'circle') {
+                  // Uniform scale: adjust radius
+                  const newRadius = Math.sqrt(
+                      Math.pow(x - controlTriangle.center.x, 2) + 
+                      Math.pow(y - controlTriangle.center.y, 2)
+                  );
+                  
+                  const oldRadius = controlTriangle.radius;
+                  const scaleFactor = newRadius / oldRadius;
+                  
+                  controlTriangle.radius = newRadius;
+                  
+                  // Scale north and east from center
+                  const northDx = controlTriangle.north.x - controlTriangle.center.x;
+                  const northDy = controlTriangle.north.y - controlTriangle.center.y;
+                  controlTriangle.north = {
+                      x: controlTriangle.center.x + northDx * scaleFactor,
+                      y: controlTriangle.center.y + northDy * scaleFactor
+                  };
+                  
+                  const eastDx = controlTriangle.east.x - controlTriangle.center.x;
+                  const eastDy = controlTriangle.east.y - controlTriangle.center.y;
+                  controlTriangle.east = {
+                      x: controlTriangle.center.x + eastDx * scaleFactor,
+                      y: controlTriangle.center.y + eastDy * scaleFactor
+                  };
+                  
+              } else if (draggedHandle === 'east') {
+                  // General affine: east can move freely
+                  controlTriangle.east = { x, y };
+              }
               
-              // Recalculate bounds
-              pasteBounds = calculatePasteBounds();
+              // Update paste transform from new triangle
+              updatePasteTransformFromControls();
               
               // Redraw
               redrawCanvas();
@@ -3194,6 +3449,7 @@
               if (force_stylus && event.pointerType === "touch") return;
               
               isDraggingPaste = false;
+              draggedHandle = null;
               dragStartPoint = null;
           }
       };
@@ -3871,28 +4127,10 @@
               renderElement(ctx, highlightElement);
           });
           
-          // Draw bounding box if we have bounds
-          if (pasteBounds) {
-              ctx.setLineDash([5, 5]);
-              ctx.strokeStyle = '#ff8c00';
-              ctx.lineWidth = 2;
-              ctx.strokeRect(pasteBounds.x, pasteBounds.y, pasteBounds.width, pasteBounds.height);
-              
-              // Draw center handle for dragging
-              const centerX = pasteBounds.x + pasteBounds.width / 2;
-              const centerY = pasteBounds.y + pasteBounds.height / 2;
-              const handleSize = 12 / zoomLevel;
-              
-              ctx.fillStyle = 'white';
-              ctx.strokeStyle = '#ff8c00';
-              ctx.lineWidth = 2;
-              ctx.beginPath();
-              ctx.arc(centerX, centerY, handleSize/2, 0, 2 * Math.PI);
-              ctx.fill();
-              ctx.stroke();
-          }
-          
           ctx.restore();
+          
+          // Draw control triangle for affine transformations
+          renderControlTriangle();
       }
 
       // Check if we can incrementally update background
