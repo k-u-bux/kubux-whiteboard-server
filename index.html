@@ -1894,7 +1894,7 @@
           
           // Apply movement to all selected elements
           if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-              moveSelectedElements(dx, dy);
+              dragMoveSelectedElements(dx, dy);
           }
           
           isDraggingSelection = false;
@@ -1902,7 +1902,7 @@
           selectionOriginalPoint = null;
       }
 
-      function moveSelectedElements(dx, dy) {
+      function dragMoveSelectedElements(dx, dy) {
           const actions = selectedElements.map(uuid => {
               const element = visualState.element.get(uuid);
               if (!element) return null;
