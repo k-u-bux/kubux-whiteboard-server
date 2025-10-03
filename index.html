@@ -921,6 +921,8 @@
       
       // Page cache using sessionStorage
       const PAGE_CACHE_PREFIX = 'whiteboard_page_';
+      const MAX_CACHED_PAGES = 10; // Maximum number of pages to cache
+      const CACHE_SIZE_WARNING_THRESHOLD = 4 * 1024 * 1024; // 4MB warning threshold
       
       // Two-canvas optimization: cache static background
       let backgroundCanvas = null;
@@ -3450,9 +3452,51 @@
           sendMessage(proposal);
       }
       
-      // Page cache functions
+      // Page cache functions with LRU eviction
       function getCacheKey(pageUuid) {
           return PAGE_CACHE_PREFIX + boardId + '_' + pageUuid;
+      }
+      
+      function getAllCachedPages() {
+          const cached = [];
+          for (let i = 0; i < sessionStorage.length; i++) {
+              const key = sessionStorage.key(i);
+              if (key && key.startsWith(PAGE_CACHE_PREFIX + boardId)) {
+                  try {
+                      const data = shared.deserialize(sessionStorage.getItem(key));
+                      cached.push({ key, data });
+                  } catch (err) {
+                      // Corrupted cache entry, remove it
+                      sessionStorage.removeItem(key);
+                  }
+              }
+          }
+          return cached;
+      }
+      
+      function evictOldestCachedPage() {
+          const cached = getAllCachedPages();
+          if (cached.length === 0) return;
+          
+          // Sort by timestamp (oldest first)
+          cached.sort((a, b) => a.data.timestamp - b.data.timestamp);
+          
+          // Remove oldest
+          const oldestKey = cached[0].key;
+          sessionStorage.removeItem(oldestKey);
+          debugLog('Evicted oldest cached page', { key: oldestKey });
+      }
+      
+      function clearAllPageCache() {
+          const keys = [];
+          for (let i = 0; i < sessionStorage.length; i++) {
+              const key = sessionStorage.key(i);
+              if (key && key.startsWith(PAGE_CACHE_PREFIX)) {
+                  keys.push(key);
+              }
+          }
+          keys.forEach(key => sessionStorage.removeItem(key));
+          debugLog('Cleared all page cache', { count: keys.length });
       }
       
       function savePageToCache(pageUuid, pageData) {
@@ -3465,8 +3509,43 @@
                   hash: pageData.hash,
                   timestamp: Date.now()
               };
-              sessionStorage.setItem(cacheKey, shared.serialize(cacheData));
-              debugLog('Page cached', { pageUuid, historyLength: pageData.history.length });
+              
+              const serialized = shared.serialize(cacheData);
+              
+              // Try to save
+              try {
+                  sessionStorage.setItem(cacheKey, serialized);
+                  debugLog('Page cached', { pageUuid, size: serialized.length });
+              } catch (quotaErr) {
+                  // Quota exceeded - try evicting old pages
+                  if (quotaErr.name === 'QuotaExceededError') {
+                      debugLog('Cache quota exceeded, evicting old pages');
+                      
+                      // Evict up to 3 oldest pages
+                      for (let i = 0; i < 3; i++) {
+                          evictOldestCachedPage();
+                      }
+                      
+                      // Try again
+                      try {
+                          sessionStorage.setItem(cacheKey, serialized);
+                          debugLog('Page cached after eviction', { pageUuid });
+                      } catch (retryErr) {
+                          console.warn('Still cannot cache after eviction, disabling cache');
+                          // If still fails, clear all cache and disable
+                          clearAllPageCache();
+                      }
+                  } else {
+                      throw quotaErr;
+                  }
+              }
+              
+              // Enforce max cached pages limit
+              const cached = getAllCachedPages();
+              while (cached.length > MAX_CACHED_PAGES) {
+                  evictOldestCachedPage();
+              }
+              
           } catch (err) {
               console.warn('Failed to cache page:', err);
               // Continue without caching - not critical
@@ -3479,6 +3558,11 @@
               const cached = sessionStorage.getItem(cacheKey);
               if (cached) {
                   const cacheData = shared.deserialize(cached);
+                  
+                  // Update timestamp for LRU
+                  cacheData.timestamp = Date.now();
+                  sessionStorage.setItem(cacheKey, shared.serialize(cacheData));
+                  
                   debugLog('Page loaded from cache', { pageUuid });
                   return cacheData;
               }
