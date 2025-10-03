@@ -3517,7 +3517,15 @@
           context.strokeStyle = element[shared.ELEMENT.COLOR];
           context.fillStyle = element[shared.ELEMENT.COLOR];
           context.lineWidth = element[shared.ELEMENT.WIDTH];
-          context.globalAlpha = element[shared.ELEMENT.OPACITY];
+          
+          // Ensure opacity is valid (between 0 and 1, not NaN)
+          let opacity = element[shared.ELEMENT.OPACITY];
+          if (typeof opacity !== 'number' || isNaN(opacity)) {
+              opacity = 1.0;
+          } else {
+              opacity = Math.max(0, Math.min(1, opacity));
+          }
+          context.globalAlpha = opacity;
           
           // Cap and join styles
           context.lineCap = shared.CAP_STYLE_STRINGS[element[shared.ELEMENT.CAP_STYLE]];
