@@ -691,10 +691,9 @@
     <script src="shared.js"></script>
     <script src="https://www.kubux.net/files/nodejs-libs/jspdf.umd.min.js"></script>
     <script>
-      // Debug logging function
       function debugLog(msg, data) {
           console.log(`[DEBUG] ${msg}`, data || '');
-      };
+      }
 
       const manifest = {
           "name": "Whiteboard App",
@@ -1697,33 +1696,9 @@
           redrawCanvas();
       }
       
-      // Apply a single action to the visual state
       function applyActionToVisualState(action) {
           if (!action) return;
-          shared.commitEdit( visualState, action );
-          return;
-          
-          switch (action.type) {
-          case shared.MOD_ACTIONS.DRAW.TYPE:
-              const stroke = action[shared.MOD_ACTIONS.DRAW.STROKE] || action.stroke;
-              shared.addElement(visualState, action.uuid, stroke);
-              shared.showElement(visualState, action.uuid);
-              break;
-              
-          case shared.MOD_ACTIONS.ERASE.TYPE:
-              const targetUuid = action[shared.MOD_ACTIONS.ERASE.TARGET_ACTION] || action.targetAction;
-              shared.hideElement(visualState, targetUuid);
-              break;
-              
-          case shared.MOD_ACTIONS.GROUP.TYPE:
-              const actions = action[shared.MOD_ACTIONS.GROUP.ACTIONS] || action.actions;
-              if (Array.isArray(actions)) {
-                  for (const subAction of actions) {
-                      applyActionToVisualState(subAction);
-                  }
-              }
-              break;
-          }
+          shared.commitEdit(visualState, action);
       }
       
       // Add stylus debugging function
@@ -3305,13 +3280,6 @@
 
       
       // Find elements that intersect with a complete eraser path
-      function findElementsIntersectingPathOld(eraserStroke) {
-          const result = shared.findIntersectingElements(visualState, eraserStroke, eraserRadius/2, 10);
-          console.log("erasing:", serialize( result ) );
-          return result;
-      }
-
-      // Find elements that intersect with a complete eraser path
       function findElementsIntersectingPath(eraserStroke) {
           let result = [];
           for ( const [ uuid, hay ] of visualState.element ) {
@@ -3874,36 +3842,6 @@
           
           ctx.restore();
       }
-
-
-      // canvasCache_is_tainted = false;
-      // canvasCache_canvas = document.createElement('canvas');
-      // canvasCache_present = 0;
-      // 
-      // function canvas_from_scratch() {
-      //     ctx.save();
-      //     ctx.setTransform(1, 0, 0, 1, 0, 0);
-      //     ctx.clearRect(0, 0, canvas.width, canvas.height);
-      //     ctx.restore();
-      // 
-      //     // Render all visible elements
-      //     shared.render_all_visible_elements(visualState, renderElementToScreen);
-      //     canvasCache_canvas = document.createElement('canvas');
-      //     canvasCache_canvas.width = canvas.width;
-      //     canvasCache_canvas.height = canvas.height;
-      //     const canvasCache_ctx = canvasCache_canvas.getContext('2d');
-      //     canvasCache_ctx.drawImage( canvas, 0, 0 );
-      // 
-      //     canvasCache_is_tainted = false;
-      //     canvasCache_present = present;
-      // }
-      // 
-      // function canvas_increment() {
-      //     if ( canvasCache_is_tainted ) {
-      //         canvas_from_scratch();
-      //         return;
-      //     }          
-      // }
 
 
       // Render pasted elements with orange highlight
