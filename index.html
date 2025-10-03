@@ -916,6 +916,11 @@
       let totalPages = 1;
       let connectionEstablished = false;
       
+      // Two-canvas optimization: cache static background
+      let backgroundCanvas = null;
+      let backgroundCtx = null;
+      let backgroundValid = false;
+      
       // Drawing state
       let isDrawing = false;
       let isErasing = false;
@@ -1054,6 +1059,16 @@
       function resizeCanvas() {
           canvas.width = container.clientWidth;
           canvas.height = container.clientHeight;
+          
+          // Resize background canvas to match
+          if (!backgroundCanvas) {
+              backgroundCanvas = document.createElement('canvas');
+              backgroundCtx = backgroundCanvas.getContext('2d');
+          }
+          backgroundCanvas.width = canvas.width;
+          backgroundCanvas.height = canvas.height;
+          backgroundValid = false; // Invalidate on resize
+          
           applyZoom();
           redrawCanvas();
       }
@@ -1604,6 +1619,9 @@
           for (const action of activeActions) {
               applyActionToVisualState(action);
           }
+          
+          // Invalidate background cache since state changed
+          backgroundValid = false;
           
           // Redraw the canvas
           redrawCanvas();
@@ -3724,32 +3742,125 @@
           ctx.restore();
       }
 
-      // Redraw the canvas
+      // Render static background (all committed elements)
+      function renderBackground() {
+          if (!backgroundCanvas || !backgroundCtx) return;
+          
+          // Clear background canvas
+          backgroundCtx.save();
+          backgroundCtx.setTransform(1, 0, 0, 1, 0, 0);
+          backgroundCtx.clearRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+          backgroundCtx.restore();
+          
+          // Apply zoom to background
+          backgroundCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+          
+          // Render all visible elements to background
+          shared.render_all_visible_elements(visualState, (element) => {
+              if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
+                  renderElement(backgroundCtx, element);
+              }
+          });
+          
+          // Render selection highlights to background
+          if (selectedElements.length > 0) {
+              renderSelectionHighlightToContext(backgroundCtx);
+          }
+          
+          backgroundValid = true;
+      }
+      
+      // Render selection highlight to a specific context
+      function renderSelectionHighlightToContext(context) {
+          if (selectedElements.length === 0) return;
+          
+          context.save();
+          
+          // Draw highlight for each selected element
+          selectedElements.forEach(uuid => {
+              const element = visualState.element.get(uuid);
+              if (!element || !visibleLayers.has(element[shared.ELEMENT.LAYER])) return;
+              
+              // Draw selection outline
+              const highlightElement = JSON.parse(JSON.stringify(element));
+              highlightElement[shared.ELEMENT.COLOR] = '#0078d7';
+              highlightElement[shared.ELEMENT.OPACITY] = 0.3;
+              highlightElement[shared.ELEMENT.WIDTH] += 4;
+              
+              renderElement(context, highlightElement);
+          });
+          
+          // Draw selection bounding box
+          const bounds = calculateSelectionBounds();
+          if (bounds) {
+              context.setLineDash([5, 5]);
+              context.strokeStyle = '#0078d7';
+              context.lineWidth = 2;
+              context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+              
+              // Draw handles for resizing
+              const handleSize = 8 / zoomLevel;
+              context.fillStyle = 'white';
+              context.strokeStyle = '#0078d7';
+              context.lineWidth = 1;
+              
+              // Draw handles at corners and midpoints
+              const handles = [
+                  {x: bounds.x, y: bounds.y}, // top-left
+                  {x: bounds.x + bounds.width/2, y: bounds.y}, // top-middle
+                  {x: bounds.x + bounds.width, y: bounds.y}, // top-right
+                  {x: bounds.x + bounds.width, y: bounds.y + bounds.height/2}, // middle-right
+                  {x: bounds.x + bounds.width, y: bounds.y + bounds.height}, // bottom-right
+                  {x: bounds.x + bounds.width/2, y: bounds.y + bounds.height}, // bottom-middle
+                  {x: bounds.x, y: bounds.y + bounds.height}, // bottom-left
+                  {x: bounds.x, y: bounds.y + bounds.height/2} // middle-left
+              ];
+              
+              handles.forEach(handle => {
+                  context.fillRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
+                  context.strokeRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
+              });
+          }
+          
+          context.restore();
+      }
+      
+      // Redraw the canvas - optimized with background caching
       function redrawCanvas() {
+          // Check if we're in an interactive mode (drawing, erasing, selecting, pasting)
+          const isInteractive = isDrawing || isErasing || isSelecting || pasteMode;
+          
+          // If background is invalid or we're not in interactive mode, render fresh background
+          if (!backgroundValid || !isInteractive) {
+              renderBackground();
+          }
+          
+          // Clear display canvas
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.restore();
-
-          // Render all visible elements
-          shared.render_all_visible_elements(visualState, renderElementToScreen);
           
-          // Draw current stroke if we are drawing or erasing
+          // Copy background to display canvas (fast!)
+          if (backgroundValid) {
+              ctx.drawImage(backgroundCanvas, 0, 0);
+          }
+          
+          ctx.restore();
+          
+          // Apply zoom for active elements
+          ctx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+          
+          // Draw current stroke if we are drawing or erasing (active layer)
           if ((isDrawing || isErasing) && currentStroke) {
               renderElement(ctx, currentStroke);
           }
           
-          // Draw selection rectangle if selecting
+          // Draw selection rectangle if selecting (active layer)
           if (isSelecting && selectionStroke) {
               renderElement(ctx, selectionStroke);
           }
           
-          // Draw selection highlights if elements are selected
-          if (selectedElements.length > 0) {
-              renderSelectionHighlight();
-          }
-          
-          // Draw paste highlights if in paste mode
+          // Draw paste highlights if in paste mode (active layer)
           if (pasteMode) {
               renderPasteHighlight();
           }
