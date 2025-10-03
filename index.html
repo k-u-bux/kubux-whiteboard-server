@@ -3956,35 +3956,21 @@
       async function exportBoardToPDF() {
           try {
               const timestamp = getTimestampForFilename();
-              
-              // Save current state
-              const originalPageUuid = currentPageUuid;
-              const originalPageNr = pageNr;
-              const originalHistory = [...history];
-              const originalPresent = present;
-              const originalHashes = [...hashes];
-              const originalVisualState = JSON.parse(JSON.stringify({
-                  element: Array.from(visualState.element.entries()),
-                  visible: Array.from(visualState.visible)
-              }));
-              
-              // Create PDF document
               const doc = new window.jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
               
-              showError(`Exporting board (0/${totalPages} pages)...`);
+              // Snapshot current page number for delta calculations
+              const startPageNr = pageNr;
               
-              // Render each page
+              // Iterate through each page sequentially - app blocks until all done
               for (let i = 1; i <= totalPages; i++) {
-                  // Add new page to PDF (except for first page)
                   if (i > 1) {
                       doc.addPage();
                   }
                   
-                  // Get PDF canvas context for this page
-                  const pdfCtx = doc.context2d;
+                  showError(`Exporting page ${i}/${totalPages}...`);
                   
-                  // Request page data
-                  await new Promise((resolve) => {
+                  // Request and wait for page data - blocks here until we get response
+                  const pageData = await new Promise((resolve) => {
                       const requestId = createRequestId();
                       const originalHandler = ws.onmessage;
                       
@@ -3992,72 +3978,52 @@
                           try {
                               const data = shared.deserialize(event.data);
                               if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE) {
-                                  // Process page data
                                   const pageHistory = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
                                   const pagePresent = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
                                   
-                                  // Apply zoom to PDF context
-                                  pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
-                                  
-                                  // Compile visual state for this page
-                                  const pageVisualState = shared.createEmptyVisualState();
-                                  const pageActions = pageHistory.slice(0, pagePresent);
-                                  for (const action of pageActions) {
-                                      shared.commitEdit(pageVisualState, action);
-                                  }
-                                  
-                                  // Render elements directly to PDF
-                                  shared.render_all_visible_elements(pageVisualState, (element) => {
-                                      if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
-                                          renderElement(pdfCtx, element);
-                                      }
-                                  });
-                                  
-                                  showError(`Exporting board (${i}/${totalPages} pages)...`);
-                                  
-                                  // Restore original handler and resolve
                                   ws.onmessage = originalHandler;
-                                  resolve();
+                                  resolve({ history: pageHistory, present: pagePresent });
                               } else {
-                                  // Pass other messages to original handler
                                   originalHandler.call(ws, event);
                               }
                           } catch (error) {
                               ws.onmessage = originalHandler;
-                              console.error('Error processing page:', error);
-                              resolve();
+                              console.error('Error getting page:', error);
+                              resolve(null);
                           }
                       };
                       
-                      // Request the page
                       const request = {
                           type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_UUID]: boardId,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: i - pageNr,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: i - startPageNr,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
                       };
                       
                       ws.send(shared.serialize(request));
                   });
+                  
+                  if (!pageData) continue;
+                  
+                  // Now render this page to PDF (synchronous)
+                  const pdfCtx = doc.context2d;
+                  pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+                  
+                  const pageVisualState = shared.createEmptyVisualState();
+                  const pageActions = pageData.history.slice(0, pageData.present);
+                  for (const action of pageActions) {
+                      shared.commitEdit(pageVisualState, action);
+                  }
+                  
+                  shared.render_all_visible_elements(pageVisualState, (element) => {
+                      if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
+                          renderElement(pdfCtx, element);
+                      }
+                  });
               }
               
-              // Save PDF
               doc.save(`board_${boardId}_${timestamp}.pdf`);
               hideError();
-              
-              // Restore original state
-              currentPageUuid = originalPageUuid;
-              pageNr = originalPageNr;
-              history = originalHistory;
-              present = originalPresent;
-              hashes = originalHashes;
-              visualState = shared.createEmptyVisualState();
-              visualState.element = new Map(originalVisualState.element);
-              visualState.visible = new Set(originalVisualState.visible);
-              
-              // Redraw canvas
-              backgroundValid = false;
-              redrawCanvas();
               
           } catch (err) {
               hideError();
