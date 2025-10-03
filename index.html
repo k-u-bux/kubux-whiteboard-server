@@ -3527,6 +3527,15 @@
           }
           context.globalAlpha = opacity;
           
+          // Use multiply blend mode for low-opacity strokes (highlighters)
+          // This creates proper highlighting: background shows through with color tint
+          // High opacity strokes use standard source-over
+          if (opacity < 0.5) {
+              context.globalCompositeOperation = 'multiply';
+          } else {
+              context.globalCompositeOperation = 'source-over';
+          }
+          
           // Cap and join styles
           context.lineCap = shared.CAP_STYLE_STRINGS[element[shared.ELEMENT.CAP_STYLE]];
           context.lineJoin = shared.JOIN_STYLE_STRINGS[element[shared.ELEMENT.JOIN_STYLE]];
