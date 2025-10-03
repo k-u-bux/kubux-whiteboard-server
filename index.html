@@ -897,10 +897,47 @@
       let totalPages = 1;
       let connectionEstablished = false;
       
-      // Page cache using sessionStorage
-      const PAGE_CACHE_PREFIX = 'whiteboard_page_';
-      const MAX_CACHED_PAGES = 10; // Maximum number of pages to cache
-      const CACHE_SIZE_WARNING_THRESHOLD = 4 * 1024 * 1024; // 4MB warning threshold
+      // Page cache using IndexedDB (larger storage, cleared on close)
+      const PAGE_CACHE_DB_NAME = 'whiteboard_cache';
+      const PAGE_CACHE_STORE_NAME = 'pages';
+      let cacheDB = null;
+      
+      // Initialize IndexedDB for page caching
+      async function initPageCacheDB() {
+          return new Promise((resolve, reject) => {
+              const request = indexedDB.open(PAGE_CACHE_DB_NAME, 1);
+              
+              request.onerror = () => {
+                  console.error('Failed to open cache database');
+                  resolve(null); // Continue without cache
+              };
+              
+              request.onsuccess = (event) => {
+                  cacheDB = event.target.result;
+                  debugLog('Cache database initialized');
+                  resolve(cacheDB);
+              };
+              
+              request.onupgradeneeded = (event) => {
+                  const db = event.target.result;
+                  if (!db.objectStoreNames.contains(PAGE_CACHE_STORE_NAME)) {
+                      // Create object store with pageUuid as key
+                      const objectStore = db.createObjectStore(PAGE_CACHE_STORE_NAME, { keyPath: 'uuid' });
+                      objectStore.createIndex('timestamp', 'timestamp', { unique: false });
+                      objectStore.createIndex('boardId', 'boardId', { unique: false });
+                  }
+              };
+          });
+      }
+      
+      // Clear cache database when window closes
+      window.addEventListener('beforeunload', () => {
+          if (cacheDB) {
+              cacheDB.close();
+          }
+          // Delete the database to clear all cached data
+          indexedDB.deleteDatabase(PAGE_CACHE_DB_NAME);
+      });
       
       // Two-canvas optimization: cache static background
       let backgroundCanvas = null;
@@ -1025,7 +1062,10 @@
       const force_stylus = true;
 
       // Initialize 
-      function init() {
+      async function init() {
+          // Initialize IndexedDB cache first
+          await initPageCacheDB();
+          
           setupCanvas();
           setupWebSocket();
           setupEventListeners();
@@ -3461,77 +3501,72 @@
           debugLog('Cleared all page cache', { count: keys.length });
       }
       
-      function savePageToCache(pageUuid, pageData) {
+      async function savePageToCache(pageUuid, pageData) {
+          if (!cacheDB) return;
+          
           try {
-              const cacheKey = getCacheKey(pageUuid);
+              const transaction = cacheDB.transaction([PAGE_CACHE_STORE_NAME], 'readwrite');
+              const store = transaction.objectStore(PAGE_CACHE_STORE_NAME);
+              
               const cacheData = {
                   uuid: pageUuid,
+                  boardId: boardId,
                   history: pageData.history,
                   present: pageData.present,
                   hash: pageData.hash,
                   timestamp: Date.now()
               };
               
-              const serialized = shared.serialize(cacheData);
+              store.put(cacheData);
               
-              // Try to save
-              try {
-                  sessionStorage.setItem(cacheKey, serialized);
-                  debugLog('Page cached', { pageUuid, size: serialized.length });
-              } catch (quotaErr) {
-                  // Quota exceeded - try evicting old pages
-                  if (quotaErr.name === 'QuotaExceededError') {
-                      debugLog('Cache quota exceeded, evicting old pages');
-                      
-                      // Evict up to 3 oldest pages
-                      for (let i = 0; i < 3; i++) {
-                          evictOldestCachedPage();
-                      }
-                      
-                      // Try again
-                      try {
-                          sessionStorage.setItem(cacheKey, serialized);
-                          debugLog('Page cached after eviction', { pageUuid });
-                      } catch (retryErr) {
-                          console.warn('Still cannot cache after eviction, disabling cache');
-                          // If still fails, clear all cache and disable
-                          clearAllPageCache();
-                      }
-                  } else {
-                      throw quotaErr;
-                  }
-              }
-              
-              // Enforce max cached pages limit
-              const cached = getAllCachedPages();
-              while (cached.length > MAX_CACHED_PAGES) {
-                  evictOldestCachedPage();
-              }
-              
+              await new Promise((resolve, reject) => {
+                  transaction.oncomplete = () => {
+                      debugLog('Page cached in IndexedDB', { pageUuid });
+                      resolve();
+                  };
+                  transaction.onerror = () => {
+                      console.warn('Failed to cache page:', transaction.error);
+                      reject(transaction.error);
+                  };
+              });
           } catch (err) {
               console.warn('Failed to cache page:', err);
               // Continue without caching - not critical
           }
       }
       
-      function loadPageFromCache(pageUuid) {
+      async function loadPageFromCache(pageUuid) {
+          if (!cacheDB) return null;
+          
           try {
-              const cacheKey = getCacheKey(pageUuid);
-              const cached = sessionStorage.getItem(cacheKey);
-              if (cached) {
-                  const cacheData = shared.deserialize(cached);
-                  
-                  // Update timestamp for LRU
-                  cacheData.timestamp = Date.now();
-                  sessionStorage.setItem(cacheKey, shared.serialize(cacheData));
-                  
-                  debugLog('Page loaded from cache', { pageUuid });
-                  return cacheData;
-              }
+              const transaction = cacheDB.transaction([PAGE_CACHE_STORE_NAME], 'readwrite');
+              const store = transaction.objectStore(PAGE_CACHE_STORE_NAME);
+              
+              const request = store.get(pageUuid);
+              
+              return await new Promise((resolve, reject) => {
+                  request.onsuccess = () => {
+                      const cacheData = request.result;
+                      if (cacheData) {
+                          // Update timestamp for LRU
+                          cacheData.timestamp = Date.now();
+                          store.put(cacheData);
+                          
+                          debugLog('Page loaded from cache', { pageUuid });
+                          resolve(cacheData);
+                      } else {
+                          resolve(null);
+                      }
+                  };
+                  request.onerror = () => {
+                      console.warn('Failed to load page from cache:', request.error);
+                      resolve(null);
+                  };
+              });
           } catch (err) {
               console.warn('Failed to load page from cache:', err);
+              return null;
           }
-          return null;
       }
       
       // Navigate to next/previous page
