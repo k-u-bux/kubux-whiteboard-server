@@ -689,7 +689,17 @@
     </div>
 
     <script src="shared.js"></script>
-    <script src="https://www.kubux.net/files/nodejs-libs/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+      // The CDN version exports as window.jsPDF directly (not window.jspdf.jsPDF)
+      // Create alias for compatibility with existing code
+      if (window.jsPDF) {
+          window.jspdf = { jsPDF: window.jsPDF };
+          console.log('jsPDF loaded with RGBA support');
+      } else {
+          console.error('Failed to load jsPDF');
+      }
+    </script>
     <script>
       // Debug logging function
       function debugLog(msg, data) {
