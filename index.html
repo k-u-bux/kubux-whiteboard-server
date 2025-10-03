@@ -4008,7 +4008,11 @@
                   
                   // Now render this page to PDF (synchronous)
                   const pdfCtx = doc.context2d;
-                  pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+                  
+                  // Reset context state for this page
+                  pdfCtx.save();
+                  pdfCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset to identity
+                  pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0); // Apply zoom
                   
                   const pageVisualState = shared.createEmptyVisualState();
                   const pageActions = pageData.history.slice(0, pageData.present);
@@ -4021,6 +4025,8 @@
                           renderElement(pdfCtx, element);
                       }
                   });
+                  
+                  pdfCtx.restore();
               }
               
               doc.save(`board_${boardId}_${timestamp}.pdf`);
