@@ -2462,10 +2462,10 @@
           });
           
           // Page navigation
-          document.getElementById('first-page').addEventListener('click', () => navigateToPage(1-pageNr));
+          document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
           document.getElementById('next-page').addEventListener('click', () => navigatePage(1));
-          document.getElementById('last-page').addEventListener('click', () => navigateToPage(totalPages-pageNr));
+          document.getElementById('last-page').addEventListener('click', () => navigatePage(totalPages-pageNr));
           document.getElementById('add-page').addEventListener('click', addNewPage);
           document.getElementById('delete-page').addEventListener('click', deletePage);
           
