@@ -1452,17 +1452,7 @@
           }
           
           const hostname = window.location.hostname || 'localhost';
-          // Use secure WebSockets when the page is loaded via HTTPS
-          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          
-          // When connected through the nginx proxy, we don't need to specify the port
-          let wsUrl;
-          if (hostname === 'localhost' || hostname === '127.0.0.1') {
-              wsUrl = `${protocol}//${hostname}:${shared.PORT}/ws`;
-          } else {
-              // For production use with nginx-proxy
-              wsUrl = `${protocol}//${hostname}/ws`;
-          }
+          const wsUrl = `ws://${hostname}:${shared.PORT}/ws`;
           
           debugLog('Connecting to WebSocket:', wsUrl);
           

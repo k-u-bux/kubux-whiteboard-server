@@ -287,9 +287,15 @@ function existingPage(pageId, board) {
 // internet
 // ========
 
-// Handle both HTTP and HTTPS connections
-// When behind nginx-proxy, we'll receive HTTP traffic
-const httpServer = http.createServer((req, res) => {
+const serverOptions = {
+    key: fs.readFileSync(getFilePath("server", "key")),
+    cert: fs.readFileSync(getFilePath("server", "cert"))
+};
+
+// debug.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
+
+// const httpServer = https.createServer( serverOptions, (req, res) => {
+const httpServer = http.createServer( (req, res) => {
     // always serve just index.html
     // rationale: allowing the client to request files opens the attack surface
     // consequence: index.html will be a self contained file; thus we embed shared.js on the fly
@@ -348,9 +354,8 @@ const wss = new WebSocket.Server({
 });
 
 httpServer.listen(PORT, () => {
-    debug.log(`[SERVER] Server is running on port ${PORT}`);
-    debug.log(`WebSocket-Server is running on port ${PORT}/ws`);
-    debug.log(`When accessed through nginx-proxy, use wss://whiteboard.kubux.net/ws`);
+    debug.log(`[SERVER] HTTP server is running on port ${PORT}`);
+    debug.log(`WebSocket-Server is running on ws://0.0.0.0:${PORT}/ws`);
 });
 
 
