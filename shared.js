@@ -1178,7 +1178,13 @@ function PDFBuilder() {
         
         const pdfContent = _serialize_pdf_content();
         
-        const blob = new Blob([pdfContent], { type: 'application/pdf' });
+        // Convert string to Uint8Array with proper binary encoding (latin1)
+        const bytes = new Uint8Array(pdfContent.length);
+        for (let i = 0; i < pdfContent.length; i++) {
+            bytes[i] = pdfContent.charCodeAt(i) & 0xFF;
+        }
+        
+        const blob = new Blob([bytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         
         const a = document.createElement('a');
