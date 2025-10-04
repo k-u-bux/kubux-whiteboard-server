@@ -734,6 +734,384 @@ function findIntersectingElements ( visualState, needle, eps, delta ) {
     return result;
 }
 
+
+// =====================================================================
+// PDF rendering
+// =====================================================================
+
+/**
+ * Maps RGB values [0-255] to PDF decimal color components [0-1].
+ * @param {string} style - CSS color string (e.g., 'rgb(255, 0, 0)').
+ * @param {boolean} isStroke - True for stroke color (RG), false for fill (rg).
+ * @returns {string} PDF color operator and values (e.g., '1 0 0 RG').
+ */
+function toPDFColor(style, isStroke) {
+    let r = 0, g = 0, b = 0;
+    const match = String(style).match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (match) {
+        r = parseInt(match[1]) / 255;
+        g = parseInt(match[2]) / 255;
+        b = parseInt(match[3]) / 255;
+    }
+    const operator = isStroke ? 'RG' : 'rg';
+    return `${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)} ${operator}`;
+}
+
+
+// PDFContext2D: The Canvas Subset Interface
+// -----------------------------------------
+
+/**
+ * A context object that translates a subset of Canvas 2D methods
+ * into PDF content stream commands, scoped to a specific page size.
+ * @param {object} pageContent - The page object to append commands to.
+ * @param {number} pageHeight - The height of the page for Y-axis inversion.
+ * @param {object} builder - The PDFBuilder instance for resource management (alpha).
+ */
+function PDFContext2D(pageContent, pageHeight, builder) {
+    const internalState = {
+        height: pageHeight,
+        _fillStyle: 'rgb(0, 0, 0)',
+        _strokeStyle: 'rgb(0, 0, 0)',
+        _lineWidth: 1,
+        _globalAlpha: 1.0, // New property for opacity
+        lineDash: [],
+        path: [],
+        transform: [1, 0, 0, 1, 0, 0]
+    };
+
+    const stateStack = [];
+
+    const addCommand = (cmd) => pageContent.commands.push(cmd);
+    const addPathCommand = (cmd) => internalState.path.push(cmd);
+    const invertY = (y) => internalState.height - y;
+
+    // Initial commands to set defaults in the PDF content stream
+    addCommand(`${internalState._lineWidth} w`);
+    addCommand(`[] 0 d`);
+
+    const context = {
+        // --- Properties (using accessors for command emission) ---
+        set fillStyle(value) {
+            internalState._fillStyle = value;
+            addCommand(toPDFColor(value, false));
+        },
+        get fillStyle() { return internalState._fillStyle; },
+
+        set strokeStyle(value) {
+            internalState._strokeStyle = value;
+            addCommand(toPDFColor(value, true));
+        },
+        get strokeStyle() { return internalState._strokeStyle; },
+
+        set lineWidth(value) {
+            internalState._lineWidth = value;
+            addCommand(`${value} w`);
+        },
+        get lineWidth() { return internalState._lineWidth; },
+        
+        set globalAlpha(value) {
+            const alpha = Math.max(0, Math.min(1, value));
+            if (internalState._globalAlpha === alpha) return;
+
+            internalState._globalAlpha = alpha;
+            
+            // Get or create the PDF resource ID for this alpha value
+            const resourceID = builder.getAlphaResourceID(alpha);
+            
+            // Emit the graphics state operator (gs)
+            addCommand(`${resourceID} gs`);
+        },
+        get globalAlpha() { return internalState._globalAlpha; },
+        
+        // --- State Management ---
+        save() {
+            addCommand('q');
+            stateStack.push({ 
+                ...internalState, 
+                transform: [...internalState.transform],
+                _globalAlpha: internalState._globalAlpha
+            });
+        },
+        restore() {
+            addCommand('Q');
+            if (stateStack.length > 0) {
+                const restoredState = stateStack.pop();
+                // Restore JS-side state
+                Object.assign(internalState, restoredState);
+
+                // Re-emit commands for properties that might have been changed/restored
+                addCommand(toPDFColor(internalState._fillStyle, false));
+                addCommand(toPDFColor(internalState._strokeStyle, true));
+                addCommand(`${internalState._lineWidth} w`);
+                
+                const resourceID = builder.getAlphaResourceID(internalState._globalAlpha);
+                addCommand(`${resourceID} gs`);
+
+                const pattern = internalState.lineDash.join(' ');
+                addCommand(`[${pattern}] 0 d`);
+            }
+        },
+
+        // --- Path Commands ---
+        beginPath() { internalState.path = []; },
+        moveTo(x, y) { addPathCommand(`${x} ${invertY(y)} m`); },
+        lineTo(x, y) { addPathCommand(`${x} ${invertY(y)} l`); },
+        arc(x, y, radius, startAngle, endAngle, counterclockwise = false) {
+            // Fails hard if unimplemented
+            throw new Error("PDFContext2D Error: arc() requires complex Bézier curve calculation and is not implemented.");
+        },
+
+        // --- Drawing Commands ---
+        stroke() {
+            if (internalState.path.length > 0) {
+                addCommand(internalState.path.join('\n'));
+                addCommand('S');
+                internalState.path = [];
+            }
+        },
+        fill() {
+            if (internalState.path.length > 0) {
+                addCommand(internalState.path.join('\n'));
+                addCommand('f');
+                internalState.path = [];
+            }
+        },
+
+        // --- Shape Shortcuts ---
+        fillRect(x, y, w, h) {
+            // PDF's 're' operator uses bottom-left as origin
+            addCommand(`${x} ${invertY(y + h)} ${w} ${h} re`);
+            addCommand('f');
+        },
+        strokeRect(x, y, w, h) {
+            addCommand(`${x} ${invertY(y + h)} ${w} ${h} re`);
+            addCommand('S');
+        },
+        clearRect(x, y, w, h) {
+            this.save();
+            this.fillStyle = 'rgb(255, 255, 255)'; // White fill
+            this.globalAlpha = 1.0; // Ensure clearing is fully opaque
+            this.fillRect(x, y, w, h);
+            this.restore();
+        },
+
+        // --- Transforms ---
+        translate(x, y) {
+            // The negative Y compensates for the initial CTM inversion
+            addCommand(`1 0 0 1 ${x} ${-y} cm`);
+        },
+        setTransform(a, b, c, d, e, f) {
+            addCommand(`${a} ${b} ${c} ${d} ${e} ${f} cm`);
+        },
+
+        // --- Line Style ---
+        setLineDash(segments) {
+            internalState.lineDash = segments;
+            const pattern = segments.join(' ');
+            addCommand(`[${pattern}] 0 d`);
+        }
+    };
+    
+    return context;
+}
+
+
+
+// PDFBuilder: The Document Manager and Complete Serializer
+// --------------------------------------------------------
+
+// Node.js conditional import for the 'fs' module
+let fs;
+if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+    try {
+        fs = require('fs');
+    } catch (e) {
+        // This is fine if the user runs the file in the browser (where 'require' is not defined)
+        // or if running in a restrictive sandbox.
+    }
+}
+
+function PDFBuilder() {
+    const pages = [];
+    const alphaResources = new Map();
+    let alphaCounter = 1;
+
+    // Stores byte offsets for the xref table
+    const objectOffsets = [];
+
+    function getAlphaResourceID(alpha) {
+        const alphaStr = alpha.toFixed(4); 
+        if (!alphaResources.has(alphaStr)) {
+            const resourceID = `/GS${alphaCounter++}`;
+            alphaResources.set(alphaStr, resourceID);
+        }
+        return alphaResources.get(alphaStr);
+    }
+
+    function new_page(width, height) {
+        const pageContent = { commands: [], width: width, height: height };
+        pages.push(pageContent);
+        
+        const context = PDFContext2D(pageContent, height, this); 
+
+        // Initial CTM transformation
+        context.setTransform(1, 0, 0, -1, 0, height);
+        
+        return context;
+    }
+
+    /**
+     * Helper to perform the full PDF serialization structure (Objects, XREF, Trailer).
+     * @returns {string} The complete PDF byte stream content.
+     */
+    function _serialize_pdf_content() {
+        if (pages.length === 0) {
+            throw new Error("Cannot generate PDF: Document contains no pages.");
+        }
+
+        let pdfContent = `%PDF-1.4\n%äüöß\n`;
+        let objCount = 1;
+        objectOffsets.length = 0; // Clear offsets for new serialization
+
+        // Helper to add an object and record its offset
+        const addObject = (content) => {
+            const objID = objCount++;
+            objectOffsets.push(pdfContent.length); // Record byte offset
+            pdfContent += `${objID} 0 obj\n${content}\nendobj\n`;
+            return objID;
+        };
+
+        const contentStreamIDs = [];
+        const pageObjIDs = [];
+
+        // --- 1. Content Streams ---
+        for (const page of pages) {
+            const contentStream = page.commands.join('\n');
+            const streamContent = `<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream`;
+            contentStreamIDs.push(addObject(streamContent));
+        }
+
+        // --- 2. ExtGState Objects (Alpha Definitions) ---
+        const extGStateObjects = [];
+        for (const [alphaStr, resourceID] of alphaResources.entries()) {
+            const alpha = parseFloat(alphaStr).toFixed(4);
+            const extGStateContent = `<< /Type /ExtGState /ca ${alpha} /CA ${alpha} >>`;
+            const objID = addObject(extGStateContent);
+            extGStateObjects.push({ resourceID, objID });
+        }
+        
+        // --- 3. Resource Dictionary (Shared) ---
+        let extGStateDict = '';
+        extGStateObjects.forEach(res => {
+            extGStateDict += `  ${res.resourceID} ${res.objID} 0 R\n`;
+        });
+        const resourcesDict = `<< /ExtGState <<\n${extGStateDict}>>\n>>`;
+        const resourceObjID = addObject(resourcesDict);
+
+        // --- 4. Page Dictionaries ---
+        let pagesKids = '';
+        for (let i = 0; i < pages.length; i++) {
+            const pageDict = `<<\n  /Type /Page\n  /Parent 2 0 R\n  /MediaBox [0 0 ${pages[i].width} ${pages[i].height}]\n  /Contents ${contentStreamIDs[i]} 0 R\n  /Resources ${resourceObjID} 0 R\n>>`;
+            const pageObjID = addObject(pageDict);
+            pagesKids += `${pageObjID} 0 R `;
+            pageObjIDs.push(pageObjID);
+        }
+        
+        // --- 5. Pages Root Dictionary (Object 2 - fixed ID for Pages tree) ---
+        // Note: We use a fixed ID for the Pages Root for simplicity, so we must manually place it.
+        const pagesRootID = 2; 
+        const pagesRootDict = `<<\n  /Type /Pages\n  /Kids [${pagesKids}]\n  /Count ${pages.length}\n>>`;
+        
+        // We ensure the object ID is correct by pushing a dummy for all previous objects, 
+        // then correcting its offset later, or by simply using the current objCount.
+        
+        // For simplicity in this functional example, we will let objCount determine the IDs
+        // and adjust the Page Dictionaries to reference the correct parent ID, 
+        // which will be the ID of the Pages dictionary added next.
+        const actualPagesRootID = addObject(pagesRootDict); 
+
+        // --- 6. Catalog Root Dictionary (The document entry point) ---
+        const catalogID = addObject(`<<\n  /Type /Catalog\n  /Pages ${actualPagesRootID} 0 R\n>>`);
+        
+        
+        // --- 7. Cross-Reference Table (XREF) ---
+        const xrefStart = pdfContent.length;
+        let xrefTable = `xref\n0 ${objCount}\n0000000000 65535 f \n`; // 0th object is always free
+        
+        // Object IDs 1 through objCount-1
+        for (let i = 0; i < objectOffsets.length; i++) {
+            const offset = String(objectOffsets[i]).padStart(10, '0');
+            xrefTable += `${offset} 00000 n \n`;
+        }
+        
+        pdfContent += xrefTable;
+
+        // --- 8. Trailer ---
+        pdfContent += `trailer\n<<\n  /Size ${objCount}\n  /Root ${catalogID} 0 R\n>>\n`;
+        pdfContent += `startxref\n${xrefStart}\n%%EOF\n`;
+        
+        return pdfContent;
+    }
+
+    /**
+     * Implementation 1: For Node.js environment (Server-side I/O).
+     * @param {string} file_path - The full path to write the file.
+     */
+    function write_to_node_file(file_path) {
+        if (typeof fs === 'undefined') {
+            throw new Error("Node.js 'fs' module not found. Use download_in_browser() for the client.");
+        }
+        
+        const pdfContent = _serialize_pdf_content();
+        
+        try {
+            // Write PDF as binary/buffer
+            fs.writeFileSync(file_path, Buffer.from(pdfContent, 'binary'));
+            console.log(`\nSuccessfully wrote PDF to: ${file_path}`);
+        } catch (e) {
+            throw new Error(`Failed to write file to Node FS: ${e.message}`);
+        }
+    }
+
+    /**
+     * Implementation 2: For Browser environment (Client-side download).
+     * @param {string} file_name - The suggested name for the downloaded file.
+     */
+    function download_in_browser(file_name) {
+        if (typeof Blob === 'undefined' || typeof URL === 'undefined') {
+            throw new Error("Browser Blob/URL APIs not found. Use write_to_node_file() for the server.");
+        }
+        
+        const pdfContent = _serialize_pdf_content();
+        
+        const blob = new Blob([pdfContent], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file_name;
+        
+        // Use a slight delay to ensure the browser registers the link before clicking
+        setTimeout(() => a.click(), 100);
+        
+        URL.revokeObjectURL(url);
+        
+        console.log(`\nTriggered browser download for: ${file_name}`);
+    }
+
+    return {
+        new_page,
+        getAlphaResourceID, // exposed for the context
+        write_to_node_file, 
+        download_in_browser
+    };
+}
+
+
+
+
+
 // Export for Node.js (server)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -798,7 +1176,9 @@ if (typeof module !== 'undefined' && module.exports) {
         addGridCell,
         tracePath,
         pathsIntersect,
-        findIntersectingElements
+        findIntersectingElements,
+        PDFContext2D,
+        PDFBuilder
     };
 }
 // Export for browsers (client)
@@ -866,6 +1246,8 @@ else if (typeof window !== 'undefined') {
         addGridCell,
         tracePath,
         pathsIntersect,
-        findIntersectingElements
+        findIntersectingElements,
+        PDFContext2D,
+        PDFBuilder
     };
 }
