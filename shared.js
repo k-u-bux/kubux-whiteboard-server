@@ -1114,11 +1114,17 @@ function PDFBuilder() {
         const a = document.createElement('a');
         a.href = url;
         a.download = file_name;
+        a.style.display = 'none';
         
-        // Use a slight delay to ensure the browser registers the link before clicking
-        setTimeout(() => a.click(), 500);
+        // Add to DOM, click, then remove and cleanup
+        document.body.appendChild(a);
+        a.click();
         
-        URL.revokeObjectURL(url);
+        // Cleanup after a delay to ensure download started
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
         
         console.log(`\nTriggered browser download for: ${file_name}`);
     }
