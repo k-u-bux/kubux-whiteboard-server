@@ -3091,6 +3091,7 @@
           document.getElementById('selection-rectangle-tool').classList.remove('active');
           document.getElementById('selection-lasso-tool').classList.remove('active');
           document.getElementById('selection-stroke-tool').classList.remove('active');
+          document.getElementById('hand-tool').classList.remove('active');
           document.getElementById(`${tool}-tool`).classList.add('active');
           
           // Clear selection when switching away from selection tools
@@ -4344,7 +4345,7 @@
           if (canIncrementallyUpdate()) {
               // Incremental update: only render new DRAW actions
               backgroundCtx.save();
-              backgroundCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+              backgroundCtx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
               
               for (let i = backgroundRenderedUpTo; i < present; i++) {
                   const action = history[i];
@@ -4366,8 +4367,8 @@
           backgroundCtx.clearRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
           backgroundCtx.restore();
           
-          // Apply zoom to background
-          backgroundCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+          // Apply zoom and pan to background
+          backgroundCtx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
           
           // Render all visible elements to background
           shared.render_all_visible_elements(visualState, (element) => {
@@ -4462,8 +4463,8 @@
           
           ctx.restore();
           
-          // Apply zoom for active elements
-          ctx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+          // Apply zoom and pan for active elements
+          ctx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
           
           // Draw current stroke if we are drawing or erasing (active layer)
           if ((isDrawing || isErasing) && currentStroke) {
