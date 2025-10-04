@@ -470,6 +470,7 @@
         <button class="tool-btn" id="zoom-out">-</button>
         <span id="zoom-level">100%</span>
         <button class="tool-btn" id="zoom-in">+</button>
+        <button class="tool-btn" id="hand-tool" title="Pan (Hand Tool)">✋</button>
       </div>
       
       <div class="tool-section">
@@ -714,6 +715,8 @@
                   activeLayer: activeLayer,
                   lastTool: currentTool,
                   zoomLevel: zoomLevel,
+                  panX: panX,
+                  panY: panY,
                   colorSwatches: [],
                   // Page position
                   currentPageUuid: currentPageUuid,
@@ -780,8 +783,14 @@
               if (settings.zoomLevel !== undefined) {
                   zoomLevel = settings.zoomLevel;
                   zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
-                  applyZoom();
               }
+              
+              // Restore pan position
+              if (settings.panX !== undefined) panX = settings.panX;
+              if (settings.panY !== undefined) panY = settings.panY;
+              
+              // Apply zoom and pan
+              applyZoom();
               
               // Restore last tool
               if (settings.lastTool) {
@@ -1260,8 +1269,10 @@
       // Visual state
       let visualState = shared.createEmptyVisualState();
       
-      // Zoom state
+      // Zoom and pan state
       let zoomLevel = 1;
+      let panX = 0;
+      let panY = 0;
 
       // Layer state
       let activeLayer = 0;
@@ -1375,11 +1386,11 @@
           redrawCanvas();
       }
       
-      // Apply zoom transform
+      // Apply zoom and pan transform
       function applyZoom() {
           ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+          ctx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
       }
       
       // Show error message
@@ -2754,6 +2765,7 @@
           document.getElementById('selection-rectangle-tool').addEventListener('click', () => setTool('selection-rectangle'));
           document.getElementById('selection-lasso-tool').addEventListener('click', () => setTool('selection-lasso'));
           document.getElementById('selection-stroke-tool').addEventListener('click', () => setTool('selection-stroke'));
+          document.getElementById('hand-tool').addEventListener('click', () => setTool('hand'));
           
           // Color selection
           const colorSwatches = document.querySelectorAll('.color-swatch');
@@ -3027,6 +3039,41 @@
           sendMessage(proposal);
       }
       
+      // Hand tool pointer handler for panning
+      const hand_pointer_handler = {
+          down: () => {
+              if (force_stylus && event.pointerType === "touch") return;
+              
+              const rect = canvas.getBoundingClientRect();
+              const x = event.clientX - rect.left;
+              const y = event.clientY - rect.top;
+              
+              isDraggingPaste = true; // Reuse flag
+              dragStartPoint = { x, y, panX, panY };
+          },
+          move: () => {
+              if (force_stylus && event.pointerType === "touch") return;
+              if (!isDraggingPaste || !dragStartPoint) return;
+              
+              const rect = canvas.getBoundingClientRect();
+              const x = event.clientX - rect.left;
+              const y = event.clientY - rect.top;
+              
+              panX = dragStartPoint.panX + (x - dragStartPoint.x);
+              panY = dragStartPoint.panY + (y - dragStartPoint.y);
+              
+              applyZoom();
+              redrawCanvas();
+          },
+          up: () => {
+              if (force_stylus && event.pointerType === "touch") return;
+              
+              isDraggingPaste = false;
+              dragStartPoint = null;
+              saveSettings();
+          }
+      };
+      
       // Set current tool
       function setTool(tool) {
           // Commit paste if switching tools while in paste mode
@@ -3090,6 +3137,10 @@
               canvas.style.cursor = 'none';
               switch_settings( selection_stroke_settings );
               set_pointer_handler( selection_pointer_handler );
+              break;
+          case 'hand':
+              canvas.style.cursor = 'grab';
+              set_pointer_handler( hand_pointer_handler );
               break;
           }
       }
