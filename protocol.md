@@ -61,8 +61,6 @@ The client maintains:
   - Verified state is used as the starting point for replay updates
 - `pageNr`: Current page position in the board
 - `totalPages`: Total number of pages in the board
-- `myActions`: Array of action UUIDs performed by this client (for undo/redo)
-- `undoneActions`: Map of undone action UUIDs to their undo action UUIDs (for redo)
 
 ## Protocol Messages
 
