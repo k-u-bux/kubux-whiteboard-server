@@ -3187,8 +3187,8 @@
           down: () => {
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
+              const x = (event.clientX - rect.left - panX) / zoomLevel;
+              const y = (event.clientY - rect.top - panY) / zoomLevel;
               const pressure = event.pressure !== undefined ? event.pressure : 0.5;
               currentPath = [];
               const point = shared.createPoint(x, y, pressure);
@@ -3214,8 +3214,8 @@
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               if (!isDrawing) return;
               const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
+              const x = (event.clientX - rect.left - panX) / zoomLevel;
+              const y = (event.clientY - rect.top - panY) / zoomLevel;
               const pressure = event.pressure !== undefined ? event.pressure : 0.5;
               const point = shared.createPoint(x, y, pressure);
               currentPath.push(point);
@@ -3242,8 +3242,8 @@
           down: () => {
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
+              const x = (event.clientX - rect.left - panX) / zoomLevel;
+              const y = (event.clientY - rect.top - panY) / zoomLevel;
               const pressure = event.pressure !== undefined ? event.pressure : 0.5;
               currentPath = [];
               const point = shared.createPoint(x, y, pressure);
@@ -3260,8 +3260,8 @@
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               if (!isErasing) return;
               const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
+              const x = (event.clientX - rect.left - panX) / zoomLevel;
+              const y = (event.clientY - rect.top - panY) / zoomLevel;
               const pressure = event.pressure !== undefined ? event.pressure : 0.5;
               const point = shared.createPoint(x, y, pressure);
               currentPath.push(point);
@@ -3291,8 +3291,8 @@
               if (force_stylus && event.pointerType === "touch") return;
               
               const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
+              const x = (event.clientX - rect.left - panX) / zoomLevel;
+              const y = (event.clientY - rect.top - panY) / zoomLevel;
               
               // If clicking on a selected element, start drag mode
               if (isClickOnSelectedElement(x, y)) {
@@ -3341,8 +3341,8 @@
               // Handle dragging of selected elements
               if (isDraggingSelection) {
                   const rect = canvas.getBoundingClientRect();
-                  const x = (event.clientX - rect.left) / zoomLevel;
-                  const y = (event.clientY - rect.top) / zoomLevel;
+                  const x = (event.clientX - rect.left - panX) / zoomLevel;
+                  const y = (event.clientY - rect.top - panY) / zoomLevel;
                   
                   dragSelectedElements(x, y);
                   return;
@@ -3351,8 +3351,8 @@
               if (!isSelecting) return;
               
               const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
+              const x = (event.clientX - rect.left - panX) / zoomLevel;
+              const y = (event.clientY - rect.top - panY) / zoomLevel;
               
               // Update selection shape based on the shape type
               if (draw_settings.shape === 'rectangle') {
@@ -3399,8 +3399,8 @@
               // Finish dragging if we were dragging
               if (isDraggingSelection) {
                   const rect = canvas.getBoundingClientRect();
-                  const x = (event.clientX - rect.left) / zoomLevel;
-                  const y = (event.clientY - rect.top) / zoomLevel;
+                  const x = (event.clientX - rect.left - panX) / zoomLevel;
+                  const y = (event.clientY - rect.top - panY) / zoomLevel;
                   
                   finishDragSelectedElements(x, y);
                   return;
@@ -3499,8 +3499,8 @@
               down: () => {
                   if ( force_stylus && event.pointerType === "touch" ) { return; }
                   const rect = canvas.getBoundingClientRect();
-                  const x = (event.clientX - rect.left) / zoomLevel;
-                  const y = (event.clientY - rect.top) / zoomLevel;
+                  const x = (event.clientX - rect.left - panX) / zoomLevel;
+                  const y = (event.clientY - rect.top - panY) / zoomLevel;
                   const pressure = event.pressure !== undefined ? event.pressure : 0.5;
                   currentPath = [];
                   const point = shared.createPoint(x, y, pressure);
@@ -3523,8 +3523,8 @@
                   if ( force_stylus && event.pointerType === "touch" ) { return; }
                   if (!isDrawing) return;
                   const rect = canvas.getBoundingClientRect();
-                  const x = (event.clientX - rect.left) / zoomLevel;
-                  const y = (event.clientY - rect.top) / zoomLevel;
+                  const x = (event.clientX - rect.left - panX) / zoomLevel;
+                  const y = (event.clientY - rect.top - panY) / zoomLevel;
                   const pressure = event.pressure !== undefined ? event.pressure : 0.5;
                   const point = shared.createPoint(x, y, pressure);
                   B = point;
@@ -3562,8 +3562,8 @@
               if (force_stylus && event.pointerType === "touch") return;
               
               const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
+              const x = (event.clientX - rect.left - panX) / zoomLevel;
+              const y = (event.clientY - rect.top - panY) / zoomLevel;
               
               // Initialize control triangle if not yet done
               if (!controlTriangle) {
@@ -3605,8 +3605,8 @@
               if (!isDraggingPaste || !dragStartPoint || !draggedHandle) return;
               
               const rect = canvas.getBoundingClientRect();
-              const x = (event.clientX - rect.left) / zoomLevel;
-              const y = (event.clientY - rect.top) / zoomLevel;
+              const x = (event.clientX - rect.left - panX) / zoomLevel;
+              const y = (event.clientY - rect.top - panY) / zoomLevel;
               
               const dx = x - dragStartPoint.x;
               const dy = y - dragStartPoint.y;
