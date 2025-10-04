@@ -492,7 +492,7 @@
       </div>
 
       <div class="tool-section">
-        <button class="tool-btn" id="selection-rectangle-tool" title="Rectangle Selection">⬚</button>
+        <button class="tool-btn" id="selection-rectangle-tool" title="Rectangle Selection">▭</button>
         <button class="tool-btn" id="selection-lasso-tool" title="Lasso Selection">⭕</button>
         <button class="tool-btn" id="selection-stroke-tool" title="Stroke Selection">〰️</button>
       </div>
@@ -546,7 +546,7 @@
           <input type="range" id="opacity-selector" min="0" max="128">
         </div>
         <div class="tool-section sidebar-section" id="timer-toggle">
-          <button class="shape-btn" id="timer-btn" title="Timer">⏲</button>
+          <button class="shape-btn" id="timer-btn" title="Timer">🕐</button>
         </div>
         <div class="tool-section sidebar-section" id="loop-toggle">
           <button class="shape-btn" id="loop-btn" title="open stroke / closed loop"></button>
@@ -561,16 +561,16 @@
           <button class="shape-btn" id="rectangle-btn" title="rectangle path">▭</button>
         </div>
         <div class="tool-section sidebar-section" id="circle-selection">
-          <button class="shape-btn" id="circle-btn" title="circle path">⭕</button>
+          <button class="shape-btn" id="circle-btn" title="circle path">◯</button>
         </div>
         <div class="tool-section sidebar-section" id="horizontal-selection">
-          <button class="shape-btn" id="horizontal-btn" title="horizontal line">⎯</button>
+          <button class="shape-btn" id="horizontal-btn" title="horizontal line">─</button>
         </div>
         <div class="tool-section sidebar-section" id="vertical-selection">
-          <button class="shape-btn" id="vertical-btn" title="vertical line">⏐</button>
+          <button class="shape-btn" id="vertical-btn" title="vertical line">│</button>
         </div>
         <div class="tool-section sidebar-section" id="line-selection">
-          <button class="shape-btn" id="line-btn" title="straight line">⚞</button>
+          <button class="shape-btn" id="line-btn" title="straight line">／</button>
         </div>
         
         <!-- Selection action buttons (shown when selection tool is active) -->
@@ -584,7 +584,7 @@
           <button class="shape-btn" id="move-btn" title="Move">🔄</button>
         </div>
         <div class="tool-section sidebar-section" id="selection-layer-sidebar" style="display: none;">
-          <button class="shape-btn" id="move-layer-btn" title="Move to Layer">📑</button>
+          <button class="shape-btn" id="move-layer-btn" title="Move to Layer">⇅</button>
         </div>
         <div class="tool-section sidebar-section" id="selection-deselect-sidebar" style="display: none;">
           <button class="shape-btn" id="deselect-toggle-btn" title="Deselect Mode">➖</button>
@@ -926,14 +926,14 @@
               document.getElementById('timer-btn').classList.remove('active');
           }
           if ( draw_settings.fill ) { 
-              document.getElementById('fill-btn').innerHTML = '⬤';
+              document.getElementById('fill-btn').innerHTML = '■';
           } else {
-              document.getElementById('fill-btn').innerHTML = '◯';
+              document.getElementById('fill-btn').innerHTML = '□';
           }
           if ( draw_settings.loop ) { 
-              document.getElementById('loop-btn').innerHTML = 'D';
+              document.getElementById('loop-btn').innerHTML = '🔄';
           } else {
-              document.getElementById('loop-btn').innerHTML = 'S';
+              document.getElementById('loop-btn').innerHTML = '⤴';
           }
           update_shape_buttons();
       }
