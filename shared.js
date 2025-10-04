@@ -901,6 +901,10 @@ function PDFContext2D(pageContent, pageHeight, builder) {
             // The negative Y compensates for the initial CTM inversion
             addCommand(`1 0 0 1 ${x} ${-y} cm`);
         },
+        transform(a, b, c, d, e, f) {
+            // Multiply current matrix by the transformation matrix
+            addCommand(`${a} ${b} ${c} ${d} ${e} ${f} cm`);
+        },
         setTransform(a, b, c, d, e, f) {
             addCommand(`${a} ${b} ${c} ${d} ${e} ${f} cm`);
         },
