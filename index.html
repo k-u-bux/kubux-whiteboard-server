@@ -471,6 +471,7 @@
         <span id="zoom-level">100%</span>
         <button class="tool-btn" id="zoom-in">+</button>
         <button class="tool-btn" id="hand-tool" title="Pan (Hand Tool)">✋</button>
+        <button class="tool-btn" id="reset-view" title="Reset View (Center, 100%)">⌖</button>
       </div>
       
       <div class="tool-section">
@@ -2858,6 +2859,7 @@
           // Zoom controls
           document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.1));
           document.getElementById('zoom-out').addEventListener('click', () => adjustZoom(-0.1));
+          document.getElementById('reset-view').addEventListener('click', resetView);
           
           // Undo/Redo buttons
           undoBtn.addEventListener('click', handleUndo);
@@ -3150,6 +3152,17 @@
       function adjustZoom(delta) {
           zoomLevel = Math.max(0.5, Math.min(3, zoomLevel + delta));
           zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+          applyZoom();
+          redrawCanvas();
+          saveSettings();
+      }
+      
+      // Reset view to default (center, 100% zoom)
+      function resetView() {
+          zoomLevel = 1;
+          panX = 0;
+          panY = 0;
+          zoomLevelDisplay.textContent = '100%';
           applyZoom();
           redrawCanvas();
           saveSettings();
