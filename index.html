@@ -560,6 +560,9 @@
         <div class="tool-section sidebar-section" id="rectangle-selection">
           <button class="shape-btn" id="rectangle-btn" title="rectangle path">▭</button>
         </div>
+        <div class="tool-section sidebar-section" id="circle-selection">
+          <button class="shape-btn" id="circle-btn" title="circle path">⭕</button>
+        </div>
         <div class="tool-section sidebar-section" id="horizontal-selection">
           <button class="shape-btn" id="horizontal-btn" title="horizontal line">⎯</button>
         </div>
@@ -2831,6 +2834,12 @@
               saveSettings();
           });
           
+          document.getElementById('circle-btn').addEventListener('click', () => {
+              set_shape_tool( 'circle' );
+              update_shape_buttons();
+              saveSettings();
+          });
+          
           document.getElementById('horizontal-btn').addEventListener('click', () => {
               set_shape_tool( 'horizontal' );
               update_shape_buttons();
@@ -3465,6 +3474,26 @@
                    shared.createPoint( B[0], B[1], B[2] ) ];
       }
 
+      function circle_path ( A, B ) {
+          // A is center, B is a point on the circle
+          const centerX = A[0];
+          const centerY = A[1];
+          const radius = Math.sqrt(Math.pow(B[0] - centerX, 2) + Math.pow(B[1] - centerY, 2));
+          
+          // Use 72 vertices for a smooth circle (every 5 degrees)
+          const numVertices = 72;
+          const points = [];
+          
+          for (let i = 0; i < numVertices; i++) {
+              const angle = (i / numVertices) * 2 * Math.PI;
+              const x = centerX + radius * Math.cos(angle);
+              const y = centerY + radius * Math.sin(angle);
+              points.push(shared.createPoint(x, y, 0.5));
+          }
+          
+          return points;
+      }
+
       function draw_shape_pointer_handler ( make_path ) {
           const result = {
               down: () => {
@@ -3522,6 +3551,7 @@
       }
 
       const draw_rectangle_pointer_handler = draw_shape_pointer_handler( bbox_path );
+      const draw_circle_pointer_handler = draw_shape_pointer_handler( circle_path );
       const draw_horizontal_pointer_handler = draw_shape_pointer_handler( horizontal_path );
       const draw_vertical_pointer_handler = draw_shape_pointer_handler( vertical_path );
       const draw_line_pointer_handler = draw_shape_pointer_handler( straight_path );
@@ -3694,6 +3724,7 @@
           case 'curve':
               document.getElementById('curve-btn').classList.add('active');
               document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('circle-btn').classList.remove('active');
               document.getElementById('horizontal-btn').classList.remove('active');
               document.getElementById('vertical-btn').classList.remove('active');
               document.getElementById('line-btn').classList.remove('active');
@@ -3701,6 +3732,15 @@
           case 'rectangle':
               document.getElementById('curve-btn').classList.remove('active');
               document.getElementById('rectangle-btn').classList.add('active');
+              document.getElementById('circle-btn').classList.remove('active');
+              document.getElementById('horizontal-btn').classList.remove('active');
+              document.getElementById('vertical-btn').classList.remove('active');
+              document.getElementById('line-btn').classList.remove('active');
+              break;
+          case 'circle':
+              document.getElementById('curve-btn').classList.remove('active');
+              document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('circle-btn').classList.add('active');
               document.getElementById('horizontal-btn').classList.remove('active');
               document.getElementById('vertical-btn').classList.remove('active');
               document.getElementById('line-btn').classList.remove('active');
@@ -3708,6 +3748,7 @@
           case 'horizontal':
               document.getElementById('curve-btn').classList.remove('active');
               document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('circle-btn').classList.remove('active');
               document.getElementById('horizontal-btn').classList.add('active');
               document.getElementById('vertical-btn').classList.remove('active');
               document.getElementById('line-btn').classList.remove('active');
@@ -3715,6 +3756,7 @@
           case 'vertical':
               document.getElementById('curve-btn').classList.remove('active');
               document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('circle-btn').classList.remove('active');
               document.getElementById('horizontal-btn').classList.remove('active');
               document.getElementById('vertical-btn').classList.add('active');
               document.getElementById('line-btn').classList.remove('active');
@@ -3722,6 +3764,7 @@
           case 'line':
               document.getElementById('curve-btn').classList.remove('active');
               document.getElementById('rectangle-btn').classList.remove('active');
+              document.getElementById('circle-btn').classList.remove('active');
               document.getElementById('horizontal-btn').classList.remove('active');
               document.getElementById('vertical-btn').classList.remove('active');
               document.getElementById('line-btn').classList.add('active');
@@ -3739,6 +3782,8 @@
               return isSelectionTool ? selection_pointer_handler : draw_path_pointer_handler;
           case 'rectangle':
               return isSelectionTool ? selection_pointer_handler : draw_rectangle_pointer_handler;
+          case 'circle':
+              return isSelectionTool ? selection_pointer_handler : draw_circle_pointer_handler;
           case 'horizontal':
               return isSelectionTool ? selection_pointer_handler : draw_horizontal_pointer_handler;
           case 'vertical':
