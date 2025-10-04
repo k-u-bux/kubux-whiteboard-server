@@ -1116,7 +1116,7 @@ function PDFBuilder() {
         a.download = file_name;
         
         // Use a slight delay to ensure the browser registers the link before clicking
-        setTimeout(() => a.click(), 100);
+        setTimeout(() => a.click(), 500);
         
         URL.revokeObjectURL(url);
         
