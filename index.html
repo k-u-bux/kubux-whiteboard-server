@@ -4514,48 +4514,41 @@
           try {
               const timestamp = getTimestampForFilename();
               
-              // Create offscreen canvas for rasterization
-              const exportCanvas = document.createElement('canvas');
-              exportCanvas.width = canvas.width;
-              exportCanvas.height = canvas.height;
-              const exportCtx = exportCanvas.getContext('2d');
+              // Create PDF with vector rendering
+              const builder = shared.PDFBuilder();
+              const pdfCtx = builder.new_page(canvas.width, canvas.height);
               
-              // Apply zoom and render all visible elements
-              exportCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+              // Apply zoom transformation
+              pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+              
+              // Render all visible elements as vectors
               shared.render_all_visible_elements(visualState, (element) => {
                   if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
-                      renderElement(exportCtx, element);
+                      renderElement(pdfCtx, element);
                   }
               });
               
-              // Convert to PNG image (supports transparency)
-              const imageData = exportCanvas.toDataURL('image/png');
-              
-              // Create PDF with image
-              const doc = new window.jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
-              doc.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
-              doc.save(`board_${boardId}_page_${pageNr}_${timestamp}.pdf`);
+              // Download the PDF
+              builder.download_in_browser(`board_${boardId}_page_${pageNr}_${timestamp}.pdf`);
               
           } catch (err) {
               showError(`PDF export failed: ${err.message}`);
               console.error('PDF export error:', err);
           }
-      };
+      }
 
       async function exportBoardToPDF() {
           try {
               const timestamp = getTimestampForFilename();
-              const doc = new window.jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
+              
+              // Create PDF with vector rendering
+              const builder = shared.PDFBuilder();
               
               // Snapshot current page number for delta calculations
               const startPageNr = pageNr;
               
               // Iterate through each page sequentially
               for (let i = 1; i <= totalPages; i++) {
-                  if (i > 1) {
-                      doc.addPage();
-                  }
-                  
                   showError(`Exporting page ${i}/${totalPages}...`);
                   
                   // Request and wait for page data
@@ -4595,33 +4588,29 @@
                   
                   if (!pageData) continue;
                   
-                  // Rasterize this page to PNG
-                  const exportCanvas = document.createElement('canvas');
-                  exportCanvas.width = canvas.width;
-                  exportCanvas.height = canvas.height;
-                  const exportCtx = exportCanvas.getContext('2d');
+                  // Create new page in PDF
+                  const pdfCtx = builder.new_page(canvas.width, canvas.height);
                   
-                  // Apply zoom and render page
-                  exportCtx.setTransform(zoomLevel, 0, 0, zoomLevel, 0, 0);
+                  // Apply zoom and pan transformation
+                  pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
                   
+                  // Compile visual state for this page
                   const pageVisualState = shared.createEmptyVisualState();
                   const pageActions = pageData.history.slice(0, pageData.present);
                   for (const action of pageActions) {
                       shared.commitEdit(pageVisualState, action);
                   }
                   
+                  // Render all visible elements as vectors
                   shared.render_all_visible_elements(pageVisualState, (element) => {
                       if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
-                          renderElement(exportCtx, element);
+                          renderElement(pdfCtx, element);
                       }
                   });
-                  
-                  // Convert to PNG and add to PDF
-                  const imageData = exportCanvas.toDataURL('image/png');
-                  doc.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
               }
               
-              doc.save(`board_${boardId}_${timestamp}.pdf`);
+              // Download the complete multi-page PDF
+              builder.download_in_browser(`board_${boardId}_${timestamp}.pdf`);
               hideError();
               
           } catch (err) {
