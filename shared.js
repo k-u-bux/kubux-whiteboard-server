@@ -810,6 +810,24 @@ function PDFContext2D(pageContent, pageHeight, builder) {
         },
         get lineWidth() { return internalState._lineWidth; },
         
+        set lineCap(value) {
+            // Convert CSS string values to PDF codes: 0=butt, 1=round, 2=square
+            const capMap = { 'butt': 0, 'round': 1, 'square': 2 };
+            const capCode = capMap[value] !== undefined ? capMap[value] : 0;
+            addCommand(`${capCode} J`);
+        },
+        
+        set lineJoin(value) {
+            // Convert CSS string values to PDF codes: 0=miter, 1=round, 2=bevel
+            const joinMap = { 'miter': 0, 'round': 1, 'bevel': 2 };
+            const joinCode = joinMap[value] !== undefined ? joinMap[value] : 0;
+            addCommand(`${joinCode} j`);
+        },
+        
+        set miterLimit(value) {
+            addCommand(`${value} M`);
+        },
+        
         set globalAlpha(value) {
             const alpha = Math.max(0, Math.min(1, value));
             if (internalState._globalAlpha === alpha) return;
@@ -857,6 +875,7 @@ function PDFContext2D(pageContent, pageHeight, builder) {
         beginPath() { internalState.path = []; },
         moveTo(x, y) { addPathCommand(`${x} ${invertY(y)} m`); },
         lineTo(x, y) { addPathCommand(`${x} ${invertY(y)} l`); },
+        closePath() { addPathCommand('h'); },
         arc(x, y, radius, startAngle, endAngle, counterclockwise = false) {
             // Fails hard if unimplemented
             throw new Error("PDFContext2D Error: arc() requires complex Bézier curve calculation and is not implemented.");
