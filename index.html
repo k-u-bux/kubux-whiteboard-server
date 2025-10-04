@@ -694,6 +694,88 @@
           console.log(`[DEBUG] ${msg}`, data || '');
       }
 
+      // Settings persistence
+      const SETTINGS_STORAGE_KEY = 'whiteboard_settings';
+      
+      function saveSettings() {
+          try {
+              const settings = {
+                  pen: pen_settings,
+                  chalk: chalk_settings,
+                  highlighter: highlighter_settings,
+                  eraser: eraser_settings,
+                  selectionRectangle: selection_rectangle_settings,
+                  selectionLasso: selection_lasso_settings,
+                  selectionStroke: selection_stroke_settings,
+                  activeLayer: activeLayer,
+                  lastTool: currentTool,
+                  colorSwatches: []
+              };
+              
+              // Save color swatch customizations
+              document.querySelectorAll('.color-swatch').forEach(swatch => {
+                  settings.colorSwatches.push({
+                      color: swatch.dataset.color,
+                      backgroundColor: swatch.style.backgroundColor
+                  });
+              });
+              
+              localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+          } catch (err) {
+              console.warn('Failed to save settings:', err);
+          }
+      }
+      
+      function loadSettings() {
+          try {
+              const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+              if (!saved) return false;
+              
+              const settings = JSON.parse(saved);
+              
+              // Restore tool settings
+              if (settings.pen) Object.assign(pen_settings, settings.pen);
+              if (settings.chalk) Object.assign(chalk_settings, settings.chalk);
+              if (settings.highlighter) Object.assign(highlighter_settings, settings.highlighter);
+              if (settings.eraser) Object.assign(eraser_settings, settings.eraser);
+              if (settings.selectionRectangle) Object.assign(selection_rectangle_settings, settings.selectionRectangle);
+              if (settings.selectionLasso) Object.assign(selection_lasso_settings, settings.selectionLasso);
+              if (settings.selectionStroke) Object.assign(selection_stroke_settings, settings.selectionStroke);
+              
+              // Restore color swatches
+              if (settings.colorSwatches) {
+                  const swatches = document.querySelectorAll('.color-swatch');
+                  settings.colorSwatches.forEach((swatch, index) => {
+                      if (swatches[index]) {
+                          swatches[index].dataset.color = swatch.color;
+                          swatches[index].style.backgroundColor = swatch.backgroundColor;
+                      }
+                  });
+              }
+              
+              // Restore active layer
+              if (settings.activeLayer !== undefined) {
+                  activeLayer = settings.activeLayer;
+                  document.querySelectorAll('.layer-active-btn').forEach(btn => {
+                      btn.classList.remove('active');
+                      if (parseInt(btn.getAttribute('data-layer')) === activeLayer) {
+                          btn.classList.add('active');
+                      }
+                  });
+              }
+              
+              // Restore last tool
+              if (settings.lastTool) {
+                  setTool(settings.lastTool);
+              }
+              
+              return true;
+          } catch (err) {
+              console.warn('Failed to load settings:', err);
+              return false;
+          }
+      }
+      
       // settings
       let eraser_settings = {
           tool: "eraser",
@@ -1225,6 +1307,9 @@
       async function init() {
           // Initialize IndexedDB cache first
           await initPageCacheDB();
+          
+          // Load saved settings
+          loadSettings();
           
           setupCanvas();
           setupWebSocket();
@@ -1906,16 +1991,16 @@
       function selectWidth () {
           const penRadius = widthSelector.value;
           draw_settings.width = parseInt(penRadius);
-          // widthValue.textContent = currentWidth;
-          // Update the CSS custom property on the input element
           widthSelector.style.setProperty('--thumb-size', draw_settings.width);
-      };
+          saveSettings();
+      }
       
       // Opacity selection
       function selectOpacity () {
           draw_settings.opacity = parseInt( opacitySelector.value ) / 128;
           opacitySelector.style.setProperty('--thumb-opacity', draw_settings.opacity);
-      };
+          saveSettings();
+      }
       
       // Setup Simple Color Picker
       function setupColorPicker() {
@@ -2626,6 +2711,7 @@
                   this.classList.add('active');
                   draw_settings.color = this.dataset.color;
                   updateKnobs();
+                  saveSettings();
               });
               
               // For long press - open color picker
@@ -2651,41 +2737,49 @@
           document.getElementById('timer-btn').addEventListener('click', () => {
               draw_settings.undo = ( draw_settings.tool != "eraser" ) && ! draw_settings.undo;
               updateKnobs();
+              saveSettings();
           });
           
           document.getElementById('loop-btn').addEventListener('click', () => {
               draw_settings.loop = ( ! draw_settings.loop );
               updateKnobs();
+              saveSettings();
           });
           
           document.getElementById('fill-btn').addEventListener('click', () => {
               draw_settings.fill = ( ! draw_settings.fill );
               updateKnobs();
+              saveSettings();
           });
           
           document.getElementById('curve-btn').addEventListener('click', () => {
               set_shape_tool( 'curve' );
               update_shape_buttons();
+              saveSettings();
           });
           
           document.getElementById('rectangle-btn').addEventListener('click', () => {
               set_shape_tool( 'rectangle' );
               update_shape_buttons();
+              saveSettings();
           });
           
           document.getElementById('horizontal-btn').addEventListener('click', () => {
               set_shape_tool( 'horizontal' );
               update_shape_buttons();
+              saveSettings();
           });
           
           document.getElementById('vertical-btn').addEventListener('click', () => {
               set_shape_tool( 'vertical' );
               update_shape_buttons();
+              saveSettings();
           });
           
           document.getElementById('line-btn').addEventListener('click', () => {
               set_shape_tool( 'line' );
               update_shape_buttons();
+              saveSettings();
           });
           
           // Page navigation
@@ -2764,6 +2858,9 @@
                       document.querySelector(`.layer-visibility-btn[data-layer="${layer}"]`).classList.add('active');
                       updateVisualState();
                   }
+                  
+                  // Save settings
+                  saveSettings();
               });
           });
       }
