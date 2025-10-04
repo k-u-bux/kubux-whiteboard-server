@@ -741,18 +741,45 @@ function findIntersectingElements ( visualState, needle, eps, delta ) {
 
 /**
  * Maps RGB values [0-255] to PDF decimal color components [0-1].
- * @param {string} style - CSS color string (e.g., 'rgb(255, 0, 0)').
+ * @param {string} style - CSS color string (e.g., 'rgb(255, 0, 0)', '#ff0000', or 'red').
  * @param {boolean} isStroke - True for stroke color (RG), false for fill (rg).
  * @returns {string} PDF color operator and values (e.g., '1 0 0 RG').
  */
 function toPDFColor(style, isStroke) {
     let r = 0, g = 0, b = 0;
-    const match = String(style).match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-    if (match) {
-        r = parseInt(match[1]) / 255;
-        g = parseInt(match[2]) / 255;
-        b = parseInt(match[3]) / 255;
+    
+    // Handle rgb() format
+    const rgbMatch = String(style).match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (rgbMatch) {
+        r = parseInt(rgbMatch[1]) / 255;
+        g = parseInt(rgbMatch[2]) / 255;
+        b = parseInt(rgbMatch[3]) / 255;
     }
+    // Handle hex format (#RRGGBB or #RGB)
+    else if (String(style).startsWith('#')) {
+        let hex = style.slice(1);
+        // Expand shorthand (#RGB -> #RRGGBB)
+        if (hex.length === 3) {
+            hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+        }
+        r = parseInt(hex.substr(0, 2), 16) / 255;
+        g = parseInt(hex.substr(2, 2), 16) / 255;
+        b = parseInt(hex.substr(4, 2), 16) / 255;
+    }
+    // Handle named colors (basic set)
+    else {
+        const namedColors = {
+            'black': [0, 0, 0], 'white': [255, 255, 255],
+            'red': [255, 0, 0], 'green': [0, 128, 0], 'blue': [0, 0, 255],
+            'yellow': [255, 255, 0], 'cyan': [0, 255, 255], 'magenta': [255, 0, 255],
+            'gray': [128, 128, 128], 'grey': [128, 128, 128]
+        };
+        const rgb = namedColors[String(style).toLowerCase()] || [0, 0, 0];
+        r = rgb[0] / 255;
+        g = rgb[1] / 255;
+        b = rgb[2] / 255;
+    }
+    
     const operator = isStroke ? 'RG' : 'rg';
     return `${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)} ${operator}`;
 }
@@ -977,9 +1004,6 @@ function PDFBuilder() {
         pages.push(pageContent);
         
         const context = PDFContext2D(pageContent, height, this); 
-
-        // Initial CTM transformation
-        context.setTransform(1, 0, 0, -1, 0, height);
         
         return context;
     }
