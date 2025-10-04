@@ -403,7 +403,7 @@ The client supports PDF export:
 1. **Optimistic Updates**: Clients apply changes immediately, then send to server
 2. **Hash Chain Verification**: Each state transition is validated with a hash chain
 3. **Periodic Pings**: Server sends ping messages to verify client state
-4. **Replay Mechanism**: When inconsistencies are detected, server sends replay updates
+4. **Replay Mechanism**: When inconsistencies are detected, client asks for replay updates
 5. **Fallback to Full Page**: If replay fails, client requests full page data
 
 ### Hash Verification Process
