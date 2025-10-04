@@ -971,15 +971,21 @@ function PDFContext2D(pageContent, pageHeight, builder) {
 // PDFBuilder: The Document Manager and Complete Serializer
 // --------------------------------------------------------
 
-// Node.js conditional import for the 'fs' module
-let fs;
+// Node.js conditional imports
+let fs, zlib;
 if (typeof process !== 'undefined' && process.versions && process.versions.node) {
     try {
         fs = require('fs');
+        zlib = require('zlib');
     } catch (e) {
         // This is fine if the user runs the file in the browser (where 'require' is not defined)
         // or if running in a restrictive sandbox.
     }
+}
+
+// Check for pako library in browser (for compression)
+function hasPako() {
+    return typeof window !== 'undefined' && typeof window.pako !== 'undefined';
 }
 
 function PDFBuilder() {
@@ -1032,10 +1038,50 @@ function PDFBuilder() {
         const contentStreamIDs = [];
         const pageObjIDs = [];
 
-        // --- 1. Content Streams ---
+        // --- 1. Content Streams (with optional compression) ---
         for (const page of pages) {
             const contentStream = page.commands.join('\n');
-            const streamContent = `<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream`;
+            
+            // Try to compress the content stream
+            let compressedData = null;
+            let useCompression = false;
+            
+            // Node.js environment (use zlib)
+            if (typeof zlib !== 'undefined') {
+                try {
+                    compressedData = zlib.deflateSync(Buffer.from(contentStream, 'utf8'));
+                    useCompression = true;
+                } catch (e) {
+                    console.warn('Compression failed (Node.js), using uncompressed stream:', e.message);
+                }
+            }
+            // Browser environment (use pako if available)
+            else if (hasPako()) {
+                try {
+                    const textEncoder = new TextEncoder();
+                    const uint8Array = textEncoder.encode(contentStream);
+                    compressedData = window.pako.deflate(uint8Array);
+                    useCompression = true;
+                } catch (e) {
+                    console.warn('Compression failed (browser), using uncompressed stream:', e.message);
+                }
+            }
+            
+            let streamContent;
+            if (useCompression && compressedData) {
+                // Convert binary data to Latin-1 string for PDF
+                let binaryString = '';
+                const bytes = new Uint8Array(compressedData);
+                for (let i = 0; i < bytes.length; i++) {
+                    binaryString += String.fromCharCode(bytes[i]);
+                }
+                
+                streamContent = `<< /Length ${binaryString.length} /Filter /FlateDecode >>\nstream\n${binaryString}\nendstream`;
+            } else {
+                // Uncompressed fallback
+                streamContent = `<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream`;
+            }
+            
             contentStreamIDs.push(addObject(streamContent));
         }
 
