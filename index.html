@@ -694,10 +694,14 @@
           console.log(`[DEBUG] ${msg}`, data || '');
       }
 
-      // Settings persistence
-      const SETTINGS_STORAGE_KEY = 'whiteboard_settings';
+      // Settings persistence (board-specific)
+      function getSettingsStorageKey() {
+          return `whiteboard_settings_${boardId}`;
+      }
       
       function saveSettings() {
+          if (!boardId) return; // Can't save without boardId
+          
           try {
               const settings = {
                   pen: pen_settings,
@@ -709,7 +713,12 @@
                   selectionStroke: selection_stroke_settings,
                   activeLayer: activeLayer,
                   lastTool: currentTool,
-                  colorSwatches: []
+                  zoomLevel: zoomLevel,
+                  colorSwatches: [],
+                  // Page position
+                  currentPageUuid: currentPageUuid,
+                  pageNr: pageNr,
+                  totalPages: totalPages
               };
               
               // Save color swatch customizations
@@ -720,15 +729,18 @@
                   });
               });
               
-              localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+              localStorage.setItem(getSettingsStorageKey(), JSON.stringify(settings));
+              debugLog('Settings saved', { boardId });
           } catch (err) {
               console.warn('Failed to save settings:', err);
           }
       }
       
       function loadSettings() {
+          if (!boardId) return false; // Can't load without boardId
+          
           try {
-              const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+              const saved = localStorage.getItem(getSettingsStorageKey());
               if (!saved) return false;
               
               const settings = JSON.parse(saved);
@@ -764,9 +776,27 @@
                   });
               }
               
+              // Restore zoom level
+              if (settings.zoomLevel !== undefined) {
+                  zoomLevel = settings.zoomLevel;
+                  zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+                  applyZoom();
+              }
+              
               // Restore last tool
               if (settings.lastTool) {
                   setTool(settings.lastTool);
+              }
+              
+              // Store page position for restoration after connection
+              // (Don't navigate yet - wait for WebSocket connection)
+              if (settings.currentPageUuid) {
+                  window.savedPagePosition = {
+                      uuid: settings.currentPageUuid,
+                      pageNr: settings.pageNr,
+                      totalPages: settings.totalPages
+                  };
+                  debugLog('Saved page position loaded', window.savedPagePosition);
               }
               
               return true;
@@ -3047,6 +3077,7 @@
           zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
           applyZoom();
           redrawCanvas();
+          saveSettings();
       }
       
       // Update page info display
