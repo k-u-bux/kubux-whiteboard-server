@@ -1104,8 +1104,8 @@
       // Compute affine transformation from control triangle positions
       function affineFromControls() {
           const a = ( controlTriangle.east.x - controlTriangle.center.x ) / initialTriangle.radius;
-          const b = ( controlTriangle.north.x - controlTriangle.center.x ) / initialTriangle.radius;
-          const c = - ( controlTriangle.east.y - controlTriangle.center.y ) / initialTriangle.radius;
+          const c = ( controlTriangle.north.x - controlTriangle.center.x ) / initialTriangle.radius;
+          const b = - ( controlTriangle.east.y - controlTriangle.center.y ) / initialTriangle.radius;
           const d = - ( controlTriangle.north.y - controlTriangle.center.y ) / initialTriangle.radius;
           const e = controlTriangle.center.x - a * initialTriangle.center.x - c * initialTriangle.center.y;
           const f = controlTriangle.center.y - b * initialTriangle.center.x - d * initialTriangle.center.y;
