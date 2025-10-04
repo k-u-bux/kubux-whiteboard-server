@@ -287,10 +287,10 @@ function existingPage(pageId, board) {
 // internet
 // ========
 
-const serverOptions = {
-    key: fs.readFileSync(getFilePath("server", "key")),
-    cert: fs.readFileSync(getFilePath("server", "cert"))
-};
+// const serverOptions = {
+//     key: fs.readFileSync(getFilePath("server", "key")),
+//     cert: fs.readFileSync(getFilePath("server", "cert"))
+// };
 
 // debug.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
