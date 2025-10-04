@@ -1846,6 +1846,7 @@
       
       // Track if we are in a cache verification cycle to avoid infinite loops
       let cacheVerificationInProgress = false;
+      let hasRestoredSavedPosition = false; // Track if we've restored saved page position
       
       // Handle full page message from server
       function handleFullPageMessage(data) {
@@ -1916,6 +1917,17 @@
                   present: present,
                   hash: hashes[present]
               });
+          }
+          
+          // After loading initial page, check if we should restore saved position
+          if (!hasRestoredSavedPosition && window.savedPagePosition) {
+              hasRestoredSavedPosition = true;
+              
+              // If the saved page is different from current, navigate to it
+              if (window.savedPagePosition.uuid !== currentPageUuid) {
+                  debugLog('Restoring saved page position', window.savedPagePosition);
+                  requestFullPage(window.savedPagePosition.uuid);
+              }
           }
       }
       
