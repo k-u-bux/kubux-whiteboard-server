@@ -1338,8 +1338,8 @@
           // Initialize IndexedDB cache first
           await initPageCacheDB();
           
-          // Load saved settings
-          loadSettings();
+          // Note: loadSettings() will be called after board registration
+          // when we have a valid boardId
           
           setupCanvas();
           setupWebSocket();
@@ -1548,6 +1548,10 @@
           passwd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
           const urlParams = new URLSearchParams(window.location.search);
           window.history.replaceState(null, null, `?board=${boardId}&passwd=${passwd}`);
+          
+          // Load settings now that we have a boardId
+          loadSettings();
+          updateKnobs();
       }
       
       // Register with an existing board
@@ -1591,6 +1595,10 @@
               // If the board ID changed for some reason, update URL
               window.history.replaceState(null, null, `?board=${boardId}`);
           }
+          
+          // Load settings now that we have a boardId
+          loadSettings();
+          updateKnobs();
           
           // The server will send a full page message next, so we do not need
           // to request one explicitly
@@ -1929,6 +1937,9 @@
                   requestFullPage(window.savedPagePosition.uuid);
               }
           }
+          
+          // Save current page position to settings
+          saveSettings();
       }
       
       // Request a full page from the server
