@@ -1623,6 +1623,18 @@
       
       // Handle ping message from server
 
+      // a ping between a mod-request and the accept/decline response shall be ignored
+      // BUT: the response may get lost ==> we need a timeout.
+
+      const RESPONSE_TIMEOUT = 2000; // 2 secs
+      let pending_actions = new Set();
+      let pending_timer = Date.now();
+
+      function pending_register_action ( uuid ) {
+          pending_actions.add( uuid );
+          pending_timer = Date.now();
+      }
+
       function adjustVerfiedIndex ( snapshots ) {
           index = 0;
           the_index = 0;
@@ -1641,8 +1653,14 @@
           }
           verifiedIndex = index;
       }
-
+                                                                       
       function handlePingMessage(data) {
+          const current_time = Date.now();
+          if ( current_time > 2000 + pending_timer ) {
+              pending_actions.clear();
+          }                                                                  
+          if ( pendging_actions.Size > 0 ) { return; }
+
           const pingPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.UUID];
           const pingPageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH];
           const pingPageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR];
@@ -1694,7 +1712,7 @@
               verifiedIndex = present;
               updateVisualState();
           } else {
-              // We're in sync with server
+              // We are in sync with server
               verifiedIndex = matchingIndex;
               updateSyncStatus();
           }
@@ -1705,6 +1723,8 @@
           const acceptedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.ACTION_UUID];
           const beforeHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.BEFORE_HASH];
           const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.AFTER_HASH];
+
+          pending_actions.delete( acceptedActionUuid );
           
           // Check if this action is in our history
           const actionIndex = history.findIndex(action => action.uuid === acceptedActionUuid);
@@ -1716,7 +1736,7 @@
               return;
           }
           
-          // Verify our computed hashes match the server's
+          // Verify our computed hashes match the server:
           if (hashes[actionIndex] !== beforeHash || hashes[actionIndex + 1] !== afterHash) {
               // Hash mismatch - action was applied at different point in history
               debugLog(`Hash mismatch for action ${acceptedActionUuid}: client=${hashes[actionIndex]}/${hashes[actionIndex+1]} vs server=${beforeHash}/${afterHash}`);
@@ -1744,6 +1764,8 @@
           const declinedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE.ACTION_UUID];
           const reason = data[shared.MESSAGES.SERVER_TO_CLIENT.DECLINE.REASON];
           
+          pending_actions.delete( declinedActionUuid );
+
           console.error(`Server declined action ${declinedActionUuid}: ${reason}`);
           
           // Find the declined action in our history
@@ -2373,6 +2395,7 @@
           updateSyncStatus();
           
           // Send to server
+          pending_register_action( groupUuid );
           sendMessage(proposal);
       }
 
@@ -2447,6 +2470,7 @@
           updateSyncStatus();
           
           // Send to server
+          pending_register_action( groupUuid );
           sendMessage(proposal);
       }
 
@@ -2583,6 +2607,7 @@
           updateSyncStatus();
           
           // Send to server
+          pending_register_action( groupUuid );
           sendMessage(proposal);
       }
       
@@ -2671,6 +2696,7 @@
           updateSyncStatus();
           
           // Send to server
+          pending_register_action( groupUuid );
           sendMessage(proposal);
       }
 
@@ -2755,6 +2781,7 @@
           updateSyncStatus();
           
           // Send to server
+          pending_register_action( groupUuid );
           sendMessage(proposal);
       }
 
@@ -3856,6 +3883,7 @@
           updateSyncStatus();
           
           // Send to server
+          pending_register_action( actionUuid );
           sendMessage(proposal);
           return actionUuid;
       }
@@ -3915,6 +3943,7 @@
           updateSyncStatus();
           
           // Send to server
+          pending_register_action( groupUuid );
           sendMessage(proposal);
       }
       
