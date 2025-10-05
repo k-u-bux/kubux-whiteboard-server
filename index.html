@@ -442,6 +442,115 @@
           position: absolute;
           cursor: pointer;
       }
+      
+      /* Board Navigation Overlay */
+      #board-nav-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.5);
+          display: none;
+          justify-content: center;
+          align-items: center;
+          z-index: 2000;
+      }
+      
+      #board-nav-window {
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+          width: 400px;
+          max-width: 90%;
+      }
+      
+      #board-nav-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 15px 20px;
+          border-bottom: 1px solid #ddd;
+      }
+      
+      #board-nav-title {
+          font-size: 18px;
+          font-weight: bold;
+          margin: 0;
+      }
+      
+      #board-nav-close {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: #666;
+          padding: 0;
+          width: 30px;
+          height: 30px;
+          line-height: 1;
+      }
+      
+      #board-nav-close:hover {
+          color: #000;
+      }
+      
+      .board-nav-section {
+          padding: 20px;
+          border-bottom: 1px solid #ddd;
+      }
+      
+      .board-nav-section:last-child {
+          border-bottom: none;
+      }
+      
+      .board-nav-section h3 {
+          margin: 0 0 15px 0;
+          font-size: 16px;
+          color: #333;
+      }
+      
+      .board-nav-form {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+      }
+      
+      .board-nav-form input {
+          padding: 10px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 14px;
+      }
+      
+      .board-nav-form input:focus {
+          outline: none;
+          border-color: #0078d7;
+      }
+      
+      .board-nav-actions {
+          display: flex;
+          justify-content: flex-end;
+      }
+      
+      .board-nav-btn {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 4px;
+          font-size: 14px;
+          cursor: pointer;
+          background-color: #0078d7;
+          color: white;
+      }
+      
+      .board-nav-btn:hover {
+          background-color: #005a9e;
+      }
+      
+      .board-nav-btn:disabled {
+          background-color: #ccc;
+          cursor: not-allowed;
+      }
     </style>
   </head>
   <body>
@@ -525,7 +634,7 @@
       </div>      
 
       <div class="tool-section" id="debug-tools">
-        <button class="tool-btn" id="debug-btn" title="Debug">🐞</button>
+        <button class="tool-btn" id="board-nav-btn" title="Board Navigation">🗂️</button>
         <span id="sync-status">✓</span>
       </div>
     </div>
@@ -598,6 +707,39 @@
       </div>
     </div>
 
+
+    <!-- Board Navigation Overlay -->
+    <div id="board-nav-overlay">
+      <div id="board-nav-window">
+        <div id="board-nav-header">
+          <h3 id="board-nav-title">Board Navigation</h3>
+          <button id="board-nav-close">×</button>
+        </div>
+        
+        <!-- New Board Section -->
+        <div class="board-nav-section">
+          <h3>Create New Board</h3>
+          <form class="board-nav-form" id="new-board-form">
+            <input type="password" id="credential-input" placeholder="Enter credential" required>
+            <div class="board-nav-actions">
+              <button type="submit" class="board-nav-btn">New Board</button>
+            </div>
+          </form>
+        </div>
+        
+        <!-- Go to Board Section -->
+        <div class="board-nav-section">
+          <h3>Go to Board</h3>
+          <form class="board-nav-form" id="goto-board-form">
+            <input type="text" id="board-id-input" placeholder="Board UUID" required>
+            <input type="password" id="board-password-input" placeholder="Board password (optional)">
+            <div class="board-nav-actions">
+              <button type="submit" class="board-nav-btn">Go to Board</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <!-- Simple Color Picker -->
     <div id="simple-color-picker">
@@ -2974,8 +3116,20 @@
           undoBtn.addEventListener('click', handleUndo);
           redoBtn.addEventListener('click', handleRedo);
           
-          // Debug button
-          document.getElementById('debug-btn').addEventListener('click', showDebugInfo);
+          // Board navigation button
+          document.getElementById('board-nav-btn').addEventListener('click', openBoardNavigation);
+          document.getElementById('board-nav-close').addEventListener('click', closeBoardNavigation);
+          
+          // Board navigation forms
+          document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
+          document.getElementById('goto-board-form').addEventListener('submit', handleGotoBoard);
+          
+          // Close overlay when clicking outside the window
+          document.getElementById('board-nav-overlay').addEventListener('click', function(e) {
+              if (e.target === this) {
+                  closeBoardNavigation();
+              }
+          });
           
           // Export PDF buttons
           document.getElementById('pdf-btn').addEventListener('click', exportPageToPDF);
@@ -4767,6 +4921,64 @@
           }
       }
 
+      
+      // Board Navigation Functions
+      function openBoardNavigation() {
+          const overlay = document.getElementById('board-nav-overlay');
+          overlay.style.display = 'flex';
+          
+          // Pre-fill current board ID if available
+          if (boardId) {
+              document.getElementById('board-id-input').value = boardId;
+          }
+      }
+      
+      function closeBoardNavigation() {
+          const overlay = document.getElementById('board-nav-overlay');
+          overlay.style.display = 'none';
+          
+          // Clear form inputs
+          document.getElementById('credential-input').value = '';
+          document.getElementById('board-id-input').value = '';
+          document.getElementById('board-password-input').value = '';
+      }
+      
+      function handleNewBoard(e) {
+          e.preventDefault();
+          
+          const credential = document.getElementById('credential-input').value;
+          
+          if (!credential) {
+              alert('Please enter a credential');
+              return;
+          }
+          
+          // Change URL and reload page with new board creation
+          const newUrl = `${window.location.origin}${window.location.pathname}?credential=${encodeURIComponent(credential)}`;
+          window.location.href = newUrl;
+      }
+      
+      function handleGotoBoard(e) {
+          e.preventDefault();
+          
+          const boardIdInput = document.getElementById('board-id-input').value.trim();
+          const boardPasswordInput = document.getElementById('board-password-input').value;
+          
+          if (!boardIdInput) {
+              alert('Please enter a board UUID');
+              return;
+          }
+          
+          // Build URL with board ID and optional password
+          let newUrl = `${window.location.origin}${window.location.pathname}?board=${encodeURIComponent(boardIdInput)}`;
+          
+          if (boardPasswordInput) {
+              newUrl += `&passwd=${encodeURIComponent(boardPasswordInput)}`;
+          }
+          
+          // Change URL and reload page
+          window.location.href = newUrl;
+      }
       
       // Initialize the app
       window.addEventListener('DOMContentLoaded', init);
