@@ -1656,10 +1656,10 @@
                                                                        
       function handlePingMessage(data) {
           const current_time = Date.now();
-          if ( current_time > 2000 + pending_timer ) {
+          if ( current_time > RESPONSE_TIMEOUT + pending_timer ) {
               pending_actions.clear();
           }                                                                  
-          if ( pendging_actions.Size > 0 ) { return; }
+          if ( pending_actions.Size > 0 ) { return; }
 
           const pingPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.UUID];
           const pingPageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH];
