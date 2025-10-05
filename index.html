@@ -3664,17 +3664,27 @@
               } else if (draggedHandle === 'north') {
                   // Rotation: constrain north to circle
                   const newNorth = constrainNorthToCircle({ x, y });
+
+                  const v = { x: newNorth.x - controlTriangle.center.x, y: newNorth.y - controlTriangle.center.y };
+                  const u = { x: controlTriangle.north.x - controlTriangle.center.x, y: constrolTriangle.north.y - controlTriangle.center.y };
+                  const c = ( v.x * u.x + v.y * u.y ) / ( u.x * u.x + u.y * u.y );
+                  const s = ( v.x * u.y - v.y * u.x ) / ( u.x * u.x + u.y * u.y );
+        
                   controlTriangle.north = newNorth;
                   
-                  // Update east to maintain perpendicularity
-                  const angle = Math.atan2(
-                      newNorth.y - controlTriangle.center.y,
-                      newNorth.x - controlTriangle.center.x
-                  );
-                  controlTriangle.east = {
-                      x: controlTriangle.center.x - controlTriangle.radius * Math.cos(angle - Math.PI/2),
-                      y: controlTriangle.center.y - controlTriangle.radius * Math.sin(angle - Math.PI/2)
-                  };
+                  const w = { x: controlTriangle.east.x - controlTriangle.center.x, y: constrolTriangle.east.y - controlTriangle.center.y };
+                  const new_w = { x: c * w.x + s * w.y, y : -s * w.x + c *w.y };
+                  controlTriangle.east = { x: controlTriangle.center.x + new_w.x, y: controlTriangle.center.y + new_w.y };
+
+                  // // Update east to maintain perpendicularity
+                  // const angle = Math.atan2(
+                  //     newNorth.y - controlTriangle.center.y,
+                  //     newNorth.x - controlTriangle.center.x
+                  // );
+                  // controlTriangle.east = {
+                  //     x: controlTriangle.center.x - controlTriangle.radius * Math.cos(angle - Math.PI/2),
+                  //     y: controlTriangle.center.y - controlTriangle.radius * Math.sin(angle - Math.PI/2)
+                  // };
                   
               } else if (draggedHandle === 'circle') {
                   // Uniform scale: adjust radius
