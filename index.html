@@ -1776,7 +1776,21 @@
           
           boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD_ID];
           passwd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
-          const urlParams = new URLSearchParams(window.location.search);
+          
+          // Build the full URL with board ID and password
+          const boardUrl = `${window.location.origin}${window.location.pathname}?board=${boardId}&passwd=${passwd}`;
+          
+          // Copy to clipboard
+          navigator.clipboard.writeText(boardUrl).then(() => {
+              debugLog('Board URL copied to clipboard');
+          }).catch(err => {
+              console.warn('Failed to copy to clipboard:', err);
+          });
+          
+          // Show dialog with URL
+          alert(`New board created!\n\nURL (copied to clipboard):\n${boardUrl}\n\nBoard ID: ${boardId}\nPassword: ${passwd}\n\nShare this URL with others to collaborate.`);
+          
+          // Update URL without reloading
           window.history.replaceState(null, null, `?board=${boardId}&passwd=${passwd}`);
           
           // Load settings now that we have a boardId
