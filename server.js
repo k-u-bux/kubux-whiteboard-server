@@ -6,11 +6,67 @@ const path = require('path');
 const url = require('url');
 const assert = require('assert');
 
-// sha256
+// Password hashing with scrypt (memory-hard, resistant to rainbow tables and brute-force)
 const crypto = require('crypto');
 
-function sha256(inputString) {
-  return crypto.createHash('sha256').update(inputString).digest('hex');
+/**
+ * Hash a password using scrypt
+ * scrypt is a password-based key derivation function that is intentionally slow and memory-hard,
+ * making it resistant to both rainbow table attacks and hardware-accelerated brute-force attacks.
+ * 
+ * @param {string} password - The password to hash
+ * @returns {string} The hash in format: salt:hash (both hex-encoded)
+ */
+function hashPassword(password) {
+  // Generate a random salt (32 bytes = 256 bits)
+  const salt = crypto.randomBytes(32);
+  
+  // scrypt parameters:
+  // - N (cost): 16384 (2^14) - CPU/memory cost parameter (reasonable balance)
+  // - r (blockSize): 8 - block size parameter
+  // - p (parallelization): 1 - parallelization parameter
+  // - keylen: 64 - desired key length in bytes
+  const hash = crypto.scryptSync(password, salt, 64, {
+    N: 16384,
+    r: 8,
+    p: 1
+  });
+  
+  // Return salt:hash (both in hex format)
+  return salt.toString('hex') + ':' + hash.toString('hex');
+}
+
+/**
+ * Verify a password against a stored hash
+ * 
+ * @param {string} password - The password to verify
+ * @param {string} storedHash - The stored hash in format salt:hash
+ * @returns {boolean} True if password matches
+ */
+function verifyPassword(password, storedHash) {
+  try {
+    const [saltHex, hashHex] = storedHash.split(':');
+    if (!saltHex || !hashHex) {
+      console.error('[SERVER] Invalid hash format - expected salt:hash format');
+      return false;
+    }
+    
+    const salt = Buffer.from(saltHex, 'hex');
+    const storedHashBuffer = Buffer.from(hashHex, 'hex');
+    
+    // Compute hash with same parameters
+    const computedHash = crypto.scryptSync(password, salt, 64, {
+      N: 16384,
+      r: 8,
+      p: 1
+    });
+    
+    // Use timing-safe comparison to prevent timing attacks
+    return crypto.timingSafeEqual(storedHashBuffer, computedHash);
+  } catch (error) {
+    console.error('[SERVER] Error verifying password:', error.message);
+    return false;
+  }
 }
 
 // Dual-mode configuration: proxy vs direct
@@ -571,10 +627,23 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, requestId) => {
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
-    if (!credentials.includes(sha256(password))) {
-        debug.log(`[SERVER] Client ${clientId} has tried to create a board: passwd = ${password}, sha256 = ${sha256(password)}`);
+    
+    // Check credentials using scrypt
+    let isAuthorized = false;
+    
+    for (const storedHash of credentials) {
+        if (verifyPassword(password, storedHash)) {
+            isAuthorized = true;
+            debug.log(`[SERVER] Client ${clientId} authenticated successfully`);
+            break;
+        }
+    }
+    
+    if (!isAuthorized) {
+        debug.log(`[SERVER] Client ${clientId} failed authentication`);
         return;
     }
+    
     debug.log(`[SERVER] Client ${clientId} is allowed to create boards`);
     createNewBoard(ws, clientId, requestId);
 };

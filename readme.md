@@ -1,6 +1,6 @@
 # Kubux Whiteboard Server
 
-A real-time collaborative whiteboard application designed for mathematics education and collaboration. This project provides a WebSocket-based server and browser client that enables multiple users to draw, annotate, and collaborate on a shared canvas in real-time.
+A real-time collaborative whiteboard application designed for mathematics education and collaboration. This project provides a WebSocket-based server and browser client that enables multiple users draw on a shared canvas in real-time. The idea is that you will run your own whiteboard server on you home lab.
 
 ![Kubux Whiteboard Demo](https://via.placeholder.com/800x400?text=Kubux+Whiteboard+Demo)
 
@@ -20,8 +20,8 @@ A real-time collaborative whiteboard application designed for mathematics educat
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
-- npm (v6 or higher)
+- Nix package manager (recommended) - Provides Node.js and all dependencies automatically
+- Alternatively: Node.js (v14 or higher) and npm (v6 or higher)
 
 ### Setup
 
@@ -31,26 +31,195 @@ A real-time collaborative whiteboard application designed for mathematics educat
    cd kubux-whiteboard-server
    ```
 
-2. Install dependencies:
+2. Create required directories:
+   ```bash
+   mkdir -p data conf logs
+   ```
+
+3. Set up authentication (for board creation):
+   ```bash
+   # Create a password hash using the provided utility
+   ./passwd_hash your-secret-password
+   
+   # Copy the hash and create conf/passwd.json
+   echo '["your-hash-here"]' > conf/passwd.json
+   ```
+   
+   Example:
+   ```bash
+   ./passwd_hash mypassword123
+   # Output: mypassword123  ->  a3f2b8c...salt...:d4e9f1a...hash...
+   
+   # Create conf/passwd.json with the hash
+   echo '["a3f2b8c...salt...:d4e9f1a...hash..."]' > conf/passwd.json
+   ```
+   
+   **Security Note:** The password hashing now uses **scrypt**, a memory-hard key derivation function that is highly resistant to:
+   - Rainbow table attacks (each password gets a unique random salt)
+   - Brute-force attacks (computationally expensive to compute)
+   - Hardware-accelerated attacks (memory-hard design)
+   
+   The hash format is `salt:hash` where both parts are hex-encoded. The server maintains backward compatibility with legacy SHA-256 hashes, but scrypt is strongly recommended for new deployments.
+
+4. Install dependencies (if using Nix):
+   ```bash
+   nix develop
+   ```
+   
+   Or with npm directly:
    ```bash
    npm install
    ```
 
-3. Generate SSL certificates for secure WebSocket connections (optional):
-   ```bash
-   mkdir -p data/certs
-   openssl req -nodes -new -x509 -keyout data/certs/server.key -out data/certs/server.cert
+## Running the Server
+
+The Kubux Whiteboard Server supports two modes of operation:
+
+### Mode 1: Proxy Mode (Production)
+
+This mode is designed for production deployments with a reverse proxy (like nginx-proxy) handling SSL termination. The server listens on port 80 internally, and clients connect via secure WebSockets (wss://) through the proxy.
+
+```bash
+# With Nix (recommended)
+nix develop
+npm start
+
+# Or directly with npm
+npm start
+```
+
+**Use case:** Production deployment on a home lab or server with nginx-proxy managing SSL certificates (e.g., via Let's Encrypt).
+
+**How it works:**
+- Server listens on port 80 (internal)
+- nginx-proxy forwards HTTPS:443 → HTTP:80
+- Clients connect via wss://whiteboard.your-domain.com/ws
+
+### Mode 2: Direct Mode (Local/Development)
+
+This mode allows the server to listen on a specified port and serve the application directly without a reverse proxy. Perfect for local testing or ad-hoc usage.
+
+```bash
+# With Nix (recommended)
+nix develop
+KUBUX_WHITEBOARD_URL=http://localhost:8080 npm start
+
+# Or directly with npm
+KUBUX_WHITEBOARD_URL=http://localhost:8080 npm start
+```
+
+You can specify any port:
+```bash
+# Run on port 3000
+KUBUX_WHITEBOARD_URL=http://localhost:3000 npm start
+
+# Run on a specific IP address and port (for LAN access)
+KUBUX_WHITEBOARD_URL=http://192.168.1.100:9999 npm start
+```
+
+**Use case:** 
+- Local testing and development
+- Ad-hoc whiteboard sessions without a dedicated server
+- Direct access without SSL/proxy setup
+
+**How it works:**
+- Server extracts port from `KUBUX_WHITEBOARD_URL` and listens on that port
+- Server injects WebSocket URL into the client
+- Clients connect directly via ws://localhost:PORT/ws (plain WebSocket, no SSL)
+
+**Access:** Open your browser to the URL specified in `KUBUX_WHITEBOARD_URL` (e.g., http://localhost:8080)
+
+### Mode 3: Docker with Reverse Proxy (Production)
+
+For production deployments, the repository includes a Dockerfile and docker-compose.yml template for running with nginx-proxy and automatic SSL certificate management via Let's Encrypt.
+
+#### Prerequisites
+- Docker and Docker Compose installed
+- A domain name pointing to your server
+- nginx-proxy setup (included in docker-compose.yml)
+
+#### Setup
+
+1. **Configure docker-compose.yml**
+   
+   Edit the `docker-compose.yml` file and replace the following placeholders:
+   
+   ```yaml
+   # In the proxy service:
+   - <your_nginx_dir>         # Directory for nginx-proxy data (e.g., /home/user/nginx-proxy)
+   - <your_mail>              # Your email for Let's Encrypt notifications
+   
+   # In the whiteboard service:
+   - <your_whiteboard_domain> # Your domain (e.g., whiteboard.example.com)
+   - <app-dir>                # Directory containing your app data (e.g., /home/user/whiteboard-data)
    ```
 
-4. Start the server:
+2. **Create required directories on host**
+   
    ```bash
-   npm start
+   # Create nginx-proxy directories
+   mkdir -p <your_nginx_dir>/{ssl,var/log/{nullmailer,unattended-upgrades,dockergen,dnsmasq,letsencrypt,nginx}}
+   
+   # Create app data directory with subdirectories
+   mkdir -p <app-dir>/{data,conf,logs}
    ```
 
-5. Open the whiteboard in your browser:
+3. **Set up authentication**
+   
+   ```bash
+   # Create password hash
+   ./passwd_hash your-secret-password
+   
+   # Create conf/passwd.json in your app directory
+   echo '["your-hash-here"]' > <app-dir>/conf/passwd.json
    ```
-   http://localhost:5236
+
+4. **Build and run**
+   
+   ```bash
+   docker-compose up -d
    ```
+
+#### How it works
+
+The Docker deployment uses a multi-container setup:
+
+- **nginx-proxy container**: 
+  - Handles SSL termination with Let's Encrypt
+  - Routes traffic to the whiteboard container
+  - Listens on ports 80 (HTTP) and 443 (HTTPS)
+
+- **whiteboard container**:
+  - Runs the Node.js whiteboard server
+  - Exposes port 80 internally (no external port mapping)
+  - Connects to proxy via Docker network
+  - Environment variables:
+    - `VIRTUAL_HOST`: Your domain name
+    - `VIRTUAL_PORT`: 80 (tells nginx-proxy which internal port to use)
+    - `LETSENCRYPT_HOST`: Domain for SSL certificate
+
+**Traffic Flow:**
+1. Client → HTTPS:443 (nginx-proxy)
+2. nginx-proxy → HTTP:80 (whiteboard container)
+3. Client connects via WSS (WebSocket Secure) through nginx-proxy
+
+**Access:** https://your-whiteboard-domain (e.g., https://whiteboard.example.com)
+
+#### Managing the deployment
+
+```bash
+# View logs
+docker-compose logs -f whiteboard
+
+# Restart the whiteboard service
+docker-compose restart whiteboard
+
+# Stop all services
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up -d --build
+```
 
 ## Usage
 

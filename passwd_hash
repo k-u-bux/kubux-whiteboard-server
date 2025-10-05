@@ -1,5 +1,44 @@
-#! /usr/bin/env bash
-for passwd in $@; do
-    echo -n $passwd"  ->  "
-    node -e "console.log(require('crypto').createHash('sha256').update('${passwd}').digest('hex'))"
+#!/usr/bin/env bash
+
+# Password hashing utility using scrypt
+# Usage: ./passwd_hash password1 [password2 ...]
+#
+# This script generates secure password hashes using the scrypt algorithm,
+# which is resistant to rainbow table and brute-force attacks.
+#
+# Output format: salt:hash (both hex-encoded)
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <password> [<password2> ...]"
+    echo ""
+    echo "Generates scrypt hashes for the given passwords."
+    echo "Each hash includes a random salt and is resistant to rainbow table attacks."
+    exit 1
+fi
+
+for passwd in "$@"; do
+    echo -n "$passwd  ->  "
+    node -e "
+const crypto = require('crypto');
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(32);
+  const hash = crypto.scryptSync(password, salt, 64, {
+    N: 16384,
+    r: 8,
+    p: 1
+  });
+  return salt.toString('hex') + ':' + hash.toString('hex');
+}
+
+console.log(hashPassword('$passwd'));
+"
 done
+
+echo ""
+echo "Copy the hash(es) above to your conf/passwd.json file in the format:"
+echo '["hash1", "hash2", ...]'
+echo ""
+echo "Note: These are scrypt hashes (format: salt:hash). The salt is stored"
+echo "alongside the hash and used during verification. This approach is highly"
+echo "resistant to rainbow table and brute-force attacks."
