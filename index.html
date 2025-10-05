@@ -1450,10 +1450,21 @@
               return; // Don't attempt to connect
           }
           
-          // const hostname = window.location.hostname || 'localhost';
-          // const wsUrl = `ws://${hostname}:${shared.PORT}/ws`;
-          const hostname = window.location.hostname;
-          const wsUrl = `wss://${hostname}/ws`;
+          let wsUrl;
+          
+          // Check if server injected a specific WebSocket URL (direct mode)
+          if (typeof WHITEBOARD_WS_URL !== 'undefined' && WHITEBOARD_WS_URL !== null) {
+              wsUrl = WHITEBOARD_WS_URL;
+              debugLog('Using direct WebSocket URL:', wsUrl);
+          } else {
+              // Auto-detect mode (proxy mode)
+              const hostname = window.location.hostname;
+              const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+              
+              // For production with nginx-proxy (no port in URL)
+              wsUrl = `${protocol}//${hostname}/ws`;
+              debugLog('Using auto-detected WebSocket URL:', wsUrl);
+          }
           
           debugLog('Connecting to WebSocket:', wsUrl);
           

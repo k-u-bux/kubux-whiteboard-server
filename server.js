@@ -13,6 +13,31 @@ function sha256(inputString) {
   return crypto.createHash('sha256').update(inputString).digest('hex');
 }
 
+// Dual-mode configuration: proxy vs direct
+const WHITEBOARD_URL = process.env.KUBUX_WHITEBOARD_URL;
+let serverPort = 80; // Default for proxy mode
+let isDirectMode = false;
+let websocketUrl = null;
+
+if (WHITEBOARD_URL) {
+    // Parse the URL to extract port and protocol
+    try {
+        const parsedUrl = new URL(WHITEBOARD_URL);
+        serverPort = parseInt(parsedUrl.port) || (parsedUrl.protocol === 'https:' ? 443 : 80);
+        isDirectMode = true;
+        websocketUrl = WHITEBOARD_URL.replace(/^http/, 'ws') + '/ws';
+        console.log(`[SERVER] Direct mode enabled: ${WHITEBOARD_URL}`);
+        console.log(`[SERVER] Listening on port: ${serverPort}`);
+        console.log(`[SERVER] Clients should connect to: ${websocketUrl}`);
+    } catch (err) {
+        console.error(`[SERVER] Invalid KUBUX_WHITEBOARD_URL: ${WHITEBOARD_URL}`);
+        console.error(`[SERVER] Error: ${err.message}`);
+        process.exit(1);
+    }
+} else {
+    console.log(`[SERVER] Proxy mode (production): listening on port ${serverPort}`);
+    console.log(`[SERVER] Expecting nginx-proxy to handle SSL and forward to port ${serverPort}`);
+}
 
 const { 
   PORT,
@@ -326,11 +351,21 @@ const httpServer = http.createServer( (req, res) => {
                     return;
                 }
                 
-                // Replace the script tag with the actual content
-                const modifiedData = data.replace(
-                    '<script src="shared.js"></script>',
-                    `<script>\n// Begin shared.js content\n${jsData}\n// End shared.js content\n</script>`
-                );
+                // Create the WebSocket configuration script
+                const wsConfigScript = isDirectMode 
+                    ? `const WHITEBOARD_WS_URL = "${websocketUrl}";`
+                    : 'const WHITEBOARD_WS_URL = null;';
+                
+                // Replace the script tag with the actual content and inject WebSocket config
+                const modifiedData = data
+                    .replace(
+                        '<script src="shared.js"></script>',
+                        `<script>\n// Begin shared.js content\n${jsData}\n// End shared.js content\n</script>`
+                    )
+                    .replace(
+                        '</head>',
+                        `<script>${wsConfigScript}</script>\n</head>`
+                    );
                 
                 res.writeHead(200, { 'Content-Type': contentType });
                 res.end(modifiedData);
@@ -355,9 +390,15 @@ const wss = new WebSocket.Server({
     }
 });
 
-httpServer.listen(PORT, () => {
-    debug.log(`[SERVER] HTTP server is running on port ${PORT}`);
-    debug.log(`WebSocket-Server is running on ws://0.0.0.0:${PORT}/ws`);
+httpServer.listen(serverPort, () => {
+    debug.log(`[SERVER] HTTP server is running on port ${serverPort}`);
+    if (isDirectMode) {
+        debug.log(`[SERVER] Direct access: ${WHITEBOARD_URL}`);
+        debug.log(`[SERVER] WebSocket endpoint: ${websocketUrl}`);
+    } else {
+        debug.log(`[SERVER] WebSocket endpoint available at: /ws`);
+        debug.log(`[SERVER] (Accessible via reverse proxy at wss://<your-domain>/ws)`);
+    }
 });
 
 
