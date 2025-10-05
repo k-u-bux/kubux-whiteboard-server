@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+for passwd in $@; do
+    echo -n $passwd"  ->  "
+    node -e "console.log(require('crypto').createHash('sha256').update('${passwd}').digest('hex'))"
+done
