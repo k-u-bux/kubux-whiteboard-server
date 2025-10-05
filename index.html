@@ -1124,7 +1124,10 @@
           
           const centerX = pasteBounds.x + pasteBounds.width / 2;
           const centerY = pasteBounds.y + pasteBounds.height / 2;
-          const radius = Math.max(pasteBounds.width, pasteBounds.height) / 2;
+          
+          // Use minimum dimension to keep handles on screen, with a minimum radius for usability
+          const minRadius = 50; // Minimum radius in pixels for comfortable interaction
+          const radius = Math.max(minRadius, Math.min(pasteBounds.width, pasteBounds.height) / 2);
           
           controlTriangle = {
               center: { x: centerX, y: centerY },
