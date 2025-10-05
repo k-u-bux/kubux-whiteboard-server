@@ -1022,6 +1022,12 @@
       let totalPages = 1;
       let connectionEstablished = false;
       
+      // Reconnection with exponential backoff
+      let reconnectAttempts = 0;
+      let reconnectTimer = null;
+      let maxReconnectDelay = 30000; // Maximum 30 seconds
+      let initialReconnectDelay = 1000; // Start with 1 second
+      
       // Page cache using IndexedDB (larger storage, cleared on close)
       const PAGE_CACHE_DB_NAME = 'whiteboard_cache';
       const PAGE_CACHE_STORE_NAME = 'pages';
@@ -1425,11 +1431,53 @@
           }
       }
       
-      // Reconnect WebSocket
+      // Calculate exponential backoff delay
+      function getReconnectDelay() {
+          // Calculate: min(maxDelay, initialDelay * 2^attempts)
+          const delay = Math.min(
+              maxReconnectDelay,
+              initialReconnectDelay * Math.pow(2, reconnectAttempts)
+          );
+          return delay;
+      }
+      
+      // Schedule automatic reconnection with exponential backoff
+      function scheduleReconnect() {
+          // Clear any existing reconnection timer
+          if (reconnectTimer) {
+              clearTimeout(reconnectTimer);
+              reconnectTimer = null;
+          }
+          
+          const delay = getReconnectDelay();
+          const seconds = (delay / 1000).toFixed(1);
+          
+          debugLog(`Scheduling reconnection attempt ${reconnectAttempts + 1} in ${seconds}s`);
+          showError(`Connection lost. Reconnecting in ${seconds}s... (Attempt ${reconnectAttempts + 1})`);
+          
+          reconnectTimer = setTimeout(() => {
+              reconnectAttempts++;
+              debugLog(`Attempting reconnection (attempt ${reconnectAttempts})`);
+              setupWebSocket();
+          }, delay);
+      }
+      
+      // Reconnect WebSocket (manual reconnection - resets backoff)
       function reconnectWebSocket() {
+          // Clear any pending automatic reconnection
+          if (reconnectTimer) {
+              clearTimeout(reconnectTimer);
+              reconnectTimer = null;
+          }
+          
+          // Reset reconnection attempts for manual reconnect
+          reconnectAttempts = 0;
+          
           if (ws) {
               ws.close();
           }
+          
+          debugLog('Manual reconnection initiated');
           setupWebSocket();
           hideError();
       }
@@ -1474,6 +1522,13 @@
           ws.onopen = () => {
               debugLog('WebSocket connection established');
               
+              // Reset reconnection attempts on successful connection
+              reconnectAttempts = 0;
+              if (reconnectTimer) {
+                  clearTimeout(reconnectTimer);
+                  reconnectTimer = null;
+              }
+              
               if (isCreating) {
                   // Send board creation request
                   createBoard(credential);
@@ -1486,7 +1541,9 @@
           ws.onclose = () => {
               debugLog('Disconnected from server');
               connectionEstablished = false;
-              showError('Connection to server lost. Please reconnect.');
+              
+              // Schedule automatic reconnection with exponential backoff
+              scheduleReconnect();
           };
           
           ws.onerror = (error) => {
