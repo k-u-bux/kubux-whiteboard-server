@@ -35,13 +35,15 @@ const {
 } = require('./shared');
 
 
+// Config storage configuration
+const CONF_DIR = './conf';
+
 // Logs storage configuration
 const { Console } = require('console');
 const LOGS_DIR = './logs';
 const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
 const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
 const debug = new Console({ stdout: debugOutput, stderr: debugOutput });
-
 
 // Data storage configuration
 const DATA_DIR = './data';
@@ -53,7 +55,7 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 // Path helpers
-const getPasswdFilePath = () => path.join(DATA_DIR, 'passwd.json');
+const getPasswdFilePath = () => path.join(CONF_DIR, 'passwd.json');
 const getRemovalLogPath = () => path.join(DATA_DIR, 'to_be_removed.json');
 const getFilePath = (uuid,ext) => path.join(DATA_DIR, `${uuid}.${ext}`);
 
