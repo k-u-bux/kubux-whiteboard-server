@@ -840,7 +840,8 @@ function routeMessage(ws, message) {
             ws.boardId = data.boardId;
         }
         
-        debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}':`, serialize( data ) );
+        // debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}':`, serialize( data ) );
+        debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}'` );
         
         const handler = messageHandlers[data.type];
         if (handler) {
