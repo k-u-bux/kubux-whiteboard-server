@@ -377,9 +377,53 @@ function existingPage(pageId, board) {
 
 // debug.log(`key = ${serverOptions.key}, cert = ${serverOptions.cert}`);
 
+// Whitelist of files to serve for PWA support
+const serveableFiles = {
+    '/manifest.json': { path: 'manifest.json', type: 'application/json' },
+    '/sw.js': { path: 'sw.js', type: 'application/javascript' },
+    '/icon-192.png': { path: 'icon-192.png', type: 'image/png' },
+    '/icon-512.png': { path: 'icon-512.png', type: 'image/png' }
+};
+
 // const httpServer = https.createServer( serverOptions, (req, res) => {
 const httpServer = http.createServer( (req, res) => {
-    // always serve just index.html
+    const requestUrl = url.parse(req.url).pathname;
+    
+    // Trust proxy headers - critical for HTTPS detection behind reverse proxy
+    // This allows PWA/service workers to work correctly
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const isSecure = forwardedProto === 'https' || req.connection.encrypted;
+    
+    // Add security headers for HTTPS responses
+    if (isSecure) {
+        // Inform browser this should always be accessed via HTTPS
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    
+    // Check if this is a PWA file request
+    if (serveableFiles[requestUrl]) {
+        const fileInfo = serveableFiles[requestUrl];
+        const filePath = path.join(__dirname, fileInfo.path);
+        
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                if (err.code === 'ENOENT') {
+                    res.writeHead(404, { 'Content-Type': 'text/plain' });
+                    res.end('File not found');
+                } else {
+                    res.writeHead(500);
+                    res.end('Server error: ' + err.code);
+                }
+                return;
+            }
+            
+            res.writeHead(200, { 'Content-Type': fileInfo.type });
+            res.end(data);
+        });
+        return;
+    }
+    
+    // Default: serve index.html with embedded shared.js
     // rationale: allowing the client to request files opens the attack surface
     // consequence: index.html will be a self contained file; thus we embed shared.js on the fly
     const filePath = path.join(__dirname, 'index.html');
