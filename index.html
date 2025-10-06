@@ -716,13 +716,22 @@
           <button id="board-nav-close">×</button>
         </div>
         
+        <!-- Copy Link Section -->
+        <div class="board-nav-section">
+          <h3>Current Board</h3>
+          <div class="board-nav-form">
+            <button type="button" class="board-nav-btn" id="copy-link-btn">📋 Copy Board Link</button>
+            <span id="copy-feedback" style="display: none; color: #4CAF50; margin-left: 10px;">✓ Copied!</span>
+          </div>
+        </div>
+        
         <!-- New Board Section -->
         <div class="board-nav-section">
           <h3>Create New Board</h3>
           <form class="board-nav-form" id="new-board-form">
-            <input type="password" id="credential-input" placeholder="Enter credential" required>
             <div class="board-nav-actions">
-              <button type="submit" class="board-nav-btn">New Board</button>
+              <button type="submit" class="board-nav-btn" id="new-board-btn" disabled>New Board</button>
+              <span id="credential-status" style="font-size: 12px; color: #666;"></span>
             </div>
           </form>
         </div>
@@ -731,7 +740,9 @@
         <div class="board-nav-section">
           <h3>Go to Board</h3>
           <form class="board-nav-form" id="goto-board-form">
-            <input type="text" id="board-id-input" placeholder="Board UUID" required>
+            <input type="text" id="board-url-input" placeholder="Paste board URL here">
+            <div style="text-align: center; margin: 10px 0; color: #999;">— or enter details —</div>
+            <input type="text" id="board-id-input" placeholder="Board UUID">
             <input type="password" id="board-password-input" placeholder="Board password (optional)">
             <div class="board-nav-actions">
               <button type="submit" class="board-nav-btn">Go to Board</button>
@@ -1158,6 +1169,7 @@
       let ws = null;
       let boardId = null;
       let passwd = null; // needed for edits
+      let storedCredential = null; // Store credential from URL for creating new boards
       let clientId = shared.generateUuid(); // Unique client identifier
       let currentPageUuid = null;
       let pageNr = 1;
@@ -1503,6 +1515,17 @@
       async function init() {
           // Initialize IndexedDB cache first
           await initPageCacheDB();
+          
+          // Check for credential in URL and store it
+          const urlParams = new URLSearchParams(window.location.search);
+          const credential = urlParams.get('credential');
+          if (credential) {
+              storedCredential = credential;
+              debugLog('Credential stored from URL');
+          }
+          
+          // Update new board button state based on credentials
+          updateNewBoardButtonState();
           
           // Note: loadSettings() will be called after board registration
           // when we have a valid boardId
@@ -3133,6 +3156,7 @@
           // Board navigation button
           document.getElementById('board-nav-btn').addEventListener('click', openBoardNavigation);
           document.getElementById('board-nav-close').addEventListener('click', closeBoardNavigation);
+          document.getElementById('copy-link-btn').addEventListener('click', copyBoardLink);
           
           // Board navigation forms
           document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
@@ -4936,10 +4960,84 @@
       }
 
       
+      // Update new board button state based on stored credentials
+      function updateNewBoardButtonState() {
+          const newBoardBtn = document.getElementById('new-board-btn');
+          const credentialStatus = document.getElementById('credential-status');
+          
+          if (storedCredential) {
+              newBoardBtn.disabled = false;
+              credentialStatus.textContent = '✓ Ready';
+              credentialStatus.style.color = '#4CAF50';
+          } else {
+              newBoardBtn.disabled = true;
+              credentialStatus.textContent = 'No credentials';
+              credentialStatus.style.color = '#999';
+          }
+      }
+      
+      // Copy current board link to clipboard
+      function copyBoardLink() {
+          if (!boardId) {
+              alert('No board is currently loaded');
+              return;
+          }
+          
+          // Build the full URL with board ID and password
+          let boardUrl = `${window.location.origin}${window.location.pathname}?board=${boardId}`;
+          if (passwd) {
+              boardUrl += `&passwd=${passwd}`;
+          }
+          
+          // Copy to clipboard
+          navigator.clipboard.writeText(boardUrl).then(() => {
+              // Show feedback
+              const feedback = document.getElementById('copy-feedback');
+              feedback.style.display = 'inline';
+              setTimeout(() => {
+                  feedback.style.display = 'none';
+              }, 2000);
+          }).catch(err => {
+              alert('Failed to copy to clipboard');
+              console.error('Clipboard error:', err);
+          });
+      }
+      
+      // Parse whiteboard URL to extract board ID and password
+      function parseWhiteboardURL(urlString) {
+          try {
+              const url = new URL(urlString);
+              
+              // Check if it's the same origin (same domain)
+              if (url.origin !== window.location.origin) {
+                  return null; // Different domain - invalid
+              }
+              
+              // Extract board ID and password from query parameters
+              const params = new URLSearchParams(url.search);
+              const boardId = params.get('board');
+              
+              if (!boardId) {
+                  return null; // No board ID - invalid
+              }
+              
+              return {
+                  boardId: boardId,
+                  password: params.get('passwd') || ''
+              };
+          } catch (e) {
+              // Invalid URL format
+              return null;
+          }
+      }
+      
       // Board Navigation Functions
       function openBoardNavigation() {
           const overlay = document.getElementById('board-nav-overlay');
           overlay.style.display = 'flex';
+          
+          // Update new board button state
+          updateNewBoardButtonState();
           
           // Pre-fill current board ID if available
           if (boardId) {
@@ -4952,7 +5050,7 @@
           overlay.style.display = 'none';
           
           // Clear form inputs
-          document.getElementById('credential-input').value = '';
+          document.getElementById('board-url-input').value = '';
           document.getElementById('board-id-input').value = '';
           document.getElementById('board-password-input').value = '';
       }
@@ -4960,34 +5058,51 @@
       function handleNewBoard(e) {
           e.preventDefault();
           
-          const credential = document.getElementById('credential-input').value;
-          
-          if (!credential) {
-              alert('Please enter a credential');
+          if (!storedCredential) {
+              alert('No credentials available. Please access the app with ?credential=xxx first.');
               return;
           }
           
-          // Change URL and reload page with new board creation
-          const newUrl = `${window.location.origin}${window.location.pathname}?credential=${encodeURIComponent(credential)}`;
+          // Use stored credential to create new board
+          const newUrl = `${window.location.origin}${window.location.pathname}?credential=${encodeURIComponent(storedCredential)}`;
           window.location.href = newUrl;
       }
       
       function handleGotoBoard(e) {
           e.preventDefault();
           
+          const boardUrlInput = document.getElementById('board-url-input').value.trim();
           const boardIdInput = document.getElementById('board-id-input').value.trim();
           const boardPasswordInput = document.getElementById('board-password-input').value;
           
-          if (!boardIdInput) {
-              alert('Please enter a board UUID');
+          let targetBoardId = null;
+          let targetPassword = null;
+          
+          // Try to parse URL first if provided
+          if (boardUrlInput) {
+              const parsed = parseWhiteboardURL(boardUrlInput);
+              
+              if (!parsed) {
+                  alert('Invalid whiteboard URL. Please check the URL and try again.');
+                  return;
+              }
+              
+              targetBoardId = parsed.boardId;
+              targetPassword = parsed.password;
+          } else if (boardIdInput) {
+              // Use manual entry if URL not provided
+              targetBoardId = boardIdInput;
+              targetPassword = boardPasswordInput;
+          } else {
+              alert('Please enter either a board URL or board UUID');
               return;
           }
           
           // Build URL with board ID and optional password
-          let newUrl = `${window.location.origin}${window.location.pathname}?board=${encodeURIComponent(boardIdInput)}`;
+          let newUrl = `${window.location.origin}${window.location.pathname}?board=${encodeURIComponent(targetBoardId)}`;
           
-          if (boardPasswordInput) {
-              newUrl += `&passwd=${encodeURIComponent(boardPasswordInput)}`;
+          if (targetPassword) {
+              newUrl += `&passwd=${encodeURIComponent(targetPassword)}`;
           }
           
           // Change URL and reload page
