@@ -107,9 +107,9 @@ For production deployments, the repository includes a Dockerfile and docker-comp
 
 #### Setup
 
-1. **Configure docker-compose.yml**
+1. **Integrate nginx-proxy and the whiteboard server into your docker-compose.yml**
    
-   Edit the `docker-compose.yml` file and replace the following placeholders:
+   A minimal `docker-compose.yml` file (just the reverse proxy and the whiteboard server) is included in the distribution.  Replace the following placeholders:
    
    ```yaml
    # In the proxy service:
@@ -126,26 +126,11 @@ For production deployments, the repository includes a Dockerfile and docker-comp
    ```bash
    # Create nginx-proxy directories
    mkdir -p <your_nginx_dir>/{ssl,var/log/{nullmailer,unattended-upgrades,dockergen,dnsmasq,letsencrypt,nginx}}
-   
-   # Create app data directory with subdirectories
-   mkdir -p <app-dir>/{data,conf,logs}
    ```
+   
+3. **Start docker-compose**
+   The docker-compose file does build the container for the whiteboard server directly from the Dockerfile. The provided Dockerfile employ the somewhat hacky trick of mounting the development directory directly into the container. If you have set up the data, logs, and conf directories and the password file for local testing, they can be directly reused for deployment.
 
-3. **Set up authentication**
-   
-   ```bash
-   # Create password hash
-   ./passwd_hash your-secret-password
-   
-   # Create conf/passwd.json in your app directory
-   echo '["your-hash-here"]' > <app-dir>/conf/passwd.json
-   ```
-
-4. **Build and run**
-   
-   ```bash
-   docker-compose up -d
-   ```
 
 #### How it works
 
@@ -170,7 +155,7 @@ The Docker deployment uses a multi-container setup:
 2. nginx-proxy → HTTP:80 (whiteboard container)
 3. Client connects via WSS (WebSocket Secure) through nginx-proxy
 
-**Access:** https://your-whiteboard-domain (e.g., https://whiteboard.example.com)
+**Access:** https://your-whiteboard-domain/?credential=<your_password>
 
 #### Managing the deployment
 
@@ -191,10 +176,10 @@ docker-compose up -d --build
 ## Usage
 
 ### Creating a New Whiteboard
-
-1. Visit the server URL in your browser
-2. You will be presented with a login screen or directly taken to a new board
-3. Share the board URL with collaborators to work together
+    Point your browser at: "https://your-whiteboard-domain/?credential=<your_password>"
+    
+    A new board will be created and the URL will change to point towards that board. The URL contains a password. Share the URL includin the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
+    
 
 ### Basic Controls
 
