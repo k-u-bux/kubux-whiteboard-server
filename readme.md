@@ -250,39 +250,17 @@ kubux-whiteboard-server/
 ├── protocol.md         # Protocol documentation
 ├── package.json        # Project configuration and dependencies
 └── data/               # Data storage directory
-    ├── certs/          # SSL certificates
     └── *.board/*.page  # Board and page data
+└── conf/               # Configuration directory
+    └── passwd.json     # Password file
 ```
 
-### Adding New Features
-
-When adding new features:
-
-1. Update the shared.js file for any constants or utilities needed by both client and server
-2. Modify server.js to handle any new message types or actions
-3. Update index.html to add UI controls and client-side logic
-4. Document the new feature in the appropriate documentation files
-
-### Running Tests
-
-Currently, the project does not include automated tests. Manual testing is required for new features and bug fixes.
 
 ## License
 
 [Apache License 2.0](LICENSE) - This project is licensed under the Apache License 2.0. See the LICENSE file for the full license text.
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## Acknowledgements
 
-- Inspired by [Xournal++](https://github.com/xournalpp/xournalpp), a handwriting note-taking software
-- Uses WebSockets for real-time communication
-- Implements the Model-Context Protocol for extensibility
+- Many drawing features are inspired by [Xournal++](https://github.com/xournalpp/xournalpp), a comprehensive handwriting note-taking software
