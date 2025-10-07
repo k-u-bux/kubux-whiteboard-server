@@ -637,7 +637,7 @@
 
       <div class="tool-section" id="debug-tools">
         <button class="tool-btn" id="board-nav-btn" title="Board Navigation">🗂️</button>
-        <span id="sync-status">✓</span>
+        // <span id="sync-status">✓</span>
       </div>
     </div>
     
@@ -1469,7 +1469,7 @@
       const reconnectButton = document.getElementById('reconnect-button');
       const undoBtn = document.getElementById('undo-btn');
       const redoBtn = document.getElementById('redo-btn');
-      const syncStatus = document.getElementById('sync-status');
+      // const syncStatus = document.getElementById('sync-status');
 
       const colorSelectionDiv = document.getElementById('color-selection');
       const widthSelectionDiv = document.getElementById('width-selection');
@@ -1595,15 +1595,15 @@
       
       // Show synchronization status
       function updateSyncStatus() {
-          if (present > verifiedIndex) {
-              // Some actions not yet confirmed by server
-              syncStatus.textContent = "⟳";
-              syncStatus.style.color = "#ff9800";
-          } else {
-              // All actions confirmed
-              syncStatus.textContent = "✓";
-              syncStatus.style.color = "#4caf50";
-          }
+      //     if (present > verifiedIndex) {
+      //         // Some actions not yet confirmed by server
+      //         syncStatus.textContent = "⟳";
+      //         syncStatus.style.color = "#ff9800";
+      //     } else {
+      //         // All actions confirmed
+      //         syncStatus.textContent = "✓";
+      //         syncStatus.style.color = "#4caf50";
+      //     }
       }
       
       // Calculate exponential backoff delay
