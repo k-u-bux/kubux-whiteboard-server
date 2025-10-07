@@ -2,7 +2,7 @@
 
 A real-time collaborative whiteboard application designed for mathematics education and collaboration. This project provides a WebSocket-based server and browser client that enables multiple users draw on a shared canvas in real-time. The idea is that you will run your own whiteboard server on you home lab.
 
-![Kubux Whiteboard Demo](https://via.placeholder.com/800x400?text=Kubux+Whiteboard+Demo)
+![Kubux Whiteboard Demo](screenshot.png)
 
 ## Features
 
@@ -14,7 +14,6 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Layer system** - Organize content across 8 separate layers with visibility control
 - **PDF export** - Export single pages or entire whiteboards as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
-- **Optimized rendering** - Two-canvas approach for smooth performance
 
 ## Installation
 
@@ -54,12 +53,12 @@ A real-time collaborative whiteboard application designed for mathematics educat
    echo '["a3f2b8c...salt...:d4e9f1a...hash..."]' > conf/passwd.json
    ```
    
-   **Security Note:** The password hashing now uses **scrypt**, a memory-hard key derivation function that is highly resistant to:
+   **Security Note:** The password hashing uses **scrypt**, a memory-hard key derivation function that is highly resistant to:
    - Rainbow table attacks (each password gets a unique random salt)
    - Brute-force attacks (computationally expensive to compute)
    - Hardware-accelerated attacks (memory-hard design)
    
-   The hash format is `salt:hash` where both parts are hex-encoded. The server maintains backward compatibility with legacy SHA-256 hashes, but scrypt is strongly recommended for new deployments.
+   The hash format is `salt:hash` where both parts are hex-encoded.
 
 4. Install dependencies (if using Nix):
    ```bash
@@ -75,36 +74,11 @@ A real-time collaborative whiteboard application designed for mathematics educat
 
 The Kubux Whiteboard Server supports two modes of operation:
 
-### Mode 1: Proxy Mode (Production)
-
-This mode is designed for production deployments with a reverse proxy (like nginx-proxy) handling SSL termination. The server listens on port 80 internally, and clients connect via secure WebSockets (wss://) through the proxy.
-
-```bash
-# With Nix (recommended)
-nix develop
-npm start
-
-# Or directly with npm
-npm start
-```
-
-**Use case:** Production deployment on a home lab or server with nginx-proxy managing SSL certificates (e.g., via Let's Encrypt).
-
-**How it works:**
-- Server listens on port 80 (internal)
-- nginx-proxy forwards HTTPS:443 → HTTP:80
-- Clients connect via wss://whiteboard.your-domain.com/ws
-
-### Mode 2: Direct Mode (Local/Development)
+### Mode 1: Direct Mode (Local/Development)
 
 This mode allows the server to listen on a specified port and serve the application directly without a reverse proxy. Perfect for local testing or ad-hoc usage.
 
 ```bash
-# With Nix (recommended)
-nix develop
-KUBUX_WHITEBOARD_URL=http://localhost:8080 npm start
-
-# Or directly with npm
 KUBUX_WHITEBOARD_URL=http://localhost:8080 npm start
 ```
 
@@ -112,24 +86,17 @@ You can specify any port:
 ```bash
 # Run on port 3000
 KUBUX_WHITEBOARD_URL=http://localhost:3000 npm start
-
-# Run on a specific IP address and port (for LAN access)
-KUBUX_WHITEBOARD_URL=http://192.168.1.100:9999 npm start
 ```
 
 **Use case:** 
 - Local testing and development
-- Ad-hoc whiteboard sessions without a dedicated server
-- Direct access without SSL/proxy setup
+- If the specified port is exposed (not blocked by a firewall) and your computer is accessible from the ouside, you can use this mode to create an ad-hoc whiteboard sessions without a dedicated server
 
-**How it works:**
-- Server extracts port from `KUBUX_WHITEBOARD_URL` and listens on that port
-- Server injects WebSocket URL into the client
-- Clients connect directly via ws://localhost:PORT/ws (plain WebSocket, no SSL)
 
 **Access:** Open your browser to the URL specified in `KUBUX_WHITEBOARD_URL` (e.g., http://localhost:8080)
 
-### Mode 3: Docker with Reverse Proxy (Production)
+
+### Mode 2: Docker with Reverse Proxy (Production)
 
 For production deployments, the repository includes a Dockerfile and docker-compose.yml template for running with nginx-proxy and automatic SSL certificate management via Let's Encrypt.
 
