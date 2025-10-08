@@ -5109,6 +5109,9 @@
           
           // Change URL and reload page
           window.location.href = newUrl;
+          boardId = targetBoardId;
+          passwd = targetPassword;
+          registerBoard(boardId);
       }
       
       // Register Service Worker for PWA
