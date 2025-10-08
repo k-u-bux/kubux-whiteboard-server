@@ -131,6 +131,9 @@ For production deployments, the repository includes a Dockerfile and docker-comp
 3. **Start docker-compose**
    The docker-compose file does build the container for the whiteboard server directly from the Dockerfile. The provided Dockerfile employ the somewhat hacky trick of mounting the development directory directly into the container. If you have set up the data, logs, and conf directories and the password file for local testing, they can be directly reused for deployment.
 
+4. **Support for PWA**
+   Manually create the whiteboard referenced in manifest.json to support installation as a progressive web app. When the client points the browser to a shared URL, they should be offered the option to create a progressive web app. The advantage on a tablet is that the browser interface is removed in the web app which enlarges the available board space.
+   
 
 #### How it works
 
