@@ -2,7 +2,7 @@
   "name": "Kubux Whiteboard",
   "short_name": "Whiteboard",
   "description": "Collaborative whiteboard application",
-  "start_url": "/?board=3339a4a1-991e-4127-b574-5472b0337b93&passwd=ip15q63x3ryc",
+  "start_url": "/most_recent_board",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0078d7",

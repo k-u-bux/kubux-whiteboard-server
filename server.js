@@ -385,6 +385,9 @@ const serveableFiles = {
     '/icon-512.png': { path: 'icon-512.png', type: 'image/png' }
 };
 
+// Special routes that should serve index.html
+const specialRoutes = ['/most_recent_board'];
+
 // const httpServer = https.createServer( serverOptions, (req, res) => {
 const httpServer = http.createServer( (req, res) => {
     const requestUrl = url.parse(req.url).pathname;
