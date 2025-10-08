@@ -264,3 +264,4 @@ kubux-whiteboard-server/
 ## Acknowledgements
 
 - Many drawing features are inspired by [Xournal++](https://github.com/xournalpp/xournalpp), a comprehensive handwriting note-taking software
+- AI models (Gemini and Claude) have assisted in generating large parts of the code. At some point, I even figured out how to prevent it from changing the protocol willy nilly.
