@@ -1671,6 +1671,8 @@
                   boardId = board_data.boardId;
                   passwd = board_data.passwd;
               } 
+          } else {
+              debugLog( 'not loading most recent board. current board:', boardId );
           }
 
           // Determine if we are creating or registering
