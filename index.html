@@ -1665,11 +1665,12 @@
           passwd = urlParams.get('passwd');
 
           if( boardId === "0000000-0000-0000-0000-000000000000" && passwd === "000000000000" ) {
+              debugLog( 'load most recent board.' );
               const board_data = loadMostRecentBoard();
               if ( board_data ) {
                   boardId = board_data.boardId;
                   passwd = board_data.passwd;
-              }
+              } 
           }
 
           // Determine if we are creating or registering
