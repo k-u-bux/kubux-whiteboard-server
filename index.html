@@ -1664,7 +1664,7 @@
           boardId = urlParams.get('board');
           passwd = urlParams.get('passwd');
 
-          if( boardId === "0000000-0000-0000-0000-000000000000" && passwd === "000000000000" ) {
+          if( boardId === '0000000-0000-0000-0000-000000000000' ) {
               debugLog( 'load most recent board.' );
               const board_data = loadMostRecentBoard();
               if ( board_data ) {
