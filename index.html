@@ -5108,11 +5108,11 @@
           }
           
           // Change URL and (not) reload page
-          boardId = targetBoardId;
-          passwd = targetPassword;
-          registerBoard(boardId);
-          // window.location.assign( newUrl );
-          history.pushState(null, '', newUrl);                                     
+          // boardId = targetBoardId;
+          // passwd = targetPassword;
+          // registerBoard(boardId);
+          window.location.assign( newUrl );
+          // history.pushState(null, '', newUrl);                                     
       }
       
       // Register Service Worker for PWA
