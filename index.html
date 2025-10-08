@@ -860,7 +860,7 @@
       }
       
       function saveSettings() {
-          if (!boardId) return; // Can't save without boardId
+          if (!boardId) return; // Ca not save without boardId
           
           try {
               const settings = {
@@ -899,7 +899,7 @@
       }
       
       function loadSettings() {
-          if (!boardId) return false; // Can't load without boardId
+          if (!boardId) return false; // Ca not load without boardId
           
           try {
               const saved = localStorage.getItem(getSettingsStorageKey());
@@ -957,7 +957,7 @@
               }
               
               // Store page position for restoration after connection
-              // (Don't navigate yet - wait for WebSocket connection)
+              // (Do not navigate yet - wait for WebSocket connection)
               if (settings.currentPageUuid) {
                   window.savedPagePosition = {
                       uuid: settings.currentPageUuid,
@@ -1542,11 +1542,11 @@
           }
       }
       
-      // Check if we're on the /most_recent_board route and redirect
+      // Check if we are on the /most_recent_board route and redirect
       function handleMostRecentBoardRoute() {
           const pathname = window.location.pathname;
           
-          // Check if we're on the /most_recent_board route
+          // Check if we are on the /most_recent_board route
           if (pathname === '/most_recent_board') {
               const recentBoard = loadMostRecentBoard();
               
@@ -1560,11 +1560,11 @@
                   
                   debugLog('Redirecting to most recent board', targetUrl);
                   window.location.href = targetUrl;
-                  return true; // Indicate we're redirecting
+                  return 'redirect'; // Actually redirecting
               } else {
-                  // No recent board - show error
-                  showError('No recent board found. Please create or join a board first.');
-                  return true; // Prevent further initialization
+                  // No recent board - will open navigation after init
+                  debugLog('No recent board found, will open navigation dialog');
+                  return 'open-nav'; // Need to open board navigation
               }
           }
           
@@ -1573,9 +1573,10 @@
       
       // Initialize 
       async function init() {
-          // Check if we're on /most_recent_board route and handle redirect
-          if (handleMostRecentBoardRoute()) {
-              return; // Stop initialization if we're redirecting
+          // Check if we are on /most_recent_board route and handle redirect
+          const routeStatus = handleMostRecentBoardRoute();
+          if (routeStatus === 'redirect') {
+              return; // ONLY stop initialization if actually redirecting
           }
           
           // Initialize IndexedDB cache first
@@ -1601,13 +1602,20 @@
           // when we have a valid boardId
           
           setupCanvas();
-          setupWebSocket();
           setupEventListeners();
           setupColorPicker();
           setupLayerControls();
           setupSelectionControls();
           updatePasteButton(); // Initialize paste button state
           debugStylusEvents(); // Add stylus debugging
+          
+          // If we are on /most_recent_board with no saved board, open navigation dialog
+          if (routeStatus === 'open-nav') {
+              openBoardNavigation();
+          } else {
+              // Normal initialization - setup WebSocket
+              setupWebSocket();
+          }
       }
       
       // Set up canvas size
@@ -1733,7 +1741,7 @@
           // If neither board nor credential provided, show error
           if (!boardId && !isCreating) {
               showError('Please provide credentials to create a new board.');
-              return; // Don't attempt to connect
+              return; // Do not attempt to connect
           }
           
           let wsUrl;
@@ -2734,7 +2742,7 @@
               const element = visualState.element.get(uuid);
               if (element) {
                   // Create a deep copy of the element
-                  // Note: Elements don't contain UUIDs - UUIDs are only used as Map keys and in actions
+                  // Note: Elements do not contain UUIDs - UUIDs are only used as Map keys and in actions
                   // The element structure only contains drawable data (type, path, points, color, etc.)
                   const elementCopy = JSON.parse(JSON.stringify(element));
                   clipboard.elements.push(elementCopy);
