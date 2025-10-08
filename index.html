@@ -1610,7 +1610,9 @@
           debugStylusEvents(); // Add stylus debugging
           
           // If we are on /most_recent_board with no saved board, open navigation dialog
+          // Otherwise setup WebSocket normally
           if (routeStatus === 'open-nav') {
+              // Open board navigation dialog - WebSocket will be set up after user provides board details
               openBoardNavigation();
           } else {
               // Normal initialization - setup WebSocket
