@@ -139,6 +139,7 @@ All messages use specific type identifiers and structured payloads.
   "requestId": "request-uuid"
 }
 ```
+Answer: the server sends a registration message.
 
 #### Board Creation
 ```json
@@ -149,6 +150,8 @@ All messages use specific type identifiers and structured payloads.
   "requestId": "request-uuid"
 }
 ```
+Answer: the server sends a creation message.
+
 
 #### Full Page Request
 ```json
@@ -160,6 +163,7 @@ All messages use specific type identifiers and structured payloads.
   "requestId": "request-uuid"
 }
 ```
+Answer: the server sends a full page message.
 
 #### Replay Request
 ```json
@@ -171,6 +175,7 @@ All messages use specific type identifiers and structured payloads.
   "requestId": "request-uuid"
 }
 ```
+Answer: the server sends a replay or a ping (if the board is missing)
 
 #### Modification Action Proposal
 ```json
@@ -186,6 +191,7 @@ All messages use specific type identifiers and structured payloads.
   "before-hash": "hash-before-action"
 }
 ```
+Answer: the server accepts or declines. If accepted, it sends a ping to all interested parties.
 
 ### Server to Client Messages
 
