@@ -1664,6 +1664,14 @@
           boardId = urlParams.get('board');
           passwd = urlParams.get('passwd');
 
+          if( boardId === "0000000-0000-0000-0000-000000000000" && passwd === "000000000000" ) {
+              const board_data = loadMostRecentBoard();
+              if ( board_data ) {
+                  boardId = board_data.boardId;
+                  passwd = board_data.passwd;
+              }
+          }
+
           // Determine if we are creating or registering
           const isCreating = !!credential;
           const isEditing = !!passwd;
@@ -1829,6 +1837,34 @@
           updateKnobs();
       }
       
+          
+      // Save most recent board to localStorage
+      function saveMostRecentBoard() {
+          const boardData = {
+              boardId: boardId,
+              passwd: passwd,
+              timestamp: Date.now()
+          };
+          
+          localStorage.setItem('most_recent_board', JSON.stringify(boardData));
+          debugLog('Saved most recent board', boardData);
+      }
+      
+      // Load most recent board from localStorage
+      function loadMostRecentBoard() {
+          try {
+              const saved = localStorage.getItem('most_recent_board');
+              if (!saved) return null;
+              
+              const boardData = JSON.parse(saved);
+              debugLog('Loaded most recent board', boardData);
+              return boardData;
+          } catch (err) {
+              console.warn('Failed to load most recent board:', err);
+              return null;
+          }
+      }
+
       // Register with an existing board
       function registerBoard(boardId) {
           const requestId = createRequestId();
@@ -1874,6 +1910,7 @@
           // Load settings now that we have a boardId
           loadSettings();
           updateKnobs();
+          saveMostRecentBoard();
           
           // The server will send a full page message next, so we do not need
           // to request one explicitly
