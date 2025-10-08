@@ -860,7 +860,7 @@
       }
       
       function saveSettings() {
-          if (!boardId) return; // Can't save without boardId
+          if (!boardId) return; // Cannot save without boardId
           
           try {
               const settings = {
@@ -899,7 +899,7 @@
       }
       
       function loadSettings() {
-          if (!boardId) return false; // Can't load without boardId
+          if (!boardId) return false; // Cannot load without boardId
           
           try {
               const saved = localStorage.getItem(getSettingsStorageKey());
@@ -957,7 +957,7 @@
               }
               
               // Store page position for restoration after connection
-              // (Don't navigate yet - wait for WebSocket connection)
+              // (Do not navigate yet - wait for WebSocket connection)
               if (settings.currentPageUuid) {
                   window.savedPagePosition = {
                       uuid: settings.currentPageUuid,
@@ -1670,7 +1670,7 @@
           // If neither board nor credential provided, show error
           if (!boardId && !isCreating) {
               showError('Please provide credentials to create a new board.');
-              return; // Don't attempt to connect
+              return; // Do not attempt to connect
           }
           
           let wsUrl;
@@ -2665,7 +2665,7 @@
               const element = visualState.element.get(uuid);
               if (element) {
                   // Create a deep copy of the element
-                  // Note: Elements don't contain UUIDs - UUIDs are only used as Map keys and in actions
+                  // Note: Elements do not contain UUIDs - UUIDs are only used as Map keys and in actions
                   // The element structure only contains drawable data (type, path, points, color, etc.)
                   const elementCopy = JSON.parse(JSON.stringify(element));
                   clipboard.elements.push(elementCopy);
