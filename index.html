@@ -1560,11 +1560,11 @@
                   
                   debugLog('Redirecting to most recent board', targetUrl);
                   window.location.href = targetUrl;
-                  return true; // Indicate we're redirecting
+                  return 'redirect'; // Indicate we're redirecting
               } else {
-                  // No recent board - show error
-                  showError('No recent board found. Please create or join a board first.');
-                  return true; // Prevent further initialization
+                  // No recent board - will open board navigation after init
+                  debugLog('No recent board found, will open navigation dialog');
+                  return 'open-nav'; // Indicate we should open navigation
               }
           }
           
@@ -1574,7 +1574,8 @@
       // Initialize 
       async function init() {
           // Check if we're on /most_recent_board route and handle redirect
-          if (handleMostRecentBoardRoute()) {
+          const routeStatus = handleMostRecentBoardRoute();
+          if (routeStatus === 'redirect') {
               return; // Stop initialization if we're redirecting
           }
           
@@ -1601,13 +1602,23 @@
           // when we have a valid boardId
           
           setupCanvas();
-          setupWebSocket();
           setupEventListeners();
           setupColorPicker();
           setupLayerControls();
           setupSelectionControls();
           updatePasteButton(); // Initialize paste button state
           debugStylusEvents(); // Add stylus debugging
+          
+          // If we're on /most_recent_board with no saved board, open navigation
+          if (routeStatus === 'open-nav') {
+              // Open board navigation dialog after a brief delay to ensure DOM is ready
+              setTimeout(() => {
+                  openBoardNavigation();
+              }, 100);
+          } else {
+              // Normal initialization - setup WebSocket
+              setupWebSocket();
+          }
       }
       
       // Set up canvas size
