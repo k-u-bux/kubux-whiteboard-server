@@ -1513,71 +1513,8 @@
       // settings
       const force_stylus = true;
 
-      // Save most recent board to localStorage
-      function saveMostRecentBoard() {
-          if (!boardId) return;
-          
-          const boardData = {
-              boardId: boardId,
-              passwd: passwd || '',
-              timestamp: Date.now()
-          };
-          
-          localStorage.setItem('most_recent_board', JSON.stringify(boardData));
-          debugLog('Saved most recent board', boardData);
-      }
-      
-      // Load most recent board from localStorage
-      function loadMostRecentBoard() {
-          try {
-              const saved = localStorage.getItem('most_recent_board');
-              if (!saved) return null;
-              
-              const boardData = JSON.parse(saved);
-              debugLog('Loaded most recent board', boardData);
-              return boardData;
-          } catch (err) {
-              console.warn('Failed to load most recent board:', err);
-              return null;
-          }
-      }
-      
-      // Check if we're on the /most_recent_board route and redirect
-      function handleMostRecentBoardRoute() {
-          const pathname = window.location.pathname;
-          
-          // Check if we're on the /most_recent_board route
-          if (pathname === '/most_recent_board') {
-              const recentBoard = loadMostRecentBoard();
-              
-              if (recentBoard && recentBoard.boardId) {
-                  // Build URL with board ID and password
-                  let targetUrl = `${window.location.origin}/?board=${encodeURIComponent(recentBoard.boardId)}`;
-                  
-                  if (recentBoard.passwd) {
-                      targetUrl += `&passwd=${encodeURIComponent(recentBoard.passwd)}`;
-                  }
-                  
-                  debugLog('Redirecting to most recent board', targetUrl);
-                  window.location.href = targetUrl;
-                  return true; // Indicate we're redirecting
-              } else {
-                  // No recent board - show error
-                  showError('No recent board found. Please create or join a board first.');
-                  return true; // Prevent further initialization
-              }
-          }
-          
-          return false; // Not on /most_recent_board route
-      }
-      
       // Initialize 
       async function init() {
-          // Check if we're on /most_recent_board route and handle redirect
-          if (handleMostRecentBoardRoute()) {
-              return; // Stop initialization if we're redirecting
-          }
-          
           // Initialize IndexedDB cache first
           await initPageCacheDB();
           
@@ -1870,9 +1807,6 @@
           boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD_ID];
           passwd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
           
-          // Save as most recent board
-          saveMostRecentBoard();
-          
           // Build the full URL with board ID and password
           const boardUrl = `${window.location.origin}${window.location.pathname}?board=${boardId}&passwd=${passwd}`;
           
@@ -1927,9 +1861,6 @@
           // Update board ID and URL if necessary
           boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID];
           const urlParams = new URLSearchParams(window.location.search);
-          
-          // Save as most recent board
-          saveMostRecentBoard();
           
           if (urlParams.get('credential')) {
               // If we created a board, update URL to use board ID instead
