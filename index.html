@@ -5107,8 +5107,9 @@
               newUrl += `&passwd=${encodeURIComponent(targetPassword)}`;
           }
           
-          // Change URL and reload page
-          window.location.href = newUrl;
+          // Change URL and (not) reload page
+          // window.location.assign( newUrl );
+          history.pushState(null, '', newUrl);                                     
           boardId = targetBoardId;
           passwd = targetPassword;
           registerBoard(boardId);
