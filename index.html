@@ -1846,7 +1846,7 @@
               timestamp: Date.now()
           };
           
-          localStorage.setItem('most_recent_board', JSON.stringify(boardData));
+          localStorage.setItem('most_recent_board', shared.serialize(boardData));
           debugLog('Saved most recent board', boardData);
       }
       
@@ -1856,7 +1856,7 @@
               const saved = localStorage.getItem('most_recent_board');
               if (!saved) return null;
               
-              const boardData = JSON.parse(saved);
+              const boardData = shared.deserialize(saved);
               debugLog('Loaded most recent board', boardData);
               return boardData;
           } catch (err) {
