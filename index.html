@@ -1611,10 +1611,9 @@
           
           // If we're on /most_recent_board with no saved board, open navigation
           if (routeStatus === 'open-nav') {
-              // Open board navigation dialog after a brief delay to ensure DOM is ready
-              setTimeout(() => {
-                  openBoardNavigation();
-              }, 100);
+              // Open board navigation dialog immediately
+              // The navigation dialog is fully functional and doesn't need WebSocket
+              openBoardNavigation();
           } else {
               // Normal initialization - setup WebSocket
               setupWebSocket();
