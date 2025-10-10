@@ -4865,6 +4865,14 @@
           
           // Apply zoom and pan for active elements
           ctx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+
+          for ( let 0 = present; i < history.length; i++ ) {
+              const action = history[i];
+              const stroke = action[shared.MOD_ACTIONS.DRAW.STROKE];
+              if (stroke && visibleLayers.has(stroke[shared.ELEMENT.LAYER])) {
+                  renderElement(ctx, stroke);
+              }
+          }
           
           // Draw current stroke if we are drawing or erasing (active layer)
           if ((isDrawing || isErasing) && currentStroke) {
