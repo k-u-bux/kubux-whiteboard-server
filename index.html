@@ -1924,7 +1924,7 @@
       // a ping between a mod-request and the accept/decline response shall be ignored
       // BUT: the response may get lost ==> we need a timeout.
 
-      const RESPONSE_TIMEOUT = 2000; // 2 secs
+      const RESPONSE_TIMEOUT = 100; // msecs
       let pending_actions = new Set();
       let pending_timer = Date.now();
 
@@ -1953,8 +1953,7 @@
       }
                                                                        
       function handlePingMessage(data) {
-          const current_time = Date.now();
-          if ( current_time > RESPONSE_TIMEOUT + pending_timer ) {
+          if ( Date.now() > RESPONSE_TIMEOUT + pending_timer ) {
               pending_actions.clear();
           }                                                                  
           if ( pending_actions.Size > 0 ) { return; }
