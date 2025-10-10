@@ -181,7 +181,7 @@ docker-compose up -d --build
 ### Creating a New Whiteboard
     Point your browser at: "https://your-whiteboard-domain/?credential=<your_password>"
     
-A new board will be created and the URL will change to point towards that board. The URL contains a password. Share the URL includin the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
+A new board will be created and the URL will change to point towards that board. The URL contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
     
 
 ### Basic Controls
