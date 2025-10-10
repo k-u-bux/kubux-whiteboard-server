@@ -1,6 +1,6 @@
 # Kubux Whiteboard Server
 
-A real-time collaborative whiteboard application designed for mathematics education and collaboration. This project provides a WebSocket-based server and browser client that enables multiple users draw on a shared canvas in real-time. The idea is that you will run your own whiteboard server on you home lab.
+A real-time collaborative whiteboard application designed for mathematics education and collaboration. This project provides a WebSocket-based server and browser client that enables multiple users draw on a shared canvas in real-time. The idea is that you will run your own whiteboard server on your home lab.
 
 ![Kubux Whiteboard Demo](screenshot.png)
 
