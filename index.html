@@ -2044,7 +2044,7 @@
               return;
           }
 
-          if ( hashes[actionIndex] === beforeHash || hashes[actionIndex + 1] === afterHash) {
+          if ( hashes[actionIndex] === beforeHash && hashes[actionIndex + 1] === afterHash) {
               verifedIndex = actionIndex + 1;
               updateSyncStatus();
               updateUndoRedoButtons();
