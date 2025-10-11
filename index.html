@@ -2033,18 +2033,18 @@
               return;
           }
 
-          // if ( actionIndex < verifiedIndex ) {
-          //     updateSyncStatus();
-          //     updateUndoRedoButtons();
-          //     return;
-          // }
-          // 
-          // if ( hashes[actionIndex] === beforeHash && hashes[actionIndex + 1] === afterHash) {
-          //     verifedIndex = actionIndex + 1;
-          //     updateSyncStatus();
-          //     updateUndoRedoButtons();
-          //     return;
-          // }
+          if ( actionIndex < verifiedIndex ) {
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              return;
+          }
+          
+          if ( hashes[actionIndex] === beforeHash && hashes[actionIndex + 1] === afterHash) {
+              verifedIndex = actionIndex + 1;
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              return;
+          }
           
           // Verify our computed hashes match the server:
           if (hashes[actionIndex] !== beforeHash || hashes[actionIndex + 1] !== afterHash) {
