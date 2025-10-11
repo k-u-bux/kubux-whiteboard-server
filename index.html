@@ -2017,11 +2017,6 @@
 
       // Handle accept message from server
       function handleAcceptMessage(data) {
-          // Update page info
-          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_PAGE_NR];
-          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_TOTAL_PAGES];
-          updatePageInfo();
-          
           const acceptedActionUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.ACTION_UUID];
           const beforeHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.BEFORE_HASH];
           const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.AFTER_HASH];
@@ -2037,27 +2032,28 @@
               requestReplay();
               return;
           }
-
-          if ( actionIndex < verifiedIndex ) {
-              updateSyncStatus();
-              updateUndoRedoButtons();
+          
+          // Verify our computed hashes match the server:
+          if (hashes[actionIndex] !== beforeHash || hashes[actionIndex + 1] !== afterHash) {
+              // Hash mismatch - action was applied at different point in history
+              debugLog(`Hash mismatch for action ${acceptedActionUuid}: client=${hashes[actionIndex]}/${hashes[actionIndex+1]} vs server=${beforeHash}/${afterHash}`);
+              requestReplay();
               return;
           }
 
-          if ( hashes[actionIndex] === beforeHash || hashes[actionIndex + 1] === afterHash) {
-              verifedIndex = actionIndex + 1;
-              updateSyncStatus();
-              updateUndoRedoButtons();
-              return;
+          // Hashes match - update verified index
+          if (verifiedIndex <= actionIndex) {
+              verifiedIndex = actionIndex + 1;
           }
           
-          // future idea: reorder future
-          // const [ action ] = history.splice( actionIndex, 1 );
-          // history.splice( verifiedIndex, 0, action );
-          // ...
-
-          debugLog(`Hash mismatch for action ${acceptedActionUuid}: client=${hashes[actionIndex]}/${hashes[actionIndex+1]} vs server=${beforeHash}/${afterHash}`);
-          requestReplay();
+          // Update page info
+          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_PAGE_NR];
+          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_TOTAL_PAGES];
+          updatePageInfo();
+          
+          // Update UI
+          updateSyncStatus();
+          updateUndoRedoButtons();
       }
       
       // Handle decline message from server
