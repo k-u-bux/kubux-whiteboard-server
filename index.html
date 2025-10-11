@@ -2051,6 +2051,34 @@
               return;
           }
           
+          lastVerifiedHash = hashes[ verifedIndex ];
+          for ( let j = verifiedIndex; j < present; j++ ) {
+              if ( beforeHash === shared.hashNext( lastVerifiedHash, history[ j ] ) ) {
+                  if ( j == actionIndex ) {
+                      const [ action ] = history.splice( j, 1 );
+                      history.splice( verifedIndex + 1, 0, action );
+                      ++ verifedIndex;
+                  } else if ( j < actionIndex ) {
+                      const [ action_one ] = history.splice( j, 1 );
+                      history.splice( verifedIndex + 1, 0, action_one );
+                      ++ verifedIndex;
+                      const [ action ] = history.splice( actionIndex, 1 );
+                      history.splice( verifedIndex + 1, 0, action );
+                      ++ verifedIndex;                      
+                  } else {
+                      const [ action_one ] = history.splice( j, 1 );
+                      history.splice( verifedIndex + 1, 0, action_one );
+                      ++ verifedIndex;
+                      const [ action ] = history.splice( actionIndex+1, 1 );
+                      history.splice( verifedIndex + 1, 0, action );
+                      ++ verifedIndex;                                            
+                  }
+                  updateSyncStatus();
+                  updateUndoRedoButtons();
+                  return;
+              }
+          }
+          
           // Verify our computed hashes match the server:
           if (hashes[actionIndex] !== beforeHash || hashes[actionIndex + 1] !== afterHash) {
               // Hash mismatch - action was applied at different point in history
