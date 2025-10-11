@@ -2051,28 +2051,32 @@
               return;
           }
           
-          lastVerifiedHash = hashes[ verifedIndex ];
+          const lastVerifiedHash = hashes[ verifedIndex ];
+          const pastVerifiedIndex = verifedIndex;
           for ( let j = verifiedIndex; j < present; j++ ) {
               if ( beforeHash === shared.hashNext( lastVerifiedHash, history[ j ] ) ) {
                   if ( j == actionIndex ) {
-                      const [ action ] = history.splice( j, 1 );
-                      history.splice( verifedIndex + 1, 0, action );
-                      ++ verifedIndex;
+                      debugLog( "beforeHash should not match" );
                   } else if ( j < actionIndex ) {
                       const [ action_one ] = history.splice( j, 1 );
-                      history.splice( verifedIndex + 1, 0, action_one );
+                      history.splice( verifedIndex, 0, action_one );
+                      hashes[ verifedIndex ] = beforeHash;
                       ++ verifedIndex;
                       const [ action ] = history.splice( actionIndex, 1 );
-                      history.splice( verifedIndex + 1, 0, action );
+                      history.splice( verifedIndex, 0, action );
+                      hashes[ verifedIndex ] = afterHash;
                       ++ verifedIndex;                      
                   } else {
                       const [ action_one ] = history.splice( j, 1 );
-                      history.splice( verifedIndex + 1, 0, action_one );
+                      history.splice( verifedIndex, 0, action_one );
+                      hashes[ verifedIndex ] = beforeHash;
                       ++ verifedIndex;
                       const [ action ] = history.splice( actionIndex+1, 1 );
-                      history.splice( verifedIndex + 1, 0, action );
+                      history.splice( verifedIndex, 0, action );
+                      hashes[ verifedIndex ] = afterHash;
                       ++ verifedIndex;                                            
                   }
+                  
                   updateSyncStatus();
                   updateUndoRedoButtons();
                   return;
