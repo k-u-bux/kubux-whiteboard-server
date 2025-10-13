@@ -2053,34 +2053,41 @@
           
           const lastVerifiedHash = hashes[ verifedIndex ];
           const pastVerifiedIndex = verifedIndex;
-          for ( let j = verifiedIndex; j < present; j++ ) {
-              if ( beforeHash === shared.hashNext( lastVerifiedHash, history[ j ] ) ) {
-                  if ( j == actionIndex ) {
-                      debugLog( "beforeHash should not match" );
-                  } else if ( j < actionIndex ) {
-                      const [ action_one ] = history.splice( j, 1 );
-                      history.splice( verifedIndex, 0, action_one );
-                      hashes[ verifedIndex ] = beforeHash;
-                      ++ verifedIndex;
-                      const [ action ] = history.splice( actionIndex, 1 );
-                      history.splice( verifedIndex, 0, action );
-                      hashes[ verifedIndex ] = afterHash;
-                      ++ verifedIndex;                      
-                  } else {
-                      const [ action_one ] = history.splice( j, 1 );
-                      history.splice( verifedIndex, 0, action_one );
-                      hashes[ verifedIndex ] = beforeHash;
-                      ++ verifedIndex;
-                      const [ action ] = history.splice( actionIndex+1, 1 );
-                      history.splice( verifedIndex, 0, action );
-                      hashes[ verifedIndex ] = afterHash;
-                      ++ verifedIndex;                                            
+          if ( beforeHash == lastVerifiedHash ) {
+               const [ action ] = history.splice( actionIndex, 1 );
+               history.splice( verifedIndex, 0, action );
+               hashes[ verifedIndex ] = afterHash;
+               ++ verifedIndex;                                            
+          } else {
+              for ( let j = verifiedIndex; j < present; j++ ) {
+                  if ( beforeHash === shared.hashNext( lastVerifiedHash, history[ j ] ) ) {
+                      if ( j == actionIndex ) {
+                          debugLog( "beforeHash should not match" );
+                      } else if ( j < actionIndex ) {
+                          const [ action_one ] = history.splice( j, 1 );
+                          history.splice( verifedIndex, 0, action_one );
+                          hashes[ verifedIndex ] = beforeHash;
+                          ++ verifedIndex;
+                          const [ action ] = history.splice( actionIndex, 1 );
+                          history.splice( verifedIndex, 0, action );
+                          hashes[ verifedIndex ] = afterHash;
+                          ++ verifedIndex;                      
+                      } else {
+                          const [ action_one ] = history.splice( j, 1 );
+                          history.splice( verifedIndex, 0, action_one );
+                          hashes[ verifedIndex ] = beforeHash;
+                          ++ verifedIndex;
+                          const [ action ] = history.splice( actionIndex+1, 1 );
+                          history.splice( verifedIndex, 0, action );
+                          hashes[ verifedIndex ] = afterHash;
+                          ++ verifedIndex;                                            
+                      }
+                      
+                      updateSyncStatus();
+                      updateUndoRedoButtons();
+                      return;
                   }
-                  
-                  updateSyncStatus();
-                  updateUndoRedoButtons();
-                  return;
-              }
+              }                        
           }
           
           // Verify our computed hashes match the server:
