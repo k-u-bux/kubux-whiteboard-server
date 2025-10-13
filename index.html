@@ -2044,6 +2044,25 @@
               return;
           }
           
+          const afterIndex = hashes.findIndex( hash => hash == afterHash );
+          const beforeIndex = hashes.findIndex( hash => hash === beforeHash );
+
+          if ( afterIndex > verifiedIndex ) {
+              verifedIndex = afterIndex;
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              return;
+          }
+          if ( beforeIndex >= verifiedIndex ) {
+              verifedIndex = beforeIndex + 1;
+              const [ action ] = history.splice( actionIndex, 1 );
+              history.splice( verifedIndex, 0, action );
+              hashes[ verifedIndex ] = afterHash;
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              return;              
+          }
+
           if ( hashes[actionIndex] === beforeHash && hashes[actionIndex + 1] === afterHash) {
               verifedIndex = actionIndex + 1;
               updateSyncStatus();
