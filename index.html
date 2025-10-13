@@ -2058,6 +2058,9 @@
                history.splice( verifedIndex, 0, action );
                hashes[ verifedIndex ] = afterHash;
                ++ verifedIndex;                                            
+               updateSyncStatus();
+               updateUndoRedoButtons();
+               return;
           } else {
               for ( let j = verifiedIndex; j < present; j++ ) {
                   if ( beforeHash === shared.hashNext( lastVerifiedHash, history[ j ] ) ) {
