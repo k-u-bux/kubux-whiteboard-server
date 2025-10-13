@@ -2054,9 +2054,10 @@
               return;
           }
           if ( beforeIndex >= verifiedIndex ) {
-              verifedIndex = beforeIndex + 1;
+              verifedIndex = beforeIndex;
               const [ action ] = history.splice( actionIndex, 1 );
               history.splice( verifedIndex, 0, action );
+              ++ verfiedIndex;
               hashes[ verifedIndex ] = afterHash;
               updateSyncStatus();
               updateUndoRedoButtons();
