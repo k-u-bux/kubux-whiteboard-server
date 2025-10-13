@@ -2048,36 +2048,38 @@
           const beforeIndex = hashes.findIndex( hash => hash === beforeHash );
 
           if ( afterIndex > verifiedIndex ) {
-              verifedIndex = afterIndex;
+              debugLog(`found afterIndex=${afterIndex} with verifiedIndex=${verifiedIndex}`);
+              verifiedIndex = afterIndex;
               updateSyncStatus();
               updateUndoRedoButtons();
               return;
           }
           if ( beforeIndex >= verifiedIndex ) {
-              verifedIndex = beforeIndex;
+              debugLog(`found beoreIndex=${afterIndex} with verfiedIndex=${verifiedIndex}`);
+              verifiedIndex = beforeIndex;
               const [ action ] = history.splice( actionIndex, 1 );
-              history.splice( verifedIndex, 0, action );
+              history.splice( verifiedIndex, 0, action );
               ++ verfiedIndex;
-              hashes[ verifedIndex ] = afterHash;
+              hashes[ verifiedIndex ] = afterHash;
               updateSyncStatus();
               updateUndoRedoButtons();
               return;              
           }
 
           if ( hashes[actionIndex] === beforeHash && hashes[actionIndex + 1] === afterHash) {
-              verifedIndex = actionIndex + 1;
+              verifiedIndex = actionIndex + 1;
               updateSyncStatus();
               updateUndoRedoButtons();
               return;
           }
           
-          // const lastVerifiedHash = hashes[ verifedIndex ];
-          // const pastVerifiedIndex = verifedIndex;
+          // const lastVerifiedHash = hashes[ verifiedIndex ];
+          // const pastVerifiedIndex = verifiedIndex;
           // if ( beforeHash == lastVerifiedHash ) {
           //      const [ action ] = history.splice( actionIndex, 1 );
-          //      history.splice( verifedIndex, 0, action );
-          //      hashes[ verifedIndex ] = afterHash;
-          //      ++ verifedIndex;                                            
+          //      history.splice( verifiedIndex, 0, action );
+          //      hashes[ verifiedIndex ] = afterHash;
+          //      ++ verifiedIndex;                                            
           //      updateSyncStatus();
           //      updateUndoRedoButtons();
           //      return;
@@ -2088,22 +2090,22 @@
           //                 debugLog( "beforeHash should not match" );
           //             } else if ( j < actionIndex ) {
           //                 const [ action_one ] = history.splice( j, 1 );
-          //                 history.splice( verifedIndex, 0, action_one );
-          //                 hashes[ verifedIndex ] = beforeHash;
-          //                 ++ verifedIndex;
+          //                 history.splice( verifiedIndex, 0, action_one );
+          //                 hashes[ verifiedIndex ] = beforeHash;
+          //                 ++ verifiedIndex;
           //                 const [ action ] = history.splice( actionIndex, 1 );
-          //                 history.splice( verifedIndex, 0, action );
-          //                 hashes[ verifedIndex ] = afterHash;
-          //                 ++ verifedIndex;                      
+          //                 history.splice( verifiedIndex, 0, action );
+          //                 hashes[ verifiedIndex ] = afterHash;
+          //                 ++ verifiedIndex;                      
           //             } else {
           //                 const [ action_one ] = history.splice( j, 1 );
-          //                 history.splice( verifedIndex, 0, action_one );
-          //                 hashes[ verifedIndex ] = beforeHash;
-          //                 ++ verifedIndex;
+          //                 history.splice( verifiedIndex, 0, action_one );
+          //                 hashes[ verifiedIndex ] = beforeHash;
+          //                 ++ verifiedIndex;
           //                 const [ action ] = history.splice( actionIndex+1, 1 );
-          //                 history.splice( verifedIndex, 0, action );
-          //                 hashes[ verifedIndex ] = afterHash;
-          //                 ++ verifedIndex;                                            
+          //                 history.splice( verifiedIndex, 0, action );
+          //                 hashes[ verifiedIndex ] = afterHash;
+          //                 ++ verifiedIndex;                                            
           //             }
           //             
           //             updateSyncStatus();
