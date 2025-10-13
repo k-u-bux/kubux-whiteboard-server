@@ -2052,6 +2052,7 @@
               verifiedIndex = afterIndex;
               updateSyncStatus();
               updateUndoRedoButtons();
+              if ( present < verifiedIndex ) { present = verifiedIndex; }
               return;
           }
           if ( beforeIndex >= verifiedIndex ) {
@@ -2063,6 +2064,7 @@
               hashes[ verifiedIndex ] = afterHash;
               updateSyncStatus();
               updateUndoRedoButtons();
+              if ( present < verifiedIndex ) { present = verifiedIndex; }
               return;              
           }
 
@@ -2070,6 +2072,7 @@
               verifiedIndex = actionIndex + 1;
               updateSyncStatus();
               updateUndoRedoButtons();
+              if ( present < verifiedIndex ) { present = verifiedIndex; }
               return;
           }
           
