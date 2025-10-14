@@ -1956,7 +1956,10 @@
           if ( Date.now() > RESPONSE_TIMEOUT + pending_timer ) {
               pending_actions.clear();
           }                                                                  
-          if ( pending_actions.Size > 0 ) { return; }
+          if ( pending_actions.Size > 0 ) { 
+            debugLog( "exit handlePingMessage because of pending actions" );
+            return; 
+          }
 
           const pingPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.UUID];
           const pingPageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH];
