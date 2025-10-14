@@ -2037,7 +2037,13 @@
               return;
           }
 
-          const actionIndex = history.findIndex(action => action.uuid === acceptedActionUuid);
+          if ( acceptedActionIndex < verifiedIndex ) {
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              return;
+          }
+
+          const actionIndex = history.findIndex(action => action.uuid === acceptedActionUuid, undefined, verifiedIndex);
           
           if ( actionIndex === -1 ) {
               // Action not found in our history - request replay
@@ -2058,8 +2064,8 @@
               return;
           }
 
-          const afterIndex = hashes.findIndex( hash => hash == afterHash );
-          const beforeIndex = hashes.findIndex( hash => hash === beforeHash );
+          const afterIndex = hashes.findIndex( hash => hash == afterHash, undefined, verifiedIndex );
+          const beforeIndex = hashes.findIndex( hash => hash === beforeHash, undefined, verifiedIndex );
 
           if ( afterIndex > verifiedIndex ) {
               debugLog(`found afterIndex=${afterIndex} with verifiedIndex=${verifiedIndex}`);
