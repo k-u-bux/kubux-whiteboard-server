@@ -2029,10 +2029,17 @@
 
           pending_actions.delete( acceptedActionUuid );
           
-          // Check if this action is in our history
+                                                    
+          if ( afterHash === hashes[ verifiedIndex ] ) {
+              ++ verifedIndex;
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              return;
+          }
+
           const actionIndex = history.findIndex(action => action.uuid === acceptedActionUuid);
           
-          if (actionIndex === -1) {
+          if ( actionIndex === -1 ) {
               // Action not found in our history - request replay
               debugLog(`Accepted action ${acceptedActionUuid} not found in our history`);
               requestReplay();
@@ -2044,7 +2051,7 @@
               return;
           }
           
-          if ( actionIndex == acceptedActionIndex ) {
+          if ( actionIndex === acceptedActionIndex ) {
               updateSyncStatus();
               updateUndoRedoButtons();
               verifiedIndex = actionIndex + 1;
