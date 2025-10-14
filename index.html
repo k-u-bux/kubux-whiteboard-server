@@ -1931,6 +1931,7 @@
       function pending_register_action ( uuid ) {
           pending_actions.add( uuid );
           pending_timer = Date.now();
+          debugLog( `A total of ${pending_actions.length} actions is pending` );
       }
 
       function adjustVerfiedIndex ( snapshots ) {
@@ -2797,7 +2798,6 @@
           
           // Send to server
           pending_register_action( groupUuid );
-          debugLog( `A total of ${pending_actions.length} actions is pending` );
           sendMessage(proposal);
       }
 
