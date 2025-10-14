@@ -2797,6 +2797,7 @@
           
           // Send to server
           pending_register_action( groupUuid );
+          debugLog( `A total of ${pending_actions.length} actions is pending` );
           sendMessage(proposal);
       }
 
