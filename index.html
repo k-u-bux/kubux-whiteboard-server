@@ -1931,7 +1931,7 @@
       function pending_register_action ( uuid ) {
           pending_actions.add( uuid );
           pending_timer = Date.now();
-          debugLog( `A total of ${pending_actions.length} actions is pending` );
+          debugLog( `A total of ${pending_actions.size} actions is pending` );
       }
 
       function adjustVerfiedIndex ( snapshots ) {
@@ -1957,7 +1957,7 @@
           if ( Date.now() > RESPONSE_TIMEOUT + pending_timer ) {
               pending_actions.clear();
           }                                                                  
-          if ( pending_actions.Size > 0 ) { 
+          if ( pending_actions.size > 0 ) { 
             debugLog( "exit handlePingMessage because of pending actions" );
             return; 
           }
