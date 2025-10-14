@@ -258,6 +258,7 @@ const MESSAGES = {
         ACCEPT: {
             TYPE: 'accept',
             UUID: 'uuid',
+            ACTION_INDEX : 'action-index',
             ACTION_UUID: 'action-uuid',
             BEFORE_HASH: 'before-hash',
             AFTER_HASH: 'after-hash',

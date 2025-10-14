@@ -899,6 +899,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             const acceptMessage = {
                 type: MESSAGES.SERVER_TO_CLIENT.ACCEPT.TYPE,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.UUID]: pageUuid,
+                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.ACTION_INDEX]: page.present - 1,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.ACTION_UUID]: actionId,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.BEFORE_HASH]: page.hashes[page.present - 1],
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.AFTER_HASH]: page.hashes[page.present],
