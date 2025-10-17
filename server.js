@@ -9,6 +9,7 @@ const assert = require('assert');
 // Password hashing with scrypt (memory-hard, resistant to rainbow tables and brute-force)
 const crypto = require('crypto');
 
+
 /**
  * Hash a password using scrypt
  * scrypt is a password-based key derivation function that is intentionally slow and memory-hard,
@@ -121,10 +122,22 @@ const CONF_DIR = './conf';
 
 // Logs storage configuration
 const { Console } = require('console');
+const { Writable } = require('stream');
+
+class NullStream extends Writable {
+  _write(chunk, encoding, callback) {
+    // Acknowledge the write operation but do nothing with the data.
+    // Calling the callback is essential to signal that the write is complete.
+    callback();
+  }
+}
+
+const debugNull = new NullStream();
+
 const LOGS_DIR = './logs';
 const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
 const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
-const debug = new Console({ stdout: debugOutput, stderr: debugOutput });
+const debug = new Console({ stdout: debugNull, stderr: debugOutput });
 
 // Data storage configuration
 const DATA_DIR = './data';
