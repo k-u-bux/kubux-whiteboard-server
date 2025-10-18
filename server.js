@@ -6,6 +6,74 @@ const path = require('path');
 const url = require('url');
 const assert = require('assert');
 
+
+// Config storage configuration
+const CONF_DIR = './conf';
+
+// Logging
+const { Console } = require('console');
+const { Writable } = require('stream');
+
+const LOGS_DIR = './logs';
+const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
+const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
+
+class NullStream extends Writable {
+  _write(chunk, encoding, callback) {
+    // Acknowledge the write operation but do nothing with the data.
+    // Calling the callback is essential to signal that the write is complete.
+    callback();
+  }
+}
+
+const debugNull = new NullStream();
+
+class TeeStream extends Writable {
+
+  constructor(...streams) {
+    super();
+    this.streams = streams;
+  }
+
+  _write(chunk, encoding, callback) {
+    // We use Promise.all to wait for all the write operations to complete.
+    Promise.all(
+      this.streams.map(stream => {
+        return new Promise((resolve, reject) => {
+          stream.write(chunk, encoding, (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+        });
+      })
+    )
+      .then(() => {
+        callback();
+      })
+      .catch(error => {
+        callback(error);
+      });
+  }
+
+  destroy() {
+    for (const stream of this.streams) {
+      // End the stream and then destroy it.
+      stream.end(() => stream.destroy());
+    }
+  }
+
+}
+
+const debugTee = new TeeStream( process.stdout, debugOutput );
+
+const debug = new Console({ stdout: debugNull, stderr: debugTee });
+
+
+
+
 // Password hashing with scrypt (memory-hard, resistant to rainbow tables and brute-force)
 const crypto = require('crypto');
 
@@ -116,70 +184,6 @@ const {
   POINT 
 } = require('./shared');
 
-
-// Config storage configuration
-const CONF_DIR = './conf';
-
-// Logs storage configuration
-const { Console } = require('console');
-const { Writable } = require('stream');
-
-const LOGS_DIR = './logs';
-const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
-const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
-
-class NullStream extends Writable {
-  _write(chunk, encoding, callback) {
-    // Acknowledge the write operation but do nothing with the data.
-    // Calling the callback is essential to signal that the write is complete.
-    callback();
-  }
-}
-
-const debugNull = new NullStream();
-
-class TeeStream extends Writable {
-
-  constructor(...streams) {
-    super();
-    this.streams = streams;
-  }
-
-  _write(chunk, encoding, callback) {
-    // We use Promise.all to wait for all the write operations to complete.
-    Promise.all(
-      this.streams.map(stream => {
-        return new Promise((resolve, reject) => {
-          stream.write(chunk, encoding, (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
-      })
-    )
-      .then(() => {
-        callback();
-      })
-      .catch(error => {
-        callback(error);
-      });
-  }
-
-  destroy() {
-    for (const stream of this.streams) {
-      // End the stream and then destroy it.
-      stream.end(() => stream.destroy());
-    }
-  }
-
-}
-
-const debugTee = new TeeStream( process.stdout, debugOutput );
-
-const debug = new Console({ stdout: debugNull, stderr: debugTee });
 
 // Data storage configuration
 const DATA_DIR = './data';
