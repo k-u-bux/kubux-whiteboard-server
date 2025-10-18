@@ -48,7 +48,7 @@ function verifyPassword(password, storedHash) {
   try {
     const [saltHex, hashHex] = storedHash.split(':');
     if (!saltHex || !hashHex) {
-      console.error('[SERVER] Invalid hash format - expected salt:hash format');
+      debug.error('[SERVER] Invalid hash format - expected salt:hash format');
       return false;
     }
     
@@ -65,7 +65,7 @@ function verifyPassword(password, storedHash) {
     // Use timing-safe comparison to prevent timing attacks
     return crypto.timingSafeEqual(storedHashBuffer, computedHash);
   } catch (error) {
-    console.error('[SERVER] Error verifying password:', error.message);
+    debug.error('[SERVER] Error verifying password:', error.message);
     return false;
   }
 }
@@ -83,17 +83,17 @@ if (WHITEBOARD_URL) {
         serverPort = parseInt(parsedUrl.port) || (parsedUrl.protocol === 'https:' ? 443 : 80);
         isDirectMode = true;
         websocketUrl = WHITEBOARD_URL.replace(/^http/, 'ws') + '/ws';
-        console.log(`[SERVER] Direct mode enabled: ${WHITEBOARD_URL}`);
-        console.log(`[SERVER] Listening on port: ${serverPort}`);
-        console.log(`[SERVER] Clients should connect to: ${websocketUrl}`);
+        debug.log(`[SERVER] Direct mode enabled: ${WHITEBOARD_URL}`);
+        debug.log(`[SERVER] Listening on port: ${serverPort}`);
+        debug.log(`[SERVER] Clients should connect to: ${websocketUrl}`);
     } catch (err) {
-        console.error(`[SERVER] Invalid KUBUX_WHITEBOARD_URL: ${WHITEBOARD_URL}`);
-        console.error(`[SERVER] Error: ${err.message}`);
+        debug.error(`[SERVER] Invalid KUBUX_WHITEBOARD_URL: ${WHITEBOARD_URL}`);
+        debug.error(`[SERVER] Error: ${err.message}`);
         process.exit(1);
     }
 } else {
-    console.log(`[SERVER] Proxy mode (production): listening on port ${serverPort}`);
-    console.log(`[SERVER] Expecting nginx-proxy to handle SSL and forward to port ${serverPort}`);
+    debug.log(`[SERVER] Proxy mode (production): listening on port ${serverPort}`);
+    debug.log(`[SERVER] Expecting nginx-proxy to handle SSL and forward to port ${serverPort}`);
 }
 
 const { 
@@ -124,6 +124,10 @@ const CONF_DIR = './conf';
 const { Console } = require('console');
 const { Writable } = require('stream');
 
+const LOGS_DIR = './logs';
+const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
+const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
+
 class NullStream extends Writable {
   _write(chunk, encoding, callback) {
     // Acknowledge the write operation but do nothing with the data.
@@ -134,10 +138,48 @@ class NullStream extends Writable {
 
 const debugNull = new NullStream();
 
-const LOGS_DIR = './logs';
-const getDebugLogPath = () => path.join(LOGS_DIR, 'debug.log');
-const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
-const debug = new Console({ stdout: debugNull, stderr: debugOutput });
+class TeeStream extends Writable {
+
+  constructor(...streams) {
+    super();
+    this.streams = streams;
+  }
+
+  _write(chunk, encoding, callback) {
+    // We use Promise.all to wait for all the write operations to complete.
+    Promise.all(
+      this.streams.map(stream => {
+        return new Promise((resolve, reject) => {
+          stream.write(chunk, encoding, (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+        });
+      })
+    )
+      .then(() => {
+        callback();
+      })
+      .catch(error => {
+        callback(error);
+      });
+  }
+
+  destroy() {
+    for (const stream of this.streams) {
+      // End the stream and then destroy it.
+      stream.end(() => stream.destroy());
+    }
+  }
+
+}
+
+const debugTee = new TeeStream( process.stdout, debugOutput );
+
+const debug = new Console({ stdout: debugNull, stderr: debugTee });
 
 // Data storage configuration
 const DATA_DIR = './data';
@@ -934,7 +976,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         releasePage(pageUuid);
         
     } catch (error) {
-        console.error(`[SERVER] Error processing mod action: ${error.message}`, error);
+        debug.error(`[SERVER] Error processing mod action: ${error.message}`, error);
         // Send a decline message with the error
         if (ws && data) {
             const errorContext = {
@@ -1020,7 +1062,7 @@ function routeMessage(ws, message) {
             throw new Error(`Unhandled message type: ${data.type}`);
         }
     } catch (e) {
-        console.error('[SERVER] Error processing message:', e);
+        debug.error('[SERVER] Error processing message:', e);
         // Send an error message to the client if possible
         if (ws && ws.readyState === WebSocket.OPEN) {
             const errorMessage = {
