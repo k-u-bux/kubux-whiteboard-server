@@ -20,8 +20,6 @@ const debugOutput = fs.createWriteStream(getDebugLogPath(), { flags: 'a' });
 
 class NullStream extends Writable {
   _write(chunk, encoding, callback) {
-    // Acknowledge the write operation but do nothing with the data.
-    // Calling the callback is essential to signal that the write is complete.
     callback();
   }
 }
@@ -69,9 +67,7 @@ class TeeStream extends Writable {
 
 const debugTee = new TeeStream( process.stdout, debugOutput );
 
-const debug = new Console({ stdout: debugNull, stderr: debugTee });
-
-
+const debug = new Console({ stdout: debugOutput, stderr: debugTee });
 
 
 // Password hashing with scrypt (memory-hard, resistant to rainbow tables and brute-force)
