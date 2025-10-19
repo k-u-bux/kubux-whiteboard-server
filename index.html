@@ -1556,10 +1556,8 @@
       
       // Resize canvas to fit window
       function resizeCanvas() {
-          // canvas.width = container.clientWidth;
-          // canvas.height = container.clientHeight;
-          canvas.width = 1600;
-          canvas.height = 1000;
+          canvas.width = container.clientWidth;
+          canvas.height = container.clientHeight;
           
           // Resize background canvas to match
           if (!backgroundCanvas) {
