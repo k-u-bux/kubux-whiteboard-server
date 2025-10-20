@@ -720,6 +720,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
     let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID];
     if ( boardId && isUuid( boardId ) ) {
         registerBoard(ws, boardId, clientId, requestId);
+    } else {
+        debug.error( `Client ${clientId} wants to register invalid board ${boardId}` );
     }
 };
 
