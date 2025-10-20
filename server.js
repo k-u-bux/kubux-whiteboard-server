@@ -236,7 +236,7 @@ initializeGlobals();
 function loadItem(itemId, ext, check) {
     if ( ! check( itemId ) ) { 
         debug.log( `Invalid itemId: ${itemId}` );
-        return; 
+        return null; 
     }
     const filePath = getFilePath(itemId, ext);
     if (fs.existsSync(filePath)) {
@@ -268,6 +268,10 @@ const savePage = (pageId, page) => saveItem(pageId, page, 'page', isUuid);
 
 
 function createBoard(boardId) {
+    if ( ! isUuid( boardId ) ) { 
+        debug.log( `refuse to create a board with ID ${boardId}.` );
+        return null; 
+    }
     debug.log(`[SERVER] Create a standard board.`);
     const pageId = generateUuid();
     const password = generatePasswd();
@@ -280,6 +284,10 @@ function createBoard(boardId) {
 }
 
 function createPage(pageId) {
+    if ( ! isUuid( pageId ) ) { 
+        debug.log( `refuse to create a page with ID ${pageId}.` );
+        return null; 
+    }
     debug.log(`[SERVER] Create an empty page.`);
     const page = { 
         history: [], // array of edit-ops
