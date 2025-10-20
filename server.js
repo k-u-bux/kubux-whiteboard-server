@@ -167,6 +167,7 @@ const {
   hashAny, 
   hashNext, 
   generateUuid, 
+  isUuid,
   generatePasswd,
   serialize, 
   deserialize,
