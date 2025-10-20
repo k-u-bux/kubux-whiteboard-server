@@ -233,7 +233,11 @@ initializeGlobals();
 // helper functions for persistent storage and caching
 // ===================================================
 
-function loadItem(itemId, ext) {
+function loadItem(itemId, ext, check) {
+    if ( ! check( itemId ) ) { 
+        debug.log( `Invalid itemId: ${itemId}` );
+        return; 
+    }
     const filePath = getFilePath(itemId, ext);
     if (fs.existsSync(filePath)) {
         const fileText = fs.readFileSync(filePath, 'utf8');
@@ -246,17 +250,21 @@ function loadItem(itemId, ext) {
     return null;
 }
 
-function saveItem(itemId, item, ext) {
+function saveItem(itemId, item, ext, check) {
+    if ( ! check( itemId ) ) { 
+        debug.log( `Invalid itemId: ${itemId}` );
+        return; 
+    }
     const filePath = getFilePath(itemId, ext);
     const fileText = serialize(item);
     fs.writeFileSync(filePath, fileText, 'utf8');
 }
 
 
-const loadBoard = (boardId) => loadItem(boardId, 'board');
-const loadPage = (pageId) => loadItem(pageId, 'page');
-const saveBoard = (boardId, board) => saveItem(boardId, board, 'board');
-const savePage = (pageId, page) => saveItem(pageId, page, 'page');
+const loadBoard = (boardId) => loadItem(boardId, 'board', isUuid);
+const loadPage = (pageId) => loadItem(pageId, 'page', isUuid);
+const saveBoard = (boardId, board) => saveItem(boardId, board, 'board', isUuid);
+const savePage = (pageId, page) => saveItem(pageId, page, 'page', isUuid);
 
 
 function createBoard(boardId) {
@@ -753,6 +761,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, requestId) => {
     const boardId = data.boardId || ws.boardId;
+    if ( ! boardId ) { return; }
+    if ( ! isUuid( boardId ) ) { return; }
     const board = useBoard(boardId);
     assert(board);
 
