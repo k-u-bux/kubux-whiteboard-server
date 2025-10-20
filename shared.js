@@ -46,6 +46,11 @@ function generateUuid() {
     });
 }
 
+function isUuid(str) {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return regex.test(str);
+}
+
 function generatePasswd() {
     return 'xxxxxxxxxxxx'.replace(/[x]/g, function(c) {
         const r = Math.random() * 36 | 0;
@@ -1226,6 +1231,7 @@ if (typeof module !== 'undefined' && module.exports) {
         recent_snapshots,
         // uuid
         generateUuid,
+        isUuid,
         generatePasswd,
         // serialization
         serialize,
@@ -1295,6 +1301,7 @@ else if (typeof window !== 'undefined') {
         recent_snapshots,
         // uuid
         generateUuid,
+        isUuid,
         generatePasswd,
         // serialization
         serialize,

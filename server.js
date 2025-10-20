@@ -718,7 +718,7 @@ function registerBoard(ws, boardId, clientId, requestId) {
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
     let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID];
-    if (boardId) {
+    if ( boardId && isUuid( boardId ) ) {
         registerBoard(ws, boardId, clientId, requestId);
     }
 };
