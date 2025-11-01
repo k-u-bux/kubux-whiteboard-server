@@ -8,6 +8,7 @@ A real-time collaborative whiteboard application designed for mathematics educat
 
 - **Real-time collaboration** - Multiple users can simultaneously work on the same whiteboard
 - **Multi-page support** - Create and navigate between multiple pages in a whiteboard
+- **Spectator mode** - You can send invites that enable viewing (including navigation) but not editing
 - **Rich drawing tools** - Pen, highlighter, and chalk tools with customizable properties
 - **Shape tools** - Draw circles, rectangles, horizontal/vertical/diagonal lines
 - **Selection tools** - Rectangle, lasso, and stroke-based selection with cut/copy/paste
