@@ -2275,7 +2275,7 @@
           updateUndoRedoButtons();
           
           // Cache verification successful - reset flag
-          cacheVerificationInProgress = false;
+          // cacheVerificationInProgress = false;
           
           // Update cache with new state
           savePageToCache(pageUuid, {
@@ -2293,7 +2293,7 @@
       }
       
       // Track if we are in a cache verification cycle to avoid infinite loops
-      let cacheVerificationInProgress = false;
+      // let cacheVerificationInProgress = false;
       let hasRestoredSavedPosition = false; // Track if we have restored saved page position
       
       // Handle full page message from server
@@ -2307,7 +2307,7 @@
           if (cachedPage && cachedPage.hash === data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]) {
               // We have valid cached data - use it and request only updates via replay
               debugLog('Using cached page data, requesting replay for updates');
-              cacheVerificationInProgress = true; // Mark that we are in verification
+              // cacheVerificationInProgress = true; // Mark that we are in verification
               
               currentPageUuid = pageUuid;
               history = cachedPage.history;
@@ -2334,7 +2334,7 @@
           } else {
               // No cache or hash mismatch - use full page data
               debugLog('No cache available or hash mismatch, using full page data');
-              cacheVerificationInProgress = false; // Reset flag
+              // cacheVerificationInProgress = false; // Reset flag
               
               currentPageUuid = pageUuid;
               history = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
