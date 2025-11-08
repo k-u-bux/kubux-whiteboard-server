@@ -956,7 +956,8 @@ function PDFContext2D(pageContent, pageHeight, builder) {
         },
         transform(a, b, c, d, e, f) {
             // Multiply current matrix by the transformation matrix
-            addCommand(`${a} ${-b} ${-c} ${d} ${e} ${-f} cm`);
+            // addCommand(`${a} ${-b} ${-c} ${d} ${e} ${-f} cm`);
+            addCommand(`${a} ${-b} ${-c} ${d} ${e + c*internalState.height} ${internalState.height*(1-d) - f} cm`);
         },
 
         // --- Line Style ---
