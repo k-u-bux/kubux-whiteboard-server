@@ -2297,11 +2297,12 @@
       let hasRestoredSavedPosition = false; // Track if we have restored saved page position
       
       // Handle full page message from server
-      function handleFullPageMessage(data) {
+      async function handleFullPageMessage(data) {
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID];
           
           // Check if we have this page cached (but only if not already in verification cycle)
-          const cachedPage = loadPageFromCache(pageUuid);
+          // const cachedPage = !cacheVerificationInProgress ? loadPageFromCache(pageUuid) : null;
+          const cachedPage = await loadPageFromCache(pageUuid);
           
           if (cachedPage && cachedPage.hash === data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]) {
               // We have valid cached data - use it and request only updates via replay
@@ -4482,50 +4483,37 @@
           }
       }
       
-      // Helper function to convert an IDBRequest into an awaitable Promise
-      function promisifyRequest(request) {
-          return new Promise((resolve, reject) => {
-              request.onsuccess = () => resolve(request.result || request);
-              request.onerror = () => reject(request.error);
-              
-              // Add transaction handlers for completeness and failure propagation
-              if (request.transaction) {
-                  request.transaction.oncomplete = () => resolve(request.result || request);
-                  request.transaction.onerror = () => reject(request.transaction.error);
-              }
-          });
-      }
-      
       async function loadPageFromCache(pageUuid) {
-          // Fail hard if the database is not initialized.
-          if (!cacheDB) {
-              throw new Error("Cache database 'cacheDB' not initialized.");
-          }
+          if (!cacheDB) return null;
           
           try {
-              // The transaction is now 'readonly' as no modification is intended.
-              const transaction = cacheDB.transaction([PAGE_CACHE_STORE_NAME], 'readonly');
+              const transaction = cacheDB.transaction([PAGE_CACHE_STORE_NAME], 'readwrite');
               const store = transaction.objectStore(PAGE_CACHE_STORE_NAME);
               
-              // AWAIT the read operation
-              const cacheData = await promisifyRequest(store.get(pageUuid));
+              const request = store.get(pageUuid);
               
-              // Await transaction completion to ensure the read is finalized before returning.
-              await promisifyRequest(transaction); 
-              
-              if (cacheData) {
-                  // Success: Return the object
-                  debugLog('Page loaded from cache', { pageUuid });
-                  return cacheData; 
-              } else {
-                  // Success: Return null (Cache Miss)
-                  return null;
-              }
+              return await new Promise((resolve, reject) => {
+                  request.onsuccess = () => {
+                      const cacheData = request.result;
+                      if (cacheData) {
+                          // Update timestamp for LRU
+                          // cacheData.timestamp = Date.now();
+                          // store.put(cacheData);
+                          
+                          debugLog('Page loaded from cache', { pageUuid });
+                          resolve(cacheData);
+                      } else {
+                          resolve(null);
+                      }
+                  };
+                  request.onerror = () => {
+                      console.warn('Failed to load page from cache:', request.error);
+                      resolve(null);
+                  };
+              });
           } catch (err) {
-              // Fail hard: Any critical IndexedDB error (get or transaction failure) 
-              // will be caught and re-thrown.
               console.warn('Failed to load page from cache:', err);
-              throw err;
+              return null;
           }
       }
 
