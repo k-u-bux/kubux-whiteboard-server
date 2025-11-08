@@ -958,9 +958,6 @@ function PDFContext2D(pageContent, pageHeight, builder) {
             // Multiply current matrix by the transformation matrix
             addCommand(`${a} ${-b} ${-c} ${d} ${e} ${-f} cm`);
         },
-        setTransform(a, b, c, d, e, f) {
-            addCommand(`${a} ${-b} ${-c} ${d} ${e} ${-f} cm`);
-        },
 
         // --- Line Style ---
         setLineDash(segments) {

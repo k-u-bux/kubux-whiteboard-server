@@ -5019,7 +5019,7 @@
               const pdfCtx = builder.new_page(canvas.width, canvas.height);
               
               // Apply zoom transformation
-              pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+              pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
               
               // Render all visible elements as vectors
               shared.render_all_visible_elements(visualState, (element) => {
