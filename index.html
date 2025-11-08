@@ -5092,7 +5092,7 @@
                   const pdfCtx = builder.new_page(canvas.width, canvas.height);
                   
                   // Apply zoom and pan transformation
-                  pdfCtx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+                  pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
                   
                   // Compile visual state for this page
                   const pageVisualState = shared.createEmptyVisualState();
