@@ -2297,11 +2297,12 @@
       let hasRestoredSavedPosition = false; // Track if we have restored saved page position
       
       // Handle full page message from server
-      function handleFullPageMessage(data) {
+      async function handleFullPageMessage(data) {
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID];
           
           // Check if we have this page cached (but only if not already in verification cycle)
-          const cachedPage = !cacheVerificationInProgress ? loadPageFromCache(pageUuid) : null;
+          // const cachedPage = !cacheVerificationInProgress ? loadPageFromCache(pageUuid) : null;
+          const cachedPage = await loadPageFromCache(pageUuid);
           
           if (cachedPage && cachedPage.hash === data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]) {
               // We have valid cached data - use it and request only updates via replay
@@ -4515,7 +4516,7 @@
               return null;
           }
       }
-      
+
       // Navigate to next/previous page
       function navigatePage(delta) {
           // Save current page to cache before navigating
