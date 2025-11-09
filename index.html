@@ -2304,34 +2304,34 @@
           // const cachedPage = !cacheVerificationInProgress ? loadPageFromCache(pageUuid) : null;
           const cachedPage = await loadPageFromCache(pageUuid);
           
-          if (cachedPage && cachedPage.hash === data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]) {
-              // We have valid cached data - use it and request only updates via replay
-              debugLog('Using cached page data, requesting replay for updates');
-              // cacheVerificationInProgress = true; // Mark that we are in verification
-              
-              currentPageUuid = pageUuid;
-              history = cachedPage.history;
-              present = cachedPage.present;
-              hashes = [ shared.hashAny( currentPageUuid ) ];
-              for ( let i = 0; i < history.length; ++ i ) {
-                  hashes.push( shared.hashNext( hashes[ i ], history[ i ] ) );
-              }
-              
-              verifiedIndex = present;
-              
-              // Update page info
-              pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
-              totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
-              updatePageInfo();
-              
-              // Recompile visual state
-              updateVisualState();
-              updateSyncStatus();
-              updateUndoRedoButtons();
-              
-              // Request replay to get any updates since we last visited
-              requestReplay();
-          } else {
+          // if (cachedPage && cachedPage.hash === data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]) {
+          //     // We have valid cached data - use it and request only updates via replay
+          //     debugLog('Using cached page data, requesting replay for updates');
+          //     // cacheVerificationInProgress = true; // Mark that we are in verification
+          //     
+          //     currentPageUuid = pageUuid;
+          //     history = cachedPage.history;
+          //     present = cachedPage.present;
+          //     hashes = [ shared.hashAny( currentPageUuid ) ];
+          //     for ( let i = 0; i < history.length; ++ i ) {
+          //         hashes.push( shared.hashNext( hashes[ i ], history[ i ] ) );
+          //     }
+          //     
+          //     verifiedIndex = present;
+          //     
+          //     // Update page info
+          //     pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
+          //     totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
+          //     updatePageInfo();
+          //     
+          //     // Recompile visual state
+          //     updateVisualState();
+          //     updateSyncStatus();
+          //     updateUndoRedoButtons();
+          //     
+          //     // Request replay to get any updates since we last visited
+          //     requestReplay();
+          // } else {
               // No cache or hash mismatch - use full page data
               debugLog('No cache available or hash mismatch, using full page data');
               // cacheVerificationInProgress = false; // Reset flag
@@ -2366,7 +2366,7 @@
                   present: present,
                   hash: hashes[present]
               });
-          }
+          // }
           
           // After loading initial page, check if we should restore saved position
           if (!hasRestoredSavedPosition && window.savedPagePosition) {
@@ -4516,6 +4516,11 @@
               return null;
           }
       }
+
+      function reallyLoadPageFromCache ( pageUuid ) {
+          const cachedData = await loadPageFromCache( pageUuid );
+          return cachedData;
+      }                                   
 
       // Navigate to next/previous page
       function navigatePage(delta) {
