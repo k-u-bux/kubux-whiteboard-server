@@ -2297,7 +2297,7 @@
       let hasRestoredSavedPosition = false; // Track if we have restored saved page position
       
       // Handle full page message from server
-      async function handleFullPageMessage(data) {
+      function handleFullPageMessage(data) {
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID];
           
           // Check if we have this page cached (but only if not already in verification cycle)
