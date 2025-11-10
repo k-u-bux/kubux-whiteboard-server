@@ -4407,12 +4407,13 @@
               const store = transaction.objectStore(PAGE_CACHE_STORE_NAME);
               
               const cacheData = {
+                  uuid: pageUuid,
                   history: pageData.history,
                   present: pageData.present,
                   hashes: pageData.hashes
               };
               
-              store.put(cacheData, pageUuid);
+              store.put(cacheData);
               
               await new Promise((resolve, reject) => {
                   transaction.oncomplete = () => {
