@@ -4439,15 +4439,12 @@
               const store = transaction.objectStore(PAGE_CACHE_STORE_NAME);
               
               const request = store.get(pageUuid);
-              
-              return await new Promise((resolve, reject) => {
+              const cacheData = null;
+
+              await new Promise((resolve, reject) => {
                   request.onsuccess = () => {
-                      const cacheData = request.result;
+                      cacheData = request.result;
                       if (cacheData) {
-                          // Update timestamp for LRU
-                          // cacheData.timestamp = Date.now();
-                          // store.put(cacheData);
-                          
                           debugLog('Page loaded from cache', { pageUuid });
                           resolve(cacheData);
                       } else {
@@ -4459,6 +4456,8 @@
                       resolve(null);
                   };
               });
+
+              return cacheData;
           } catch (err) {
               console.warn('Failed to load page from cache:', err);
               return null;
