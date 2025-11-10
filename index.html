@@ -2274,16 +2274,6 @@
           updateSyncStatus();
           updateUndoRedoButtons();
           
-          // Cache verification successful - reset flag
-          // cacheVerificationInProgress = false;
-          
-          // Update cache with new state
-          savePageToCache(pageUuid, {
-              history: history,
-              present: present,
-              hash: hashes[present]
-          });
-          
           debugLog("Replay applied successfully", {
               replaySequenceLength: replaySequence.length,
               historyLength: history.length,
@@ -2327,13 +2317,6 @@
           // Update UI
           updateSyncStatus();
           updateUndoRedoButtons();
-          
-          // Save this page to cache
-          savePageToCache(pageUuid, {
-              history: history,
-              present: present,
-              hashes: hashes
-          });
           
           // After loading initial page, check if we should restore saved position
           if (!hasRestoredSavedPosition && window.savedPagePosition) {
@@ -4490,7 +4473,7 @@
           savePageToCache(currentPageUuid, {
               history: history,
               present: present,
-              hash: hashes[present]
+              hashes: hashes
           });
           
           // Request full page with delta
