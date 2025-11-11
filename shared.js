@@ -208,6 +208,21 @@ const MESSAGES = {
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
+        REGISTER_PAGE: {
+            TYPE: 'register-page',
+            BOARD_UUID: 'board-uuid',
+            PAGE_ID: 'pageId',
+            DELTA: 'delta',
+            CLIENT_ID: 'clientId',
+            REQUEST_ID: 'requestId'
+        },
+        PAGE_INFO_REQUEST: {
+            TYPE: 'page-info-request',
+            BOARD_UUID: 'board-uuid',
+            PAGE_ID: 'pageId',
+            DELTA: 'delta',
+            REQUEST_ID: 'requestId'
+        },
         CREATE_BOARD: {
             TYPE: 'create-board',
             PASSWORD: 'passwd',
@@ -248,6 +263,24 @@ const MESSAGES = {
             TYPE: 'board-registered',
             BOARD_ID: 'boardId',
             FIRST_PAGE_ID: 'firstPageId',
+            TOTAL_PAGES: 'totalPages',
+            REQUEST_ID: 'requestId'
+        },
+        PAGE_REGISTERED: {
+            TYPE: 'page-registered',
+            PAGE_ID: 'pageId',
+            HASH: 'hash',
+            SNAPSHOTS: 'snapshots',
+            PAGE_NR: 'pageNr',
+            TOTAL_PAGES: 'totalPages',
+            REQUEST_ID: 'requestId'
+        },
+        PAGE_INFO: {
+            TYPE: 'page-info',
+            PAGE_ID: 'pageId',
+            HASH: 'hash',
+            SNAPSHOTS: 'snapshots',
+            PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages',
             REQUEST_ID: 'requestId'
         },

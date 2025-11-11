@@ -4439,7 +4439,7 @@
               const store = transaction.objectStore(PAGE_CACHE_STORE_NAME);
               
               const request = store.get(pageUuid);
-              const cacheData = null;
+              let cacheData = null;
 
               await new Promise((resolve, reject) => {
                   request.onsuccess = () => {

@@ -731,6 +731,80 @@ function registerBoard(ws, boardId, clientId, requestId) {
     }
 }
 
+function findPage ( board, pageId, delta ) {
+    pageId = existingPage( pageId, board );
+    const index = board.pageOrder.indexOf(pageId);
+    if (index === -1) {
+        debug.log(`[SERVER] Page not found in board: ${pageId}; returning first page`);
+        return ( board.pageOrder[0] );
+    }
+    let newIndex = index + delta;
+    if ( newIndex < 0 ) { newIndex = 0; }
+    if ( newIndex >= board.pageOrder.length ) { newIndex = board.pageOrder.length - 1; }
+    return ( board.pageOrder[newIndex] );
+}
+
+function describePage(ws, boardId, pageId, delta, requestId) {
+    const board = useBoard(boardId);
+    if (board && board.pageOrder.includes(pageId) ) {
+        debug.log(`[SERVER] Client ${clientId} wants info about page: ${pageId} on board ${boardId}`);
+        pageId = findPage( board, pageId, delta );
+        const page = usePage(pageId);
+        const pageNr = board.pageOrder.indexOf(pageId) + 1;
+        const totalPages = board.pageOrder.length;
+        const pageHash = page.hashes[page.present];        
+        const snapshot_indices = recent_snapshots( page.history.length );
+        const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
+         
+        const registrationResponse = {
+            type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: board.pageOrder.length,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(registrationResponse));
+        releasePage(pageId);
+        releaseBoard(boardId);
+    }
+}
+
+function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
+    const board = useBoard(boardId);
+    if ( board && board.pageOrder.includes(pageId) ) {
+        ws.boardId = boardId; // Store boardId in WebSocket client
+        ws.pageId = pageId;
+        ws.clientId = clientId; // Store client ID for tracking
+        if (clientId) {
+            clients[clientId] = ws;
+        }
+        
+        debug.log(`[SERVER] Client ${clientId} registered with page: ${pageId} on board ${boardId}`);
+        pageId = findPage( board, pageId, delta );
+        const page = usePage(pageId);
+        const pageNr = board.pageOrder.indexOf(pageId) + 1;
+        const totalPages = board.pageOrder.length;
+        const pageHash = page.hashes[page.present];        
+        const snapshot_indices = recent_snapshots( page.history.length );
+        const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
+        
+        const registrationResponse = {
+            type: MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID]: pageId,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.HASH]: pageHash,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.SNAPSHOTS]: snapshots,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR]: pageNr,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(registrationResponse));
+        releasePage(pageId);
+        releaseBoard(boardId);
+    }
+}
+
 // Handler for board registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
@@ -739,6 +813,31 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
         registerBoard(ws, boardId, clientId, requestId);
     } else {
         debug.error( `Client ${clientId} wants to register invalid board ${boardId}` );
+    }
+};
+
+// Handler for page registration
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, requestId) => {
+    const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID];
+    let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD_ID];
+    let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE_ID];
+    let delta =      data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA];
+    if ( boardId && isUuid( boardId ) && pageId $$ isUuis( pageId ) ) {
+        registerPage(ws, boardId, clientId, pageId, delta, requestId);
+    } else {
+        debug.error( `Client ${clientId} wants to register invalid page ${pageId}` );
+    }
+};
+
+// Handler for page info
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, requestId) => {
+    let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD_ID];
+    let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE_ID];
+    let delta =      data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
+    if ( boardId && isUuid( boardId ) && pageId $$ isUuis( pageId ) ) {
+        describePage(ws, boardId, pageId, delta, requestId);
+    } else {
+        debug.error( `Client ${clientId} wants to register invalid page ${pageId}` );
     }
 };
 
