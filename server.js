@@ -822,7 +822,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, reque
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD_ID];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE_ID];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA];
-    if ( boardId && isUuid( boardId ) && pageId $$ isUuis( pageId ) ) {
+    if ( boardId && isUuid( boardId ) && pageId && isUuis( pageId ) ) {
         registerPage(ws, boardId, clientId, pageId, delta, requestId);
     } else {
         debug.error( `Client ${clientId} wants to register invalid page ${pageId}` );
@@ -834,7 +834,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD_ID];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE_ID];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
-    if ( boardId && isUuid( boardId ) && pageId $$ isUuis( pageId ) ) {
+    if ( boardId && isUuid( boardId ) && pageId && isUuis( pageId ) ) {
         describePage(ws, boardId, pageId, delta, requestId);
     } else {
         debug.error( `Client ${clientId} wants to register invalid page ${pageId}` );
