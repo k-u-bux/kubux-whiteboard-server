@@ -1120,6 +1120,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     
     const board = useBoard(boardId);
     const pageId = existingPage(pageUuid, board);
+
+    if ( data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER] ) {
+        ws.pageId = pageId;
+    }
+
     if (pageId !== pageUuid) {
         debug.log(`[SERVER] Hash ${pageUuid} has been replaced, sending full page`);
         // sendFullPage(ws, boardId, pageId, requestId);
