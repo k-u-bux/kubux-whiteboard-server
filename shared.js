@@ -234,6 +234,7 @@ const MESSAGES = {
             BOARD_UUID: 'board-uuid',
             PAGE_ID: 'pageId',
             DELTA: 'delta',
+            REGISTER: 'register',
             REQUEST_ID: 'requestId'
         },
         MOD_ACTION_PROPOSALS: {
@@ -248,6 +249,7 @@ const MESSAGES = {
             PAGE_UUID: 'page-uuid',
             PRESENT: 'present',
             PRESENT_HASH: 'present-hash',
+            REGISTER: 'register',
             REQUEST_ID: 'requestId'
         }
     },

@@ -898,8 +898,9 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
     if (!pageId) {
         throw new Error('No valid page ID could be determined from request');
     }
-    
-    ws.pageId = pageId;
+    if ( data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] ) {
+        ws.pageId = pageId;
+    }
     sendFullPage(ws, boardId, pageId, requestId);
 };
 
