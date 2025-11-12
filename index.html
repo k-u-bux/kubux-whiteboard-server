@@ -2347,6 +2347,7 @@
           }
           
           request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] = delta;
+          request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] = true;
           request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID] = requestId;
           
           debugLog('Requesting full page', request);
@@ -2362,6 +2363,7 @@
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
+              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: true,
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
           };
           
