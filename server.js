@@ -653,6 +653,7 @@ function ping_client( client ) {
     const board = useBoard(client.boardId);
     assert(board);
     const pageId = existingPage(client.pageId, board);
+    client.pageId = pageId;
     ping_client_with_page( client, pageId, board );
 }
 
