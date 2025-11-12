@@ -691,14 +691,14 @@ function createNewBoard(ws, clientId, requestId) {
         
         debug.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
         
-        const creationResponse = {
+        const response = {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD_ID]: boardId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD]: board.passwd,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE_ID]: ws.pageId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
         };
-        ws.send(serialize(creationResponse));
+        ws.send(serialize(response));
         logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, creationResponse, requestId );
         releaseBoard(boardId);
         sendFullPage(ws, boardId, ws.pageId, requestId);
@@ -718,14 +718,14 @@ function registerBoard(ws, boardId, clientId, requestId) {
         
         debug.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
         
-        const registrationResponse = {
+        const response = {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID]: boardId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE_ID]: ws.pageId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
         };
-        ws.send(serialize(registrationResponse));
+        ws.send(serialize(response));
         releaseBoard(boardId);
         sendFullPage(ws, boardId, ws.pageId, requestId);
     }
@@ -790,7 +790,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         const snapshot_indices = recent_snapshots( page.history.length );
         const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
         
-        const registrationResponse = {
+        const response = {
             type: MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID]: pageId,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.HASH]: pageHash,
@@ -799,7 +799,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID]: requestId
         };
-        ws.send(serialize(registrationResponse));
+        ws.send(serialize(response));
         releasePage(pageId);
         releaseBoard(boardId);
     }
