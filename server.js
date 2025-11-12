@@ -756,7 +756,7 @@ function describePage(ws, boardId, pageId, delta, requestId) {
         const snapshot_indices = recent_snapshots( page.history.length );
         const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
          
-        const registrationResponse = {
+        const response = {
             type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
@@ -765,7 +765,7 @@ function describePage(ws, boardId, pageId, delta, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: board.pageOrder.length,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
         };
-        ws.send(serialize(registrationResponse));
+        ws.send(serialize(response));
         releasePage(pageId);
         releaseBoard(boardId);
     }
