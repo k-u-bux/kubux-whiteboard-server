@@ -1184,6 +1184,34 @@
       let maxReconnectDelay = 30000; // Maximum 30 seconds
       let initialReconnectDelay = 1000; // Start with 1 second
       
+        
+      // pages
+      let page = {};
+      let lru_page_uuid_array = [];
+      const lru_num_pages = 36;
+
+      function clear_lru_pages () {
+          while ( lru_page_uuid_array.length > lru_num_pages ) {
+              const oldest = lru_page_uuid_array.pop();
+              delete page[ oldest ];
+          }
+      }
+
+      function findAndRemove(array, item) {
+          const index = array.indexOf(item); // indexOf is simpler for primitives like strings
+          if (index !== -1) {
+              array.splice(index, 1);
+              return true; // Indicate successful removal
+          }
+          return false; // Indicate item not found
+      }
+
+      function mark_use ( uuid ) {
+          findAndRemove( lru_page_uuid_array, uuid );
+          lru_page_uuid_array.unshift( uuid );
+      }
+
+
       // Page cache using IndexedDB (larger storage, cleared on close)
       const PAGE_CACHE_DB_NAME = 'whiteboard_cache';
       const PAGE_CACHE_STORE_NAME = 'pages';
@@ -2294,10 +2322,10 @@
           debugLog('No cache available or hash mismatch, using full page data');
           // cacheVerificationInProgress = false; // Reset flag
           
-          currentPageUuid = pageUuid;
+          // currentPageUuid = pageUuid;
           history = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
           present = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
-          hashes = [ shared.hashAny( currentPageUuid ) ];
+          hashes = [ shared.hashAny( pageUuid ) ];
           for ( let i = 0; i < history.length; ++ i ) {
               hashes.push( shared.hashNext( hashes[ i ], history[ i ] ) );
           }

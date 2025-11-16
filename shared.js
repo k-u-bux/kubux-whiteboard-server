@@ -286,6 +286,14 @@ const MESSAGES = {
             TOTAL_PAGES: 'totalPages',
             REQUEST_ID: 'requestId'
         },
+        PAGE_LOST {
+            TYPE: 'page-lost',
+            LOST: 'lost',
+            UUID: 'uuid',
+            PAGE_NR: 'pageNr',
+            TOTAL_PAGES: 'totalPages',
+            REQUEST_ID: 'requestId'
+        },
         FULL_PAGE: {
             TYPE: 'fullPage',
             UUID: 'uuid',

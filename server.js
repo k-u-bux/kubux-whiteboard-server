@@ -587,14 +587,16 @@ function broadcastMessageToBoard(message, boardId, excludeWs = null) {
     });
 }
 
+function sendPageLost(ws, boardId, requestedPageId, foundPageId, requestId) {
+}
+
 function sendFullPage(ws, boardId, requestedPageId, requestId) {
     const board = useBoard(boardId);
-    assert(board);
+    if ( ! board ) { return; }
+
     const pageId = existingPage(requestedPageId, board);
-    
-    ws.boardId = boardId;
-    ws.pageId = pageId;
-    
+    if ( pageId != requestedPageId ) {
+    }
     const page = usePage(pageId);
 
     const pageHistory = page.history;
