@@ -4367,20 +4367,25 @@
       }
       
       // Delete current page
-      function deletePage() {
-          const actionUuid = shared.generateUuid();
-          const deletePageAction = {
-              type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
-              [shared.MOD_ACTIONS.UUID]: actionUuid
-          };
-          const proposal = {
-              type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deletePageAction,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
-          };
-          sendMessage(proposal);
+      function deletePage() {    
+          const confirmation = window.confirm(
+              'Are you sure you want to permanently delete the current page? This action cannot be undone.'
+          );
+          if ( confirmation ) {
+              const actionUuid = shared.generateUuid();
+              const deletePageAction = {
+                  type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
+                  [shared.MOD_ACTIONS.UUID]: actionUuid
+              };
+              const proposal = {
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deletePageAction,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
+              };
+              sendMessage(proposal);
+          }
       }
       
       // Page cache functions with LRU eviction
