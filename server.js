@@ -749,27 +749,41 @@ function findPage ( board, pageId, delta ) {
 
 function describePage(ws, boardId, pageId, delta, requestId) {
     const board = useBoard(boardId);
-    if (board && board.pageOrder.includes(pageId) ) {
+    if (board && board.pageOrder.includes(pageId)) {
         debug.log(`[SERVER] Client ${clientId} wants info about page: ${pageId} on board ${boardId}`);
-        pageId = findPage( board, pageId, delta );
-        const page = usePage(pageId);
-        const pageNr = board.pageOrder.indexOf(pageId) + 1;
+        const resolvedPageId = existingPage(pageId, board);
+        const page = usePage(resolvedPageId);
+        const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
         const totalPages = board.pageOrder.length;
         const pageHash = page.hashes[page.present];        
         const snapshot_indices = recent_snapshots( page.history.length );
         const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
          
-        const response = {
-            type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: board.pageOrder.length,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
-        };
-        ws.send(serialize(response));
-        releasePage(pageId);
+        // If requested page was deleted, send page-lost with replacement page info
+        if (resolvedPageId !== pageId) {
+            debug.log(`[SERVER] Requested page ${pageId} was deleted, redirecting to replacement ${resolvedPageId}`);
+            const response = {
+                type: MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST]: true,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.UUID]: resolvedPageId,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR]: pageNr,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES]: totalPages,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
+            };
+            ws.send(serialize(response));
+        } else {
+            const response = {
+                type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: board.pageOrder.length,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
+            };
+            ws.send(serialize(response));
+        }
+        releasePage(resolvedPageId);
         releaseBoard(boardId);
     }
 }
@@ -785,17 +799,25 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         }
         
         debug.log(`[SERVER] Client ${clientId} registered with page: ${pageId} on board ${boardId}`);
-        pageId = findPage( board, pageId, delta );
-        const page = usePage(pageId);
-        const pageNr = board.pageOrder.indexOf(pageId) + 1;
+        
+        // Check if requested page exists (handle deleted pages)
+        const resolvedPageId = existingPage(pageId, board);
+        const page = usePage(resolvedPageId);
+        const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
         const totalPages = board.pageOrder.length;
         const pageHash = page.hashes[page.present];        
         const snapshot_indices = recent_snapshots( page.history.length );
         const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
         
+        // If requested page was deleted, just register to replacement page seamlessly
+        if (resolvedPageId !== pageId) {
+            debug.log(`[SERVER] Requested page ${pageId} was deleted, registering to replacement ${resolvedPageId}`);
+            ws.pageId = resolvedPageId; // Update client's page ID to replacement
+        }
+        
         const response = {
             type: MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID]: pageId,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID]: resolvedPageId,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.HASH]: pageHash,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.SNAPSHOTS]: snapshots,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR]: pageNr,
@@ -803,7 +825,8 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID]: requestId
         };
         ws.send(serialize(response));
-        releasePage(pageId);
+        
+        releasePage(resolvedPageId);
         releaseBoard(boardId);
     }
 }
@@ -825,7 +848,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, reque
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD_ID];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE_ID];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA];
-    if ( boardId && isUuid( boardId ) && pageId && isUuis( pageId ) ) {
+    if ( boardId && isUuid( boardId ) && pageId && isUuid( pageId ) ) {
         registerPage(ws, boardId, clientId, pageId, delta, requestId);
     } else {
         debug.error( `Client ${clientId} wants to register invalid page ${pageId}` );
@@ -837,7 +860,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD_ID];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE_ID];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
-    if ( boardId && isUuid( boardId ) && pageId && isUuis( pageId ) ) {
+    if ( boardId && isUuid( boardId ) && pageId && isUuid( pageId ) ) {
         describePage(ws, boardId, pageId, delta, requestId);
     } else {
         debug.error( `Client ${clientId} wants to register invalid page ${pageId}` );
