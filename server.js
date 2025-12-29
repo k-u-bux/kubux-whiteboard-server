@@ -1161,20 +1161,18 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     }
 
     if (pageId !== pageUuid) {
-        debug.log(`[SERVER] Hash ${pageUuid} has been replaced, sending full page`);
-        // sendFullPage(ws, boardId, pageId, requestId);
-        ping_client_with_page( ws, pageId, board );
+        debug.log(`[SERVER] Hash ${pageUuid} has been replaced by ${pageId}.`);
+        sendPageLost( ws, boardId, pageUuid, pageId, requestId )
         releaseBoard(boardId);
         return;
     }
     
     const page = usePage(pageId);
     if (page.hashes[present] !== presentHash) {
-        debug.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending full page`);
-        // sendFullPage(ws, boardId, pageId, requestId);
-        ping_client_with_page( ws, pageId, board );
-        releaseBoard(boardId);
+        debug.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending page info`);
+        sendPageInfo( ws, boardId, pageId, requestId );
         releasePage(pageId);
+        releaseBoard(boardId);
         return;
     }
 
