@@ -587,9 +587,6 @@ function broadcastMessageToBoard(message, boardId, excludeWs = null) {
     });
 }
 
-function sendPageLost(ws, boardId, requestedPageId, foundPageId, requestId) {
-}
-
 function sendFullPage(ws, boardId, requestedPageId, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
@@ -616,6 +613,24 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
     };
 
     releasePage(pageId);
+    releaseBoard(boardId);
+    ws.send(serialize(message));
+    logSentMessage(message.type, message, requestId);
+}
+
+function sendPageLost(ws, boardId, requestedPageId, foundPageId, requestId) {
+    const board = useBoard(boardId);
+    if ( ! board ) { return; }
+    const pageNr = board.pageOrder.indexOf(foundPageId) + 1;
+    const totalPages = board.pageOrder.length;
+    const message = {
+        type: MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST]: requestedPageId,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.UUID]: foundpageId,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR]: pageNr,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES]: totalPages,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
+    };
     releaseBoard(boardId);
     ws.send(serialize(message));
     logSentMessage(message.type, message, requestId);
