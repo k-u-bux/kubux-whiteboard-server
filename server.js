@@ -587,6 +587,12 @@ function broadcastMessageToBoard(message, boardId, excludeWs = null) {
     });
 }
 
+function get_page_snapshots(page) {
+    const snapshot_indices = recent_snapshots( page.history.length );
+    const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
+    return ( snapshots );
+}
+
 function sendFullPage(ws, boardId, requestedPageId, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
@@ -613,6 +619,31 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
     };
 
     releasePage(pageId);
+    releaseBoard(boardId);
+    ws.send(serialize(message));
+    logSentMessage(message.type, message, requestId);
+}
+
+function sendPageInfo(ws, boardId, pageId, requestId) {
+    const board = useBoard(boardId);
+    if ( ! board ) { return; }
+    const pageId = existingPage(requestedPageId, board);
+    const page = usePage(pageId);
+    const pageHistory = page.history;
+    const pagePresent = page.present;
+    const pageHash = page.hashes[pagePresent];
+    const pageNr = board.pageOrder.indexOf(pageId) + 1;
+    const totalPages = board.pageOrder.length;
+    const snapshots = get_page_snapshots(page)
+    const message = {
+        type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: totalPages,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
+    };
     releaseBoard(boardId);
     ws.send(serialize(message));
     logSentMessage(message.type, message, requestId);
@@ -647,9 +678,7 @@ function ping_client_with_page ( client, pageId, board ) {
     const pageNr = board.pageOrder.indexOf(pageId) + 1;
     const totalPages = board.pageOrder.length;
     const pageHash = page.hashes[page.present];
-    
-    const snapshot_indices = recent_snapshots( page.history.length );
-    const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
+    const snapshots = get_page_snapshots(page);
     
     const message = {
         type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
@@ -764,29 +793,19 @@ function findPage ( board, pageId, delta ) {
 
 function describePage(ws, boardId, pageId, delta, requestId) {
     const board = useBoard(boardId);
-    if (board && board.pageOrder.includes(pageId)) {
+    if ( board && board.pageOrder.includes( pageId ) ) {
         debug.log(`[SERVER] Client ${clientId} wants info about page: ${pageId} on board ${boardId}`);
         const resolvedPageId = existingPage(pageId, board);
-        const page = usePage(resolvedPageId);
-        const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
-        const totalPages = board.pageOrder.length;
-        const pageHash = page.hashes[page.present];        
-        const snapshot_indices = recent_snapshots( page.history.length );
-        const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
-         
-        // If requested page was deleted, send page-lost with replacement page info
         if (resolvedPageId !== pageId) {
             debug.log(`[SERVER] Requested page ${pageId} was deleted, redirecting to replacement ${resolvedPageId}`);
-            const response = {
-                type: MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST]: true,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.UUID]: resolvedPageId,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR]: pageNr,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES]: totalPages,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
-            };
-            ws.send(serialize(response));
+            sendPageLost( boardId, pageId, resolvedPageId, requestId )
         } else {
+            const page = usePage(resolvedPageId);
+            const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
+            const totalPages = board.pageOrder.length;
+            const pageHash = page.hashes[page.present];        
+            const snapshots = get_page_snapshots(page);
+            
             const response = {
                 type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
                 [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
@@ -797,10 +816,10 @@ function describePage(ws, boardId, pageId, delta, requestId) {
                 [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
             };
             ws.send(serialize(response));
+            releasePage(resolvedPageId);
         }
-        releasePage(resolvedPageId);
-        releaseBoard(boardId);
     }
+    releaseBoard(boardId);
 }
 
 function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
@@ -821,8 +840,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
         const totalPages = board.pageOrder.length;
         const pageHash = page.hashes[page.present];        
-        const snapshot_indices = recent_snapshots( page.history.length );
-        const snapshots = snapshot_indices.map( index => page.hashes[ index ] );
+        const snapshots = get_page_snapshots(page);
         
         // If requested page was deleted, just register to replacement page seamlessly
         if (resolvedPageId !== pageId) {
