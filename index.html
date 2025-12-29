@@ -1981,6 +1981,7 @@
           
           // Update board ID and URL if necessary
           boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID];
+          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE_ID];
           const urlParams = new URLSearchParams(window.location.search);
           
           if (urlParams.get('credential')) {
@@ -1991,14 +1992,13 @@
               window.history.replaceState(null, null, `?board=${boardId}`);
           }
           
-          // Load settings now that we have a boardId
-          loadSettings();
-          updateKnobs();
-          saveMostRecentBoard();
+          // We do not have any page data, yet:
+          // loadSettings();
+          // updateKnobs();
+          // saveMostRecentBoard();
           
-          // Register to the initial/default page after board registration
           debugLog('Registering to initial page after board registration');
-          registerPage(currentPageUuid, 0);
+          requestFullPage(currentPageUuid);
       }
       
       // Handle page registration response
@@ -2530,7 +2530,7 @@
       }
       
       // Request a full page from the server
-      function requestFullPage(pageId, delta = 0) {
+      function requestFullPage(pageId, delta = 0, do_register = true ) {
           const requestId = createRequestId();
           
           const request = {
@@ -2543,7 +2543,7 @@
           }
           
           request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] = delta;
-          request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] = true;
+          request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] = do_register;
           request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID] = requestId;
           
           debugLog('Requesting full page', request);
