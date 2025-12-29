@@ -1781,6 +1781,15 @@
                   case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE:
                       handleBoardRegistered(data);
                       break;
+                  case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE:
+                      handlePageRegistered(data);
+                      break;
+                  case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE:
+                      handlePageInfo(data);
+                      break;
+                  case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE:
+                      handlePageLost(data);
+                      break;
                   case shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE:
                       handleFullPageMessage(data);
                       break;
@@ -1912,6 +1921,49 @@
           ws.send(shared.serialize(registerMessage));
       }
       
+      // Register to work on a specific page
+      function registerPage(pageId, delta = 0) {
+          const requestId = createRequestId();
+          
+          const registerPageMessage = {
+              type: shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD_UUID]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE_ID]: pageId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA]: delta,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID]: clientId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.REQUEST_ID]: requestId
+          };
+          
+          debugLog('Sending page registration:', {
+              pageId,
+              delta,
+              requestId,
+              message: registerPageMessage
+          });
+          ws.send(shared.serialize(registerPageMessage));
+      }
+      
+      // Request page information (metadata only)
+      function requestPageInfo(pageId, delta = 0) {
+          const requestId = createRequestId();
+          
+          const pageInfoRequest = {
+              type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD_UUID]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE_ID]: pageId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: delta,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
+          };
+          
+          debugLog('Requesting page info:', {
+              pageId,
+              delta,
+              requestId,
+              message: pageInfoRequest
+          });
+          sendMessage(pageInfoRequest);
+      }
+      
       // Handle board registration response
       function handleBoardRegistered(data) {
           debugLog('Board registered successfully');
@@ -1944,8 +1996,123 @@
           updateKnobs();
           saveMostRecentBoard();
           
-          // The server will send a full page message next, so we do not need
-          // to request one explicitly
+          // Register to the initial/default page after board registration
+          debugLog('Registering to initial page after board registration');
+          registerPage(currentPageUuid, 0);
+      }
+      
+      // Handle page registration response
+      function handlePageRegistered(data) {
+          const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID];
+          const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID];
+          const pageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.HASH];
+          const snapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.SNAPSHOTS];
+          const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR];
+          const totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES];
+          
+          debugLog('Page registered successfully', {
+              requestId,
+              pageId,
+              pageHash,
+              pageNr,
+              totalPages,
+              snapshots: snapshots ? snapshots.length : 0
+          });
+          
+          // Update current page UUID
+          currentPageUuid = pageId;
+          
+          // Store snapshots for verification
+          if (snapshots && snapshots.length > 0) {
+              // Find matching hash in our chain to update verified index
+              let verifiedIndex = -1;
+              for (let i = 0; i < hashes.length; i++) {
+                  if (hashes[i] === pageHash) {
+                      verifiedIndex = i;
+                      break;
+                  }
+              }
+          }
+          
+          // Update page info
+          pageNr = pageNr;
+          totalPages = totalPages;
+          updatePageInfo();
+          
+          // After page registration, request full page content if needed
+          debugLog('Requesting full page after registration');
+          requestFullPage(currentPageUuid, 0);
+      }
+      
+      // Handle page info response (metadata only)
+      function handlePageInfo(data) {
+          const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID];
+          const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID];
+          const pageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH];
+          const snapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS];
+          const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
+          const totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
+          
+          debugLog('Page info received', {
+              requestId,
+              pageId,
+              pageHash,
+              pageNr,
+              totalPages,
+              snapshots: snapshots ? snapshots.length : 0
+          });
+          
+          // Update page info only (no full page content)
+          pageNr = pageNr;
+          totalPages = totalPages;
+          updatePageInfo();
+          
+          // Update hash if we have different hash - check against current page hash
+          if (pageHash && (hashes[verifiedIndex] !== pageHash)) {
+              debugLog('Hash mismatch in page info, checking against page hash');
+              // If hash mismatch, request full page to get back in sync
+              requestFullPage(pageId);
+          } else {
+              // Hash matches, just update metadata
+              debugLog('Hash matches, only updating page metadata');
+          }
+      }
+      
+      // Handle page lost response (page deletion with redirection)
+      function handlePageLost(data) {
+          const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID];
+          const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.UUID];
+          const lost = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST];
+          const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR];
+          const totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES];
+          
+          debugLog('Page lost received', {
+              requestId,
+              pageId: pageId,
+              lost,
+              pageNr,
+              totalPages
+          });
+          
+          if (lost) {
+              debugLog(`Current page has been deleted: ${currentPageUuid}`);
+              debugLog(`Redirecting to replacement page: ${pageId}`);
+              
+              // Update page info
+              pageNr = pageNr;
+              totalPages = totalPages;
+              updatePageInfo();
+              
+              // Navigate to replacement page
+              debugLog('Requesting full page for replacement');
+              requestFullPage(pageId);
+          } else {
+              debugLog('Page loss was only informational (not deleted)');
+              // Update page info
+              pageNr = pageNr;
+              totalPages = totalPages;
+              updatePageInfo();
+          }
       }
       
       // Handle ping message from server
@@ -4689,11 +4856,11 @@
           if (!element) return;
           context.save();
           push_settings(context, element);
-          const type = element[ELEMENT.TYPE];
-          const path = element[ELEMENT.PATH];
-          const is_closed = ( path == DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
+          const type = element[shared.ELEMENT.TYPE];
+          const path = element[shared.ELEMENT.PATH];
+          const is_closed = ( path == shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == shared.DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
           lay_path(context, element);
-          if ( type == DRAWABLE.TYPE.FILL ) {
+          if ( type == shared.DRAWABLE.TYPE.FILL ) {
               if ( ! is_closed ) {
                   console.error('Only closed paths can be filled.',"");
                   throw new Error('Only closed paths can be filled.');
@@ -4701,7 +4868,7 @@
               lay_path(context, element);
               context.closePath();
               context.fill()
-          } else if ( type == DRAWABLE.TYPE.STROKE ) {
+          } else if ( type == shared.DRAWABLE.TYPE.STROKE ) {
               if ( is_closed ) {
                   draw_closed(context, element);
               } else {
