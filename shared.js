@@ -204,13 +204,13 @@ const MESSAGES = {
     CLIENT_TO_SERVER: {
         REGISTER_BOARD: {
             TYPE: 'register-board',
-            BOARD_ID: 'boardId',
+            BOARD_ID: 'board-uuid',
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
         REGISTER_PAGE: {
             TYPE: 'register-page',
-            BOARD_UUID: 'board-uuid',
+            BOARD_ID: 'board-uuid',
             PAGE_ID: 'pageId',
             DELTA: 'delta',
             CLIENT_ID: 'clientId',
@@ -218,7 +218,7 @@ const MESSAGES = {
         },
         PAGE_INFO_REQUEST: {
             TYPE: 'page-info-request',
-            BOARD_UUID: 'board-uuid',
+            BOARD_ID: 'board-uuid',
             PAGE_ID: 'pageId',
             DELTA: 'delta',
             REQUEST_ID: 'requestId'
@@ -231,7 +231,7 @@ const MESSAGES = {
         },
         FULL_PAGE_REQUESTS: {
             TYPE: 'fullPage-requests',
-            BOARD_UUID: 'board-uuid',
+            BOARD_ID: 'board-uuid',
             PAGE_ID: 'pageId',
             DELTA: 'delta',
             REGISTER: 'register',
@@ -256,14 +256,14 @@ const MESSAGES = {
     SERVER_TO_CLIENT: {
         BOARD_CREATED: {
             TYPE: 'board-created',
-            BOARD_ID: 'boardId',
+            BOARD_ID: 'board-uuid',
             PASSWORD: 'passwd',
             FIRST_PAGE_ID: 'firstPageId',
             REQUEST_ID: 'requestId'
         },
         BOARD_REGISTERED: {
             TYPE: 'board-registered',
-            BOARD_ID: 'boardId',
+            BOARD_ID: 'board-uuid',
             FIRST_PAGE_ID: 'firstPageId',
             TOTAL_PAGES: 'totalPages',
             REQUEST_ID: 'requestId'
