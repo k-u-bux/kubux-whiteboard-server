@@ -782,7 +782,7 @@ function findPage ( board, pageId, delta ) {
     pageId = existingPage( pageId, board );
     const index = board.pageOrder.indexOf(pageId);
     if (index === -1) {
-        debug.log(`[SERVER] Page not found in board: ${pageId}; returning first page`);
+        debug.log(`[SERVER] Page not found in board: ${pageId}.`);
         return ( board.pageOrder[0] );
     }
     let newIndex = index + delta;
@@ -793,49 +793,46 @@ function findPage ( board, pageId, delta ) {
 
 function describePage(ws, boardId, pageId, delta, requestId) {
     const board = useBoard(boardId);
-    if ( board && board.pageOrder.includes( pageId ) ) {
-        debug.log(`[SERVER] Client ${clientId} wants info about page: ${pageId} on board ${boardId}`);
-        const resolvedPageId = existingPage(pageId, board);
+    if ( board ) {
+        const resolvedPageId = findPage( board, pageId, delta );
+        debug.log(`[SERVER] Client ${clientId} wants info about page: ${pageId}+${delta} on board ${boardId}`);
         if (resolvedPageId !== pageId) {
             debug.log(`[SERVER] Requested page ${pageId} was deleted, redirecting to replacement ${resolvedPageId}`);
-            sendPageLost( boardId, pageId, resolvedPageId, requestId )
-        } else {
-            const page = usePage(resolvedPageId);
-            const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
-            const totalPages = board.pageOrder.length;
-            const pageHash = page.hashes[page.present];        
-            const snapshots = get_page_snapshots(page);
-            
-            const response = {
-                type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: board.pageOrder.length,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
-            };
-            ws.send(serialize(response));
-            releasePage(resolvedPageId);
         }
+        const page = usePage(resolvedPageId);
+        const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
+        const totalPages = board.pageOrder.length;
+        const pageHash = page.hashes[page.present];        
+        const snapshots = get_page_snapshots(page);
+        
+        const response = {
+            type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: board.pageOrder.length,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(response));
+        releasePage(resolvedPageId);
     }
     releaseBoard(boardId);
 }
 
 function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
     const board = useBoard(boardId);
-    if ( board && board.pageOrder.includes(pageId) ) {
+    if ( board ) {
+        const resolvedPageId = findPage( board, pageId, delta );
         ws.boardId = boardId; // Store boardId in WebSocket client
-        ws.pageId = pageId;
+        ws.pageId = resolvedPageId;
         ws.clientId = clientId; // Store client ID for tracking
         if (clientId) {
             clients[clientId] = ws;
         }
         
-        debug.log(`[SERVER] Client ${clientId} registered with page: ${pageId} on board ${boardId}`);
+        debug.log(`[SERVER] Client ${clientId} registered with page: ${resolvedPageId} on board ${boardId}`);
         
-        // Check if requested page exists (handle deleted pages)
-        const resolvedPageId = existingPage(pageId, board);
         const page = usePage(resolvedPageId);
         const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
         const totalPages = board.pageOrder.length;
@@ -845,7 +842,6 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         // If requested page was deleted, just register to replacement page seamlessly
         if (resolvedPageId !== pageId) {
             debug.log(`[SERVER] Requested page ${pageId} was deleted, registering to replacement ${resolvedPageId}`);
-            ws.pageId = resolvedPageId; // Update client's page ID to replacement
         }
         
         const response = {
@@ -860,8 +856,8 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         ws.send(serialize(response));
         
         releasePage(resolvedPageId);
-        releaseBoard(boardId);
     }
+    releaseBoard(boardId);
 }
 
 // Handler for board registration
@@ -929,38 +925,18 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
     const boardId = data.boardId || ws.boardId;
     if ( ! boardId ) { return; }
     if ( ! isUuid( boardId ) ) { return; }
-    const board = useBoard(boardId);
+    const board = useBoard( boardId );
     assert(board);
-
-    let pageId;
-    if (data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER]) {
-        const pageNumber = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_NUMBER];
-        if (pageNumber < 1 || pageNumber > board.pageOrder.length) {
-            throw new Error(`Invalid page number: ${pageNumber}`);
+    const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID];
+    const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
+    if ( pageId != undefined && isUuid( pageId ) && delta != undefined ) {
+        resolvedPageId = findPage( board, data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID] );
+        if ( data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] ) {
+            ws.pageId = resolvedPageId;
         }
-        pageId = board.pageOrder[pageNumber - 1];
-    } else if (data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID] && 
-               data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] !== undefined) {
-        pageId = existingPage(data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID], board);
-        const index = board.pageOrder.indexOf(pageId);
-        if (index === -1) {
-            throw new Error(`Page not found in board: ${pageId}`);
-        }
-        
-        const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
-        let newIndex = index + delta;
-        if ( newIndex < 0 ) { newIndex = 0; }
-        if ( newIndex >= board.pageOrder.length ) { newIndex = board.pageOrder.length - 1; }
-        pageId = board.pageOrder[newIndex];
+        sendFullPage(ws, boardId, resolvedPageId, requestId)
     }
-    
-    if (!pageId) {
-        throw new Error('No valid page ID could be determined from request');
-    }
-    if ( data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] ) {
-        ws.pageId = pageId;
-    }
-    sendFullPage(ws, boardId, pageId, requestId);
+    releaseBoard( boardId );
 };
 
 function flag_and_fix_inconsistent_state( page, msg ) {
