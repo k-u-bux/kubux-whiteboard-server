@@ -1854,7 +1854,7 @@
           verifiedIndex = 0;
           visualState = shared.createEmptyVisualState();
           
-          boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD_ID];
+          boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD];
           passwd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
           
           // Build the full URL with board ID and password
@@ -5175,7 +5175,7 @@
                       
                       const request = {
                           type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_ID]: boardId,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD]: boardId,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE]: currentPageUuid,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: i - startPageNr,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId

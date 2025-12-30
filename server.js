@@ -1006,12 +1006,12 @@ function handleRedoAction(page, action) {
 function createDeclineMessage(boardId, pageId, targetActionId, reason = "") {
     return {
         type: MESSAGES.SERVER_TO_CLIENT.DECLINE.TYPE,
-        boardId: boardId,
         [MESSAGES.SERVER_TO_CLIENT.DECLINE.PAGE]: pageId,
         [MESSAGES.SERVER_TO_CLIENT.DECLINE.ACTION_UUID]: targetActionId,
         [MESSAGES.SERVER_TO_CLIENT.DECLINE.REASON]: reason
     };
 }
+ ++++++++ REPLACE
 
 function sendDeclineMessage(context, reason, requestId) {
     const declineMessage = createDeclineMessage(
@@ -1182,7 +1182,6 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     }
     const replayMessage = {
         type: MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE,
-        boardId: boardId,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE]: pageUuid,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.BEFORE_HASH]: presentHash,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH]: page.hashes[page.present],
