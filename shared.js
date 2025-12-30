@@ -204,22 +204,22 @@ const MESSAGES = {
     CLIENT_TO_SERVER: {
         REGISTER_BOARD: {
             TYPE: 'register-board',
-            BOARD_ID: 'board-uuid',
+            BOARD: 'board-uuid',
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
         REGISTER_PAGE: {
             TYPE: 'register-page',
-            BOARD_ID: 'board-uuid',
-            PAGE_ID: 'pageId',
+            BOARD: 'board-uuid',
+            PAGE: 'page-uuid',
             DELTA: 'delta',
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
         PAGE_INFO_REQUEST: {
             TYPE: 'page-info-request',
-            BOARD_ID: 'board-uuid',
-            PAGE_ID: 'pageId',
+            BOARD: 'board-uuid',
+            PAGE: 'page-uuid',
             DELTA: 'delta',
             REQUEST_ID: 'requestId'
         },
@@ -231,8 +231,8 @@ const MESSAGES = {
         },
         FULL_PAGE_REQUESTS: {
             TYPE: 'fullPage-requests',
-            BOARD_ID: 'board-uuid',
-            PAGE_ID: 'pageId',
+            BOARD: 'board-uuid',
+            PAGE: 'page-uuid',
             DELTA: 'delta',
             REGISTER: 'register',
             REQUEST_ID: 'requestId'
@@ -240,13 +240,13 @@ const MESSAGES = {
         MOD_ACTION_PROPOSALS: {
             TYPE: 'mod-action-proposals',
             PASSWORD: 'passwd',
-            PAGE_UUID: 'page-uuid',
+            PAGE: 'page-uuid',
             PAYLOAD: 'payload',
             BEFORE_HASH: 'before-hash'
         },
         REPLAY_REQUESTS: {
             TYPE: 'replay-requests',
-            PAGE_UUID: 'page-uuid',
+            PAGE: 'page-uuid',
             PRESENT: 'present',
             PRESENT_HASH: 'present-hash',
             REGISTER: 'register',
@@ -256,21 +256,21 @@ const MESSAGES = {
     SERVER_TO_CLIENT: {
         BOARD_CREATED: {
             TYPE: 'board-created',
-            BOARD_ID: 'board-uuid',
+            BOARD: 'board-uuid',
             PASSWORD: 'passwd',
-            FIRST_PAGE_ID: 'firstPageId',
+            FIRST_PAGE: 'first-page-uuid',
             REQUEST_ID: 'requestId'
         },
         BOARD_REGISTERED: {
             TYPE: 'board-registered',
-            BOARD_ID: 'board-uuid',
-            FIRST_PAGE_ID: 'firstPageId',
+            BOARD: 'board-uuid',
+            FIRST_PAGE: 'first-page-uuid',
             TOTAL_PAGES: 'totalPages',
             REQUEST_ID: 'requestId'
         },
         PAGE_REGISTERED: {
             TYPE: 'page-registered',
-            PAGE_ID: 'pageId',
+            PAGE: 'page-uuid',
             HASH: 'hash',
             SNAPSHOTS: 'snapshots',
             PAGE_NR: 'pageNr',
@@ -279,7 +279,7 @@ const MESSAGES = {
         },
         PAGE_INFO: {
             TYPE: 'page-info',
-            PAGE_ID: 'pageId',
+            PAGE: 'page-uuid',
             HASH: 'hash',
             SNAPSHOTS: 'snapshots',
             PAGE_NR: 'pageNr',
@@ -289,14 +289,14 @@ const MESSAGES = {
         PAGE_LOST {
             TYPE: 'page-lost',
             LOST: 'lost',
-            UUID: 'uuid',
+            PAGE: 'page-uuid',
             PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages',
             REQUEST_ID: 'requestId'
         },
         FULL_PAGE: {
             TYPE: 'fullPage',
-            UUID: 'uuid',
+            PAGE: 'page-uuid',
             HISTORY: 'history',
             PRESENT: 'present',
             HASH: 'hash',
@@ -305,23 +305,23 @@ const MESSAGES = {
         },
         ACCEPT: {
             TYPE: 'accept',
-            UUID: 'uuid',
+            PAGE: 'page-uuid',
             ACTION_INDEX : 'action-index',
             ACTION_UUID: 'action-uuid',
             BEFORE_HASH: 'before-hash',
             AFTER_HASH: 'after-hash',
-            CURRENT_PAGE_NR: 'current page-nr in its board',
-            CURRENT_TOTAL_PAGES: 'current #pages of the board'
+            PAGE_NR: 'current page-nr in its board',
+            TOTAL_PAGES: 'current #pages of the board'
         },
         DECLINE: {
             TYPE: 'decline',
-            UUID: 'uuid',
+            PAGE: 'page-uuid',
             ACTION_UUID: 'action-uuid',
             REASON: 'reason'
         },
         REPLAY: {
             TYPE: 'replay',
-            UUID: 'uuid',
+            PAGE: 'page-uuid',
             BEFORE_HASH: 'beforeHash',
             AFTER_HASH: 'afterHash',
             SEQUENCE: 'edits',
@@ -332,7 +332,7 @@ const MESSAGES = {
         },
         PING: {
             TYPE: 'ping',
-            UUID: 'uuid',
+            PAGE: 'page-uuid',
             HASH: 'hash',
             PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages',

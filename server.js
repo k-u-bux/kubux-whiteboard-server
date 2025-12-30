@@ -610,7 +610,7 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
     
     const message = {
         type: MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE,
-        [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID]: pageId,
+        [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE]: pageId,
         [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY]: pageHistory,
         [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT]: pagePresent,
         [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]: pageHash,
@@ -637,7 +637,7 @@ function sendPageInfo(ws, boardId, pageId, requestId) {
     const snapshots = get_page_snapshots(page)
     const message = {
         type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
-        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageId,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
@@ -657,7 +657,7 @@ function sendPageLost(ws, boardId, requestedPageId, foundPageId, requestId) {
     const message = {
         type: MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST]: requestedPageId,
-        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.UUID]: foundpageId,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE]: foundpageId,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES]: totalPages,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
@@ -682,7 +682,7 @@ function ping_client_with_page ( client, pageId, board ) {
     
     const message = {
         type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
-        [MESSAGES.SERVER_TO_CLIENT.PING.UUID]: pageId,
+        [MESSAGES.SERVER_TO_CLIENT.PING.PAGE]: pageId,
         [MESSAGES.SERVER_TO_CLIENT.PING.HASH]: pageHash,
         [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES]: totalPages,
@@ -740,7 +740,7 @@ function createNewBoard(ws, clientId, requestId) {
         
         const response = {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD_ID]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD]: boardId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD]: board.passwd,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE_ID]: ws.pageId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
@@ -767,7 +767,7 @@ function registerBoard(ws, boardId, clientId, requestId) {
         
         const response = {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD]: boardId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE_ID]: ws.pageId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
@@ -807,7 +807,7 @@ function describePage(ws, boardId, pageId, delta, requestId) {
         
         const response = {
             type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID]: pageId,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageId,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
@@ -846,7 +846,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         
         const response = {
             type: MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID]: resolvedPageId,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE]: resolvedPageId,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.HASH]: pageHash,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.SNAPSHOTS]: snapshots,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR]: pageNr,
@@ -863,7 +863,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
 // Handler for board registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
-    let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID];
+    let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD];
     if ( boardId && isUuid( boardId ) ) {
         registerBoard(ws, boardId, clientId, requestId);
     } else {
@@ -874,8 +874,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
 // Handler for page registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, requestId) => {
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID];
-    let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD_ID];
-    let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE_ID];
+    let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD];
+    let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA];
     if ( boardId && isUuid( boardId ) && pageId && isUuid( pageId ) ) {
         registerPage(ws, boardId, clientId, pageId, delta, requestId);
@@ -886,8 +886,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, reque
 
 // Handler for page info
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, requestId) => {
-    let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD_ID];
-    let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE_ID];
+    let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD];
+    let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
     if ( boardId && isUuid( boardId ) && pageId && isUuid( pageId ) ) {
         describePage(ws, boardId, pageId, delta, requestId);
@@ -927,10 +927,10 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
     if ( ! isUuid( boardId ) ) { return; }
     const board = useBoard( boardId );
     assert(board);
-    const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID];
+    const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE];
     const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
     if ( pageId != undefined && isUuid( pageId ) && delta != undefined ) {
-        resolvedPageId = findPage( board, data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID] );
+        resolvedPageId = findPage( board, data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE] );
         if ( data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] ) {
             ws.pageId = resolvedPageId;
         }
@@ -974,9 +974,9 @@ function handleUndoAction(page, action) {
     flag_and_fix_inconsistent_state( page, "undo" );
     if (page.present > 0) {
         const currentAction = page.history[page.present - 1];
-        if (currentAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.UNDO.TARGET_ACTION]) {
+        if (currentAction[MOD_ACTIONS.PAGE] === action[MOD_ACTIONS.UNDO.TARGET_ACTION]) {
             if ( ! revertEdit( page.state, currentAction ) ) {
-                debug.log( `BAD: cannot undo action ${currentAction[MOD_ACTIONS.UUID]}` );
+                debug.log( `BAD: cannot undo action ${currentAction[MOD_ACTIONS.PAGE]}` );
                 debug.log( `currentAction = ${serialize( currentAction )}` );
             }
             page.present -= 1;
@@ -991,9 +991,9 @@ function handleRedoAction(page, action) {
     flag_and_fix_inconsistent_state( page, "redo" );
     if (page.present < page.history.length) {
         const nextAction = page.history[page.present];
-        if (nextAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.REDO.TARGET_ACTION]) {
+        if (nextAction[MOD_ACTIONS.PAGE] === action[MOD_ACTIONS.REDO.TARGET_ACTION]) {
             if ( ! commitEdit( page.state, nextAction ) ) {
-                debug.log( `BAD: cannot redo action ${nextAction[MOD_ACTIONS.UUID]}` );
+                debug.log( `BAD: cannot redo action ${nextAction[MOD_ACTIONS.PAGE]}` );
             }
             page.present += 1;
             flag_and_fix_inconsistent_state( page, "redo exit" );
@@ -1007,7 +1007,7 @@ function createDeclineMessage(boardId, pageId, targetActionId, reason = "") {
     return {
         type: MESSAGES.SERVER_TO_CLIENT.DECLINE.TYPE,
         boardId: boardId,
-        [MESSAGES.SERVER_TO_CLIENT.DECLINE.UUID]: pageId,
+        [MESSAGES.SERVER_TO_CLIENT.DECLINE.PAGE]: pageId,
         [MESSAGES.SERVER_TO_CLIENT.DECLINE.ACTION_UUID]: targetActionId,
         [MESSAGES.SERVER_TO_CLIENT.DECLINE.REASON]: reason
     };
@@ -1029,11 +1029,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     try {
         const boardId = data.boardId || ws.boardId;
         const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
-        const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID];
+        const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE];
         const action = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
         const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH];
         const clientId = ws.clientId;
-        const actionId = action[MOD_ACTIONS.UUID];
+        const actionId = action[MOD_ACTIONS.PAGE];
 
         const board = useBoard(boardId);
         // debug.log(`password = ${password},  board.passwd = ${board.passwd}`);
@@ -1110,13 +1110,13 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         if (accept) {
             const acceptMessage = {
                 type: MESSAGES.SERVER_TO_CLIENT.ACCEPT.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.UUID]: pageUuid,
+                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE]: pageUuid,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.ACTION_INDEX]: page.present - 1,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.ACTION_UUID]: actionId,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.BEFORE_HASH]: page.hashes[page.present - 1],
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.AFTER_HASH]: page.hashes[page.present],
-                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
-                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_TOTAL_PAGES]: board.pageOrder.length
+                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
+                [MESSAGES.SERVER_TO_CLIENT.ACCEPT.TOTAL_PAGES]: board.pageOrder.length
             };
             ws.send(serialize(acceptMessage));
             logSentMessage(acceptMessage.type, acceptMessage, requestId);
@@ -1138,8 +1138,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         if (ws && data) {
             const errorContext = {
                 boardId: data.boardId || ws.boardId,
-                pageUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID],
-                actionUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]?.[MOD_ACTIONS.UUID],
+                pageUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE],
+                actionUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]?.[MOD_ACTIONS.PAGE],
                 ws
             };
             sendDeclineMessage(errorContext, `Server error: ${error.message}`, requestId);
@@ -1149,7 +1149,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, requestId) => {
     const boardId = data.boardId || ws.boardId;
-    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID];
+    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
     const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH];
     
@@ -1183,7 +1183,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const replayMessage = {
         type: MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE,
         boardId: boardId,
-        [MESSAGES.SERVER_TO_CLIENT.REPLAY.UUID]: pageUuid,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE]: pageUuid,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.BEFORE_HASH]: presentHash,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH]: page.hashes[page.present],
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE]: replayActions,

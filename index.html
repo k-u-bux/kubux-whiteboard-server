@@ -1912,7 +1912,7 @@
           
           const registerMessage = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD_ID]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD]: boardId,
               [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID]: clientId,
               [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.REQUEST_ID]: requestId
           };
@@ -1927,8 +1927,8 @@
           
           const registerPageMessage = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD_ID]: boardId,
-              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE_ID]: pageId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE]: pageId,
               [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA]: delta,
               [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID]: clientId,
               [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.REQUEST_ID]: requestId
@@ -1949,8 +1949,8 @@
           
           const pageInfoRequest = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD_ID]: boardId,
-              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE_ID]: pageId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE]: pageId,
               [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: delta,
               [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
           };
@@ -1980,8 +1980,8 @@
           visualState = shared.createEmptyVisualState();
           
           // Update board ID and URL if necessary
-          boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD_ID];
-          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE_ID];
+          boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD];
+          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE];
           const urlParams = new URLSearchParams(window.location.search);
           
           if (urlParams.get('credential')) {
@@ -2012,7 +2012,7 @@
       // Handle page registration response
       function handlePageRegistered(data) {
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID];
-          currentPageUuid  = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID];
+          currentPageUuid  = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE];
           pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR];
           totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES];
           
@@ -2029,7 +2029,7 @@
       // Handle page info response (metadata only)
       function handlePageInfo(data) {
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID];
-          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID];
+          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE];
           pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
           totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
           
@@ -2046,7 +2046,7 @@
       // Handle page lost response (page deletion with redirection)
       function handlePageLost(data) {
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID];
-          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.UUID];
+          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE];
           const lost = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST];
           pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR];
           totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES];
@@ -2105,7 +2105,7 @@
             return; 
           }
 
-          const pingPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.UUID];
+          const pingPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE];
           const pingPageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.HASH];
           const pingPageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR];
           const pingTotalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES];
@@ -2165,8 +2165,8 @@
       // Handle accept message from server
       function handleAcceptMessage(data) {
           // Update page info
-          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_PAGE_NR];
-          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.CURRENT_TOTAL_PAGES];
+          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE_NR];
+          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.TOTAL_PAGES];
           updatePageInfo();
           
           const acceptedActionIndex = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.ACTION_INDEX];
@@ -2335,7 +2335,7 @@
       
       // Handle replay message from server
       function handleReplayMessage(data) {
-          const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.UUID];
+          const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE];
           const beforeHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.BEFORE_HASH];
           const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH];
           const replaySequence = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE];
@@ -2431,7 +2431,7 @@
       
       // Handle full page message from server
       function handleFullPageMessage(data) {
-          const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.UUID];
+          const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
 
           // No cache or hash mismatch - use full page data
           debugLog('No cache available or hash mismatch, using full page data');
@@ -2482,11 +2482,11 @@
           
           const request = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_ID]: boardId
+              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD]: boardId
           };
           
           if (pageId) {
-              request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID] = pageId;
+              request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE] = pageId;
           }
           
           request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] = delta;
@@ -2503,7 +2503,7 @@
           
           const request = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: true,
@@ -2882,7 +2882,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
           };
@@ -2954,7 +2954,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
           };
@@ -3091,7 +3091,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
           };
@@ -3183,7 +3183,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
           };
@@ -3265,7 +3265,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
           };
@@ -3539,7 +3539,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: undoAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
           };
@@ -3573,7 +3573,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: redoAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
           };
@@ -4381,7 +4381,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: drawAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
           };
@@ -4443,7 +4443,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
           };
@@ -4471,7 +4471,7 @@
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: newPageAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
           };
@@ -4494,7 +4494,7 @@
               const proposal = {
                   type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
                   [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE_UUID]: currentPageUuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
                   [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deletePageAction,
                   [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
               };
@@ -5176,7 +5176,7 @@
                       const request = {
                           type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD_ID]: boardId,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE_ID]: currentPageUuid,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE]: currentPageUuid,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: i - startPageNr,
                           [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
                       };
