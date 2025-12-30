@@ -2001,118 +2001,65 @@
           requestFullPage(currentPageUuid);
       }
       
+      function joinPage ( uuid, nr, total ) {
+          currentPageUuid = uuid;
+          pageNr = nr;
+          totalPages = total;
+          updatePageInfo();
+          requestFullPage(currentPageUuid, 0);
+      }
+
       // Handle page registration response
       function handlePageRegistered(data) {
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID];
-          const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID];
-          const pageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.HASH];
-          const snapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.SNAPSHOTS];
-          const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR];
-          const totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES];
+          currentPageUuid  = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_ID];
+          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR];
+          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES];
           
           debugLog('Page registered successfully', {
               requestId,
-              pageId,
-              pageHash,
+              currentPageUuid,
               pageNr,
-              totalPages,
-              snapshots: snapshots ? snapshots.length : 0
+              totalPages
           });
           
-          // Update current page UUID
-          currentPageUuid = pageId;
-          
-          // Store snapshots for verification
-          if (snapshots && snapshots.length > 0) {
-              // Find matching hash in our chain to update verified index
-              let verifiedIndex = -1;
-              for (let i = 0; i < hashes.length; i++) {
-                  if (hashes[i] === pageHash) {
-                      verifiedIndex = i;
-                      break;
-                  }
-              }
-          }
-          
-          // Update page info
-          pageNr = pageNr;
-          totalPages = totalPages;
-          updatePageInfo();
-          
-          // After page registration, request full page content if needed
-          debugLog('Requesting full page after registration');
-          requestFullPage(currentPageUuid, 0);
+          joinPage( currentPageUuid, pageNr, totalPages );
       }
       
       // Handle page info response (metadata only)
       function handlePageInfo(data) {
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID];
-          const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID];
-          const pageHash = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH];
-          const snapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS];
-          const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
-          const totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
+          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_ID];
+          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
+          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
           
           debugLog('Page info received', {
               requestId,
-              pageId,
-              pageHash,
+              currentPageUuid,
               pageNr,
-              totalPages,
-              snapshots: snapshots ? snapshots.length : 0
+              totalPages
           });
           
-          // Update page info only (no full page content)
-          pageNr = pageNr;
-          totalPages = totalPages;
-          updatePageInfo();
-          
-          // Update hash if we have different hash - check against current page hash
-          if (pageHash && (hashes[verifiedIndex] !== pageHash)) {
-              debugLog('Hash mismatch in page info, checking against page hash');
-              // If hash mismatch, request full page to get back in sync
-              requestFullPage(pageId);
-          } else {
-              // Hash matches, just update metadata
-              debugLog('Hash matches, only updating page metadata');
-          }
+          joinPage( currentPageUuid, pageNr, totalPages );
       }
       
       // Handle page lost response (page deletion with redirection)
       function handlePageLost(data) {
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID];
-          const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.UUID];
+          currentPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.UUID];
           const lost = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST];
-          const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR];
-          const totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES];
+          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR];
+          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES];
           
           debugLog('Page lost received', {
               requestId,
-              pageId: pageId,
+              currentPageUuid,
               lost,
               pageNr,
               totalPages
           });
-          
-          if (lost) {
-              debugLog(`Current page has been deleted: ${currentPageUuid}`);
-              debugLog(`Redirecting to replacement page: ${pageId}`);
-              
-              // Update page info
-              pageNr = pageNr;
-              totalPages = totalPages;
-              updatePageInfo();
-              
-              // Navigate to replacement page
-              debugLog('Requesting full page for replacement');
-              requestFullPage(pageId);
-          } else {
-              debugLog('Page loss was only informational (not deleted)');
-              // Update page info
-              pageNr = pageNr;
-              totalPages = totalPages;
-              updatePageInfo();
-          }
+
+          joinPage( currentPageUuid, pageNr, totalPages );
       }
       
       // Handle ping message from server
