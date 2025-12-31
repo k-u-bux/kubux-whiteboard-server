@@ -657,7 +657,7 @@ function sendPageLost(ws, boardId, requestedPageId, foundPageId, requestId) {
     const message = {
         type: MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST]: requestedPageId,
-        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE]: foundpageId,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE]: foundPageId,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES]: totalPages,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
