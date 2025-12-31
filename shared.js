@@ -286,7 +286,7 @@ const MESSAGES = {
             TOTAL_PAGES: 'totalPages',
             REQUEST_ID: 'requestId'
         },
-        PAGE_LOST {
+        PAGE_LOST: {
             TYPE: 'page-lost',
             LOST: 'lost',
             PAGE: 'page-uuid',

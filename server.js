@@ -627,7 +627,7 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
 function sendPageInfo(ws, boardId, pageId, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
-    const pageId = existingPage(requestedPageId, board);
+    pageId = existingPage(requestedPageId, board);
     const page = usePage(pageId);
     const pageHistory = page.history;
     const pagePresent = page.present;
@@ -1011,7 +1011,6 @@ function createDeclineMessage(boardId, pageId, targetActionId, reason = "") {
         [MESSAGES.SERVER_TO_CLIENT.DECLINE.REASON]: reason
     };
 }
- ++++++++ REPLACE
 
 function sendDeclineMessage(context, reason, requestId) {
     const declineMessage = createDeclineMessage(
