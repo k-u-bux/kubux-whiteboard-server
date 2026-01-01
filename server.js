@@ -934,7 +934,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
         if ( data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] ) {
             ws.pageId = resolvedPageId;
         }
-        sendFullPage(ws, boardId, resolvedPageId, requestId)
+        if ( delta != 0 || resolvedPageId == pageId ) {
+            sendFullPage( ws, boardId, resolvedPageId, requestId );
+        } else {
+            sendPageLost( ws, boardId, pageId, resolvedPageId, requestId );
+        }
     }
     releaseBoard( boardId );
 };
