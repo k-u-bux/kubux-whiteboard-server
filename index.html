@@ -4717,11 +4717,11 @@
           if (!element) return;
           context.save();
           push_settings(context, element);
-          const type = element[ELEMENT.TYPE];
-          const path = element[ELEMENT.PATH];
-          const is_closed = ( path == DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
+          const type = element[shared.ELEMENT.TYPE];
+          const path = element[shared.ELEMENT.PATH];
+          const is_closed = ( path == shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == shared.DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
           lay_path(context, element);
-          if ( type == DRAWABLE.TYPE.FILL ) {
+          if ( type == shared.DRAWABLE.TYPE.FILL ) {
               if ( ! is_closed ) {
                   console.error('Only closed paths can be filled.',"");
                   throw new Error('Only closed paths can be filled.');
@@ -4729,7 +4729,7 @@
               lay_path(context, element);
               context.closePath();
               context.fill()
-          } else if ( type == DRAWABLE.TYPE.STROKE ) {
+          } else if ( type == shared.DRAWABLE.TYPE.STROKE ) {
               if ( is_closed ) {
                   draw_closed(context, element);
               } else {
