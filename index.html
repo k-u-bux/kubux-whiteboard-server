@@ -1120,6 +1120,7 @@
               fillToggleDiv.style.display = 'flex';
               loopToggleDiv.style.display = 'flex';
               curveSelectionDiv.style.display = 'flex';
+              circleSelectionDiv.style.display = 'flex';
               rectangleSelectionDiv.style.display = 'flex';
               horizontalSelectionDiv.style.display = 'flex';
               verticalSelectionDiv.style.display = 'flex';
@@ -1134,6 +1135,7 @@
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
               curveSelectionDiv.style.display = 'none';
+              circleSelectionDiv.style.display = 'none';
               rectangleSelectionDiv.style.display = 'none';
               horizontalSelectionDiv.style.display = 'none';
               verticalSelectionDiv.style.display = 'none';
@@ -1147,6 +1149,7 @@
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
               curveSelectionDiv.style.display = 'none';
+              circleSelectionDiv.style.display = 'none';
               rectangleSelectionDiv.style.display = 'none';
               horizontalSelectionDiv.style.display = 'none';
               verticalSelectionDiv.style.display = 'none';
@@ -1160,6 +1163,7 @@
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
               curveSelectionDiv.style.display = 'none';
+              circleSelectionDiv.style.display = 'none';
               rectangleSelectionDiv.style.display = 'none';
               horizontalSelectionDiv.style.display = 'none';
               verticalSelectionDiv.style.display = 'none';
@@ -1507,6 +1511,7 @@
       const fillToggleDiv = document.getElementById('fill-toggle');
       const loopToggleDiv = document.getElementById('loop-toggle');
       const curveSelectionDiv = document.getElementById('curve-selection');
+      const circleSelectionDiv = document.getElementById('circle-selection');
       const rectangleSelectionDiv = document.getElementById('rectangle-selection');
       const horizontalSelectionDiv = document.getElementById('horizontal-selection');
       const verticalSelectionDiv = document.getElementById('vertical-selection');
@@ -3843,6 +3848,10 @@
               isSelecting = true;
               currentPath = [];
               const point = shared.createPoint(x, y, 0.5);
+              const point_a = shared.createPoint(x, y, 0.5);
+              const point_b = shared.createPoint(x, y, 0.5);
+              const point_c = shared.createPoint(x, y, 0.5);
+              const point_d = shared.createPoint(x, y, 0.5);
               currentPath.push(point);
               
               // Create selection stroke based on current shape settings
@@ -3863,7 +3872,7 @@
               
               // For rectangle selection, initialize with 4 points
               if (draw_settings.shape === 'rectangle') {
-                  selectionStroke[shared.ELEMENT.POINTS] = [point, point, point, point];
+                  selectionStroke[shared.ELEMENT.POINTS] = [point_a, point_b, point_c, point_d];
               } else {
                   selectionStroke[shared.ELEMENT.POINTS] = [point];
               }
