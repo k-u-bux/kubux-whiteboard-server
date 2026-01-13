@@ -3754,6 +3754,10 @@
               isSelecting = true;
               currentPath = [];
               const point = shared.createPoint(x, y, 0.5);
+              const point_a = shared.createPoint(x, y, 0.5);
+              const point_b = shared.createPoint(x, y, 0.5);
+              const point_c = shared.createPoint(x, y, 0.5);
+              const point_d = shared.createPoint(x, y, 0.5);
               currentPath.push(point);
               
               // Create selection stroke based on current shape settings
@@ -3774,7 +3778,7 @@
               
               // For rectangle selection, initialize with 4 points
               if (draw_settings.shape === 'rectangle') {
-                  selectionStroke[shared.ELEMENT.POINTS] = [point, point, point, point];
+                  selectionStroke[shared.ELEMENT.POINTS] = [point_a, point_b, point_c, point_d];
               } else {
                   selectionStroke[shared.ELEMENT.POINTS] = [point];
               }
