@@ -347,6 +347,7 @@ function releasePage(pageId) {
             persistPage(Id);
             pageCache.delete(Id);
             evictablePages.delete(Id);
+            debug.log(`[SERVER]: evicting page ${Id}`);
         }
     }
 }
@@ -746,7 +747,7 @@ function createNewBoard(ws, clientId, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
         };
         ws.send(serialize(response));
-        logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, creationResponse, requestId );
+        logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, response, requestId );
         releaseBoard(boardId);
         sendFullPage(ws, boardId, ws.pageId, requestId);
     }
@@ -822,7 +823,9 @@ function describePage(ws, boardId, pageId, delta, requestId) {
 
 function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
     const board = useBoard(boardId);
-    if ( board ) {
+    if ( !board ) {
+        debug.log(`[SERVER]: Cannot find board ${boardId}`);
+    } else {
         const resolvedPageId = findPage( board, pageId, delta );
         ws.boardId = boardId; // Store boardId in WebSocket client
         ws.pageId = resolvedPageId;
@@ -834,27 +837,30 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         debug.log(`[SERVER] Client ${clientId} registered with page: ${resolvedPageId} on board ${boardId}`);
         
         const page = usePage(resolvedPageId);
-        const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
-        const totalPages = board.pageOrder.length;
-        const pageHash = page.hashes[page.present];        
-        const snapshots = get_page_snapshots(page);
-        
-        // If requested page was deleted, just register to replacement page seamlessly
-        if (resolvedPageId !== pageId) {
-            debug.log(`[SERVER] Requested page ${pageId} was deleted, registering to replacement ${resolvedPageId}`);
+        if ( !page ) {
+            debug.log(`[SERVER]: Cannot find page ${pageUuid}`);
+        } else {
+            const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
+            const totalPages = board.pageOrder.length;
+            const pageHash = page.hashes[page.present];        
+            const snapshots = get_page_snapshots(page);
+            
+            // If requested page was deleted, just register to replacement page seamlessly
+            if (resolvedPageId !== pageId) {
+                debug.log(`[SERVER] Requested page ${pageId} was deleted, registering to replacement ${resolvedPageId}`);
+            }
+            
+            const response = {
+                type: MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE]: resolvedPageId,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.HASH]: pageHash,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.SNAPSHOTS]: snapshots,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR]: pageNr,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID]: requestId
+            };
+            ws.send(serialize(response));
         }
-        
-        const response = {
-            type: MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE]: resolvedPageId,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.HASH]: pageHash,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.SNAPSHOTS]: snapshots,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR]: pageNr,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID]: requestId
-        };
-        ws.send(serialize(response));
-        
         releasePage(resolvedPageId);
     }
     releaseBoard(boardId);
@@ -978,9 +984,9 @@ function handleUndoAction(page, action) {
     flag_and_fix_inconsistent_state( page, "undo" );
     if (page.present > 0) {
         const currentAction = page.history[page.present - 1];
-        if (currentAction[MOD_ACTIONS.PAGE] === action[MOD_ACTIONS.UNDO.TARGET_ACTION]) {
+        if (currentAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.UNDO.TARGET_ACTION]) {
             if ( ! revertEdit( page.state, currentAction ) ) {
-                debug.log( `BAD: cannot undo action ${currentAction[MOD_ACTIONS.PAGE]}` );
+                debug.log( `BAD: cannot undo action ${currentAction[MOD_ACTIONS.UUID]}` );
                 debug.log( `currentAction = ${serialize( currentAction )}` );
             }
             page.present -= 1;
@@ -995,9 +1001,9 @@ function handleRedoAction(page, action) {
     flag_and_fix_inconsistent_state( page, "redo" );
     if (page.present < page.history.length) {
         const nextAction = page.history[page.present];
-        if (nextAction[MOD_ACTIONS.PAGE] === action[MOD_ACTIONS.REDO.TARGET_ACTION]) {
+        if (nextAction[MOD_ACTIONS.UUID] === action[MOD_ACTIONS.REDO.TARGET_ACTION]) {
             if ( ! commitEdit( page.state, nextAction ) ) {
-                debug.log( `BAD: cannot redo action ${nextAction[MOD_ACTIONS.PAGE]}` );
+                debug.log( `BAD: cannot redo action ${nextAction[MOD_ACTIONS.UUID]}` );
             }
             page.present += 1;
             flag_and_fix_inconsistent_state( page, "redo exit" );
@@ -1036,9 +1042,17 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         const action = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
         const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH];
         const clientId = ws.clientId;
-        const actionId = action[MOD_ACTIONS.PAGE];
+        const actionId = action[MOD_ACTIONS.UUID];
 
-        const board = useBoard(boardId);
+        debug.log(`[SERVER]: actionId = ${actionId}`);
+
+        const board = useBoard( boardId );
+        if (!board) {
+            releaseBoard( boardId );
+            debug.log(`[SERVER]: Cannot find board ${boardId}`);
+            return;
+        }
+
         // debug.log(`password = ${password},  board.passwd = ${board.passwd}`);
         if ( !password || password != board.passwd ) {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, "unauthorized");
@@ -1048,7 +1062,13 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             return;
         }
 
-        const page = usePage(pageUuid);
+        const page = usePage( pageUuid );
+        if (!page) {
+            releasePage( pageUuid );
+            debug.log(`[SERVER]: Cannot find page ${pageUuid}`);
+            return;
+        }
+
         let accept;
         let reason;
         const actionType = action.type;
@@ -1078,6 +1098,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             const newPageId = generateUuid();
             const newPage = createPage(newPageId);
             releasePage(newPageId);
+            debug.log(`[SERVER]: add new page ${newPageId} behind ${pageUuid}`);
             board.pageOrder.splice(board.pageOrder.indexOf(pageUuid) + 1, 0, newPageId);
             releaseBoard(boardId);
             sendFullPage(ws, boardId, newPageId, requestId);
@@ -1142,7 +1163,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             const errorContext = {
                 boardId: data.boardId || ws.boardId,
                 pageUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE],
-                actionUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]?.[MOD_ACTIONS.PAGE],
+                actionUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]?.[MOD_ACTIONS.UUID],
                 ws
             };
             sendDeclineMessage(errorContext, `Server error: ${error.message}`, requestId);
