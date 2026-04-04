@@ -602,30 +602,32 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
     if ( pageId != requestedPageId ) {
     }
     const page = usePage(pageId);
+    if (page) {
 
-    const pageHistory = page.history;
-    const pagePresent = page.present;
-    const pageHash = page.hashes[pagePresent];
-    const pageNr = board.pageOrder.indexOf(pageId) + 1;
-    const totalPages = board.pageOrder.length;
-    
-    const message = {
-        type: MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE,
-        [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE]: pageId,
-        [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY]: pageHistory,
-        [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT]: pagePresent,
-        [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]: pageHash,
-        [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR]: pageNr,
-        [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES]: totalPages
-    };
-
-    releasePage(pageId);
+        const pageHistory = page.history;
+        const pagePresent = page.present;
+        const pageHash = page.hashes[pagePresent];
+        const pageNr = board.pageOrder.indexOf(pageId) + 1;
+        const totalPages = board.pageOrder.length;
+        
+        const message = {
+            type: MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE]: pageId,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY]: pageHistory,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT]: pagePresent,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]: pageHash,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR]: pageNr,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES]: totalPages
+        };
+        
+        releasePage(pageId);
+        ws.send(serialize(message));
+        logSentMessage(message.type, message, requestId);
+    }
     releaseBoard(boardId);
-    ws.send(serialize(message));
-    logSentMessage(message.type, message, requestId);
 }
 
-function sendPageInfo(ws, boardId, pageId, requestId) {
+function sendPageInfo(ws, boardId, requestedPageId, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
     pageId = existingPage(requestedPageId, board);
@@ -796,7 +798,7 @@ function describePage(ws, boardId, pageId, delta, requestId) {
     const board = useBoard(boardId);
     if ( board ) {
         const resolvedPageId = findPage( board, pageId, delta );
-        debug.log(`[SERVER] Client ${clientId} wants info about page: ${pageId}+${delta} on board ${boardId}`);
+        debug.log(`[SERVER] Client ${ws.clientId} wants info about page: ${pageId}+${delta} on board ${boardId}`);
         if (resolvedPageId !== pageId) {
             debug.log(`[SERVER] Requested page ${pageId} was deleted, redirecting to replacement ${resolvedPageId}`);
         }
@@ -838,7 +840,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         
         const page = usePage(resolvedPageId);
         if ( !page ) {
-            debug.log(`[SERVER]: Cannot find page ${pageUuid}`);
+            debug.log(`[SERVER]: Cannot find page ${resolvedPageId}`);
         } else {
             const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
             const totalPages = board.pageOrder.length;
@@ -1294,7 +1296,7 @@ function shutdown(signal) {
   clearInterval( intervalPersist );
   persistAllBoards();
   persistAllPages();
-  server.close(() => {
+  httpServer.close(() => {
     debug.log('Server connections closed. Exiting process.');
     process.exit(0);
   });
