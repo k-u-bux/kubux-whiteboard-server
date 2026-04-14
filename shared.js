@@ -1109,7 +1109,7 @@ function PDFBuilder() {
 
         // --- 4. Page Dictionaries ---
         // Predict the Pages Root ID (it will be the next object)
-        const pagesRootID = objCount;
+        const pagesRootID = objCount + pages.length;
         let pagesKids = '';
         for (let i = 0; i < pages.length; i++) {
             const pageDict = `<<\n  /Type /Page\n  /Parent ${pagesRootID} 0 R\n  /MediaBox [0 0 ${pages[i].width} ${pages[i].height}]\n  /Contents ${contentStreamIDs[i]} 0 R\n  /Resources ${resourceObjID} 0 R\n>>`;
