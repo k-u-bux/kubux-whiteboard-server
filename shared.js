@@ -1108,26 +1108,19 @@ function PDFBuilder() {
         const resourceObjID = addObject(resourcesDict);
 
         // --- 4. Page Dictionaries ---
+        // Predict the Pages Root ID (it will be the next object)
+        const pagesRootID = objCount;
         let pagesKids = '';
         for (let i = 0; i < pages.length; i++) {
-            const pageDict = `<<\n  /Type /Page\n  /Parent 2 0 R\n  /MediaBox [0 0 ${pages[i].width} ${pages[i].height}]\n  /Contents ${contentStreamIDs[i]} 0 R\n  /Resources ${resourceObjID} 0 R\n>>`;
+            const pageDict = `<<\n  /Type /Page\n  /Parent ${pagesRootID} 0 R\n  /MediaBox [0 0 ${pages[i].width} ${pages[i].height}]\n  /Contents ${contentStreamIDs[i]} 0 R\n  /Resources ${resourceObjID} 0 R\n>>`;
             const pageObjID = addObject(pageDict);
             pagesKids += `${pageObjID} 0 R `;
             pageObjIDs.push(pageObjID);
         }
         
-        // --- 5. Pages Root Dictionary (Object 2 - fixed ID for Pages tree) ---
-        // Note: We use a fixed ID for the Pages Root for simplicity, so we must manually place it.
-        const pagesRootID = 2; 
+        // --- 5. Pages Root Dictionary ---
         const pagesRootDict = `<<\n  /Type /Pages\n  /Kids [${pagesKids}]\n  /Count ${pages.length}\n>>`;
-        
-        // We ensure the object ID is correct by pushing a dummy for all previous objects, 
-        // then correcting its offset later, or by simply using the current objCount.
-        
-        // For simplicity in this functional example, we will let objCount determine the IDs
-        // and adjust the Page Dictionaries to reference the correct parent ID, 
-        // which will be the ID of the Pages dictionary added next.
-        const actualPagesRootID = addObject(pagesRootDict); 
+        const actualPagesRootID = addObject(pagesRootDict);
 
         // --- 6. Catalog Root Dictionary (The document entry point) ---
         const catalogID = addObject(`<<\n  /Type /Catalog\n  /Pages ${actualPagesRootID} 0 R\n>>`);
