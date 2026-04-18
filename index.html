@@ -2208,10 +2208,11 @@
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE];
 
           if ( currentPageUuid !== pageUuid ) {
-              joinPage( pageUuid,
-                        data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE_NR],
-                        data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.TOTAL_PAGES] );
               return;
+              // joinPage( pageUuid,
+              //           data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE_NR],
+              //           data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.TOTAL_PAGES] );
+              // return;
           }
 
           // update page into
