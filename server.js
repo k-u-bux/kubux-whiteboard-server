@@ -75,6 +75,23 @@ const debug = new Console({ stdout: debugNull, stderr: debugTee });
 const crypto = require('crypto');
 
 
+function generateSecureUuid() {
+    let randomBytes = crypto.randomBytes(16);
+    // Set version (4) and variant bits per RFC 4122
+    randomBytes[6] = (randomBytes[6] & 0x0f) | 0x40; // Version 4
+    randomBytes[8] = (randomBytes[8] & 0x3f) | 0x80; // Variant 10
+    // Format as UUID string
+    const hex = Array.from(randomBytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`;
+}
+
+function generatePasswd() {
+    // Generate 12 characters from base36 alphabet (0-9, a-z)
+    let randomBytes = crypto.randomBytes(12);
+    // Convert to base36 (0-9a-z)
+    return Array.from(randomBytes, b => (b % 36).toString(36)).join('');
+}
+
 /**
  * Hash a password using scrypt
  * scrypt is a password-based key derivation function that is intentionally slow and memory-hard,
@@ -166,9 +183,7 @@ const {
   recent_snapshots,
   hashAny, 
   hashNext, 
-  generateUuid, 
   isUuid,
-  generatePasswd,
   serialize, 
   deserialize,
   createEmptyVisualState, 
@@ -273,7 +288,7 @@ function createBoard(boardId) {
         return null; 
     }
     debug.log(`[SERVER] Create a standard board.`);
-    const pageId = generateUuid();
+    const pageId = generateSecureUuid();
     const password = generatePasswd();
     const board = {
         passwd: password,
@@ -728,7 +743,7 @@ const messageHandlers = {};
 
 
 function createNewBoard(ws, clientId, requestId) {
-    const boardId = generateUuid();
+    const boardId = generateSecureUuid();
     const board = createBoard(boardId);
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
@@ -1097,7 +1112,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             break;
         case MOD_ACTIONS.NEW_PAGE.TYPE:
             releasePage(pageUuid);
-            const newPageId = generateUuid();
+            const newPageId = generateSecureUuid();
             const newPage = createPage(newPageId);
             releasePage(newPageId);
             debug.log(`[SERVER]: add new page ${newPageId} behind ${pageUuid}`);
@@ -1118,7 +1133,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 sendPingToBoard( boardId );
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
-                const newPageId = generateUuid();
+                const newPageId = generateSecureUuid();
                 deletionMap[pageUuid] = newPageId;
                 const newPage = createPage(newPageId);
                 releasePage( newPageId );

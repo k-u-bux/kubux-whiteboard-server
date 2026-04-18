@@ -1,7 +1,7 @@
 // PORT
 
-// const PORT=5236;
-const PORT=80;
+const PORT=5236;
+// const PORT=80;
 
 
 // spaced snapshots
@@ -50,14 +50,6 @@ function isUuid(str) {
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return regex.test(str);
 }
-
-function generatePasswd() {
-    return 'xxxxxxxxxxxx'.replace(/[x]/g, function(c) {
-        const r = Math.random() * 36 | 0;
-        return r.toString(36);
-    });
-}
-
 
 // serialization / deserialization
 const serialize = (data) => {
@@ -1266,7 +1258,6 @@ if (typeof module !== 'undefined' && module.exports) {
         // uuid
         generateUuid,
         isUuid,
-        generatePasswd,
         // serialization
         serialize,
         deserialize,
@@ -1336,7 +1327,6 @@ else if (typeof window !== 'undefined') {
         // uuid
         generateUuid,
         isUuid,
-        generatePasswd,
         // serialization
         serialize,
         deserialize,
