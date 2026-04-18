@@ -257,6 +257,7 @@ const MESSAGES = {
             TYPE: 'board-registered',
             BOARD: 'board-uuid',
             FIRST_PAGE: 'first-page-uuid',
+            LAST_PAGE: 'last-page-uuid',
             TOTAL_PAGES: 'totalPages',
             REQUEST_ID: 'requestId'
         },
@@ -280,7 +281,7 @@ const MESSAGES = {
         },
         PAGE_LOST: {
             TYPE: 'page-lost',
-            LOST: 'lost',
+            LOST: 'lost-uuid',
             PAGE: 'page-uuid',
             PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages',

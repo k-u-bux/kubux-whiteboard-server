@@ -67,8 +67,8 @@ class TeeStream extends Writable {
 
 const debugTee = new TeeStream( process.stdout, debugOutput );
 
-const debug = new Console({ stdout: debugNull, stderr: debugTee });
-// const debug = new Console({ stdout: debugOutput, stderr: debugTee });
+// const debug = new Console({ stdout: debugNull, stderr: debugTee });
+const debug = new Console({ stdout: debugOutput, stderr: debugTee });
 
 
 // Password hashing with scrypt (memory-hard, resistant to rainbow tables and brute-force)
@@ -786,13 +786,13 @@ function registerBoard(ws, boardId, clientId, requestId) {
         const response = {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD]: boardId,
-            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE_ID]: ws.pageId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE]: ws.pageId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.LAST_PAGE]: board.pageOrder[ board.pageOrder.length - 1 ],
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
         };
         ws.send(serialize(response));
         releaseBoard(boardId);
-        sendFullPage(ws, boardId, ws.pageId, requestId);
     }
 }
 
@@ -945,6 +945,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, requestId) => {
+    debug.log( `[SERVER] handling full page request, requestId = ${requestId}, data = `, data )
     const boardId = data.boardId || ws.boardId;
     if ( ! boardId ) { return; }
     if ( ! isUuid( boardId ) ) { return; }
@@ -952,15 +953,18 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
     assert(board);
     const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE];
     const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
+    debug.log( "[SERVER] handling full page request", `pageId = ${pageId}, delta = ${delta}`)
     if ( pageId != undefined && isUuid( pageId ) && delta != undefined ) {
-        resolvedPageId = findPage( board, data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE] );
-        if ( data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] ) {
-            ws.pageId = resolvedPageId;
-        }
-        if ( delta != 0 || resolvedPageId == pageId ) {
-            sendFullPage( ws, boardId, resolvedPageId, requestId );
-        } else {
+        resolvedPageId = findPage( board, pageId, delta );
+        if ( resolvedPageId !== pageId ) {
+            debug.log( "handling full page request, page lost", `${resolvedPageId} vs. ${pageId}`)
             sendPageLost( ws, boardId, pageId, resolvedPageId, requestId );
+        } else {
+            debug.log( "handling full page request, full page", `${resolvedPageId} vs. ${pageId}`)
+            if ( data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] ) {
+                ws.pageId = resolvedPageId;
+            }
+            sendFullPage( ws, boardId, resolvedPageId, requestId );
         }
     }
     releaseBoard( boardId );
@@ -1253,7 +1257,7 @@ function routeMessage(ws, message) {
         }
         
         // debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}':`, serialize( data ) );
-        debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}'` );
+        debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}', data = `, data );
         
         const handler = messageHandlers[data.type];
         if (handler) {
