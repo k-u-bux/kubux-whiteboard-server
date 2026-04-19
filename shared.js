@@ -233,6 +233,7 @@ const MESSAGES = {
         MOD_ACTION_PROPOSALS: {
             TYPE: 'mod-action-proposals',
             PASSWORD: 'passwd',
+            BOARD: 'board-uuid',
             PAGE: 'page-uuid',
             PAYLOAD: 'payload',
             BEFORE_HASH: 'before-hash'
