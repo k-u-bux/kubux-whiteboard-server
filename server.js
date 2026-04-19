@@ -1247,7 +1247,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     releasePage(pageId);
     releaseBoard(boardId);
     ws.send(serialize(replayMessage));
-    logSentMessage(replayMessage.type, replayMessage, requestId, wc.clientId);
+    logSentMessage(replayMessage.type, replayMessage, requestId, ws.clientId);
 };
 
 function routeMessage(ws, message) {
