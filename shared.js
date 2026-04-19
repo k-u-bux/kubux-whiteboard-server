@@ -508,7 +508,7 @@ function is_invalid_FULL_PAGE_REQUESTS_message(data) {
     
     // boardId can come from data or ws.boardId (checked in handler)
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD];
-    if (boardId !== undefined && !isUuid(boardId)) return true;
+    if (!boardId || !isUuid(boardId)) return true;
     
     const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE];
     if (pageId !== undefined && !isUuid(pageId)) return true;
@@ -527,7 +527,7 @@ function is_invalid_MOD_ACTION_PROPOSALS_message(data) {
     
     // boardId can come from data or ws.boardId (checked in handler)
     const boardId = data.boardId;
-    if (boardId !== undefined && !isUuid(boardId)) return true;
+    if (!boardId || !isUuid(boardId)) return true;
     
     const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
     if (!password || typeof password !== 'string') return true;
@@ -549,7 +549,7 @@ function is_invalid_REPLAY_REQUESTS_message(data) {
     
     // boardId can come from data or ws.boardId (checked in handler)
     const boardId = data.boardId;
-    if (boardId !== undefined && !isUuid(boardId)) return true;
+    if (!boardId || !isUuid(boardId)) return true;
     
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     if (!pageUuid || !isUuid(pageUuid)) return true;
