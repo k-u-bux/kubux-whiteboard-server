@@ -535,8 +535,8 @@ function is_invalid_MOD_ACTION_PROPOSALS_message(data) {
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE];
     if (!pageUuid || !isUuid(pageUuid)) return true;
     
-    const action = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
-    if (is_invalid_action_payload(action)) return true;
+    // const action = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+    // if (is_invalid_action_payload(action)) return true;
     
     const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH];
     if (beforeHash !== undefined && typeof beforeHash !== 'string') return true;
@@ -561,7 +561,7 @@ function is_invalid_REPLAY_REQUESTS_message(data) {
     if (!presentHash || typeof presentHash !== 'string') return true;
     
     const register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER];
-    if (register !== undefined && typeof register !== 'boolean') return true;
+    if (register === undefined || typeof register !== 'boolean') return true;
     
     return false;
 }
