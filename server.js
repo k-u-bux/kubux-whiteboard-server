@@ -592,8 +592,8 @@ httpServer.listen(serverPort, () => {
 });
 
 
-function logSentMessage(type, payload, requestId = 'N/A') {
-    debug.log(`[SERVER > CLIENT] Sending message of type '${type}' in response to '${requestId}' with payload:`, payload);
+function logSentMessage(type, payload, requestId = 'N/A', clientId = 'unknown' ) {
+    debug.log(`[SERVER > CLIENT] Sending message of type '${type}' to '${clientId}' in response to '${requestId}' with payload:`, payload);
 }
 
 function broadcastMessageToBoard(message, boardId, excludeWs = null) {
@@ -639,7 +639,7 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
         
         releasePage(pageId);
         ws.send(serialize(message));
-        logSentMessage(message.type, message, requestId);
+        logSentMessage(message.type, message, requestId, ws.clientId);
     }
     releaseBoard(boardId);
 }
@@ -667,7 +667,7 @@ function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
     };
     releaseBoard(boardId);
     ws.send(serialize(message));
-    logSentMessage(message.type, message, requestId);
+    logSentMessage(message.type, message, requestId, ws.clientId);
 }
 
 function sendPageLost(ws, boardId, requestedPageId, foundPageId, do_switch, requestId) {
@@ -686,7 +686,7 @@ function sendPageLost(ws, boardId, requestedPageId, foundPageId, do_switch, requ
     };
     releaseBoard(boardId);
     ws.send(serialize(message));
-    logSentMessage(message.type, message, requestId);
+    logSentMessage(message.type, message, requestId, ws.clientId);
 }
 
 
@@ -714,7 +714,7 @@ function ping_client_with_page ( client, pageId, board ) {
     releaseBoard(client.boardId);
     
     client.send(serialize(message));
-    logSentMessage(message.type, message, 'N/A');
+    logSentMessage(message.type, message, 'N/A', client);
 }
 
 function ping_client( client ) {
@@ -768,7 +768,7 @@ function createNewBoard(ws, clientId, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
         };
         ws.send(serialize(response));
-        logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, response, requestId );
+        logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, response, requestId, clientId );
         releaseBoard(boardId);
         sendFullPage(ws, boardId, ws.pageId, true, requestId);
     }
@@ -1056,7 +1056,7 @@ function sendDeclineMessage(context, reason, requestId) {
         reason
     );
     context.ws.send(serialize(declineMessage));
-    logSentMessage(declineMessage.type, declineMessage, requestId);
+    logSentMessage(declineMessage.type, declineMessage, requestId, context.ws.clientId);
 }
 
 // Handler for modification actions
@@ -1083,7 +1083,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         if ( !password || password != board.passwd ) {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, "unauthorized");
             ws.send(serialize(declineMessage));
-            logSentMessage(declineMessage.type, declineMessage, requestId);
+            logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
             releaseBoard(boardId);
             return;
         }
@@ -1169,14 +1169,14 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.TOTAL_PAGES]: board.pageOrder.length
             };
             ws.send(serialize(acceptMessage));
-            logSentMessage(acceptMessage.type, acceptMessage, requestId);
+            logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
             
             // Broadcast to other clients
             broadcastMessageToBoard(acceptMessage, boardId, ws);
         } else {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, reason);
             ws.send(serialize(declineMessage));
-            logSentMessage(declineMessage.type, declineMessage, requestId);
+            logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
         }
         
         releaseBoard(boardId);
@@ -1247,7 +1247,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     releasePage(pageId);
     releaseBoard(boardId);
     ws.send(serialize(replayMessage));
-    logSentMessage(replayMessage.type, replayMessage, requestId);
+    logSentMessage(replayMessage.type, replayMessage, requestId, ws.clientId);
 };
 
 function routeMessage(ws, message) {
