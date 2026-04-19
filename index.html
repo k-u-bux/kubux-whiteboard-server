@@ -2402,7 +2402,7 @@
           
           let pageData = null;
     
-          if ( pageUuid !== currenPageUuid ) {
+          if ( pageUuid !== currentPageUuid ) {
               pageData = loadPageFromCache( pageUuid );
               pageData['hashes'] = [ shared.hashAny( pageUuid ) ];
               for ( let i = 0; i < pageData['history'].length; ++ i ) {
@@ -2525,7 +2525,7 @@
           } );
           
           if ( do_switch ) {
-              currenPageUuid = pageUuid;
+              currentPageUuid = pageUuid;
               history = pageHist;
               present = pagePres;
               hashes = pageHashes;
