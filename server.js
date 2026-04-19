@@ -1212,7 +1212,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
 
     if (pageId !== pageUuid) {
         debug.log(`[SERVER] Hash ${pageUuid} has been replaced by ${pageId}.`);
-        sendPageLost( ws, boardId, pageUuid, pageId, do_switch, requestId )
+        sendPageLost( ws, boardId, pageUuid, pageId, do_register, requestId )
         releaseBoard(boardId);
         return;
     }
@@ -1220,7 +1220,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const page = usePage(pageId);
     if (page.hashes[present] !== presentHash) {
         debug.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending page info`);
-        sendPageInfo( ws, boardId, pageId, do_switch, requestId );
+        sendPageInfo( ws, boardId, pageId, do_register, requestId );
         releasePage(pageId);
         releaseBoard(boardId);
         return;
