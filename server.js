@@ -897,7 +897,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
 
 // Handler for board registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_REGISTER_BOARD_message( data ) ) { return; } else { debug.log(`[SERVER] dropped register board request from `, ws.clientId); }
+    if ( is_invalid_REGISTER_BOARD_message( data ) ) { return; } else { debug.log(`[SERVER] dropped register page request from `, ws.clientId); }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
     let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD];
     if ( boardId && isUuid( boardId ) ) {
@@ -909,7 +909,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
 
 // Handler for page registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_CREATE_BOARD_message( data ) ) { return; } else { debug.log(`[SERVER] dropped register page request from `, ws.clientId); }
+    if ( is_invalid_REGISTER_PAGE_message( data ) ) { return; } else { debug.log(`[SERVER] dropped register page request from `, ws.clientId); }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID];
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE];
