@@ -2070,6 +2070,8 @@
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE];
           const pageNumber = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
           const pageTotal = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
+          const pageSnapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS];
+          const do_switch = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH];
           
           debugLog('Page info received', {
               requestId,
@@ -2077,6 +2079,7 @@
           });
           
           pagesMetaData[ pageUuid ] = [ pageNumber, pageTotal ];
+          requestFullPage( pageUuid, do_switch )
       }
       
       // Handle page lost response (page deletion with redirection)
