@@ -2496,7 +2496,7 @@
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
           const pageHist = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
           const pagePres = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
-          let pagehashes = [ shared.hashAny( pageUuid ) ];
+          let pageHashes = [ shared.hashAny( pageUuid ) ];
           for ( let i = 0; i < history.length; ++ i ) {
               pageHashes.push( shared.hashNext( pageHashes[ i ], pageHist[ i ] ) );
           }
