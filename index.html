@@ -2079,7 +2079,25 @@
           });
           
           pagesMetaData[ pageUuid ] = [ pageNumber, pageTotal ];
-          requestFullPage( pageUuid, do_switch )
+          pageData = loadPageFromCache( pageUuid );
+          pageHashes = [ shared.hashAny( pageUuid ) ];
+          for ( let i = 0; i < pageData['history'].length; ++ i ) {
+              pageHashes.push( shared.hashNext( pageHashes[ i ], pageData['history'][ i ] ) );
+          }
+
+          for ( let j = pageSnapshots.length - 1; j >= 0; --j ) {
+              const snapshot = pageSnapshots[ j ];
+              const index = pageHashes.indexOf( snapshot );
+              if ( index >= 0 ) {
+                  pageData['present'] = index;
+                  pageData['hash'] = snapshot;
+                  savePageToCache( pageUuid, pageData );
+                  requestReplay( pageUuid, do_switch );
+                  return;
+              }
+          }          
+
+          requestFullPage( pageUuid, do_switch );
       }
       
       // Handle page lost response (page deletion with redirection)
