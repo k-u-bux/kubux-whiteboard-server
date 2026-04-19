@@ -239,6 +239,7 @@ const MESSAGES = {
         },
         REPLAY_REQUESTS: {
             TYPE: 'replay-requests',
+            BOARD: 'board-uuid',
             PAGE: 'page-uuid',
             PRESENT: 'present',
             PRESENT_HASH: 'present-hash',
@@ -564,17 +565,6 @@ function is_invalid_REPLAY_REQUESTS_message(data) {
     
     return false;
 }
-
-
-// These validation functions:
-// - Check type and structure
-// - Validate all UUIDs with `isUuid()`
-// - Ensure `delta` is a finite number when present
-// - Validate `present` is non-negative integer
-// - Check action payloads have required fields and valid types
-// - Allow optional fields (like `boardId` from ws context)
-
-
 
 
 // Affine transformations

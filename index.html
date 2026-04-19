@@ -2619,6 +2619,7 @@
           if ( pageUuid !== currentPageUuid ) {
               const request = {
                   type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: pageData[ 'present' ],
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: pageData[ 'hash' ],
@@ -2630,6 +2631,7 @@
           } else {          
               const request = {
                   type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: currentPageUuid,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
