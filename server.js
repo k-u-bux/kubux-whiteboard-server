@@ -767,6 +767,7 @@ const messageHandlers = {};
 function createNewBoard(ws, clientId, requestId) {
     const boardId = generateSecureUuid();
     const board = createBoard(boardId);
+    ws.boardId = boardId;
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
         ws.clientId = clientId; // Store client ID for tracking
@@ -934,6 +935,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, reque
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA];
+    ws.boardId = boardId;
     if ( boardId && isUuid( boardId ) && pageId && isUuid( pageId ) ) {
         registerPage(ws, boardId, clientId, pageId, delta, requestId);
     } else {
@@ -948,6 +950,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
         return;
     }
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD];
+    ws.boardId = boardId;
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
     let do_switch =  data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER];
@@ -993,7 +996,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
         return;
     }
     debug.log( `[SERVER] handling full page request, requestId = ${requestId}, data = `, data )
-    const boardId = data.boardId || ws.boardId;
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD];
+    ws.boardId = boardId;
     if ( ! boardId ) { return; }
     if ( ! isUuid( boardId ) ) { return; }
     const board = useBoard( boardId );
@@ -1109,7 +1113,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         return;
     }
     try {
-        const boardId = data.boardId || ws.boardId;
+        const boardId = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD];
+        ws.boardId = boardId;
         const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
         const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE];
         const action = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
@@ -1234,7 +1239,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         // Send a decline message with the error
         if (ws && data) {
             const errorContext = {
-                boardId: data.boardId || ws.boardId,
+                boardId: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD],
                 pageUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE],
                 actionUuid: data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]?.[MOD_ACTIONS.UUID],
                 ws
@@ -1249,7 +1254,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
         debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
         return;
     }
-    const boardId = data.boardId || ws.boardId;
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD];
+    ws.boardId = boardId;
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
     const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH];
@@ -1306,16 +1312,7 @@ function routeMessage(ws, message) {
         const data = deserialize(message);
         const requestId = data.requestId || data['action-uuid'] || 'N/A';
         
-        // Extract boardId from message or use stored one
-        const boardId = data.boardId || ws.boardId;
-        
-        // If the message includes a boardId, update the WebSocket client
-        if (data.boardId && data.boardId !== ws.boardId) {
-            ws.boardId = data.boardId;
-        }
-        
-        // debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}':`, serialize( data ) );
-        debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${boardId}', data = `, data );
+        debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );
         
         const handler = messageHandlers[data.type];
         if (handler) {
