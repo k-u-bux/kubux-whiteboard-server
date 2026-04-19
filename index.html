@@ -2539,10 +2539,13 @@
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
           const pageHist = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
           const pagePres = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
+          const page_nr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
+          const n_pages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
           let pageHashes = [ shared.hashAny( pageUuid ) ];
           for ( let i = 0; i < history.length; ++ i ) {
               pageHashes.push( shared.hashNext( pageHashes[ i ], pageHist[ i ] ) );
           }
+          pagesMetaData[ pageUuid ] = [ page_nr, n_pages ];
           savePageToCache( pageUuid, {
               history: pageHist,
               present: pagePres,
@@ -2562,8 +2565,8 @@
               updateVisualState();
               
               // Update page info
-              pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
-              totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
+              pageNr = page_nr;
+              totalPages = n_pages;
               updatePageInfo();
               
               // Update UI
