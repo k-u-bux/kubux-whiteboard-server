@@ -813,7 +813,7 @@ function findPage ( board, pageId, delta ) {
     return ( board.pageOrder[newIndex] );
 }
 
-function describePage(ws, boardId, pageId, delta, requestId) {
+function describePage(ws, boardId, pageId, delta, do_switch, requestId) {
     const board = useBoard(boardId);
     if ( board ) {
         const resolvedPageId = findPage( board, pageId, delta );
@@ -834,6 +834,7 @@ function describePage(ws, boardId, pageId, delta, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: board.pageOrder.length,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REGISTER]: do_switch,           
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
         };
         ws.send(serialize(response));
@@ -889,6 +890,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
 
 // Handler for board registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_REGISTER_BOARD_message( data ) ) { return; }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
     let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD];
     if ( boardId && isUuid( boardId ) ) {
@@ -900,6 +902,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
 
 // Handler for page registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_CREATE_BOARD_message( data ) ) { return; }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID];
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE];
@@ -913,11 +916,13 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, reque
 
 // Handler for page info
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_PAGE_INFO_REQUEST_message( data ) ) { return; }
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
+    let do_switch =  data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER];
     if ( boardId && isUuid( boardId ) && pageId && isUuid( pageId ) ) {
-        describePage(ws, boardId, pageId, delta, requestId);
+        describePage(ws, boardId, pageId, delta, do_switch, requestId);
     } else {
         debug.error( `Client ${clientId} wants to register invalid page ${pageId}` );
     }
@@ -925,6 +930,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
 
 // Handler for board creation
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_CREATE_BOARD_message( data ) ) { return; }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
     
@@ -949,7 +955,9 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_FULL_PAGE_REQUESTS_message( data ) ) { return; }
     debug.log( `[SERVER] handling full page request, requestId = ${requestId}, data = `, data )
+    if ( is_invalid_FULL_PAGE_REQUESTS_message( data ) ) { return; }
     const boardId = data.boardId || ws.boardId;
     if ( ! boardId ) { return; }
     if ( ! isUuid( boardId ) ) { return; }
@@ -1061,6 +1069,7 @@ function sendDeclineMessage(context, reason, requestId) {
 
 // Handler for modification actions
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_MOD_ACTION_PROPOSALS_message( data ) ) { return; }
     try {
         const boardId = data.boardId || ws.boardId;
         const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
@@ -1198,6 +1207,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_REPLAY_REQUESTS_message( data ) ) { return; }
     const boardId = data.boardId || ws.boardId;
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];

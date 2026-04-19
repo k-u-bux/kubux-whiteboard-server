@@ -213,6 +213,7 @@ const MESSAGES = {
             BOARD: 'board-uuid',
             PAGE: 'page-uuid',
             DELTA: 'delta',
+            REGISTER: 'register',
             REQUEST_ID: 'requestId'
         },
         CREATE_BOARD: {
@@ -396,6 +397,184 @@ const JOIN_STYLES = {
 const PEN_TYPE_STRINGS = ["marker", "pencil", "highlighter", "brush"];
 const CAP_STYLE_STRINGS = ["round", "butt", "square"];
 const JOIN_STYLE_STRINGS = ["round", "bevel", "miter"];
+
+
+// some validation routines
+// ========================
+
+// Helper for validating action payloads
+function is_invalid_action_payload(action) {
+    if (!action || typeof action !== 'object') return true;
+    if (!action[MOD_ACTIONS.UUID] || typeof action[MOD_ACTIONS.UUID] !== 'string') return true;
+    if (!action[MOD_ACTIONS.TYPE] || typeof action[MOD_ACTIONS.TYPE] !== 'string') return true;
+    
+    const validTypes = [
+        MOD_ACTIONS.DRAW.TYPE,
+        MOD_ACTIONS.ERASE.TYPE,
+        MOD_ACTIONS.GROUP.TYPE,
+        MOD_ACTIONS.UNDO.TYPE,
+        MOD_ACTIONS.REDO.TYPE,
+        MOD_ACTIONS.NEW_PAGE.TYPE,
+        MOD_ACTIONS.DELETE_PAGE.TYPE
+    ];
+    
+    if (!validTypes.includes(action[MOD_ACTIONS.TYPE])) return true;
+    
+    // Type-specific validation
+    switch (action[MOD_ACTIONS.TYPE]) {
+        case MOD_ACTIONS.DRAW.TYPE:
+            if (!action[MOD_ACTIONS.DRAW.STROKE] || typeof action[MOD_ACTIONS.DRAW.STROKE] !== 'object') return true;
+            break;
+        case MOD_ACTIONS.ERASE.TYPE:
+            if (!action[MOD_ACTIONS.ERASE.TARGET_ACTION] || typeof action[MOD_ACTIONS.ERASE.TARGET_ACTION] !== 'string') return true;
+            break;
+        case MOD_ACTIONS.GROUP.TYPE:
+            if (!Array.isArray(action[MOD_ACTIONS.GROUP.ACTIONS])) return true;
+            break;
+        case MOD_ACTIONS.UNDO.TYPE:
+            if (!action[MOD_ACTIONS.UNDO.TARGET_ACTION] || typeof action[MOD_ACTIONS.UNDO.TARGET_ACTION] !== 'string') return true;
+            break;
+        case MOD_ACTIONS.REDO.TYPE:
+            if (!action[MOD_ACTIONS.REDO.TARGET_ACTION] || typeof action[MOD_ACTIONS.REDO.TARGET_ACTION] !== 'string') return true;
+            break;
+    }
+    
+    return false;
+}
+
+function is_invalid_REGISTER_BOARD_message(data) {
+    if (!data || typeof data !== 'object') return true;
+    
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD];
+    if (!boardId || !isUuid(boardId)) return true;
+    
+    const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
+    if (clientId !== undefined && typeof clientId !== 'string') return true;
+    
+    return false;
+}
+
+function is_invalid_REGISTER_PAGE_message(data) {
+    if (!data || typeof data !== 'object') return true;
+    
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD];
+    if (!boardId || !isUuid(boardId)) return true;
+    
+    const pageId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE];
+    if (!pageId || !isUuid(pageId)) return true;
+    
+    const delta = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA];
+    if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
+    
+    const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID];
+    if (clientId !== undefined && typeof clientId !== 'string') return true;
+    
+    return false;
+}
+
+function is_invalid_PAGE_INFO_REQUEST_message(data) {
+    if (!data || typeof data !== 'object') return true;
+    
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD];
+    if (!boardId || !isUuid(boardId)) return true;
+    
+    const pageId = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE];
+    if (!pageId || !isUuid(pageId)) return true;
+    
+    const delta = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
+    if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
+    
+    const register = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.REGISTER];
+    if (register !== undefined && typeof register !== 'boolean') return true;
+    
+    return false;
+}
+
+function is_invalid_CREATE_BOARD_message(data) {
+    if (!data || typeof data !== 'object') return true;
+    
+    const password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
+    if (!password || typeof password !== 'string') return true;
+    
+    const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
+    if (clientId !== undefined && typeof clientId !== 'string') return true;
+    
+    return false;
+}
+
+function is_invalid_FULL_PAGE_REQUESTS_message(data) {
+    if (!data || typeof data !== 'object') return true;
+    
+    // boardId can come from data or ws.boardId (checked in handler)
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD];
+    if (boardId !== undefined && !isUuid(boardId)) return true;
+    
+    const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE];
+    if (pageId !== undefined && !isUuid(pageId)) return true;
+    
+    const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
+    if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
+    
+    const register = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER];
+    if (register !== undefined && typeof register !== 'boolean') return true;
+    
+    return false;
+}
+
+function is_invalid_MOD_ACTION_PROPOSALS_message(data) {
+    if (!data || typeof data !== 'object') return true;
+    
+    // boardId can come from data or ws.boardId (checked in handler)
+    const boardId = data.boardId;
+    if (boardId !== undefined && !isUuid(boardId)) return true;
+    
+    const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
+    if (!password || typeof password !== 'string') return true;
+    
+    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE];
+    if (!pageUuid || !isUuid(pageUuid)) return true;
+    
+    const action = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
+    if (is_invalid_action_payload(action)) return true;
+    
+    const beforeHash = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH];
+    if (beforeHash !== undefined && typeof beforeHash !== 'string') return true;
+    
+    return false;
+}
+
+function is_invalid_REPLAY_REQUESTS_message(data) {
+    if (!data || typeof data !== 'object') return true;
+    
+    // boardId can come from data or ws.boardId (checked in handler)
+    const boardId = data.boardId;
+    if (boardId !== undefined && !isUuid(boardId)) return true;
+    
+    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
+    if (!pageUuid || !isUuid(pageUuid)) return true;
+    
+    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
+    if (present === undefined || typeof present !== 'number' || !Number.isInteger(present) || present < 0) return true;
+    
+    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH];
+    if (!presentHash || typeof presentHash !== 'string') return true;
+    
+    const register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER];
+    if (register !== undefined && typeof register !== 'boolean') return true;
+    
+    return false;
+}
+
+
+// These validation functions:
+// - Check type and structure
+// - Validate all UUIDs with `isUuid()`
+// - Ensure `delta` is a finite number when present
+// - Validate `present` is non-negative integer
+// - Check action payloads have required fields and valid types
+// - Allow optional fields (like `boardId` from ws context)
+
+
 
 
 // Affine transformations
@@ -1287,6 +1466,14 @@ if (typeof module !== 'undefined' && module.exports) {
         TRANSFORM,
         STROKE_STYLES,
         VISUAL_STATE,
+        // validation
+        is_invalid_REGISTER_BOARD_message,
+        is_invalid_REGISTER_PAGE_message,
+        is_invalid_PAGE_INFO_REQUEST_message,
+        is_invalid_CREATE_BOARD_message,
+        is_invalid_FULL_PAGE_REQUESTS_message,
+        is_invalid_REPLAY_REQUESTS_message,
+        is_invalid_MOD_ACTION_PROPOSALS_message,
         // transforms
         createIdentityTransform,
         applyTransform,
