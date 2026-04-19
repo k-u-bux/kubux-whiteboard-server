@@ -2052,6 +2052,7 @@
           currentPageUuid  = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE];
           pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.PAGE_NR];
           totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES];
+          pagesMetaData[ currentPageUuid ] = [ pageNr, totalPages ];
           
           debugLog('Page registered successfully', {
               requestId,
@@ -2178,6 +2179,7 @@
           if (pageNr !== pingPageNr || totalPages !== pingTotalPages) {
               pageNr = pingPageNr;
               totalPages = pingTotalPages;
+              pagesMetaData[ currentPageUuid ] = [ pageNr, totalPages ];
               updatePageInfo();
           }
           
@@ -2386,17 +2388,39 @@
       
       // Handle replay message from server
       function handleReplayMessage(data) {
-          const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.UUID];
+          const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE];
+          const pageNumber = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR];
+          const pageTotal = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES];
+          pagesMetaData[ pageUuid ] = [ pageNumber, pageTotal ];
+
           const beforeHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.BEFORE_HASH];
           const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH];
           const replaySequence = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE];
           const serverPresent = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PRESENT];
           const currentHash = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.CURRENT_HASH];
+          const do_switch = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.SWITCH];
           
+          let pageData = null;
+    
+          if ( pageUuid !== currenPageUuid ) {
+              pageData = loadPageFromCache( pageUuid );
+              pageData['hashes'] = [ shared.hashAny( pageUuid ) ];
+              for ( let i = 0; i < pageData['history'].length; ++ i ) {
+                  pageData['hashes'].push( shared.hashNext( pageData['hashes[ i ]'], pagaData['history'][ i ] ) );
+              }
+          } else {
+              pageData = {
+                  history: history,
+                  present: present,
+                  hash: hashes[present],
+                  hashes: hashes
+              };
+          }
+
           // Find index where replay should start (matching beforeHash)
           let startIndex = -1;
-          for (let i = 0; i < hashes.length; i++) {
-              if (hashes[i] === beforeHash) {
+          for ( let i = 0; i < pageData['hashes'].length; i++ ) {
+              if ( pageData['hashes'][i] === beforeHash ) {
                   startIndex = i;
                   break;
               }
@@ -2406,84 +2430,78 @@
               // Cannot find matching hash - need full page refresh
               debugLog("Replay hash not found in our chain, requesting full page", {
                   beforeHash,
-                  ourHashes: hashes
+                  ourHashes: pageData['hashes']
               });
-              requestFullPage(pageUuid, true);
+              requestFullPage(pageUuid, do_switch);
               return;
           }
           
           // Apply replay edits to the history
           if (replaySequence && replaySequence.length > 0) {
               // Remove any conflicting history after the replay point
-              history = history.slice(0, startIndex);
-              hashes = hashes.slice(0, startIndex + 1);
+              pageData['history'] = pageData['history'].slice(0, startIndex);
+              pageData['hashes'] = pageData['hashes'].slice(0, startIndex + 1);
               
               // Add the replayed actions to history
               for (let i = 0; i < replaySequence.length; i++) {
                   const action = replaySequence[i];
-                  history.push(action);
+                  pageData['history'].push(action);
                   
                   // Calculate new hash for each action
-                  const lastHash = hashes[hashes.length - 1];
+                  const lastHash = pageData['hashes'][pageData['hashes'].length - 1];
                   const newHash = shared.hashNext(lastHash, action);
                   hashes.push(newHash);
               }
               
               // Verify final hash matches afterHash
-              const finalHash = hashes[hashes.length - 1];
+              const finalHash = pageData['hashes'][pageData['hashes'].length - 1];
               if (finalHash !== afterHash) {
                   debugLog("Hash mismatch after replay", {
                       calculatedHash: finalHash,
                       expectedHash: afterHash
                   });
-                  requestFullPage(pageUuid, true);
+                  requestFullPage(pageUuid, do_switch);
                   return;
               }
           }
           
           // Update present position
-          present = serverPresent;
+          pagaData['present'] = serverPresent;          
           
-          // Update verified index to match present after replay
-          verifiedIndex = present;
-          
-          if (hashes[present] !== currentHash) {
+          if (pageData['hashes'][pageData['present']] !== currentHash) {
               debugLog("Current hash mismatch after replay", {
-                  ourHash: hashes[present],
+                  ourHash: pageData['hashes'][pageData['present']],
                   serverHash: currentHash
               });
-              requestFullPage(pageUuid, true);
+              requestFullPage(pageUuid, do_switch);
               return;
           }
           
-          // Recompile visual state
-          updateVisualState();
-          
-          // Update page info
-          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR];
-          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES];
-          updatePageInfo();
-          
-          // Update UI
-          updateSyncStatus();
-          updateUndoRedoButtons();
-          
-          // Cache verification successful - reset flag
-          // cacheVerificationInProgress = false;
-          
           // Update cache with new state
           savePageToCache(pageUuid, {
-              history: history,
-              present: present,
-              hash: hashes[present]
+              history: pageData['history'],
+              present: pageData['present'],
+              hash: pageData['hashes'][pageData['present']]
           });
           
-          debugLog("Replay applied successfully", {
-              replaySequenceLength: replaySequence.length,
-              historyLength: history.length,
-              present: present,
-              verifiedIndex: verifiedIndex
-          });
+          if ( do_switch ) {
+              // Recompile visual state
+              updateVisualState();
+              // Update verified index to match present after replay
+              verifiedIndex = present;
+              // Update page info
+              pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR];
+              totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES];
+              updatePageInfo();
+              
+              // Update UI
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              
+              // Cache verification successful - reset flag
+              // cacheVerificationInProgress = false;
+          }
+          debugLog("Replay applied successfully", pageData);
       }
       
       // Track if we are in a cache verification cycle to avoid infinite loops
@@ -2528,11 +2546,7 @@
               updateUndoRedoButtons();
               
               // Save this page to cache
-              savePageToCache(currentPageUuid, {
-                  history: history,
-                  present: present,
-                  hash: hashes[present]
-              });
+              commitCurrentPage();
               
               // After loading initial page, check if we should restore saved position
               if (!hasRestoredSavedPosition && window.savedPagePosition) {
@@ -4659,6 +4673,15 @@
       function loadPageFromCache(pageUuid) {
           const result = loadItem(pageUuid);
           return result;
+      }
+
+      function commitCurrentPage() {
+          pagesMetaData[ currentPageUuid ] = [ pageNr, totalPages ];
+          savePageToCache(currentPageUuid, {
+                  history: history,
+                  present: present,
+                  hash: hashes[present]
+              });
       }
 
       // Navigate to next/previous page
