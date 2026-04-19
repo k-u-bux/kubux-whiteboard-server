@@ -2485,6 +2485,10 @@
           });
           
           if ( do_switch ) {
+              currentPageUuid = pageUuid;
+              history = pageData['history'];
+              present = pageData['present'];
+              hashes = pageData['hashes'];
               // Recompile visual state
               updateVisualState();
               // Update verified index to match present after replay
