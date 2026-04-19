@@ -897,7 +897,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
 
 // Handler for board registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_REGISTER_BOARD_message( data ) ) { return; }
+    if ( is_invalid_REGISTER_BOARD_message( data ) ) { return; } else { debug.log(`[SERVER] dropped register board request from `, ws.clientId); }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
     let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD];
     if ( boardId && isUuid( boardId ) ) {
@@ -909,7 +909,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
 
 // Handler for page registration
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_CREATE_BOARD_message( data ) ) { return; }
+    if ( is_invalid_CREATE_BOARD_message( data ) ) { return; } else { debug.log(`[SERVER] dropped register page request from `, ws.clientId); }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID];
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE];
@@ -923,7 +923,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, reque
 
 // Handler for page info
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_PAGE_INFO_REQUEST_message( data ) ) { return; }
+    if ( is_invalid_PAGE_INFO_REQUEST_message( data ) ) { return; } else { debug.log(`[SERVER] dropped page info request from `, ws.clientId); }
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
@@ -937,7 +937,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
 
 // Handler for board creation
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_CREATE_BOARD_message( data ) ) { return; }
+    if ( is_invalid_CREATE_BOARD_message( data ) ) { return; } else { debug.log(`[SERVER] dropped create board request from `, ws.clientId); }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
     
@@ -962,7 +962,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_FULL_PAGE_REQUESTS_message( data ) ) { return; }
+    if ( is_invalid_FULL_PAGE_REQUESTS_message( data ) ) { return; } else { debug.log(`[SERVER] dropped full page request from `, ws.clientId); }
     debug.log( `[SERVER] handling full page request, requestId = ${requestId}, data = `, data )
     if ( is_invalid_FULL_PAGE_REQUESTS_message( data ) ) { return; }
     const boardId = data.boardId || ws.boardId;
@@ -1076,7 +1076,7 @@ function sendDeclineMessage(context, reason, requestId) {
 
 // Handler for modification actions
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_MOD_ACTION_PROPOSALS_message( data ) ) { return; }
+    if ( is_invalid_MOD_ACTION_PROPOSALS_message( data ) ) { return; } else { debug.log(`[SERVER] dropped mod action proposal from `, ws.clientId); }
     try {
         const boardId = data.boardId || ws.boardId;
         const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
@@ -1214,7 +1214,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_REPLAY_REQUESTS_message( data ) ) { return; }
+    if ( is_invalid_REPLAY_REQUESTS_message( data ) ) { return; } else { debug.log(`[SERVER] dropped replay request from `, ws.clientId); }
     const boardId = data.boardId || ws.boardId;
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
