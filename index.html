@@ -2406,7 +2406,7 @@
               pageData = loadPageFromCache( pageUuid );
               pageData['hashes'] = [ shared.hashAny( pageUuid ) ];
               for ( let i = 0; i < pageData['history'].length; ++ i ) {
-                  pageData['hashes'].push( shared.hashNext( pageData['hashes[ i ]'], pagaData['history'][ i ] ) );
+                  pageData['hashes'].push( shared.hashNext( pageData['hashes[ i ]'], pageData['history'][ i ] ) );
               }
           } else {
               pageData = {
@@ -2466,7 +2466,7 @@
           }
           
           // Update present position
-          pagaData['present'] = serverPresent;          
+          pageData['present'] = serverPresent;          
           
           if (pageData['hashes'][pageData['present']] !== currentHash) {
               debugLog("Current hash mismatch after replay", {
