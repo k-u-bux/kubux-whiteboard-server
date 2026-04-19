@@ -526,7 +526,7 @@ function is_invalid_MOD_ACTION_PROPOSALS_message(data) {
     if (!data || typeof data !== 'object') return true;
     
     // boardId can come from data or ws.boardId (checked in handler)
-    const boardId = data.boardId;
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
     
     const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
