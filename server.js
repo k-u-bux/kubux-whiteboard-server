@@ -1232,7 +1232,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_REPLAY_REQUESTS_message( data ) ) { 
-        debug.log(`[SERVER] dropped replay request from `, ws.clientId); 
+        debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
         return;
     }
     const boardId = data.boardId || ws.boardId;
