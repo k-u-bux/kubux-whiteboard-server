@@ -1322,7 +1322,10 @@ function routeMessage(ws, message) {
             throw new Error(`Unhandled message type: ${data.type}`);
         }
     } catch (e) {
-        debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );        debug.error('[SERVER] Error processing message:', e);
+        debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );        
+        debug.error('[SERVER] Error processing message:', e);
+        debug.error('[SERVER] Error processing message:', e.message);
+        debug.error('[SERVER] Error processing message:', e.stack);
         // Send an error message to the client if possible
         if (ws && ws.readyState === WebSocket.OPEN) {
             const errorMessage = {
