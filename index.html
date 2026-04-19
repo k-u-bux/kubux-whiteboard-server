@@ -2450,7 +2450,7 @@
                   // Calculate new hash for each action
                   const lastHash = pageData['hashes'][pageData['hashes'].length - 1];
                   const newHash = shared.hashNext(lastHash, action);
-                  hashes.push(newHash);
+                  pageData['hashes'].push(newHash);
               }
               
               // Verify final hash matches afterHash
