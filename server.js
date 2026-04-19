@@ -1311,10 +1311,11 @@ function routeMessage(ws, message) {
     try {
         const data = deserialize(message);
         const requestId = data.requestId || data['action-uuid'] || 'N/A';
+        const message_type = data['type'] || 'unknown';
+
+        debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );
         
-        debug.log(`[CLIENT > SERVER] Received message of type '${data.type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );
-        
-        const handler = messageHandlers[data.type];
+        const handler = messageHandlers[message_type];
         if (handler) {
             handler(ws, data, requestId);
         } else {
