@@ -2040,7 +2040,7 @@
               updateUndoRedoButtons();
               
               // Request replay to get any updates since we last visited
-              requestReplay();
+              requestReplay( currentPageUuid, true );
           } else {
               requestFullPage(currentPageUuid, true, 0);
           }
@@ -2212,7 +2212,7 @@
               // Server hash not found in our hash chain
               debugLog('Hash not found in our chain, requesting replay');
               adjustVerfiedIndex( pingSnapshots );
-              requestReplay();
+              requestReplay( currentPageUuid, true );
           } else if (matchingIndex !== present) {
               debugLog(`Server is at position ${matchingIndex}, we are at ${present}`);
               present = matchingIndex;
@@ -2269,7 +2269,7 @@
           if ( actionIndex === -1 ) {
               // Action not found in our history - request replay
               debugLog(`Accepted action ${acceptedActionUuid} not found in our history`);
-              requestReplay();
+              requestReplay( currentPageUuid, true );
               return;
           }
           if ( actionIndex < verifiedIndex ) {
@@ -2363,7 +2363,7 @@
           if (hashes[actionIndex] !== beforeHash || hashes[actionIndex + 1] !== afterHash) {
               // Hash mismatch - action was applied at different point in history
               debugLog(`Hash mismatch for action ${acceptedActionUuid}: client=${hashes[actionIndex]}/${hashes[actionIndex+1]} vs server=${beforeHash}/${afterHash}`);
-              requestReplay();
+              requestReplay( currentPageUuid, true );
               return;
           }
 
@@ -2404,7 +2404,7 @@
           }
           
           // Request replay to ensure we are in sync
-          requestReplay();
+          requestReplay( currentPageUuid, true );
       }
       
       // Handle replay message from server
