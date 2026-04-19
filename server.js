@@ -658,7 +658,7 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
 function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
-    pageId = existingPage(requestedPageId, board);
+    const pageId = existingPage(requestedPageId, board);
     const page = usePage(pageId);
     const pageHistory = page.history;
     const pagePresent = page.present;
@@ -687,12 +687,13 @@ function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
 function sendPageLost(ws, boardId, requestedPageId, foundPageId, do_switch, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
-    const pageNr = board.pageOrder.indexOf(foundPageId) + 1;
+    const pageId = existingPage(requestedPageId, board);
+    const pageNr = board.pageOrder.indexOf(pageId) + 1;
     const totalPages = board.pageOrder.length;
     const message = {
         type: MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST]: requestedPageId,
-        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE]: foundPageId,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE]: pageId,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES]: totalPages,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.SWITCH]: do_switch,
@@ -1258,7 +1259,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const pageId = existingPage(pageUuid, board);
 
     if ( do_register ) {
-        ws.pageId = pageId;
+        ws.pageId = pageUuid;
     }
 
     if (pageId !== pageUuid) {
