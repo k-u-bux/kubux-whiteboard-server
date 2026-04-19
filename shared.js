@@ -277,6 +277,7 @@ const MESSAGES = {
             SNAPSHOTS: 'snapshots',
             PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages',
+            SWITCH: 'do-move',
             REQUEST_ID: 'requestId'
         },
         PAGE_LOST: {
@@ -285,6 +286,7 @@ const MESSAGES = {
             PAGE: 'page-uuid',
             PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages',
+            SWITCH: 'do-move',
             REQUEST_ID: 'requestId'
         },
         FULL_PAGE: {
@@ -294,7 +296,8 @@ const MESSAGES = {
             PRESENT: 'present',
             HASH: 'hash',
             PAGE_NR: 'pageNr',
-            TOTAL_PAGES: 'totalPages'
+            TOTAL_PAGES: 'totalPages',
+            SWITCH: 'do-move'
         },
         ACCEPT: {
             TYPE: 'accept',
@@ -321,7 +324,8 @@ const MESSAGES = {
             PRESENT: 'present',
             CURRENT_HASH: 'currentHash',
             PAGE_NR: 'pageNr',
-            TOTAL_PAGES: 'totalPages'
+            TOTAL_PAGES: 'totalPages',
+            SWITCH: 'do-move'
         },
         PING: {
             TYPE: 'ping',

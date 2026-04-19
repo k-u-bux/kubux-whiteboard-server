@@ -2492,50 +2492,62 @@
       
       // Handle full page message from server
       function handleFullPageMessage(data) {
-          currenPageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
-          history = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
-          present = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
-          hashes = [ shared.hashAny( currentPageUuid ) ];
+          const do_switch = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.SWITCH];
+          const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE];
+          const pageHist = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
+          const pagePres = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
+          let pagehashes = [ shared.hashAny( pageUuid ) ];
           for ( let i = 0; i < history.length; ++ i ) {
-              hashes.push( shared.hashNext( hashes[ i ], history[ i ] ) );
+              pageHashes.push( shared.hashNext( pageHashes[ i ], pageHist[ i ] ) );
           }
-          debugLog( "hashes = ", `${hashes}`);
+          savePageToCache( pageUuid, {
+              history: pageHist,
+              present: pagePres,
+              hash: pageHashes[present]
+          }
           
-          // Set verified index to present
-          verifiedIndex = present;
-          
-          // Recompile visual state
-          updateVisualState();
-          
-          // Update page info
-          pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
-          totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
-          updatePageInfo();
-          
-          // Update UI
-          updateSyncStatus();
-          updateUndoRedoButtons();
-          
-          // Save this page to cache
-          savePageToCache(currentPageUuid, {
-              history: history,
-              present: present,
-              hash: hashes[present]
-          });
-          
-          // After loading initial page, check if we should restore saved position
-          if (!hasRestoredSavedPosition && window.savedPagePosition) {
-              hasRestoredSavedPosition = true;
+          if ( do_switch ) {
+              currenPageUuid = pageUuid;
+              history = pageHist;
+              present = pagePres;
+              hashes = pageHashes;
               
-              // If the saved page is different from current, navigate to it
-              if (window.savedPagePosition.uuid !== currentPageUuid) {
-                  debugLog('Restoring saved page position', window.savedPagePosition);
-                  requestFullPage(window.savedPagePosition.uuid, true);
+              // Set verified index to present
+              verifiedIndex = present;
+              
+              // Recompile visual state
+              updateVisualState();
+              
+              // Update page info
+              pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
+              totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
+              updatePageInfo();
+              
+              // Update UI
+              updateSyncStatus();
+              updateUndoRedoButtons();
+              
+              // Save this page to cache
+              savePageToCache(currentPageUuid, {
+                  history: history,
+                  present: present,
+                  hash: hashes[present]
+              });
+              
+              // After loading initial page, check if we should restore saved position
+              if (!hasRestoredSavedPosition && window.savedPagePosition) {
+                  hasRestoredSavedPosition = true;
+                  
+                  // If the saved page is different from current, navigate to it
+                  if (window.savedPagePosition.uuid !== currentPageUuid) {
+                      debugLog('Restoring saved page position', window.savedPagePosition);
+                      requestFullPage(window.savedPagePosition.uuid, true);
+                  }
               }
+              
+              // Save current page position to settings
+              saveSettings();
           }
-          
-          // Save current page position to settings
-          saveSettings();
       }
       
       // Request a full page from the server
@@ -2560,19 +2572,34 @@
       }
       
       // Request a replay from the server
-      function requestReplay() {
+      function requestReplay( pageUuid = currentPageUuid, do_resister = true ) {
           const requestId = createRequestId();
-          
-          const request = {
-              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: currentPageUuid,
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
-              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
-          };
-          
-          debugLog('Requesting replay', request);
-          sendMessage(request);
+    
+          touchPageInCache( pageUuid );
+          const pageData = loadPageFromCache( pageUuid );
+          if ( pageUuid !== currentPageUuid ) {
+              const request = {
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: pageData[ 'present' ],
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: pageData[ 'hash' ],
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER] = do_register,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
+              };
+              debugLog('Requesting replay', request);
+              sendMessage(request);
+          } else {          
+              const request = {
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: currentPageUuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER] = do_register,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
+              };
+              debugLog('Requesting replay', request);
+              sendMessage(request);
+          }
       }
       
       // Send a message to the server
@@ -4614,6 +4641,17 @@
       //     debugLog('Cleared all page cache', { count: keys.length });
       // }
       
+      function touchPageInCache( pageUuid ) {
+          const pageData = loadPageFromCache( pageUuid );
+          if ( ! pageData ) {
+              savePageToCache( pageUuid, {
+                  history: [],
+                  present: 0,
+                  hash: shared.hashAny( pageUuid )
+              } 
+          }
+      }
+
       function savePageToCache(pageUuid, pageData) {
           saveItem( pageUuid, pageData );
       }

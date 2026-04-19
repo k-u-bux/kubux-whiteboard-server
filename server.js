@@ -609,7 +609,7 @@ function get_page_snapshots(page) {
     return ( snapshots );
 }
 
-function sendFullPage(ws, boardId, requestedPageId, requestId) {
+function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
 
@@ -632,7 +632,8 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT]: pagePresent,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]: pageHash,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR]: pageNr,
-            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES]: totalPages
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES]: totalPages,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.SWITCH]: do_switch
         };
         
         releasePage(pageId);
@@ -642,7 +643,7 @@ function sendFullPage(ws, boardId, requestedPageId, requestId) {
     releaseBoard(boardId);
 }
 
-function sendPageInfo(ws, boardId, requestedPageId, requestId) {
+function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
     pageId = existingPage(requestedPageId, board);
@@ -660,6 +661,7 @@ function sendPageInfo(ws, boardId, requestedPageId, requestId) {
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: totalPages,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: do_switch, 
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
     };
     releaseBoard(boardId);
@@ -667,7 +669,7 @@ function sendPageInfo(ws, boardId, requestedPageId, requestId) {
     logSentMessage(message.type, message, requestId);
 }
 
-function sendPageLost(ws, boardId, requestedPageId, foundPageId, requestId) {
+function sendPageLost(ws, boardId, requestedPageId, foundPageId, do_switch, requestId) {
     const board = useBoard(boardId);
     if ( ! board ) { return; }
     const pageNr = board.pageOrder.indexOf(foundPageId) + 1;
@@ -678,6 +680,7 @@ function sendPageLost(ws, boardId, requestedPageId, foundPageId, requestId) {
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE]: foundPageId,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES]: totalPages,
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.SWITCH]: do_switch,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
     };
     releaseBoard(boardId);
@@ -766,7 +769,7 @@ function createNewBoard(ws, clientId, requestId) {
         ws.send(serialize(response));
         logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, response, requestId );
         releaseBoard(boardId);
-        sendFullPage(ws, boardId, ws.pageId, requestId);
+        sendFullPage(ws, boardId, ws.pageId, true, requestId);
     }
 }
 
@@ -961,10 +964,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
             sendPageLost( ws, boardId, pageId, resolvedPageId, requestId );
         } else {
             debug.log( "handling full page request, full page", `${resolvedPageId} vs. ${pageId}`)
-            if ( data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] ) {
+            const do_switch = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER];
+            if ( do_switch ) {
                 ws.pageId = resolvedPageId;
             }
-            sendFullPage( ws, boardId, resolvedPageId, requestId );
+            sendFullPage( ws, boardId, resolvedPageId, do_switch, requestId );
         }
     }
     releaseBoard( boardId );
@@ -1122,7 +1126,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             debug.log(`[SERVER]: add new page ${newPageId} behind ${pageUuid}`);
             board.pageOrder.splice(board.pageOrder.indexOf(pageUuid) + 1, 0, newPageId);
             releaseBoard(boardId);
-            sendFullPage(ws, boardId, newPageId, requestId);
+            sendFullPage(ws, boardId, newPageId, true, requestId);
             sendPingToBoard( boardId );
             return;
         case MOD_ACTIONS.DELETE_PAGE.TYPE:
@@ -1133,7 +1137,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 const newPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 1)];
                 deletionMap[pageUuid] = newPageId;
                 releaseBoard(boardId);
-                sendFullPage(ws, boardId, newPageId, requestId);
+                sendFullPage(ws, boardId, newPageId, true, requestId);
                 sendPingToBoard( boardId );
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
@@ -1143,7 +1147,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 releasePage( newPageId );
                 board.pageOrder[ index ] = newPageId;
                 releaseBoard( boardId );
-                sendFullPage( ws, boardId, newPageId, requestId );
+                sendFullPage( ws, boardId, newPageId, true, requestId );
                 sendPingToBoard( boardId );
             }
             return;
@@ -1197,17 +1201,18 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
     const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH];
+    const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER];
     
     const board = useBoard(boardId);
     const pageId = existingPage(pageUuid, board);
 
-    if ( data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER] ) {
+    if ( do_register ) {
         ws.pageId = pageId;
     }
 
     if (pageId !== pageUuid) {
         debug.log(`[SERVER] Hash ${pageUuid} has been replaced by ${pageId}.`);
-        sendPageLost( ws, boardId, pageUuid, pageId, requestId )
+        sendPageLost( ws, boardId, pageUuid, pageId, do_switch, requestId )
         releaseBoard(boardId);
         return;
     }
@@ -1215,7 +1220,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     const page = usePage(pageId);
     if (page.hashes[present] !== presentHash) {
         debug.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending page info`);
-        sendPageInfo( ws, boardId, pageId, requestId );
+        sendPageInfo( ws, boardId, pageId, do_switch, requestId );
         releasePage(pageId);
         releaseBoard(boardId);
         return;
@@ -1234,7 +1239,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.PRESENT]: page.present,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.CURRENT_HASH]: page.hashes[page.present],
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR]: board.pageOrder.indexOf(pageId) + 1,
-        [MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES]: board.pageOrder.length
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES]: board.pageOrder.length,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.SWITCH]: do_register
     };
 
     releasePage(pageId);
