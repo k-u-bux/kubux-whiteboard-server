@@ -1195,7 +1195,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 releasePage( newPageId );
                 board.pageOrder[ index ] = newPageId;
                 releaseBoard( boardId );
-                sendPageInfo( ws, boardId, newPageId, true, requestId );
+                sendFullPage( ws, boardId, newPageId, true, requestId );
                 sendPingToBoard( boardId );
             }
             return;
