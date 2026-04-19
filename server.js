@@ -714,7 +714,7 @@ function ping_client_with_page ( client, pageId, board ) {
     releaseBoard(client.boardId);
     
     client.send(serialize(message));
-    logSentMessage(message.type, message, 'N/A', client);
+    logSentMessage(message.type, message, 'N/A', client.clientId);
 }
 
 function ping_client( client ) {
@@ -1247,7 +1247,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
     releasePage(pageId);
     releaseBoard(boardId);
     ws.send(serialize(replayMessage));
-    logSentMessage(replayMessage.type, replayMessage, requestId, ws.clientId);
+    logSentMessage(replayMessage.type, replayMessage, requestId, wc.clientId);
 };
 
 function routeMessage(ws, message) {
