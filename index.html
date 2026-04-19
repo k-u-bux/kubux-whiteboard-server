@@ -2583,7 +2583,7 @@
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: pageData[ 'present' ],
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: pageData[ 'hash' ],
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: = do_register,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: do_register,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
               };
               debugLog('Requesting replay', request);
@@ -2594,7 +2594,7 @@
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: currentPageUuid,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: = do_register,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: do_register,
                   [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
               };
               debugLog('Requesting replay', request);
