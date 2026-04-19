@@ -644,6 +644,10 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.SWITCH]: do_switch
         };
         
+        if ( do_switch ) {
+            ws.pageId = pageId;
+        }
+
         releasePage(pageId);
         ws.send(serialize(message));
         logSentMessage(message.type, message, requestId, ws.clientId);
@@ -672,6 +676,9 @@ function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: do_switch, 
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
     };
+    if ( do_switch ) {
+        ws.pageId = pageId;
+    }
     releaseBoard(boardId);
     ws.send(serialize(message));
     logSentMessage(message.type, message, requestId, ws.clientId);
@@ -691,6 +698,9 @@ function sendPageLost(ws, boardId, requestedPageId, foundPageId, do_switch, requ
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.SWITCH]: do_switch,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
     };
+    if ( do_switch ) {
+        ws.pageId = pageId;
+    }
     releaseBoard(boardId);
     ws.send(serialize(message));
     logSentMessage(message.type, message, requestId, ws.clientId);
@@ -844,6 +854,9 @@ function describePage(ws, boardId, pageId, delta, do_switch, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REGISTER]: do_switch,           
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
         };
+        if ( do_switch ) {
+            ws.pageId = pageId;
+        }
         ws.send(serialize(response));
         releasePage(resolvedPageId);
     }
