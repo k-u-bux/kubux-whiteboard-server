@@ -548,14 +548,14 @@ function is_invalid_REPLAY_REQUESTS_message(data) {
     if (!data || typeof data !== 'object') return true;
     
     // boardId can come from data or ws.boardId (checked in handler)
-    const boardId = data.boardId;
+    const boardId =  data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
     
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     if (!pageUuid || !isUuid(pageUuid)) return true;
     
-    // const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
-    // if (present === undefined || typeof present !== 'number' || !Number.isInteger(present) || present < 0) return true;
+    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
+    if (present === undefined || typeof present !== 'number' || !Number.isInteger(present) || present < 0) return true;
     
     const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH];
     if (!presentHash || typeof presentHash !== 'string') return true;
