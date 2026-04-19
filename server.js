@@ -1091,7 +1091,7 @@ function sendDeclineMessage(context, reason, requestId) {
 // Handler for modification actions
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_MOD_ACTION_PROPOSALS_message( data ) ) { 
-        debug.log(`[SERVER] dropped mod action proposal from `, ws.clientId); 
+        debug.log(`[SERVER] dropped mod action proposal from '${ws.clientId}' data = `, data); 
         return;
     }
     try {
