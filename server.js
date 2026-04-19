@@ -1185,7 +1185,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 const newPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 1)];
                 deletionMap[pageUuid] = newPageId;
                 releaseBoard(boardId);
-                sendFullPage(ws, boardId, newPageId, true, requestId);
+                sendPageInfo(ws, boardId, newPageId, true, requestId);
                 sendPingToBoard( boardId );
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
@@ -1195,7 +1195,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 releasePage( newPageId );
                 board.pageOrder[ index ] = newPageId;
                 releaseBoard( boardId );
-                sendFullPage( ws, boardId, newPageId, true, requestId );
+                sendPageInfo( ws, boardId, newPageId, true, requestId );
                 sendPingToBoard( boardId );
             }
             return;
