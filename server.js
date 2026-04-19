@@ -1330,7 +1330,6 @@ function routeMessage(ws, message) {
             const errorMessage = {
                 type: "error",
                 message: e.message,
-                stack: e.stack
             };
             ws.send(serialize(errorMessage));
         }
