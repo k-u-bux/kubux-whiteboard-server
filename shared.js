@@ -519,7 +519,7 @@ function is_invalid_FULL_PAGE_REQUESTS_message(data) {
     const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE];
     if (pageId !== undefined && !isUuid(pageId)) return true;
     
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID];
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID];
     if (!requestId || !isUuid(requestId)) return true;
     
     const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
@@ -559,7 +559,7 @@ function is_invalid_REPLAY_REQUESTS_message(data) {
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     if (!pageUuid || !isUuid(pageUuid)) return true;
     
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID];
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID];
     if (!requestId || !isUuid(requestId)) return true;
     
     const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
