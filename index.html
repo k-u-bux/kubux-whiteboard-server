@@ -1803,46 +1803,51 @@
           
           ws.onmessage = (event) => {
               try {
+                  debugLog('Received event: ', event); 
                   const data = shared.deserialize(event.data);
-                  debugLog('Received message:', data);
-                  
-                  // Handle message based on type
-                  switch (data.type) {
-                  case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE:
-                      handleBoardCreated(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE:
-                      handleBoardRegistered(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE:
-                      handleFullPageMessage(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE:
-                      handlePageRegistered(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE:
-                      handlePageInfo(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE:
-                      handlePageLost(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.TYPE:
-                      handleAcceptMessage(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.DECLINE.TYPE:
-                      handleDeclineMessage(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE:
-                      handleReplayMessage(data);
-                      break;
-                  case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
-                      handlePingMessage(data);
-                      break;
-                  case "error":
-                      handleErrorMessage(data);
-                      break;
-                  default:
-                      console.error('Unknown message type:', data.type);
+                  if ( data ) {
+                      debugLog('Received message: ', data);
+                      
+                      // Handle message based on type
+                      switch (data.type) {
+                      case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE:
+                          handleBoardCreated(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TYPE:
+                          handleBoardRegistered(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE:
+                          handleFullPageMessage(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TYPE:
+                          handlePageRegistered(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE:
+                          handlePageInfo(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE:
+                          handlePageLost(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.TYPE:
+                          handleAcceptMessage(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.DECLINE.TYPE:
+                          handleDeclineMessage(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE:
+                          handleReplayMessage(data);
+                          break;
+                      case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
+                          handlePingMessage(data);
+                          break;
+                      case "error":
+                          handleErrorMessage(data);
+                          break;
+                      default:
+                          console.error('Unknown message type:', data.type);
+                      }
+                  } else {
+                      debugLog('Could not deserialize event: ', event); 
                   }
               } catch (error) {
                   console.error('Error processing message:', error);
