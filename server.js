@@ -1255,7 +1255,6 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
         debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
         return;
     }
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID];
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD];
     ws.boardId = boardId;
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
