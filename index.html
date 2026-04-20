@@ -5284,6 +5284,7 @@
                                   ws.onmessage = originalHandler;
                                   resolve({ history: pageHistory, present: pagePresent });
                               } else {
+                                  console.error('Delegating:', event);
                                   originalHandler.call(ws, event);
                               }
                           } catch (error) {
