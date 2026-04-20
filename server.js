@@ -1007,7 +1007,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
     debug.log( "[SERVER] handling full page request", `pageId = ${pageId}, delta = ${delta}`)
     if ( pageId != undefined && isUuid( pageId ) && delta != undefined ) {
         resolvedPageId = findPage( board, pageId, delta );
-        if ( resolvedPageId !== pageId && delta != 0 ) {
+        if ( resolvedPageId !== pageId && delta == 0 ) {
             debug.log( "handling full page request, page lost", `${resolvedPageId} vs. ${pageId}, delta = ${delta}`)
             sendPageLost( ws, boardId, pageId, resolvedPageId, requestId );
         } else {
