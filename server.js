@@ -1309,23 +1309,24 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
 
 function routeMessage(ws, message) {
     try {
-        const data = deserialize(message);
-        const requestId = data.requestId || data['action-uuid'] || 'N/A';
-        const message_type = data['type'] || 'unknown';
+        const data = deserialize( message );
+        if ( data ) {
+            const requestId = data.requestId || data['action-uuid'] || 'N/A';
+            const message_type = data['type'] || 'unknown';
 
-        debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );
+            debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );
         
-        const handler = messageHandlers[message_type];
-        if (handler) {
-            handler(ws, data, requestId);
+            const handler = messageHandlers[message_type];
+            if ( handler ) {
+                handler(ws, data, requestId);
+            } else {
+                throw new Error(`Unhandled message type: ${data.type}`);
+            }
         } else {
-            throw new Error(`Unhandled message type: ${data.type}`);
+            debug.error('[SERVER] Could not deserialize message: ', message);
         }
     } catch (e) {
-        debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );        
         debug.error('[SERVER] Error processing message:', e);
-        debug.error('[SERVER] Error processing message:', e.message);
-        debug.error('[SERVER] Error processing message:', e.stack);
         // Send an error message to the client if possible
         if (ws && ws.readyState === WebSocket.OPEN) {
             const errorMessage = {
