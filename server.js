@@ -641,7 +641,7 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]: pageHash,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR]: pageNr,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES]: totalPages,
-            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.REQUEST]: requestId,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.REQUEST_ID]: requestId,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.SWITCH]: do_switch
         };
         
@@ -675,7 +675,7 @@ function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: totalPages,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: do_switch, 
-        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST]: requestId
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
     };
     if ( do_switch ) {
         ws.pageId = pageId;
@@ -698,7 +698,7 @@ function sendPageLost(ws, boardId, requestedPageId, foundPageId, do_switch, requ
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR]: pageNr,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES]: totalPages,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.SWITCH]: do_switch,
-        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST]: requestId
+        [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
     };
     if ( do_switch ) {
         ws.pageId = pageId;
@@ -1299,7 +1299,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.CURRENT_HASH]: page.hashes[page.present],
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR]: board.pageOrder.indexOf(pageId) + 1,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES]: board.pageOrder.length,
-        [MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST]: requestId,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID]: requestId,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.SWITCH]: do_register
     };
 
