@@ -641,7 +641,7 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]: pageHash,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR]: pageNr,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES]: totalPages,
-            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.REQUEST_ID]: requestId,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.REQUEST]: requestId,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.SWITCH]: do_switch
         };
         
