@@ -5275,7 +5275,7 @@
                               const data = shared.deserialize(event.data);
                               if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE
                                   &&
-                                  data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY] === requestId) {
+                                  data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.REQUEST_ID] === requestId) {
                                   const pageHistory = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
                                   const pagePresent = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
                                   
