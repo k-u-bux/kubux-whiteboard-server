@@ -5273,7 +5273,9 @@
                       ws.onmessage = (event) => {
                           try {
                               const data = shared.deserialize(event.data);
-                              if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE) {
+                              if (data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE
+                                  &&
+                                  data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY] === requestId) {
                                   const pageHistory = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
                                   const pagePresent = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
                                   

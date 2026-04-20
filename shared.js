@@ -300,6 +300,7 @@ const MESSAGES = {
             HASH: 'hash',
             PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages',
+            REQUEST_ID: 'requestId',
             SWITCH: 'do-move'
         },
         ACCEPT: {
@@ -328,6 +329,7 @@ const MESSAGES = {
             CURRENT_HASH: 'currentHash',
             PAGE_NR: 'pageNr',
             TOTAL_PAGES: 'totalPages',
+            REQUEST_ID: 'requestId',
             SWITCH: 'do-move'
         },
         PING: {
@@ -483,6 +485,9 @@ function is_invalid_PAGE_INFO_REQUEST_message(data) {
     const pageId = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE];
     if (!pageId || !isUuid(pageId)) return true;
     
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+    
     const delta = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
     if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
     
@@ -513,6 +518,9 @@ function is_invalid_FULL_PAGE_REQUESTS_message(data) {
     
     const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE];
     if (pageId !== undefined && !isUuid(pageId)) return true;
+    
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
     
     const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
     if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
@@ -550,6 +558,9 @@ function is_invalid_REPLAY_REQUESTS_message(data) {
     
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
     if (!pageUuid || !isUuid(pageUuid)) return true;
+    
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
     
     const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
     if (present === undefined || typeof present !== 'number' || !Number.isInteger(present) || present < 0) return true;

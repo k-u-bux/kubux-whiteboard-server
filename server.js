@@ -641,6 +641,7 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]: pageHash,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR]: pageNr,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES]: totalPages,
+            [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.REQUEST_ID]: requestId,
             [MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.SWITCH]: do_switch
         };
         
@@ -1254,6 +1255,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
         debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
         return;
     }
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID];
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD];
     ws.boardId = boardId;
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
@@ -1298,6 +1300,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, req
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.CURRENT_HASH]: page.hashes[page.present],
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR]: board.pageOrder.indexOf(pageId) + 1,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES]: board.pageOrder.length,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST]: requestId,
         [MESSAGES.SERVER_TO_CLIENT.REPLAY.SWITCH]: do_register
     };
 
