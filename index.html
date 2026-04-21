@@ -5314,7 +5314,7 @@
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER]: false,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
                       };
-                      
+                      console.error( 'Asking for page info: ', request );
                       ws.send(shared.serialize(request));
                   });
                   
