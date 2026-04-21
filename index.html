@@ -5265,8 +5265,8 @@
               for (let i = 1; i <= totalPages; i++) {
                   showError(`Exporting page ${i}/${totalPages}...`);
                   
-                  // Request and wait for page data
-                  const pageData = await new Promise((resolve) => {
+                  // Request and wait for page info
+                  const pageInfo = await new Promise((resolve) => {
                       const requestId = createRequestId();
                       const originalHandler = ws.onmessage;
                       
@@ -5276,14 +5276,21 @@
                               console.error('requestId = ', data.requestId)
                               if ( data 
                                    &&
-                                   data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE
+                                   data.type === shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE
                                    &&
-                                   requestId == data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.REQUEST_ID] ) {
-                                  const pageHistory = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY];
-                                  const pagePresent = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT];
+                                   requestId == data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID] ) {
+                                  const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE];
+                                  const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
+                                  const pageTotal = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
+                                  const pageSnapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS];
                                   
                                   ws.onmessage = originalHandler;
-                                  resolve({ history: pageHistory, present: pagePresent });
+                                  resolve({
+                                      'pageId': pageId,
+                                      'pageNr': pageNr,
+                                      'pageTotal': pageTotal,
+                                      'pageSnapshots': pageSnapshots
+                                  });
                               } else {
                                   console.error('Delegating:', event);
                                   originalHandler.call(ws, event);
@@ -5296,18 +5303,97 @@
                       };
                       
                       const request = {
-                          type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD]: boardId,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE]: currentPageUuid,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA]: i - startPageNr,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER]: false,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID]: requestId
+                          type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD]: boardId,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE]: currentPageUuid,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: i - startPageNr,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER]: false,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
                       };
                       
                       ws.send(shared.serialize(request));
                   });
                   
-                  if (!pageData) continue;
+                  if (!pageInfo) continue;
+                 
+                  const pageUuid = pageInfo['pageId'];
+                  pagesMetaData[ pageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
+                  const pageSnapshots = pageInfo['pageSnapshots'];
+                  touchPageInCache( pageUuid );
+                  pageData = loadPageFromCache( pageUuid );
+                  pageHashes = [ shared.hashAny( pageUuid ) ];
+                  for ( let i = 0; i < pageData['history'].length; ++ i ) {
+                      pageHashes.push( shared.hashNext( pageHashes[ i ], pageData['history'][ i ] ) );
+                  }
+        
+                  for ( let j = pageSnapshots.length - 1; j >= 0; --j ) {
+                      const snapshot = pageSnapshots[ j ];
+                      const index = pageHashes.indexOf( snapshot );
+                      if ( index >= 0 ) {
+                          pageData['present'] = index;
+                          pageData['hash'] = snapshot;
+                          savePageToCache( pageUuid, pageData );
+                          break;
+                      }
+                  }          
+
+                  // Request and wait for page data
+                  const successfull_update = await new Promise((resolve) => {
+                      const requestId = createRequestId();
+                      const originalHandler = ws.onmessage;
+                      
+                      ws.onmessage = (event) => {
+                          try {
+                              const data = shared.deserialize(event.data);
+                              console.error('requestId = ', data.requestId)
+                              if ( data 
+                                   &&
+                                   data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE
+                                   &&
+                                   requestId == data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID] ) {
+
+                                  handleReplayMessage( data );
+                          
+                                  ws.onmessage = originalHandler;
+                                  resolve( true );
+                              } else {
+                                  console.error('Delegating:', event);
+                                  originalHandler.call(ws, event);
+                              }
+                          } catch (error) {
+                              ws.onmessage = originalHandler;
+                              console.error('Error getting page:', error);
+                              resolve( false );
+                          }
+                      };
+                      
+                      if ( pageUuid !== currentPageUuid ) {
+                          const request = {
+                              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: pageData[ 'present' ],
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: pageData[ 'hash' ],
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: false,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
+                          };
+                          ws.send(shared.serialize(request));
+                      } else {          
+                          const request = {
+                              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: currentPageUuid,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: false,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
+                          };
+                          ws.send(shared.serialize(request));
+                      }
+
+                  });
+                  
+                  if ( !successfull_update ) continue;
                   
                   // Create new page in PDF
                   const pdfCtx = builder.new_page(canvas.width, canvas.height);
