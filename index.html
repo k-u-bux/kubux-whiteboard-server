@@ -5357,8 +5357,8 @@
                                    requestId == data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID] ) {
 
                                   handleReplayMessage( data, true );
-                          
                                   ws.onmessage = originalHandler;
+                                  debugLog("I want to return", true);
                                   resolve( true );
                               } else {
                                   console.error('Delegating:', event);
