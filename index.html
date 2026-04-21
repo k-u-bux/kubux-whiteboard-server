@@ -5288,6 +5288,13 @@
                                   const pageTotal = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
                                   const pageSnapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS];
                                   
+                                  console.error('Got page info: ', {
+                                      'pageId': pageId,
+                                      'pageNr': pageNr,
+                                      'pageTotal': pageTotal,
+                                      'pageSnapshots': pageSnapshots
+                                   });
+
                                   ws.onmessage = originalHandler;
                                   resolve({
                                       'pageId': pageId,
