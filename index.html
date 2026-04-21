@@ -5329,7 +5329,8 @@
                   for ( let i = 0; i < pageData['history'].length; ++ i ) {
                       pageHashes.push( shared.hashNext( pageHashes[ i ], pageData['history'][ i ] ) );
                   }
-        
+                  pageData['present'] = 0;
+                  pageData['hash'] = pageHashes[ 0 ];
                   for ( let j = pageSnapshots.length - 1; j >= 0; --j ) {
                       const snapshot = pageSnapshots[ j ];
                       const index = pageHashes.indexOf( snapshot );
@@ -5337,9 +5338,9 @@
                           pageData['present'] = index;
                           pageData['hash'] = snapshot;
                           savePageToCache( pageUuid, pageData );
-                          break;
                       }
                   }          
+                  savePageToCache( pageUuid, pageData );
 
                   // Request and wait for page data
                   const successfull_update = await new Promise((resolve) => {
