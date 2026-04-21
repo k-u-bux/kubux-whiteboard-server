@@ -5349,7 +5349,6 @@
                       ws.onmessage = (event) => {
                           try {
                               const data = shared.deserialize(event.data);
-                              console.error('requestId = ', data.requestId)
                               if ( data 
                                    &&
                                    data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE
