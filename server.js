@@ -849,7 +849,7 @@ function describePage(ws, boardId, pageId, delta, do_switch, requestId) {
         
         const response = {
             type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageId,
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: resolvedPageId,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
