@@ -4702,13 +4702,17 @@
       // }
       
       function touchPageInCache( pageUuid ) {
-          const pageData = loadPageFromCache( pageUuid );
-          if ( ! pageData ) {
-              savePageToCache( pageUuid, {
-                  history: [],
-                  present: 0,
-                  hash: shared.hashAny( pageUuid )
-              } );
+          if ( pageUuid === currentPageUuid ) {
+              commitCurrentPage()
+          } else {
+              const pageData = loadPageFromCache( pageUuid );
+              if ( ! pageData ) {
+                  savePageToCache( pageUuid, {
+                      history: [],
+                      present: 0,
+                      hash: shared.hashAny( pageUuid )
+                  } );
+              }
           }
       }
 
@@ -5367,29 +5371,17 @@
                           }
                       };
                       
-                      if ( pageUuid !== currentPageUuid ) {
-                          const request = {
-                              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: pageData[ 'present' ],
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: pageData[ 'hash' ],
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: false,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
-                          };
-                          ws.send(shared.serialize(request));
-                      } else {          
-                          const request = {
-                              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: currentPageUuid,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: false,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
-                          };
-                          ws.send(shared.serialize(request));
-                      }
+                      const request = {
+                          type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: pageData[ 'present' ],
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: pageData[ 'hash' ],
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: false,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
+                      };
+
+                      ws.send(shared.serialize(request));
 
                   });
                   
