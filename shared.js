@@ -491,7 +491,7 @@ function is_invalid_PAGE_INFO_REQUEST_message(data) {
     const delta = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
     if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
     
-    const register = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.REGISTER];
+    const register = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER];
     if (register !== undefined && typeof register !== 'boolean') return true;
     
     return false;
