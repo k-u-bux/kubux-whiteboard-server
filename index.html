@@ -5282,7 +5282,7 @@
                                    &&
                                    data.type === shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE
                                    &&
-                                   requestId == data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID] ) {
+                                   requestId === data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID] ) {
                                   const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE];
                                   const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
                                   const pageTotal = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
@@ -5354,7 +5354,7 @@
                                    &&
                                    data.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE
                                    &&
-                                   requestId == data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID] ) {
+                                   requestId === data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID] ) {
 
                                   handleReplayMessage( data, true );
                                   ws.onmessage = originalHandler;
