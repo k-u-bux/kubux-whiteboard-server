@@ -2413,7 +2413,7 @@
       }
       
       // Handle replay message from server
-      function handleReplayMessage(data) {
+      function handleReplayMessage(data, cache_only = false) {
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE];
           const pageNumber = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR];
           const pageTotal = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES];
@@ -2428,7 +2428,7 @@
           
           let pageData = null;
     
-          if ( pageUuid !== currentPageUuid ) {
+          if ( pageUuid !== currentPageUuid || cache_only ) {
               pageData = loadPageFromCache( pageUuid );
               pageData['hashes'] = [ shared.hashAny( pageUuid ) ];
               for ( let i = 0; i < pageData['history'].length; ++ i ) {
@@ -5356,7 +5356,7 @@
                                    &&
                                    requestId == data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID] ) {
 
-                                  handleReplayMessage( data );
+                                  handleReplayMessage( data, true );
                           
                                   ws.onmessage = originalHandler;
                                   resolve( true );
