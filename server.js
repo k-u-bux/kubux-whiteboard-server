@@ -479,7 +479,8 @@ const serveableFiles = {
     '/manifest.json': { path: 'manifest.json', type: 'application/json' },
     '/sw.js': { path: 'sw.js', type: 'application/javascript' },
     '/icon-192.png': { path: 'icon-192.png', type: 'image/png' },
-    '/icon-512.png': { path: 'icon-512.png', type: 'image/png' }
+    '/icon-512.png': { path: 'icon-512.png', type: 'image/png' },
+    '/robots.txt': { path: 'robots.txt', type: 'text/plain' }
 };
 
 
