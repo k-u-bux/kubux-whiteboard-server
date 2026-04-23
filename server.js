@@ -482,6 +482,31 @@ const serveableFiles = {
     '/icon-512.png': { path: 'icon-512.png', type: 'image/png' }
 };
 
+
+function isValidRequest(req) {
+    const urlParts = url.parse(req.url, true);
+    const pathname = urlParts.pathname;
+    
+    // 1. Strict Path Validation: Only allow the root path
+    // This blocks /prefix, /admin, /.env, etc.
+    if (pathname !== '/') {
+        return false;
+    }
+
+    // 2. Query Parameter Validation
+    const queryKeys = Object.keys(urlParts.query);
+    const allowedKeys = ['board', 'passwd', 'credential'];
+
+    // Ensure all keys used are in the whitelist
+    const hasInvalidParams = queryKeys.some(key => !allowedKeys.includes(key));
+    if (hasInvalidParams) {
+        return false;
+    }
+
+    return true;
+}
+
+
 // const httpServer = https.createServer( serverOptions, (req, res) => {
 const httpServer = http.createServer( (req, res) => {
     const requestUrl = url.parse(req.url).pathname;
@@ -520,6 +545,19 @@ const httpServer = http.createServer( (req, res) => {
         return;
     }
     
+    // Block hidden files (like .env) immediately
+    if ( requestUrl.split('/').some( part => part.startsWith('.') ) ) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('Access Denied');
+        return;
+    }
+
+    if ( ! isValidRequest( requestUrl ) ) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('File not found');
+    }
+
+
     // Default: serve index.html with embedded shared.js
     // rationale: allowing the client to request files opens the attack surface
     // consequence: index.html will be a self contained file; thus we embed shared.js on the fly
