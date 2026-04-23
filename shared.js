@@ -677,8 +677,8 @@ function createStroke ( styleTemplate ) {
 }
 
 function createPoint ( x, y, pressure = 0.5, timestamp = Date.now() ) {
-    // return [ x, y, pressure, timestamp ];
-    return [ x, y, pressure ];
+    return [ x, y, pressure, timestamp ];
+    // return [ x, y, pressure ];
 }
 
 function addPointToStroke ( stroke, point ) {
@@ -691,8 +691,8 @@ function applyTransformToPath( transform, path ) {
     let result = [];
     for (const point of path) {
         let xy = applyTransformToPoint( transform, point[ POINT.X ], point[ POINT.Y ] );
-        // result.push( [ xy.x, xy.y, point[ POINT.PRESSURE ], point[ POINT.TIMESTAMP ] ] );
-        result.push( [ xy.x, xy.y, point[ POINT.PRESSURE ] ] );
+        result.push( [ xy.x, xy.y, point[ POINT.PRESSURE ], point[ POINT.TIMESTAMP ] ] );
+        // result.push( [ xy.x, xy.y, point[ POINT.PRESSURE ] ] );
     }
     return result;
 }
