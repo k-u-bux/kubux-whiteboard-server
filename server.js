@@ -552,7 +552,7 @@ const httpServer = http.createServer( (req, res) => {
         return;
     }
 
-    if ( ! isValidRequest( requestUrl ) ) {
+    if ( ! isValidRequest( req ) ) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('File not found');
     }
