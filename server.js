@@ -502,8 +502,11 @@ function isValidRequest(req) {
     if (hasInvalidParams) {
         return false;
     }
+    
+    // Ensure that there is a key:
+    const hasValidParams = queryKeys.some(key => allowedKeys.includes(key));
 
-    return true;
+    return hasValidParams;
 }
 
 
