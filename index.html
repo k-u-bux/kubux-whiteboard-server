@@ -2467,7 +2467,7 @@
                   ourHashes: pageData['hashes']
               });
               requestFullPage(pageUuid, do_switch);
-              return;
+              return null;
           }
           
           // Apply replay edits to the history
@@ -2495,7 +2495,7 @@
                       expectedHash: afterHash
                   });
                   requestFullPage(pageUuid, do_switch);
-                  return;
+                  return null;
               }
           }
           
@@ -2508,7 +2508,7 @@
                   serverHash: currentHash
               });
               requestFullPage(pageUuid, do_switch);
-              return;
+              return null;
           }
           
           // Update cache with new state
@@ -2540,6 +2540,8 @@
               // cacheVerificationInProgress = false;
           }
           debugLog("Replay applied successfully", pageData);
+
+          return pageData;
       }
       
       // Track if we are in a cache verification cycle to avoid infinite loops
@@ -5311,7 +5313,7 @@
                                       'pageSnapshots': pageSnapshots
                                   });
                               } else {
-                                  console.error('Delegating:', event);
+                                  debugLog('Delegating:', event);
                                   originalHandler.call(ws, event);
                               }
                           } catch (error) {
@@ -5329,7 +5331,7 @@
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER]: false,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
                       };
-                      console.error( 'Asking for page info: ', request );
+                      debugLog( 'Asking for page info: ', request );
                       ws.send(shared.serialize(request));
                   });
                   
@@ -5339,32 +5341,32 @@
                   pagesMetaData[ pageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
                   const pageSnapshots = pageInfo['pageSnapshots'];
                   touchPageInCache( pageUuid );
-                  pageData = loadPageFromCache( pageUuid );
+                  initialPageData = loadPageFromCache( pageUuid );
                   pageHashes = [ shared.hashAny( pageUuid ) ];
-                  for ( let i = 0; i < pageData['history'].length; ++ i ) {
-                      pageHashes.push( shared.hashNext( pageHashes[ i ], pageData['history'][ i ] ) );
+                  for ( let i = 0; i < initialPageData['history'].length; ++ i ) {
+                      pageHashes.push( shared.hashNext( pageHashes[ i ], initialPageData['history'][ i ] ) );
                   }
-                  pageData['present'] = 0;
-                  pageData['hash'] = pageHashes[ 0 ];
+                  initialPageData['present'] = 0;
+                  initialPageData['hash'] = pageHashes[ 0 ];
                   for ( let j = pageSnapshots.length - 1; j >= 0; --j ) {
                       const snapshot = pageSnapshots[ j ];
                       const index = pageHashes.indexOf( snapshot );
                       if ( index >= 0 ) {
-                          pageData['present'] = index;
-                          pageData['hash'] = snapshot;
+                          initialPageData['present'] = index;
+                          initialPageData['hash'] = snapshot;
                           break;
                       }
                   }          
                   debugLog("Preparing replay: ", {
                               page: pageUuid,
-                              present: pageData['present'],
-                              hash: pageData['hash'],
+                              present: initialPageData['present'],
+                              hash: initialPageData['hash'],
                               ourHashes: pageHashes
                            });
-                  savePageToCache( pageUuid, pageData );
+                  savePageToCache( pageUuid, initialPageData );
 
                   // Request and wait for page data
-                  const successfull_update = await new Promise((resolve) => {
+                  const pageData = await new Promise((resolve) => {
                       const requestId = createRequestId();
                       const originalHandler = ws.onmessage;
                       
@@ -5378,18 +5380,18 @@
                                    &&
                                    requestId === data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID] ) {
 
-                                  handleReplayMessage( data, true );
+                                  const result = handleReplayMessage( data, true );
                                   ws.onmessage = originalHandler;
 
-                                  resolve( true );
+                                  resolve( result );
                               } else {
-                                  console.error('Delegating:', event);
+                                  debugLog('Delegating:', event);
                                   originalHandler.call(ws, event);
                               }
                           } catch (error) {
                               ws.onmessage = originalHandler;
                               console.error('Error getting page:', error);
-                              resolve( false );
+                              resolve( null );
                           }
                       };
                       
@@ -5397,8 +5399,8 @@
                           type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: pageData[ 'present' ],
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: pageData[ 'hash' ],
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: initialPageData[ 'present' ],
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: initialPageData[ 'hash' ],
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: false,
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
                       };
@@ -5407,8 +5409,7 @@
 
                   });
                   
-                  if ( !successfull_update ) continue;
-                  pageData = loadPageFromCache( pageUuid );
+                  if ( !pageData ) continue;
                   
                   // Create new page in PDF
                   const pdfCtx = builder.new_page(canvas.width, canvas.height);
