@@ -5355,6 +5355,11 @@
                           break;
                       }
                   }          
+                  debugLog("Preparing replay: ", {
+                              page: pageUuid,
+                              present: pageData['present'],
+                              hash: pageData['hash']
+                           });
                   savePageToCache( pageUuid, pageData );
 
                   // Request and wait for page data
