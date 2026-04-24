@@ -5394,6 +5394,7 @@
                   });
                   
                   if ( !successfull_update ) continue;
+                  pageData = loadPageFromCache( pageUuid );
                   
                   // Create new page in PDF
                   const pdfCtx = builder.new_page(canvas.width, canvas.height);
