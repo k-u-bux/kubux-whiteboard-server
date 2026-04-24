@@ -2451,7 +2451,15 @@
                   break;
               }
           }
+
+          debugLog("Replay paramters", {
+              beforeHash: beforeHash,
+              afterHash: afterHash,
+              startIndex: startIndex,
+              ourHashes: pageData['hashes']
+          });
           
+
           if (startIndex === -1) {
               // Cannot find matching hash - need full page refresh
               debugLog("Replay hash not found in our chain, requesting full page", {
