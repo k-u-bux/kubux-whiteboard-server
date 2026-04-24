@@ -2432,7 +2432,7 @@
               pageData = loadPageFromCache( pageUuid );
               pageData['hashes'] = [ shared.hashAny( pageUuid ) ];
               for ( let i = 0; i < pageData['history'].length; ++ i ) {
-                  pageData['hashes'].push( shared.hashNext( pageData['hashes[ i ]'], pageData['history'][ i ] ) );
+                  pageData['hashes'].push( shared.hashNext( pageData['hashes'][ i ], pageData['history'][ i ] ) );
               }
           } else {
               pageData = {
