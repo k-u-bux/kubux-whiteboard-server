@@ -5358,7 +5358,8 @@
                   debugLog("Preparing replay: ", {
                               page: pageUuid,
                               present: pageData['present'],
-                              hash: pageData['hash']
+                              hash: pageData['hash'],
+                              ourHashes: pageHashes
                            });
                   savePageToCache( pageUuid, pageData );
 
