@@ -16,7 +16,8 @@ function power_of_two ( n ) {
 }
 
 function recent_snapshots ( n ) {
-  if ( n <= 1 ) { return []; }
+  if ( n <= 0 ) { return []; }
+  if ( n == 1 ) { return [ 0 ]; }
   n = n - 1;
   let result = [];
   let powers = [];
@@ -33,6 +34,7 @@ function recent_snapshots ( n ) {
     }
     n = next;
   }
+  result.push( 0 );
   return result.reverse();
 }
 
