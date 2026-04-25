@@ -480,6 +480,7 @@ const serveableFiles = {
     '/sw.js': { path: 'sw.js', type: 'application/javascript' },
     '/icon-192.png': { path: 'icon-192.png', type: 'image/png' },
     '/icon-512.png': { path: 'icon-512.png', type: 'image/png' },
+    '/favicon.ico': { path: 'favicon.ico', type: 'image/vnd.microsoft.icon' },
     '/robots.txt': { path: 'robots.txt', type: 'text/plain' }
 };
 
