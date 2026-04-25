@@ -22,7 +22,7 @@ This document contains actionable items for improving code quality, security, pe
   - Update credential storage format
   - Location: `server.js:~340, ~475`
 
-- [ ] **Validate UUIDs before file operations** (server.js)
+- [X] **Validate UUIDs before file operations** (server.js)
   - Add UUID format validation in `getFilePath()`
   - Prevent potential file system exploits from malformed UUIDs
   - Use regex: `/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`
@@ -54,7 +54,7 @@ This document contains actionable items for improving code quality, security, pe
 
 ### State Consistency
 
-- [ ] **Add message schema validation** (server.js)
+- [X] **Add message schema validation** (server.js)
   - Validate incoming messages before processing
   - Check required fields exist and have correct types
   - Consider using a schema library (Zod, Joi, etc.)
