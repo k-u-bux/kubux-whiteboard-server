@@ -8,6 +8,7 @@ convert dummy.png \
   -compose DstIn -composite icon-512.png
 
 convert icon-512.png -resize 192x192 icon-192.png
+convert icon-512.png -resize 180x180 apple-touch-icon.png
 
 convert icon-512.png \
   \( -clone 0 -resize 16x16 \) \
