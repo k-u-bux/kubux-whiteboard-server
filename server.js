@@ -1270,7 +1270,19 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
             
             // Broadcast to other clients
-            broadcastMessageToBoard(acceptMessage, boardId, ws);
+            const pageNr = board.pageOrder.indexOf(pageId) + 1;
+            const totalPages = board.pageOrder.length;
+            const pageHash = page.hashes[page.present];
+            const snapshots = get_page_snapshots(page);            
+            const pingMessage = {
+                type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
+                [MESSAGES.SERVER_TO_CLIENT.PING.PAGE]: pageId,
+                [MESSAGES.SERVER_TO_CLIENT.PING.HASH]: pageHash,
+                [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR]: pageNr,
+                [MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES]: totalPages,
+                [MESSAGES.SERVER_TO_CLIENT.PING.SNAPSHOTS]: snapshots
+            };
+            broadcastMessageToBoard(pingMessage, boardId, ws);
         } else {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, reason);
             ws.send(serialize(declineMessage));

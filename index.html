@@ -2232,15 +2232,10 @@
 
       // Handle accept message from server
       function handleAcceptMessage(data) {
-          // we are no longer interested in this page
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE];
 
           if ( currentPageUuid !== pageUuid ) {
               return;
-              // joinPage( pageUuid,
-              //           data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE_NR],
-              //           data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.TOTAL_PAGES] );
-              // return;
           }
 
           // update page into

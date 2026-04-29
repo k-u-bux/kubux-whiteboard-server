@@ -312,8 +312,8 @@ const MESSAGES = {
             ACTION_UUID: 'action-uuid',
             BEFORE_HASH: 'before-hash',
             AFTER_HASH: 'after-hash',
-            PAGE_NR: 'current page-nr in its board',
-            TOTAL_PAGES: 'current #pages of the board'
+            PAGE_NR: 'pageNr',
+            TOTAL_PAGES: 'totalPages'
         },
         DECLINE: {
             TYPE: 'decline',
