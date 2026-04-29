@@ -1278,19 +1278,25 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
             
             // Broadcast to other clients
-            const pageNr = board.pageOrder.indexOf(pageUuid) + 1;
+            const page = usePage(pageUuid);
+            const pageHistory = page.history;
+            const pagePresent = page.present;
+            const pageHash = page.hashes[pagePresent];
+            const pageNr = board.pageOrder.indexOf(pageId) + 1;
             const totalPages = board.pageOrder.length;
-            const pageHash = page.hashes[page.present];
-            const snapshots = get_page_snapshots(page);            
-            const pingMessage = {
-                type: MESSAGES.SERVER_TO_CLIENT.PING.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.PING.PAGE]: pageUUid,
-                [MESSAGES.SERVER_TO_CLIENT.PING.HASH]: pageHash,
-                [MESSAGES.SERVER_TO_CLIENT.PING.PAGE_NR]: pageNr,
-                [MESSAGES.SERVER_TO_CLIENT.PING.TOTAL_PAGES]: totalPages,
-                [MESSAGES.SERVER_TO_CLIENT.PING.SNAPSHOTS]: snapshots
+            const snapshots = get_page_snapshots(page)
+            const message = {
+                type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageId,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: totalPages,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: false, 
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
             };
-            broadcastMessageToPage(pingMessage, pageId, ws);
+ 
+            broadcastMessageToBoard(infoMessage, boardId, ws);
         } else {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, reason);
             ws.send(serialize(declineMessage));
