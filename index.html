@@ -2190,7 +2190,7 @@
           // Check if we are on the wrong page
           if (currentPageUuid !== pingPageUuid) {
               debugLog('Server indicates we should be on a different page');
-              requestFullPage(pingPageUuid, true);
+              requestPageInfo(pingPageUuid, true);
               return;
           }
           
@@ -2654,6 +2654,23 @@
               debugLog('Requesting replay', request);
               sendMessage(request);
           }
+      }
+      
+      // Request a replay from the server
+      function requestPageInfo( pageUuid = currentPageUuid, do_register = true, delta = 0 ) {
+          const requestId = createRequestId();
+          touchPageInCache( pageUuid );
+          const pageData = loadPageFromCache( pageUuid );
+          const request = 
+              type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.PAGE]: pageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.DELTA]: delta,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.REGISTER]: do_register,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.REQUEST_ID]: requestId
+          };
+          debugLog('Requesting page info', request);
+          sendMessage(request);
       }
       
       // Send a message to the server
