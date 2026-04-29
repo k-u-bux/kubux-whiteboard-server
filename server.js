@@ -1264,6 +1264,12 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         }
         
         if (accept) {
+            const pageHistory = page.history;
+            const pagePresent = page.present;
+            const pageHash = page.hashes[pagePresent];
+            const pageNr = board.pageOrder.indexOf(pageUuid) + 1;
+            const totalPages = board.pageOrder.length;
+            const snapshots = get_page_snapshots(page)
             const acceptMessage = {
                 type: MESSAGES.SERVER_TO_CLIENT.ACCEPT.TYPE,
                 [MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE]: pageUuid,
@@ -1278,16 +1284,9 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
             
             // Broadcast to other clients
-            const page = usePage(pageUuid);
-            const pageHistory = page.history;
-            const pagePresent = page.present;
-            const pageHash = page.hashes[pagePresent];
-            const pageNr = board.pageOrder.indexOf(pageId) + 1;
-            const totalPages = board.pageOrder.length;
-            const snapshots = get_page_snapshots(page)
-            const message = {
+            const infoMessage = {
                 type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageId,
+                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageUuid,
                 [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
                 [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
                 [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
