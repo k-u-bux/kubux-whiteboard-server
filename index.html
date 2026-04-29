@@ -2661,7 +2661,7 @@
           const requestId = createRequestId();
           touchPageInCache( pageUuid );
           const pageData = loadPageFromCache( pageUuid );
-          const request = 
+          const request = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.BOARD]: boardId,
               [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.PAGE]: pageUuid,
