@@ -332,10 +332,14 @@ function loadOrCreateBoard(boardId, create=true) {
     }
 }
 
-function loadOrCreatePage(pageId) {
+function loadOrCreatePage(pageId, create=true) {
     let page = loadPage(pageId);
     if (page) { return page; }
-    return createPage(pageId);
+    if ( create ) {
+        return createPage(pageId);
+    } else {
+        return null;
+    }
 }
 
 
@@ -344,9 +348,12 @@ const pageCache = new Map();
 const pageCacheMax = 10;
 const evictablePages = new Set();
 
-function usePage(pageId) {
+function usePage(pageId, create=true) {
     if (!pageCache.has(pageId)) {
-        pageCache.set(pageId, loadOrCreatePage(pageId));
+        page = loadOrCreatePage(pageId, create);
+        if ( page ) {
+            pageCache.set(pageId, page );
+        }
     }
     if (evictablePages.has(pageId)) {
         evictablePages.delete(pageId);
@@ -938,7 +945,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         
         debug.log(`[SERVER] Client ${clientId} registered with page: ${resolvedPageId} on board ${boardId}`);
         
-        const page = usePage(resolvedPageId);
+        const page = usePage(resolvedPageId, false);
         if ( !page ) {
             debug.log(`[SERVER]: Cannot find page ${resolvedPageId}`);
         } else {
