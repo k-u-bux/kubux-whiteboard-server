@@ -322,10 +322,14 @@ function createPage(pageId) {
     return (page);
 }
 
-function loadOrCreateBoard(boardId) {
+function loadOrCreateBoard(boardId, create=true) {
     let board = loadBoard(boardId);
     if (board) { return board; }
-    return createBoard(boardId);
+    if ( create ) {
+        return createBoard(boardId);
+    } else {
+        return null;
+    }
 }
 
 function loadOrCreatePage(pageId) {
@@ -380,14 +384,14 @@ const boardCache = new Map();
 const boardCacheMax = 10;
 const evictableBoards = new Set();
 
-function useBoard(boardId) {
+function useBoard(boardId, create = true) {
     if (evictableBoards.has(boardId)) {
         evictableBoards.delete(boardId);
     }
     if (boardCache.has(boardId)) {
         return boardCache.get(boardId);
     }
-    const board = loadOrCreateBoard(boardId);
+    const board = loadOrCreateBoard(boardId, create);
     if (board) {
         boardCache.set(boardId, board);
     }
@@ -848,7 +852,7 @@ function createNewBoard(ws, clientId, requestId) {
 }
 
 function registerBoard(ws, boardId, clientId, requestId) {
-    const board = useBoard(boardId);
+    const board = useBoard(boardId, false);
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
         ws.clientId = clientId; // Store client ID for tracking
