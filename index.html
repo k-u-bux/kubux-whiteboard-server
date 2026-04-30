@@ -4842,7 +4842,15 @@
       
       function loadPageFromCache(pageUuid) {
           const result = loadItem(pageUuid);
-          return result;
+          if ( result ) {
+              return result;
+          } else {
+              return {
+                       history: [],
+                       present: 0,
+                       hash: shared.hashAny( pageUuid )
+                     }
+          }
       }
 
       function commitCurrentPage() {
