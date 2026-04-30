@@ -857,189 +857,184 @@
       let lruOrder = [];
 
       let pagesMetaData = {}
-      
 
-//       /**
-//        * Save an item to the LRU cache
-//        * @param {string} key - The key to store the item under
-//        * @param {*} value - The value to store (any serializable type)
-//        */
-//       function saveItem(key, value) {
-//           try {
-//               // Remove key if it already exists
-//               const existingIndex = lruOrder.indexOf(key);
-//               if (existingIndex !== -1) {
-//                   lruOrder.splice(existingIndex, 1);
-//               }
-//               
-//               // Add key to the end (most recently used)
-//               lruOrder.push(key);
-//               
-//               // If cache exceeds max size, remove the least recently used item
-//               if (lruOrder.length > LRU_MAX_SIZE) {
-//                   const lruKey = lruOrder.shift(); // Remove first (oldest) item
-//                   sessionStorage.removeItem(lruKey);
-//                   delete dummyStorage[ key ];
-//               }
-//               
-//               // Save the item
-//               sessionStorage.setItem(key, JSON.stringify(value));
-//               dummyStorage[ key ] = value;
-// 
-//               return true;
-//           } catch (e) {
-//               console.error('Error saving item to LRU cache:', e);
-//               return false;
-//           }
-//       }
-//       
-//       /**
-//        * Load an item from the LRU cache
-//        * @param {string} key - The key to retrieve
-//        * @returns {*} The stored value, or null if not found
-//        */
-//       function loadItem(key) {
-//           try {
-//               // Get the item
-//               // const itemData = sessionStorage.getItem(key);
-//               const itemData = dummyStorage[ key ];
-//               if (itemData === null) {
-//                   return null;
-//               }
-//               
-//               // Update access order (move to end as most recently used)
-//               const existingIndex = lruOrder.indexOf(key);
-//               if (existingIndex !== -1) {
-//                   lruOrder.splice(existingIndex, 1);
-//                   lruOrder.push(key);
-//               }
-//               
-//               // Return the parsed value
-//               return JSON.parse(itemData);
-//           } catch (e) {
-//               console.error('Error loading item from LRU cache:', e);
-//               return null;
-//           }
-//       }
-//       
-//       /**
-//        * Remove an item from the LRU cache
-//        * @param {string} key - The key to remove
-//        * @returns {boolean} True if item was removed, false otherwise
-//        */
-//       function removeItem(key) {
-//           try {
-//               // Check if item exists
-//               if (sessionStorage.getItem(key) === null) {
-//                   return false;
-//               }
-//               
-//               // Remove the item
-//               sessionStorage.removeItem(key);
-// 
-//               // Remove from order array
-//               const index = lruOrder.indexOf(key);
-//               if (index !== -1) {
-//                   lruOrder.splice(index, 1);
-//               }
-//               
-//               return true;
-//           } catch (e) {
-//               console.error('Error removing item from LRU cache:', e);
-//               return false;
-//           }
-//       }
-// 
-// 
+       /**
+        * Save an item to the LRU cache
+        * @param {string} key - The key to store the item under
+        * @param {*} value - The value to store (any serializable type)
+        */
+       function saveItem(key, value) {
+           try {
+               // Remove key if it already exists
+               const existingIndex = lruOrder.indexOf(key);
+               if (existingIndex !== -1) {
+                   lruOrder.splice(existingIndex, 1);
+               }
+               
+               // Add key to the end (most recently used)
+               lruOrder.push(key);
+               
+               // If cache exceeds max size, remove the least recently used item
+               if (lruOrder.length > LRU_MAX_SIZE) {
+                   const lruKey = lruOrder.shift(); // Remove first (oldest) item
+                   sessionStorage.removeItem(lruKey);
+               }
+               
+               // Save the item
+               sessionStorage.setItem(key, JSON.stringify(value));
+ 
+               return true;
+           } catch (e) {
+               console.error('Error saving item to LRU cache:', e);
+               return false;
+           }
+       }
+       
+       /**
+        * Load an item from the LRU cache
+        * @param {string} key - The key to retrieve
+        * @returns {*} The stored value, or null if not found
+        */
+       function loadItem(key) {
+           try {
+               // Get the item
+               const itemData = sessionStorage.getItem(key);
+               if (itemData === null) {
+                   return null;
+               }
+               
+               // Update access order (move to end as most recently used)
+               const existingIndex = lruOrder.indexOf(key);
+               if (existingIndex !== -1) {
+                   lruOrder.splice(existingIndex, 1);
+                   lruOrder.push(key);
+               }
+               
+               // Return the parsed value
+               return JSON.parse(itemData);
+           } catch (e) {
+               console.error('Error loading item from LRU cache:', e);
+               return null;
+           }
+       }
+       
+       /**
+        * Remove an item from the LRU cache
+        * @param {string} key - The key to remove
+        * @returns {boolean} True if item was removed, false otherwise
+        */
+       function removeItem(key) {
+           try {
+               // Check if item exists
+               if (sessionStorage.getItem(key) === null) {
+                   return false;
+               }
+               
+               // Remove the item
+               sessionStorage.removeItem(key);
+ 
+               // Remove from order array
+               const index = lruOrder.indexOf(key);
+               if (index !== -1) {
+                   lruOrder.splice(index, 1);
+               }
+               
+               return true;
+           } catch (e) {
+               console.error('Error removing item from LRU cache:', e);
+               return false;
+           }
+       }
+ 
 
-      let dummyStorage = {}
-      /**
-       * Save an item to the LRU cache
-       * @param {string} key - The key to store the item under
-       * @param {*} value - The value to store (any serializable type)
-       */
-      function saveItem(key, value) {
-          try {
-              // Remove key if it already exists
-              const existingIndex = lruOrder.indexOf(key);
-              if (existingIndex !== -1) {
-                  lruOrder.splice(existingIndex, 1);
-              }
-              
-              // Add key to the end (most recently used)
-              lruOrder.push(key);
-              
-              // If cache exceeds max size, remove the least recently used item
-              if (lruOrder.length > LRU_MAX_SIZE) {
-                  const lruKey = lruOrder.shift(); // Remove first (oldest) item
-                  delete dummyStorage[ key ];
-              }
-              
-              // Save the item
-              dummyStorage[ key ] = value;
-
-              return true;
-          } catch (e) {
-              console.error('Error saving item to LRU cache:', e);
-              return false;
-          }
-      }
-      
-      /**
-       * Load an item from the LRU cache
-       * @param {string} key - The key to retrieve
-       * @returns {*} The stored value, or null if not found
-       */
-      function loadItem(key) {
-          try {
-              // Get the item
-              const itemData = dummyStorage[ key ];
-              if (itemData === null) {
-                  return null;
-              }
-              
-              // Update access order (move to end as most recently used)
-              const existingIndex = lruOrder.indexOf(key);
-              if (existingIndex !== -1) {
-                  lruOrder.splice(existingIndex, 1);
-                  lruOrder.push(key);
-              }
-              
-              // Return the parsed value
-              return JSON.parse(itemData);
-          } catch (e) {
-              console.error('Error loading item from LRU cache:', e);
-              return null;
-          }
-      }
-      
-      /**
-       * Remove an item from the LRU cache
-       * @param {string} key - The key to remove
-       * @returns {boolean} True if item was removed, false otherwise
-       */
-      function removeItem(key) {
-          try {
-              // Check if item exists
-              if ( dummyStorage[ key ] === null ) {
-                  return false;
-              }
-              
-              // Remove the item
-              delete dummyStorage[ key ];
-
-              // Remove from order array
-              const index = lruOrder.indexOf(key);
-              if (index !== -1) {
-                  lruOrder.splice(index, 1);
-              }
-              
-              return true;
-          } catch (e) {
-              console.error('Error removing item from LRU cache:', e);
-              return false;
-          }
-      }
+//      let dummyStorage = {}
+//      /**
+//       * Save an item to the LRU cache
+//       * @param {string} key - The key to store the item under
+//       * @param {*} value - The value to store (any serializable type)
+//       */
+//      function saveItem(key, value) {
+//          try {
+//              // Remove key if it already exists
+//              const existingIndex = lruOrder.indexOf(key);
+//              if (existingIndex !== -1) {
+//                  lruOrder.splice(existingIndex, 1);
+//              }
+//              
+//              // Add key to the end (most recently used)
+//              lruOrder.push(key);
+//              
+//              // If cache exceeds max size, remove the least recently used item
+//              if (lruOrder.length > LRU_MAX_SIZE) {
+//                  const lruKey = lruOrder.shift(); // Remove first (oldest) item
+//                  delete dummyStorage[ key ];
+//              }
+//              
+//              // Save the item
+//              dummyStorage[ key ] = value;
+//
+//              return true;
+//          } catch (e) {
+//              console.error('Error saving item to LRU cache:', e);
+//              return false;
+//          }
+//      }
+//      
+//      /**
+//       * Load an item from the LRU cache
+//       * @param {string} key - The key to retrieve
+//       * @returns {*} The stored value, or null if not found
+//       */
+//      function loadItem(key) {
+//          try {
+//              // Get the item
+//              const itemData = dummyStorage[ key ];
+//              if (itemData === null) {
+//                  return null;
+//              }
+//              
+//              // Update access order (move to end as most recently used)
+//              const existingIndex = lruOrder.indexOf(key);
+//              if (existingIndex !== -1) {
+//                  lruOrder.splice(existingIndex, 1);
+//                  lruOrder.push(key);
+//              }
+//              
+//              // Return the parsed value
+//              return JSON.parse(itemData);
+//          } catch (e) {
+//              console.error('Error loading item from LRU cache:', e);
+//              return null;
+//          }
+//      }
+//      
+//      /**
+//       * Remove an item from the LRU cache
+//       * @param {string} key - The key to remove
+//       * @returns {boolean} True if item was removed, false otherwise
+//       */
+//      function removeItem(key) {
+//          try {
+//              // Check if item exists
+//              if ( dummyStorage[ key ] === null ) {
+//                  return false;
+//              }
+//              
+//              // Remove the item
+//              delete dummyStorage[ key ];
+//
+//              // Remove from order array
+//              const index = lruOrder.indexOf(key);
+//              if (index !== -1) {
+//                  lruOrder.splice(index, 1);
+//              }
+//              
+//              return true;
+//          } catch (e) {
+//              console.error('Error removing item from LRU cache:', e);
+//              return false;
+//          }
+//      }
 
 
       function debugLog(msg, data) {
