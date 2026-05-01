@@ -934,7 +934,7 @@
               lruOrder.push(key);
               
               while (lruOrder.length > LRU_MAX_SIZE) {
-                  const lruKey = lruOrder.shift(); // Remove first (oldest) item
+                  const lruKey = lruOrder.shift();
                   delete dummyStorage[ key ];
               }
               
@@ -960,7 +960,7 @@
                   lruOrder.push(key);
               }
               
-              return JSON.parse(itemData);
+              return itemData;
           } catch (e) {
               console.error('Error loading item from LRU cache:', e);
               return null;
