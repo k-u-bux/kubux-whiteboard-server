@@ -858,6 +858,7 @@
 
       let pagesMetaData = {}
 
+/*
       function saveItem(key, value) {
           try {
               const existingIndex = lruOrder.indexOf(key);
@@ -920,71 +921,71 @@
               return false;
           }
       }
- 
+*/ 
 
-//      let dummyStorage = {}
-//      function saveItem(key, value) {
-//          try {
-//              const existingIndex = lruOrder.indexOf(key);
-//              if (existingIndex !== -1) {
-//                  lruOrder.splice(existingIndex, 1);
-//              }
-//              
-//              lruOrder.push(key);
-//              
-//              while (lruOrder.length > LRU_MAX_SIZE) {
-//                  const lruKey = lruOrder.shift(); // Remove first (oldest) item
-//                  delete dummyStorage[ key ];
-//              }
-//              
-//              dummyStorage[ key ] = value;
-//
-//              return true;
-//          } catch (e) {
-//              console.error('Error saving item to LRU cache:', e);
-//              return false;
-//          }
-//      }
-//      
-//      function loadItem(key) {
-//          try {
-//              const itemData = dummyStorage[ key ];
-//              if (itemData === null) {
-//                  return null;
-//              }
-//              
-//              const existingIndex = lruOrder.indexOf(key);
-//              if (existingIndex !== -1) {
-//                  lruOrder.splice(existingIndex, 1);
-//                  lruOrder.push(key);
-//              }
-//              
-//              return JSON.parse(itemData);
-//          } catch (e) {
-//              console.error('Error loading item from LRU cache:', e);
-//              return null;
-//          }
-//      }
-//      
-//      function removeItem(key) {
-//          try {
-//              if ( dummyStorage[ key ] === null ) {
-//                  return false;
-//              }
-//              
-//              delete dummyStorage[ key ];
-//
-//              const index = lruOrder.indexOf(key);
-//              if (index !== -1) {
-//                  lruOrder.splice(index, 1);
-//              }
-//              
-//              return true;
-//          } catch (e) {
-//              console.error('Error removing item from LRU cache:', e);
-//              return false;
-//          }
-//      }
+      let dummyStorage = {}
+      function saveItem(key, value) {
+          try {
+              const existingIndex = lruOrder.indexOf(key);
+              if (existingIndex !== -1) {
+                  lruOrder.splice(existingIndex, 1);
+              }
+              
+              lruOrder.push(key);
+              
+              while (lruOrder.length > LRU_MAX_SIZE) {
+                  const lruKey = lruOrder.shift(); // Remove first (oldest) item
+                  delete dummyStorage[ key ];
+              }
+              
+              dummyStorage[ key ] = value;
+
+              return true;
+          } catch (e) {
+              console.error('Error saving item to LRU cache:', e);
+              return false;
+          }
+      }
+      
+      function loadItem(key) {
+          try {
+              const itemData = dummyStorage[ key ];
+              if (itemData === null) {
+                  return null;
+              }
+              
+              const existingIndex = lruOrder.indexOf(key);
+              if (existingIndex !== -1) {
+                  lruOrder.splice(existingIndex, 1);
+                  lruOrder.push(key);
+              }
+              
+              return JSON.parse(itemData);
+          } catch (e) {
+              console.error('Error loading item from LRU cache:', e);
+              return null;
+          }
+      }
+      
+      function removeItem(key) {
+          try {
+              if ( dummyStorage[ key ] === null ) {
+                  return false;
+              }
+              
+              delete dummyStorage[ key ];
+
+              const index = lruOrder.indexOf(key);
+              if (index !== -1) {
+                  lruOrder.splice(index, 1);
+              }
+              
+              return true;
+          } catch (e) {
+              console.error('Error removing item from LRU cache:', e);
+              return false;
+          }
+      }
 
 
       function debugLog(msg, data) {
