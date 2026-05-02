@@ -224,6 +224,16 @@
       
       #page-info {
           margin: 0 10px;
+          padding: 5px 10px;
+          background-color: #f0f0f0;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          cursor: pointer;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      
+      #page-info:hover {
+          background-color: #e0e0e0;
       }
       
       .error-banner {
@@ -446,6 +456,84 @@
           cursor: pointer;
       }
       
+      /* Page Selection Menu */
+      #page-menu-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.5);
+          display: none;
+          justify-content: center;
+          align-items: center;
+          z-index: 2000;
+      }
+      
+      #page-menu-window {
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+          width: 300px;
+          max-width: 90%;
+          max-height: 80vh;
+          display: flex;
+          flex-direction: column;
+      }
+      
+      #page-menu-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 15px 20px;
+          border-bottom: 1px solid #ddd;
+      }
+      
+      #page-menu-title {
+          font-size: 18px;
+          font-weight: bold;
+          margin: 0;
+      }
+      
+      #page-menu-close {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: #666;
+          padding: 0;
+          width: 30px;
+          height: 30px;
+          line-height: 1;
+      }
+      
+      #page-menu-close:hover {
+          color: #000;
+      }
+      
+      #page-menu-list {
+          overflow-y: auto;
+          padding: 10px;
+      }
+      
+      .page-menu-item {
+          padding: 12px 20px;
+          cursor: pointer;
+          border-radius: 4px;
+          margin-bottom: 5px;
+          transition: background-color 0.2s;
+      }
+      
+      .page-menu-item:hover {
+          background-color: #f0f0f0;
+      }
+      
+      .page-menu-item.current {
+          background-color: #0078d7;
+          color: white;
+          font-weight: bold;
+      }
+      
       /* Board Navigation Overlay */
       #board-nav-overlay {
           position: fixed;
@@ -571,7 +659,7 @@
       <div class="tool-section page-controls">
         <button class="tool-btn" id="first-page" title="First Page">⏮️</button>
         <button class="tool-btn" id="prev-page" title="Previous Page">◀️</button>
-        <span id="page-info">Page 1 of 1</span>
+        <button id="page-info" title="Click to go to page...">Page 1 of 1</button>
         <button class="tool-btn" id="next-page" title="Next Page">▶️</button>
         <button class="tool-btn" id="last-page" title="Last Page">⏭️</button>
         <button class="tool-btn" id="add-page" title="Add Page">➕</button>
@@ -710,6 +798,19 @@
       </div>
     </div>
 
+
+    <!-- Page Selection Menu -->
+    <div id="page-menu-overlay">
+      <div id="page-menu-window">
+        <div id="page-menu-header">
+          <h3 id="page-menu-title">Go to Page</h3>
+          <button id="page-menu-close">×</button>
+        </div>
+        <div id="page-menu-list">
+          <!-- Page list items will be dynamically generated -->
+        </div>
+      </div>
+    </div>
 
     <!-- Board Navigation Overlay -->
     <div id="board-nav-overlay">
@@ -3600,10 +3701,19 @@
           // Page navigation
           document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
+          document.getElementById('page-info').addEventListener('click', openPageMenu);
           document.getElementById('next-page').addEventListener('click', () => navigatePage(1));
           document.getElementById('last-page').addEventListener('click', () => navigatePage(totalPages-pageNr));
           document.getElementById('add-page').addEventListener('click', addNewPage);
           document.getElementById('delete-page').addEventListener('click', deletePage);
+          
+          // Page menu controls
+          document.getElementById('page-menu-close').addEventListener('click', closePageMenu);
+          document.getElementById('page-menu-overlay').addEventListener('click', function(e) {
+              if (e.target === this) {
+                  closePageMenu();
+              }
+          });
           
           // Zoom controls
           document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.1));
@@ -5520,6 +5630,42 @@
               // Invalid URL format
               return null;
           }
+      }
+      
+      // Page Menu Functions
+      function openPageMenu() {
+          const overlay = document.getElementById('page-menu-overlay');
+          const menuList = document.getElementById('page-menu-list');
+          
+          // Clear existing items
+          menuList.innerHTML = '';
+          
+          // Generate page items
+          for (let i = 1; i <= totalPages; i++) {
+              const item = document.createElement('div');
+              item.className = 'page-menu-item';
+              if (i === pageNr) {
+                  item.classList.add('current');
+              }
+              item.textContent = `Go to page ${i}`;
+              item.dataset.page = i;
+              
+              item.addEventListener('click', function() {
+                  const targetPage = parseInt(this.dataset.page);
+                  const delta = targetPage - pageNr;
+                  navigatePage(delta);
+                  closePageMenu();
+              });
+              
+              menuList.appendChild(item);
+          }
+          
+          overlay.style.display = 'flex';
+      }
+      
+      function closePageMenu() {
+          const overlay = document.getElementById('page-menu-overlay');
+          overlay.style.display = 'none';
       }
       
       // Board Navigation Functions
