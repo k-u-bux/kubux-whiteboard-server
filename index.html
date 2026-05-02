@@ -463,20 +463,19 @@
           left: 0;
           width: 100%;
           height: 100%;
-          background-color: rgba(0, 0, 0, 0.5);
+          background-color: transparent;
           display: none;
-          justify-content: center;
-          align-items: center;
           z-index: 2000;
+          pointer-events: all;
       }
       
       #page-menu-window {
+          position: absolute;
           background: white;
           border-radius: 8px;
           box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-          width: 300px;
-          max-width: 90%;
-          max-height: 80vh;
+          width: 200px;
+          max-height: 400px;
           display: flex;
           flex-direction: column;
       }
@@ -5635,7 +5634,15 @@
       // Page Menu Functions
       function openPageMenu() {
           const overlay = document.getElementById('page-menu-overlay');
+          const menuWindow = document.getElementById('page-menu-window');
           const menuList = document.getElementById('page-menu-list');
+          
+          // Get button position
+          const buttonRect = pageInfo.getBoundingClientRect();
+          
+          // Position menu below button
+          menuWindow.style.left = buttonRect.left + 'px';
+          menuWindow.style.top = (buttonRect.bottom + 5) + 'px';
           
           // Clear existing items
           menuList.innerHTML = '';
@@ -5660,7 +5667,7 @@
               menuList.appendChild(item);
           }
           
-          overlay.style.display = 'flex';
+          overlay.style.display = 'block';
       }
       
       function closePageMenu() {
