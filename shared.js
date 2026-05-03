@@ -224,7 +224,7 @@ const MESSAGES = {
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
-        FULL_PAGE_REQUESTS: {
+        FULL_PAGE_REQUEST: {
             TYPE: 'fullPage-requests',
             BOARD: 'board-uuid',
             PAGE: 'page-uuid',
@@ -240,7 +240,7 @@ const MESSAGES = {
             PAYLOAD: 'payload',
             BEFORE_HASH: 'before-hash'
         },
-        REPLAY_REQUESTS: {
+        REPLAY_REQUEST: {
             TYPE: 'replay-requests',
             BOARD: 'board-uuid',
             PAGE: 'page-uuid',
@@ -511,23 +511,23 @@ function is_invalid_CREATE_BOARD_message(data) {
     return false;
 }
 
-function is_invalid_FULL_PAGE_REQUESTS_message(data) {
+function is_invalid_FULL_PAGE_REQUEST_message(data) {
     if (!data || typeof data !== 'object') return true;
     
     // boardId can come from data or ws.boardId (checked in handler)
-    const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD];
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
     
-    const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE];
+    const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE];
     if (pageId !== undefined && !isUuid(pageId)) return true;
     
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID];
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID];
     if (!requestId || !isUuid(requestId)) return true;
     
-    const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
+    const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA];
     if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
     
-    const register = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER];
+    const register = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
     if (register !== undefined && typeof register !== 'boolean') return true;
     
     return false;
@@ -551,26 +551,26 @@ function is_invalid_MOD_ACTION_PROPOSALS_message(data) {
     return false;
 }
 
-function is_invalid_REPLAY_REQUESTS_message(data) {
+function is_invalid_REPLAY_REQUEST_message(data) {
     if (!data || typeof data !== 'object') return true;
     
     // boardId can come from data or ws.boardId (checked in handler)
-    const boardId =  data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD];
+    const boardId =  data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
     
-    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
+    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE];
     if (!pageUuid || !isUuid(pageUuid)) return true;
     
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID];
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID];
     if (!requestId || !isUuid(requestId)) return true;
     
-    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
+    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT];
     if (present === undefined || typeof present !== 'number' || !Number.isInteger(present) || present < 0) return true;
     
-    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH];
+    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
     if (!presentHash || typeof presentHash !== 'string') return true;
     
-    const register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER];
+    const register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
     if (register === undefined || typeof register !== 'boolean') return true;
     
     return false;
@@ -1473,8 +1473,8 @@ if (typeof module !== 'undefined' && module.exports) {
         is_invalid_REGISTER_PAGE_message,
         is_invalid_PAGE_INFO_REQUEST_message,
         is_invalid_CREATE_BOARD_message,
-        is_invalid_FULL_PAGE_REQUESTS_message,
-        is_invalid_REPLAY_REQUESTS_message,
+        is_invalid_FULL_PAGE_REQUEST_message,
+        is_invalid_REPLAY_REQUEST_message,
         is_invalid_MOD_ACTION_PROPOSALS_message,
         // transforms
         createIdentityTransform,

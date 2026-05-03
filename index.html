@@ -2756,17 +2756,17 @@
           const requestId = createRequestId();
           
           const request = {
-              type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD]: boardId
+              type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD]: boardId
           };
           
           // if (pageId) {
-              request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE] = pageId;
-              request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER] = do_register;
+              request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE] = pageId;
+              request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER] = do_register;
           // }
           
-          request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA] = delta;
-          request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REQUEST_ID] = requestId;
+          request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA] = delta;
+          request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID] = requestId;
           
           debugLog('Requesting full page', request);
           sendMessage(request);
@@ -2780,25 +2780,25 @@
           const pageData = loadPageFromCache( pageUuid );
           if ( pageUuid !== currentPageUuid ) {
               const request = {
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: pageData[ 'present' ],
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: pageData[ 'hash' ],
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: do_register,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: pageData[ 'present' ],
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: pageData[ 'hash' ],
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER]: do_register,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: requestId
               };
               debugLog('Requesting replay', request);
               sendMessage(request);
           } else {          
               const request = {
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: currentPageUuid,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: verifiedIndex,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: hashes[verifiedIndex],
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: do_register,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: currentPageUuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: verifiedIndex,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: hashes[verifiedIndex],
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER]: do_register,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: requestId
               };
               debugLog('Requesting replay', request);
               sendMessage(request);
@@ -2811,12 +2811,12 @@
           touchPageInCache( pageUuid );
           const pageData = loadPageFromCache( pageUuid );
           const request = {
-              type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.BOARD]: boardId,
-              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.PAGE]: pageUuid,
-              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.DELTA]: delta,
-              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.REGISTER]: do_register,
-              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUESTS.REQUEST_ID]: requestId
+              type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE]: pageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: delta,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER]: do_register,
+              [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
           };
           debugLog('Requesting page info', request);
           sendMessage(request);
@@ -5528,13 +5528,13 @@
                       };
                       
                       const request = {
-                          type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD]: boardId,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE]: pageUuid,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT]: initialPageData[ 'present' ],
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH]: initialPageData[ 'hash' ],
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER]: false,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REQUEST_ID]: requestId
+                          type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: initialPageData[ 'present' ],
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: initialPageData[ 'hash' ],
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER]: false,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: requestId
                       };
 
                       ws.send(shared.serialize(request));

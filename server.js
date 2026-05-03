@@ -200,8 +200,8 @@ const {
     is_invalid_REGISTER_PAGE_message,
     is_invalid_PAGE_INFO_REQUEST_message,
     is_invalid_CREATE_BOARD_message,
-    is_invalid_FULL_PAGE_REQUESTS_message,
-    is_invalid_REPLAY_REQUESTS_message,
+    is_invalid_FULL_PAGE_REQUEST_message,
+    is_invalid_REPLAY_REQUEST_message,
     is_invalid_MOD_ACTION_PROPOSALS_message
 } = require('./shared');
 
@@ -1055,20 +1055,20 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
     createNewBoard(ws, clientId, requestId);
 };
 
-messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_FULL_PAGE_REQUESTS_message( data ) ) { 
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_FULL_PAGE_REQUEST_message( data ) ) { 
         debug.log(`[SERVER] dropped full page request from `, ws.clientId); 
         return;
     }
     debug.log( `[SERVER] handling full page request, requestId = ${requestId}, data = `, data )
-    const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.BOARD];
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD];
     ws.boardId = boardId;
     if ( ! boardId ) { return; }
     if ( ! isUuid( boardId ) ) { return; }
     const board = useBoard( boardId );
     assert(board);
-    const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.PAGE];
-    const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.DELTA];
+    const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE];
+    const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA];
     debug.log( "[SERVER] handling full page request", `pageId = ${pageId}, delta = ${delta}`)
     if ( pageId != undefined && isUuid( pageId ) && delta != undefined ) {
         resolvedPageId = findPage( board, pageId, delta );
@@ -1077,7 +1077,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.TYPE] = (ws, data, 
             sendPageLost( ws, boardId, pageId, resolvedPageId, requestId );
         } else {
             debug.log( "handling full page request, full page", `${resolvedPageId} vs. ${pageId}, delta = ${delta}`)
-            const do_switch = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUESTS.REGISTER];
+            const do_switch = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
             if ( do_switch ) {
                 ws.pageId = resolvedPageId;
             }
@@ -1331,17 +1331,17 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     }
 };
 
-messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_REPLAY_REQUESTS_message( data ) ) { 
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_REPLAY_REQUEST_message( data ) ) { 
         debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
         return;
     }
-    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.BOARD];
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
     ws.boardId = boardId;
-    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PAGE];
-    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT];
-    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.PRESENT_HASH];
-    const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUESTS.REGISTER];
+    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE];
+    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT];
+    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
+    const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
     
     const board = useBoard(boardId);
     const pageId = existingPage(pageUuid, board);
