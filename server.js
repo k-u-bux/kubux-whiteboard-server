@@ -67,9 +67,9 @@ class TeeStream extends Writable {
 
 const debugTee = new TeeStream( process.stdout, debugOutput );
 
-// const debug = new Console({ stdout: debugNull, stderr: debugTee });
+const debug = new Console({ stdout: debugNull, stderr: debugTee });
 // const debug = new Console({ stdout: debugOutput, stderr: debugTee });
-const debug = new Console({ stdout: debugTee, stderr: debugTee });
+// const debug = new Console({ stdout: debugTee, stderr: debugTee });
 
 
 // Password hashing with scrypt (memory-hard, resistant to rainbow tables and brute-force)
