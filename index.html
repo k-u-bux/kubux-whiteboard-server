@@ -5071,7 +5071,7 @@
           lay_path(context, element);
           if ( type == shared.DRAWABLE.TYPE.FILL ) {
               if ( ! is_closed ) {
-                  console.error('Only closed paths can be filled.',"");
+                  debugLog( 'Closing open path so it can be filled. path = ', path );
               }
               lay_path(context, element);
               context.closePath();
