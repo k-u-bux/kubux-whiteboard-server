@@ -1331,18 +1331,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     }
 };
 
-messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_REPLAY_REQUEST_message( data ) ) { 
-        debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
-        return;
-    }
-    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
-    ws.boardId = boardId;
-    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE];
-    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT];
-    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
-    const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
-    
+function makeReplayMessage ( boardId, pageUUid, present, presentHash, register, requestId ) {
     const board = useBoard(boardId);
     const pageId = existingPage(pageUuid, board);
 
@@ -1386,6 +1375,23 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
 
     releasePage(pageId);
     releaseBoard(boardId);
+    return replayMessage;
+}
+
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_REPLAY_REQUEST_message( data ) ) { 
+        debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
+        return;
+    }
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
+    ws.boardId = boardId;
+    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE];
+    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT];
+    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
+    const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
+    
+    const replayMessage = makeReplayMessage( boardId, pageUuid, present, presentHash, do_register, requestId );
+
     ws.send(serialize(replayMessage));
     logSentMessage(replayMessage.type, replayMessage, requestId, ws.clientId);
 };
