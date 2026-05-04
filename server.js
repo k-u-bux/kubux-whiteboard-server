@@ -1296,11 +1296,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 
             
             // Broadcast to other clients
-            if ( snapshots.length > 0 ) {
-                const index = max( 0, page.present - 2 );
-                const replayMessage = makeReplayMessage( board, page, index );
-                broadcastMessageToBoard(replayMessage, boardId, ws);
-            } else {
+            // if ( snapshots.length > 0 ) {
+            //     const index = max( 0, page.present - 2 );
+            //     const replayMessage = makeReplayMessage( board, page, index );
+            //     broadcastMessageToBoard(replayMessage, boardId, ws);
+            // } else {
                 const infoMessage = {
                     type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
                     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageUuid,
@@ -1312,7 +1312,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
                 };
                 broadcastMessageToBoard(infoMessage, boardId, ws);
-            }
+            // }
         } else {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, reason);
             ws.send(serialize(declineMessage));
