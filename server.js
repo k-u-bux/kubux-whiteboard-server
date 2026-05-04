@@ -1331,7 +1331,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     }
 };
 
-function makeReplayMessage ( boardId, pageUUid, present, presentHash, register, requestId ) {
+function makeReplayMessage ( boardId, pageUuid, present, presentHash, register, requestId ) {
     const board = useBoard(boardId);
     const pageId = existingPage(pageUuid, board);
 
