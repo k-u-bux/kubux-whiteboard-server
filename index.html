@@ -1772,7 +1772,7 @@
           backgroundValid = false; // Invalidate on resize
           
           applyZoom();
-          redrawCanvas();
+          requestRedraw();
       }
       
       // Apply zoom and pan transform
@@ -2854,7 +2854,7 @@
           backgroundValid = false;
           
           // Redraw the canvas
-          redrawCanvas();
+          requestRedraw();
       }
       
       function applyActionToVisualState(action) {
@@ -3037,7 +3037,7 @@
       // Selection Functions
       function clearSelection() {
           selectedElements = [];
-          redrawCanvas();
+          requestRedraw();
       }
 
       function calculateSelectionBounds() {
@@ -3324,7 +3324,7 @@
           initializeControlTriangle();
           
           // Redraw to show pasted elements
-          redrawCanvas();
+          requestRedraw();
       }
       
       // Calculate bounds of pasted elements with current transform
@@ -3434,7 +3434,7 @@
           controlTriangle = null;
           draggedHandle = null;
           transformMode = 'translate';
-          redrawCanvas();
+          requestRedraw();
       }
 
       function pasteElements(x, y) {
@@ -3938,7 +3938,7 @@
               panY = dragStartPoint.panY + (y - dragStartPoint.y);
               
               applyZoom();
-              redrawCanvas();
+              requestRedraw();
           },
           up: () => {
               if (force_stylus && event.pointerType === "touch") return;
@@ -4026,7 +4026,7 @@
           zoomLevel = Math.max(0.5, Math.min(3, zoomLevel + delta));
           zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
           applyZoom();
-          redrawCanvas();
+          requestRedraw();
           saveSettings();
       }
       
@@ -4037,7 +4037,7 @@
           panY = 0;
           zoomLevelDisplay.textContent = '100%';
           applyZoom();
-          redrawCanvas();
+          requestRedraw();
           saveSettings();
       }
       
@@ -4083,7 +4083,7 @@
               const point = shared.createPoint(x, y, pressure);
               currentPath.push(point);
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
-              redrawCanvas();
+              requestRedraw();
           },
           up: () => {
               if ( force_stylus && event.pointerType === "touch" ) { return; }
@@ -4129,7 +4129,7 @@
               const point = shared.createPoint(x, y, pressure);
               currentPath.push(point);
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
-              redrawCanvas();
+              requestRedraw();
           },
           up: () => {
               if ( force_stylus && event.pointerType === "touch" ) { return; }
@@ -4199,7 +4199,7 @@
               // Selection is always cumulative - no need to clear
               // (unless in deselect mode which is handled on pointer up)
               
-              redrawCanvas();
+              requestRedraw();
           },
           
           move: () => {
@@ -4257,7 +4257,7 @@
                   }
               }
               
-              redrawCanvas();
+              requestRedraw();
           },
           
           up: () => {
@@ -4308,7 +4308,7 @@
               selectionStroke = null;
               currentPath = [];
               
-              redrawCanvas();
+              requestRedraw();
           }
       };
 
@@ -4397,7 +4397,7 @@
                   B = point;
                   currentPath = make_path( A, B );
                   currentStroke[shared.ELEMENT.POINTS] = currentPath;
-                  redrawCanvas();
+                  requestRedraw();
               },
               up: () => {
                   if ( force_stylus && event.pointerType === "touch" ) { return; }
@@ -4540,7 +4540,7 @@
               updatePasteTransformFromControls();
               
               // Redraw
-              redrawCanvas();
+              requestRedraw();
           },
           
           up: () => {
@@ -5305,6 +5305,18 @@
           context.restore();
       }
       
+      let renderScheduled = false;
+
+      function requestRedraw() {
+          if ( ! renderScheduled ) {
+              renderScheduled = true;
+              requestAnimationFrame(() => {
+                  redrawCanvas();              // Render once
+                  renderScheduled = false;     // Clear flag for next frame
+              });
+          }
+      }
+
       // Redraw the canvas - optimized with background caching
       function redrawCanvas() {
           // Check if we are in an interactive mode (drawing, erasing, selecting, pasting)
