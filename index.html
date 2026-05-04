@@ -5070,9 +5070,9 @@
           const is_closed = ( path == shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR || path == shared.DRAWABLE.PATH.CLOSED_BEZIER_CURVE );
           lay_path(context, element);
           if ( type == shared.DRAWABLE.TYPE.FILL ) {
-              if ( ! is_closed ) {
-                  debugLog( 'Closing open path so it can be filled. path = ', path );
-              }
+              // if ( ! is_closed ) {
+              //     debugLog( 'Closing open path so it can be filled. path = ', path );
+              // }
               lay_path(context, element);
               context.closePath();
               context.fill()
