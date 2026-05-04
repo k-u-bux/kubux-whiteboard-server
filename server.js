@@ -1293,20 +1293,26 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             };
             ws.send(serialize(acceptMessage));
             logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
+
             
             // Broadcast to other clients
-            const infoMessage = {
-                type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageUuid,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: totalPages,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: false, 
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
-            };
- 
-            broadcastMessageToBoard(infoMessage, boardId, ws);
+            if ( snapshots ) {
+                const index = max( 0, pages.present - 2 );
+                const replayMessage = makeReplayMessage( board, page, index );
+                broadcastMessageToBoard(replayMessage, boardId, ws);
+            } else {
+                const infoMessage = {
+                    type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
+                    [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageUuid,
+                    [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
+                    [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
+                    [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
+                    [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: totalPages,
+                    [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: false, 
+                    [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
+                };
+                broadcastMessageToBoard(infoMessage, boardId, ws);
+            }
         } else {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, reason);
             ws.send(serialize(declineMessage));
@@ -1331,7 +1337,41 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     }
 };
 
-function makeReplayMessage ( boardId, pageUuid, present, presentHash, do_register, requestId ) {
+
+function makeReplayMessage ( board, page, start, do_register = false ) {
+    startHash = page.hashes[ start ];
+    const replayActions = [];
+    for (let time = start; time < page.history.length; ++time) {
+        replayActions.push(page.history[time]);
+    }
+    const replayMessage = {
+        type: MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE]: pageUuid,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.BEFORE_HASH]: startHash,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH]: page.hashes[page.present],
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE]: replayActions,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.PRESENT]: page.present,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.CURRENT_HASH]: page.hashes[page.present],
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR]: board.pageOrder.indexOf(pageId) + 1,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES]: board.pageOrder.length,
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID]: "00000000-0000-4000-0000-000000000000",
+        [MESSAGES.SERVER_TO_CLIENT.REPLAY.SWITCH]: do_register
+    };
+    return replayMessage;
+}
+
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_REPLAY_REQUEST_message( data ) ) { 
+        debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
+        return;
+    }
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
+    ws.boardId = boardId;
+    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE];
+    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT];
+    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
+    const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
+    
     const board = useBoard(boardId);
     const pageId = existingPage(pageUuid, board);
 
@@ -1375,23 +1415,6 @@ function makeReplayMessage ( boardId, pageUuid, present, presentHash, do_registe
 
     releasePage(pageId);
     releaseBoard(boardId);
-    return replayMessage;
-}
-
-messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_REPLAY_REQUEST_message( data ) ) { 
-        debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
-        return;
-    }
-    const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
-    ws.boardId = boardId;
-    const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE];
-    const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT];
-    const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
-    const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
-    
-    const replayMessage = makeReplayMessage( boardId, pageUuid, present, presentHash, do_register, requestId );
-
     ws.send(serialize(replayMessage));
     logSentMessage(replayMessage.type, replayMessage, requestId, ws.clientId);
 };
