@@ -1296,7 +1296,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 
             
             // Broadcast to other clients
-            if ( snapshots ) {
+            if ( false ) {
                 const index = max( 0, pages.present - 2 );
                 const replayMessage = makeReplayMessage( board, page, index );
                 broadcastMessageToBoard(replayMessage, boardId, ws);
