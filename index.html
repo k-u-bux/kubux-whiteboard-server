@@ -5072,7 +5072,6 @@
           if ( type == shared.DRAWABLE.TYPE.FILL ) {
               if ( ! is_closed ) {
                   console.error('Only closed paths can be filled.',"");
-                  throw new Error('Only closed paths can be filled.');
               }
               lay_path(context, element);
               context.closePath();
@@ -5086,7 +5085,6 @@
           } else {
               // If we get here, it is a bug - assertion would fail in production code
               console.error('Unknown drawable type:', type);
-              throw new Error('Invalid drawable type');
           }
           context.restore();
       }
