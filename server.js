@@ -635,11 +635,11 @@ const wss = new WebSocket.Server({
     server: httpServer,
     path: '/ws',
     perMessageDeflate: {
-        zlibDeflateOptions: { level: 6 },
-        zlibInflateOptions: { chunkSize: 16 * 1024 },
+        zlibDeflateOptions: { level: 1 },
+        zlibInflateOptions: { chunkSize: 32 * 1024 },
         serverNoContextTakeover: false,
         clientNoContextTakeover: false,
-        threshold: 512
+        threshold: 1024
     }
 });
 
