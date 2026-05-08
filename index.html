@@ -691,9 +691,29 @@
       </div>
 
       <div class="tool-section">
-        <button class="tool-btn" id="selection-rectangle-tool" title="Rectangle Selection">▭</button>
-        <button class="tool-btn" id="selection-lasso-tool" title="Lasso Selection">⭕</button>
-        <button class="tool-btn" id="selection-stroke-tool" title="Stroke Selection">〰️</button>
+        <!-- Rechteck-Auswahl mit SVG für präzise Punkte -->
+        <button class="tool-btn" id="selection-rectangle-tool" title="Rectangle Selection">
+          <svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;">
+            <rect x="10" y="20" width="80" height="60" 
+                  fill="none" stroke="currentColor" stroke-width="8" stroke-dasharray="10,10" />
+          </svg>
+        </button>
+      
+        <!-- Lasso-Auswahl (Deine Schleife) -->
+        <button class="tool-btn" id="selection-lasso-tool" title="Lasso Selection">
+          <svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;">
+            <path d="M20,50 C20,20 80,20 80,50 C80,80 20,80 20,50 Z" 
+                  fill="none" stroke="currentColor" stroke-width="8" stroke-dasharray="10,10" />
+          </svg>
+        </button>
+      
+        <!-- Stroke-Auswahl -->
+        <button class="tool-btn" id="selection-stroke-tool" title="Stroke Selection">
+          <svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;">
+            <path d="M10,50 Q30,10 50,50 T90,50" 
+                  fill="none" stroke="currentColor" stroke-width="8" stroke-dasharray="10,10" />
+          </svg>
+        </button>
       </div>
 
       <div class="tool-section" id="layer-controls">
