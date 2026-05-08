@@ -2839,34 +2839,34 @@
 
       // mode reset timer
       let modeResetTimerId = null;
-
-      function resetTool () {
-          setTool( currentDefaultTool );
+      const DEFAULT_OMEGA = 50;
+      const DEFAULT_DELTA = 250;
+      
+      function resetTool() {
+          setTool(currentDefaultTool);
       }
       
-      function scheduleResetTool(delta, omega) {
-          if ( modeResetTimerId !== null ) {
-              stopResetTool();
+      // Zentrale Logik für das Planen des nächsten Schritts
+      function scheduleResetTool(delay, nextPeriod) {
+          stopResetTool();
+      
+          modeResetTimerId = setTimeout(() => {
+              resetTool();
+              scheduleResetTool(nextPeriod, nextPeriod);
+          }, delay);
+      }
+      
+      function startResetTool() {
+          scheduleResetTool(DEFAULT_DELTA, DEFAULT_OMEGA);
+      }
+      
+      function stopResetTool() {
+          if (modeResetTimerId !== null) {
+              clearTimeout(modeResetTimerId);
+              modeResetTimerId = null;
           }
-      
-          const runAfterPostpone = () => {
-              resetTool()
-              timerId = setTimeout( function resume() {
-                  callback();
-                  timerId = setTimeout(resume, omega);
-              }, omega);
-          };
-      
-          timerId = setTimeout(runAfterPostpone, delta);
       }
 
-      function startResetTool () {
-          // scheduleReconnect( 250, 50 );
-      }        
-
-      function stopResetTool () {
-          // clearTimeout( modeResetTimerId );
-      }
       
       // Update visual state based on history up to present
       function updateVisualState() {
