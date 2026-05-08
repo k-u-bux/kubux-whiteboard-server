@@ -3323,6 +3323,7 @@
 
       // Handle paste button click - enter interactive paste mode
       function handlePasteClick() {
+          stopResetTool();
           if (!clipboard.elements.length) {
               return; // Button should be disabled, but just in case
           }
