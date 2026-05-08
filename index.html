@@ -2298,9 +2298,9 @@
           index = 0;
           the_index = 0;
           alt_index = 0;
-          the_hash = hashes[ the_index ];
-          alt_hash = snapshots[ alt_index ];
           while ( ( the_index <= verifiedIndex ) && ( alt_index < snapshots.length ) ) {
+              the_hash = hashes[ the_index ];
+              alt_hash = snapshots[ alt_index ];
               if ( the_hash != alt_hash ) {
                   ++ the_index;
                   the_hash = hashes[ the_index ];
