@@ -2843,26 +2843,24 @@
       const DEFAULT_DELTA = 250;
       
       function resetTool() {
-          setTool(currentDefaultTool);
+          setTool( currentDefaultTool );
       }
       
-      // Zentrale Logik für das Planen des nächsten Schritts
-      function scheduleResetTool(delay, nextPeriod) {
+      function scheduleResetTool ( delay, nextPeriod ) {
           stopResetTool();
-      
-          modeResetTimerId = setTimeout(() => {
+          modeResetTimerId = setTimeout( () => {
               resetTool();
-              scheduleResetTool(nextPeriod, nextPeriod);
-          }, delay);
+              scheduleResetTool( nextPeriod, nextPeriod );
+          }, delay );
       }
       
-      function startResetTool() {
-          scheduleResetTool(DEFAULT_DELTA, DEFAULT_OMEGA);
+      function startResetTool () {
+          scheduleResetTool( DEFAULT_DELTA, DEFAULT_OMEGA );
       }
       
-      function stopResetTool() {
-          if (modeResetTimerId !== null) {
-              clearTimeout(modeResetTimerId);
+      function stopResetTool () {
+          if ( modeResetTimerId !== null ) {
+              clearTimeout( modeResetTimerId );
               modeResetTimerId = null;
           }
       }
