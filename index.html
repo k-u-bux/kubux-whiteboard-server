@@ -2843,7 +2843,9 @@
       const DEFAULT_DELTA = 250;
       
       function resetTool() {
-          setTool( currentDefaultTool );
+          if ( ! pasteMode ) {
+              setTool( currentDefaultTool );
+          }
       }
       
       function scheduleResetTool ( delay, nextPeriod ) {
@@ -3049,9 +3051,9 @@
       // Setup selection controls
       function setupSelectionControls() {
           // Set up action buttons
-          cutBtn.addEventListener('click', cutSelectedElements);
-          copyBtn.addEventListener('click', copySelectedElements);
-          moveBtn.addEventListener('click', moveSelectedElements);
+          cutBtn.addEventListener('click', () => { cutSelectedElements(); startResetTool(); } );
+          copyBtn.addEventListener('click',  () => { copySelectedElements(); startResetTool(); } );
+          moveBtn.addEventListener('click',  () => { moveSelectedElements(); startResetTool(); } );
           pasteBtn.addEventListener('click', handlePasteClick);
           moveLayerBtn.addEventListener('click', showMoveToLayerDialog);
           
