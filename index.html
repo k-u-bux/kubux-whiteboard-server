@@ -3951,6 +3951,7 @@
       // Hand tool pointer handler for panning
       const hand_pointer_handler = {
           down: () => {
+              startResetTool();
               if (force_stylus && event.pointerType === "touch") return;
               
               const rect = canvas.getBoundingClientRect();
@@ -3961,6 +3962,7 @@
               dragStartPoint = { x, y, panX, panY };
           },
           move: () => {
+              startResetTool();
               if (force_stylus && event.pointerType === "touch") return;
               if (!isDraggingPaste || !dragStartPoint) return;
               
@@ -3975,6 +3977,7 @@
               requestRedraw();
           },
           up: () => {
+              startResetTool();
               if (force_stylus && event.pointerType === "touch") return;
               
               isDraggingPaste = false;
