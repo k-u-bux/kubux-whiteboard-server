@@ -2217,7 +2217,7 @@
               pending_actions.clear();
           }                                                                  
           if ( pending_actions.size > 0 ) { 
-            debugLog( "exit handlePingMessage because of pending actions" );
+            debugLog( "exit handlePageInfo because of pending actions" );
             return; 
           }
 
@@ -2311,6 +2311,8 @@
               }
           }
           verifiedIndex = index;
+          present = index;
+          commitCurrentPage();
       }
                                                                        
       function handlePingMessage(data) {
@@ -2334,7 +2336,8 @@
               serverPageNr: pingPageNr, 
               serverTotalPages: pingTotalPages,
               currentPageUuid: currentPageUuid,
-              verifiedHash: hashes[ verifiedIndex ]
+              verifiedHash: hashes[ verifiedIndex ],
+              pingSnapshots: pingSnapshots
           });
           
           // Check if we are on the wrong page
