@@ -5079,7 +5079,7 @@
           
           // Dash pattern
           const dashPattern = element[shared.ELEMENT.DASH_PATTERN];
-          if (dashPattern && dashPattern.length > 1) {
+          if (dashPattern && dashPattern.length >= 1) {
               context.setLineDash(dashPattern);
           } else {
               context.setLineDash([]);
