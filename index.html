@@ -5482,8 +5482,7 @@
                   const point = points[i];
                   const pressure = point[shared.POINT.PRESSURE];
                   
-                  // Map [0.2, 1.0] pressure to [1.0, (1 + sensitivity)] multiplier
-                  const minPressure = 0.4;
+                  const minPressure = 0.5;
                   const normalizedPressure = Math.max(0, (pressure - minPressure) / (1 - minPressure));
                   const pressureEffect = (1 + normalizedPressure * element[shared.ELEMENT.SENSITIVITY]);
                   
