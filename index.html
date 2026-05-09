@@ -1313,7 +1313,7 @@
       let draw_settings = chalk_settings;
 
       function createStroke ( settings ) {
-          const result = shared.createStroke( settings.stroke );
+          const result = debugPrint( 'stroke settings = ', shared.createStroke( settings.stroke ) );
           result[shared.ELEMENT.WIDTH] = settings.width;
           result[shared.ELEMENT.COLOR] = settings.color;
           result[shared.ELEMENT.OPACITY] = settings.opacity;
