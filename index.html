@@ -3173,9 +3173,10 @@
               mainBtn.textContent = value;
           });
           
-          // Save on change (when user releases slider)
+          // Save on change (when user releases slider) and close popup
           slider.addEventListener('change', function() {
               saveSettings();
+              popup.style.display = 'none';
           });
           
           // Close popup when clicking outside
