@@ -641,6 +641,20 @@
           background-color: #ccc;
           cursor: not-allowed;
       }
+      
+      /* Shape popup menu - horizontal */
+      #shape-popup-menu {
+          position: fixed;
+          background-color: #f0f0f0;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          padding: 4px;
+          display: flex;
+          flex-direction: row;
+          gap: 2px;
+          z-index: 1000;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
     </style>
   </head>
   <body>
@@ -768,23 +782,18 @@
         <div class="tool-section sidebar-section" id="fill-toggle">
           <button class="shape-btn" id="fill-btn" title="draw / fill"></button>
         </div>
-        <div class="tool-section sidebar-section" id="curve-selection">
-          <button class="shape-btn" id="curve-btn" title="rectangle path">➿</button>
+        <div class="tool-section sidebar-section" id="shape-selection">
+          <button class="shape-btn" id="shape-main-btn" title="Shape Tool (click to select)">➿</button>
         </div>
-        <div class="tool-section sidebar-section" id="rectangle-selection">
-          <button class="shape-btn" id="rectangle-btn" title="rectangle path">▭</button>
-        </div>
-        <div class="tool-section sidebar-section" id="circle-selection">
-          <button class="shape-btn" id="circle-btn" title="circle path">◯</button>
-        </div>
-        <div class="tool-section sidebar-section" id="horizontal-selection">
-          <button class="shape-btn" id="horizontal-btn" title="horizontal line">─</button>
-        </div>
-        <div class="tool-section sidebar-section" id="vertical-selection">
-          <button class="shape-btn" id="vertical-btn" title="vertical line">│</button>
-        </div>
-        <div class="tool-section sidebar-section" id="line-selection">
-          <button class="shape-btn" id="line-btn" title="straight line">／</button>
+        
+        <!-- Shape popup menu (horizontal) -->
+        <div id="shape-popup-menu" style="display: none;">
+          <button class="shape-btn shape-option" data-shape="curve" title="Curve path">➿</button>
+          <button class="shape-btn shape-option" data-shape="rectangle" title="Rectangle path">▭</button>
+          <button class="shape-btn shape-option" data-shape="circle" title="Circle path">◯</button>
+          <button class="shape-btn shape-option" data-shape="horizontal" title="Horizontal line">─</button>
+          <button class="shape-btn shape-option" data-shape="vertical" title="Vertical line">│</button>
+          <button class="shape-btn shape-option" data-shape="line" title="Straight line">／</button>
         </div>
         
         <!-- Selection action buttons (shown when selection tool is active) -->
@@ -3072,6 +3081,68 @@
           enterPasteMode();
       }
 
+      // Setup shape selector popup
+      function setupShapeSelector() {
+          const mainBtn = document.getElementById('shape-main-btn');
+          const popup = document.getElementById('shape-popup-menu');
+          const shapeOptions = document.querySelectorAll('.shape-option');
+          
+          // Shape icons mapping
+          const shapeIcons = {
+              'curve': '➿',
+              'rectangle': '▭',
+              'circle': '◯',
+              'horizontal': '─',
+              'vertical': '│',
+              'line': '／'
+          };
+          
+          // Toggle popup on main button click
+          mainBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const isVisible = popup.style.display === 'flex';
+              
+              if (isVisible) {
+                  popup.style.display = 'none';
+              } else {
+                  // Position popup to the right of the button
+                  const rect = mainBtn.getBoundingClientRect();
+                  popup.style.left = (rect.right + 5) + 'px';
+                  popup.style.top = rect.top + 'px';
+                  popup.style.display = 'flex';
+              }
+          });
+          
+          // Handle shape option clicks
+          shapeOptions.forEach(option => {
+              option.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                  const shape = this.getAttribute('data-shape');
+                  
+                  // Update the settings and handler
+                  set_shape_tool(shape);
+                  
+                  // Update main button icon
+                  mainBtn.textContent = shapeIcons[shape];
+                  
+                  // Close popup
+                  popup.style.display = 'none';
+                  
+                  // Save settings
+                  saveSettings();
+              });
+          });
+          
+          // Close popup when clicking outside
+          document.addEventListener('click', function(e) {
+              if (popup.style.display === 'flex' && 
+                  !popup.contains(e.target) && 
+                  e.target !== mainBtn) {
+                  popup.style.display = 'none';
+              }
+          });
+      }
+
       // Setup selection controls
       function setupSelectionControls() {
           // Set up action buttons
@@ -3721,41 +3792,8 @@
               saveSettings();
           });
           
-          document.getElementById('curve-btn').addEventListener('click', () => {
-              set_shape_tool( 'curve' );
-              update_shape_buttons();
-              saveSettings();
-          });
-          
-          document.getElementById('rectangle-btn').addEventListener('click', () => {
-              set_shape_tool( 'rectangle' );
-              update_shape_buttons();
-              saveSettings();
-          });
-          
-          document.getElementById('circle-btn').addEventListener('click', () => {
-              set_shape_tool( 'circle' );
-              update_shape_buttons();
-              saveSettings();
-          });
-          
-          document.getElementById('horizontal-btn').addEventListener('click', () => {
-              set_shape_tool( 'horizontal' );
-              update_shape_buttons();
-              saveSettings();
-          });
-          
-          document.getElementById('vertical-btn').addEventListener('click', () => {
-              set_shape_tool( 'vertical' );
-              update_shape_buttons();
-              saveSettings();
-          });
-          
-          document.getElementById('line-btn').addEventListener('click', () => {
-              set_shape_tool( 'line' );
-              update_shape_buttons();
-              saveSettings();
-          });
+          // Shape selector popup
+          setupShapeSelector();
           
           // Page navigation
           document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
