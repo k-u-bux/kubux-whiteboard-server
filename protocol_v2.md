@@ -19,7 +19,10 @@
 9. [Page Management](#page-management)
 10. [Security Model](#security-model)
 11. [Implementation Guide](#implementation-guide)
-12. [Use Cases](#use-cases)
+12. [Appendix A: Hash Algorithm](#appendix-a-hash-algorithm)
+13. [Appendix B: Message Validation](#appendix-b-message-validation)
+14. [Appendix C: Error Codes](#appendix-c-error-codes)
+15. [Changelog](#changelog)
 
 ---
 
@@ -397,7 +400,8 @@ Complete page history.
   hash: "hash-at-present",
   pageNr: 2,
   totalPages: 5,
-  "do-move": true
+  "do-move": true,
+  requestId: "request-uuid"
 }
 ```
 
@@ -448,7 +452,8 @@ Action sequence from requested point.
   currentHash: "latest-hash",
   pageNr: 2,
   totalPages: 5,
-  "do-move": false
+  "do-move": false,
+  requestId: "request-uuid"
 }
 ```
 
@@ -954,65 +959,7 @@ Server follows chain until finding existing page.
 - **Visual state compilation**: O(m × v) where v = visible elements
 - **Broadcast**: O(c) where c = connected clients
 
----
-
-## Use Cases
-
-### Use Case 1: Solo Whiteboarding
-
-```
-1. User visits app
-2. Click "New Board"
-3. Enter master password
-4. Receive board UUID + password
-5. Draw freely
-6. Share board UUID with others (optional)
-```
-
-### Use Case 2: Real-Time Collaboration
-
-```
-1. User A shares board UUID + password with User B
-2. User B registers to board
-3. Both users draw simultaneously
-4. Actions broadcast in real-time
-5. Conflicts resolved by server (first-write-wins)
-6. Both users eventually see identical canvas
-```
-
-### Use Case 3: Presentation Mode
-
-```
-1. Teacher creates board with multiple pages
-2. Teacher shares board UUID (without password)
-3. Students register (read-only)
-4. Teacher uses NEW_PAGE to add slides
-5. Teacher uses delta navigation (+1/-1) to present
-6. Students' views auto-update via PING
-```
-
-### Use Case 4: Version Recovery
-
-```
-1. User accidentally erases important drawing
-2. User finds action UUID from history
-3. User sends UNDO targeting that action
-4. Drawing restored
-5. OR: User requests REPLAY from earlier point
-6. Rebuild canvas from known-good state
-```
-
-### Use Case 5: Offline Resilience
-
-```
-1. User drawing on mobile device
-2. Connection drops
-3. User continues drawing (actions queued)
-4. Connection restored
-5. Client requests REPLAY from last known hash
-6. Client re-submits queued actions
-7. System recovers gracefully
-```
+The protocol is designed to minimize data transfer. Instead of always requesting full page history, clients use **spaced hash snapshots** (powers of 2) for efficient catch-up and **REPLAY messages** that only transfer actions since the last known state. This avoids full page transfers in common re-sync scenarios.
 
 ---
 
@@ -1072,38 +1019,7 @@ Invalid messages silently dropped.
 
 ---
 
-## Appendix C: Stroke Styles
-
-Predefined stroke templates:
-
-```javascript
-CHALK: {
-  type: "stroke",
-  width: 2.0,
-  capStyle: BUTT,
-  opacity: 1.0,
-  sensitivity: 0  // No pressure variation
-}
-
-PEN: {
-  type: "stroke",
-  width: 2.0,
-  capStyle: ROUND,
-  sensitivity: 1.0  // Full pressure sensitivity
-}
-
-HIGHLIGHTER: {
-  type: "stroke",
-  width: 24,
-  capStyle: SQUARE,
-  opacity: 0.5,
-  sensitivity: 0
-}
-```
-
----
-
-## Appendix D: Error Codes
+## Appendix C: Error Codes
 
 Server may return DECLINE with reasons:
 
