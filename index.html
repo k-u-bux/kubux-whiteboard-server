@@ -643,7 +643,7 @@
       }
       
       /* Shape popup menu - horizontal */
-      #shape-popup-menu, #path-mode-popup-menu {
+      #shape-popup-menu, #path-mode-popup-menu, #cap-style-popup-menu, #join-style-popup-menu {
           position: fixed;
           background-color: #f0f0f0;
           border: 1px solid #ccc;
@@ -831,6 +831,28 @@
           <button class="shape-btn path-mode-option" data-loop="false" data-fill="false" title="Open path">➰</button>
           <button class="shape-btn path-mode-option" data-loop="true" data-fill="false" title="Closed path">□</button>
           <button class="shape-btn path-mode-option" data-loop="true" data-fill="true" title="Filled shape">■</button>
+        </div>
+        
+        <div class="tool-section sidebar-section" id="cap-style-selection">
+          <button class="shape-btn" id="cap-style-btn" title="Cap Style (click to select)">●─●</button>
+        </div>
+        
+        <!-- Cap style popup menu (horizontal) -->
+        <div id="cap-style-popup-menu" style="display: none;">
+          <button class="shape-btn cap-style-option" data-cap-style="round" title="Round cap">●─●</button>
+          <button class="shape-btn cap-style-option" data-cap-style="butt" title="Butt cap">|─|</button>
+          <button class="shape-btn cap-style-option" data-cap-style="square" title="Square cap">■─■</button>
+        </div>
+        
+        <div class="tool-section sidebar-section" id="join-style-selection">
+          <button class="shape-btn" id="join-style-btn" title="Join Style (click to select)">⌒</button>
+        </div>
+        
+        <!-- Join style popup menu (horizontal) -->
+        <div id="join-style-popup-menu" style="display: none;">
+          <button class="shape-btn join-style-option" data-join-style="round" title="Round join">⌒</button>
+          <button class="shape-btn join-style-option" data-join-style="bevel" title="Bevel join">⊾</button>
+          <button class="shape-btn join-style-option" data-join-style="miter" title="Miter join">∟</button>
         </div>
         
         <!-- Selection action buttons (shown when selection tool is active) -->
@@ -1394,6 +1416,8 @@
           update_shape_buttons();
           updatePathModeButton();
           updateSensitivityButton();
+          updateCapStyleButton();
+          updateJoinStyleButton();
       }
       
       // updateKnobs();
@@ -1415,6 +1439,8 @@
           
           const shapeSelectionDiv = document.getElementById('shape-selection');
           const pathModeSelectionDiv = document.getElementById('path-mode-selection');
+          const capStyleSelectionDiv = document.getElementById('cap-style-selection');
+          const joinStyleSelectionDiv = document.getElementById('join-style-selection');
           
           switch (draw_settings.tool) {
           case 'pen':
@@ -1427,6 +1453,8 @@
               timerToggleDiv.style.display = 'flex';
               pathModeSelectionDiv.style.display = 'flex';
               shapeSelectionDiv.style.display = 'flex';
+              capStyleSelectionDiv.style.display = 'flex';
+              joinStyleSelectionDiv.style.display = 'flex';
               break;
           case 'selection-rectangle':
           case 'selection-lasso':
@@ -1437,6 +1465,8 @@
               timerToggleDiv.style.display = 'none';
               pathModeSelectionDiv.style.display = 'none';
               shapeSelectionDiv.style.display = 'none';
+              capStyleSelectionDiv.style.display = 'none';
+              joinStyleSelectionDiv.style.display = 'none';
               break;
           case 'selection-stroke':
               colorSelectionDiv.style.display = 'none';
@@ -1446,6 +1476,8 @@
               timerToggleDiv.style.display = 'none';
               pathModeSelectionDiv.style.display = 'none';
               shapeSelectionDiv.style.display = 'none';
+              capStyleSelectionDiv.style.display = 'none';
+              joinStyleSelectionDiv.style.display = 'none';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
@@ -1455,6 +1487,8 @@
               timerToggleDiv.style.display = 'none';
               pathModeSelectionDiv.style.display = 'none';
               shapeSelectionDiv.style.display = 'none';
+              capStyleSelectionDiv.style.display = 'none';
+              joinStyleSelectionDiv.style.display = 'none';
               break;
           }
       };
@@ -3111,6 +3145,20 @@
           'closed-fill': '■'
       };
 
+      // Cap style icons mapping
+      const capStyleIcons = {
+          'round': '●─●',
+          'butt': '|─|',
+          'square': '■─■'
+      };
+
+      // Join style icons mapping
+      const joinStyleIcons = {
+          'round': '⌒',
+          'bevel': '⊾',
+          'miter': '∟'
+      };
+
       // Get path mode key from loop and fill settings
       function getPathModeKey(loop, fill) {
           if (!loop && !fill) return 'open-draw';
@@ -3247,6 +3295,108 @@
           if (mainBtn) {
               const modeKey = getPathModeKey(draw_settings.loop, draw_settings.fill);
               mainBtn.textContent = pathModeIcons[modeKey];
+          }
+      }
+
+      // Setup cap style selector popup
+      function setupCapStyleSelector() {
+          const mainBtn = document.getElementById('cap-style-btn');
+          const popup = document.getElementById('cap-style-popup-menu');
+          const capStyleOptions = document.querySelectorAll('.cap-style-option');
+          
+          mainBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const isVisible = popup.style.display === 'flex';
+              
+              if (isVisible) {
+                  popup.style.display = 'none';
+              } else {
+                  const rect = mainBtn.getBoundingClientRect();
+                  popup.style.left = (rect.right + 5) + 'px';
+                  popup.style.top = rect.top + 'px';
+                  popup.style.display = 'flex';
+              }
+          });
+          
+          capStyleOptions.forEach(option => {
+              option.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                  const capStyle = this.getAttribute('data-cap-style');
+                  
+                  draw_settings.stroke[shared.ELEMENT.CAP_STYLE] = shared.CAP_STYLES[capStyle.toUpperCase()];
+                  mainBtn.textContent = capStyleIcons[capStyle];
+                  popup.style.display = 'none';
+                  saveSettings();
+              });
+          });
+          
+          document.addEventListener('click', function(e) {
+              if (popup.style.display === 'flex' && 
+                  !popup.contains(e.target) && 
+                  e.target !== mainBtn) {
+                  popup.style.display = 'none';
+              }
+          });
+      }
+
+      // Setup join style selector popup
+      function setupJoinStyleSelector() {
+          const mainBtn = document.getElementById('join-style-btn');
+          const popup = document.getElementById('join-style-popup-menu');
+          const joinStyleOptions = document.querySelectorAll('.join-style-option');
+          
+          mainBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const isVisible = popup.style.display === 'flex';
+              
+              if (isVisible) {
+                  popup.style.display = 'none';
+              } else {
+                  const rect = mainBtn.getBoundingClientRect();
+                  popup.style.left = (rect.right + 5) + 'px';
+                  popup.style.top = rect.top + 'px';
+                  popup.style.display = 'flex';
+              }
+          });
+          
+          joinStyleOptions.forEach(option => {
+              option.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                  const joinStyle = this.getAttribute('data-join-style');
+                  
+                  draw_settings.stroke[shared.ELEMENT.JOIN_STYLE] = shared.JOIN_STYLES[joinStyle.toUpperCase()];
+                  mainBtn.textContent = joinStyleIcons[joinStyle];
+                  popup.style.display = 'none';
+                  saveSettings();
+              });
+          });
+          
+          document.addEventListener('click', function(e) {
+              if (popup.style.display === 'flex' && 
+                  !popup.contains(e.target) && 
+                  e.target !== mainBtn) {
+                  popup.style.display = 'none';
+              }
+          });
+      }
+
+      // Update cap style button based on current settings
+      function updateCapStyleButton() {
+          const mainBtn = document.getElementById('cap-style-btn');
+          if (mainBtn && draw_settings.stroke) {
+              const capStyleIndex = draw_settings.stroke[shared.ELEMENT.CAP_STYLE];
+              const capStyleName = shared.CAP_STYLE_STRINGS[capStyleIndex];
+              mainBtn.textContent = capStyleIcons[capStyleName];
+          }
+      }
+
+      // Update join style button based on current settings
+      function updateJoinStyleButton() {
+          const mainBtn = document.getElementById('join-style-btn');
+          if (mainBtn && draw_settings.stroke) {
+              const joinStyleIndex = draw_settings.stroke[shared.ELEMENT.JOIN_STYLE];
+              const joinStyleName = shared.JOIN_STYLE_STRINGS[joinStyleIndex];
+              mainBtn.textContent = joinStyleIcons[joinStyleName];
           }
       }
 
@@ -3947,6 +4097,12 @@
           
           // Sensitivity selector popup
           setupSensitivitySelector();
+          
+          // Cap style selector popup
+          setupCapStyleSelector();
+          
+          // Join style selector popup
+          setupJoinStyleSelector();
           
           // Page navigation
           document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
