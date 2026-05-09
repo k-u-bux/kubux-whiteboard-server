@@ -653,7 +653,7 @@ const STROKE_STYLES = {
         1.0,                  // opacity
         CAP_STYLES.ROUND,      // capStyle
         JOIN_STYLES.BEVEL,    // joinStyle
-        [2,2],                  // dashPattern
+        [30,20],                  // dashPattern
         1.0,                  // pressureSensitivity
         1,                    // layer
         PEN_TYPES.MARKER      // penType
