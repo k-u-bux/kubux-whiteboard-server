@@ -1376,22 +1376,19 @@
           selectionLayerSidebar.style.display = isSelectionTool ? 'flex' : 'none';
           selectionDeselectSidebar.style.display = isSelectionTool ? 'flex' : 'none';
           
+          const shapeSelectionDiv = document.getElementById('shape-selection');
+          
           switch (draw_settings.tool) {
           case 'pen':
           case 'chalk':
           case 'highlighter':
               colorSelectionDiv.style.display = 'flex';
               widthSelectionDiv.style.display = 'flex';
-              opacitySelectionDiv .style.display = 'flex';
+              opacitySelectionDiv.style.display = 'flex';
               timerToggleDiv.style.display = 'flex';
               fillToggleDiv.style.display = 'flex';
               loopToggleDiv.style.display = 'flex';
-              curveSelectionDiv.style.display = 'flex';
-              circleSelectionDiv.style.display = 'flex';
-              rectangleSelectionDiv.style.display = 'flex';
-              horizontalSelectionDiv.style.display = 'flex';
-              verticalSelectionDiv.style.display = 'flex';
-              lineSelectionDiv.style.display = 'flex';
+              shapeSelectionDiv.style.display = 'flex';
               break;
           case 'selection-rectangle':
           case 'selection-lasso':
@@ -1401,12 +1398,7 @@
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
-              curveSelectionDiv.style.display = 'none';
-              circleSelectionDiv.style.display = 'none';
-              rectangleSelectionDiv.style.display = 'none';
-              horizontalSelectionDiv.style.display = 'none';
-              verticalSelectionDiv.style.display = 'none';
-              lineSelectionDiv.style.display = 'none';
+              shapeSelectionDiv.style.display = 'none';
               break;
           case 'selection-stroke':
               colorSelectionDiv.style.display = 'none';
@@ -1415,26 +1407,16 @@
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
-              curveSelectionDiv.style.display = 'none';
-              circleSelectionDiv.style.display = 'none';
-              rectangleSelectionDiv.style.display = 'none';
-              horizontalSelectionDiv.style.display = 'none';
-              verticalSelectionDiv.style.display = 'none';
-              lineSelectionDiv.style.display = 'none';
+              shapeSelectionDiv.style.display = 'none';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
               widthSelectionDiv.style.display = 'flex';
-              opacitySelectionDiv .style.display = 'none';
+              opacitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
-              curveSelectionDiv.style.display = 'none';
-              circleSelectionDiv.style.display = 'none';
-              rectangleSelectionDiv.style.display = 'none';
-              horizontalSelectionDiv.style.display = 'none';
-              verticalSelectionDiv.style.display = 'none';
-              lineSelectionDiv.style.display = 'none';
+              shapeSelectionDiv.style.display = 'none';
               break;
           }
       };
@@ -3081,21 +3063,21 @@
           enterPasteMode();
       }
 
+      // Shape icons mapping (used by setupShapeSelector and update_shape_buttons)
+      const shapeIcons = {
+          'curve': '➿',
+          'rectangle': '▭',
+          'circle': '◯',
+          'horizontal': '─',
+          'vertical': '│',
+          'line': '／'
+      };
+
       // Setup shape selector popup
       function setupShapeSelector() {
           const mainBtn = document.getElementById('shape-main-btn');
           const popup = document.getElementById('shape-popup-menu');
           const shapeOptions = document.querySelectorAll('.shape-option');
-          
-          // Shape icons mapping
-          const shapeIcons = {
-              'curve': '➿',
-              'rectangle': '▭',
-              'circle': '◯',
-              'horizontal': '─',
-              'vertical': '│',
-              'line': '／'
-          };
           
           // Toggle popup on main button click
           mainBtn.addEventListener('click', function(e) {
@@ -4704,57 +4686,11 @@
           }
       }
 
-      function update_shape_buttons () {
-          // switch ( draw_settings.shape ) {
-          // case 'curve':
-          //     document.getElementById('curve-btn').classList.add('active');
-          //     document.getElementById('rectangle-btn').classList.remove('active');
-          //     document.getElementById('circle-btn').classList.remove('active');
-          //     document.getElementById('horizontal-btn').classList.remove('active');
-          //     document.getElementById('vertical-btn').classList.remove('active');
-          //     document.getElementById('line-btn').classList.remove('active');
-          //     break;
-          // case 'rectangle':
-          //     document.getElementById('curve-btn').classList.remove('active');
-          //     document.getElementById('rectangle-btn').classList.add('active');
-          //     document.getElementById('circle-btn').classList.remove('active');
-          //     document.getElementById('horizontal-btn').classList.remove('active');
-          //     document.getElementById('vertical-btn').classList.remove('active');
-          //     document.getElementById('line-btn').classList.remove('active');
-          //     break;
-          // case 'circle':
-          //     document.getElementById('curve-btn').classList.remove('active');
-          //     document.getElementById('rectangle-btn').classList.remove('active');
-          //     document.getElementById('circle-btn').classList.add('active');
-          //     document.getElementById('horizontal-btn').classList.remove('active');
-          //     document.getElementById('vertical-btn').classList.remove('active');
-          //     document.getElementById('line-btn').classList.remove('active');
-          //     break;
-          // case 'horizontal':
-          //     document.getElementById('curve-btn').classList.remove('active');
-          //     document.getElementById('rectangle-btn').classList.remove('active');
-          //     document.getElementById('circle-btn').classList.remove('active');
-          //     document.getElementById('horizontal-btn').classList.add('active');
-          //     document.getElementById('vertical-btn').classList.remove('active');
-          //     document.getElementById('line-btn').classList.remove('active');
-          //     break;
-          // case 'vertical':
-          //     document.getElementById('curve-btn').classList.remove('active');
-          //     document.getElementById('rectangle-btn').classList.remove('active');
-          //     document.getElementById('circle-btn').classList.remove('active');
-          //     document.getElementById('horizontal-btn').classList.remove('active');
-          //     document.getElementById('vertical-btn').classList.add('active');
-          //     document.getElementById('line-btn').classList.remove('active');
-          //     break;
-          // case 'line':
-          //     document.getElementById('curve-btn').classList.remove('active');
-          //     document.getElementById('rectangle-btn').classList.remove('active');
-          //     document.getElementById('circle-btn').classList.remove('active');
-          //     document.getElementById('horizontal-btn').classList.remove('active');
-          //     document.getElementById('vertical-btn').classList.remove('active');
-          //     document.getElementById('line-btn').classList.add('active');
-          //     break;
-          // }
+      function update_shape_buttons() {
+          const mainBtn = document.getElementById('shape-main-btn');
+          if (mainBtn && draw_settings.shape) {
+              mainBtn.textContent = shapeIcons[draw_settings.shape];
+          }
       }
 
       function shape_to_ph ( shape ) {
