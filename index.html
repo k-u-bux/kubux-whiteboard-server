@@ -655,6 +655,29 @@
           z-index: 1000;
           box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       }
+      
+      /* Sensitivity popup slider */
+      #sensitivity-popup {
+          position: fixed;
+          background-color: #f0f0f0;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          padding: 8px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          z-index: 1000;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
+      
+      #sensitivity-slider {
+          width: 150px;
+      }
+      
+      #sensitivity-value {
+          min-width: 20px;
+          font-weight: bold;
+      }
     </style>
   </head>
   <body>
@@ -786,6 +809,16 @@
         <div class="tool-section sidebar-section" id="opacity-selection">
           <input type="range" id="opacity-selector" min="0" max="128">
         </div>
+        <div class="tool-section sidebar-section" id="sensitivity-selection">
+          <button class="shape-btn" id="sensitivity-btn" title="Pressure Sensitivity (click to adjust)">3</button>
+        </div>
+        
+        <!-- Sensitivity popup slider (horizontal) -->
+        <div id="sensitivity-popup" style="display: none;">
+          <input type="range" id="sensitivity-slider" min="0" max="9" step="1" value="3">
+          <span id="sensitivity-value">3</span>
+        </div>
+        
         <div class="tool-section sidebar-section" id="timer-toggle">
           <button class="shape-btn" id="timer-btn" title="Timer">🕐</button>
         </div>
@@ -1360,6 +1393,7 @@
           }
           update_shape_buttons();
           updatePathModeButton();
+          updateSensitivityButton();
       }
       
       // updateKnobs();
@@ -1388,6 +1422,7 @@
               colorSelectionDiv.style.display = 'flex';
               widthSelectionDiv.style.display = 'flex';
               opacitySelectionDiv.style.display = 'flex';
+              sensitivitySelectionDiv.style.display = 'flex';
               timerToggleDiv.style.display = 'flex';
               fillToggleDiv.style.display = 'flex';
               loopToggleDiv.style.display = 'flex';
@@ -1398,6 +1433,7 @@
               colorSelectionDiv.style.display = 'none';
               widthSelectionDiv.style.display = 'none';
               opacitySelectionDiv.style.display = 'none';
+              sensitivitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
@@ -1407,6 +1443,7 @@
               colorSelectionDiv.style.display = 'none';
               widthSelectionDiv.style.display = 'flex'; // For stroke width
               opacitySelectionDiv.style.display = 'none';
+              sensitivitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
@@ -1416,6 +1453,7 @@
               colorSelectionDiv.style.display = 'none';
               widthSelectionDiv.style.display = 'flex';
               opacitySelectionDiv.style.display = 'none';
+              sensitivitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
               fillToggleDiv.style.display = 'none';
               loopToggleDiv.style.display = 'none';
@@ -1693,6 +1731,7 @@
       const colorSelectionDiv = document.getElementById('color-selection');
       const widthSelectionDiv = document.getElementById('width-selection');
       const opacitySelectionDiv = document.getElementById('opacity-selection');
+      const sensitivitySelectionDiv = document.getElementById('sensitivity-selection');
       const timerToggleDiv = document.getElementById('timer-toggle');
       const fillToggleDiv = document.getElementById('fill-toggle');
       const loopToggleDiv = document.getElementById('loop-toggle');
@@ -3092,6 +3131,71 @@
           return 'open-draw';
       }
 
+      // Setup sensitivity selector popup with slider
+      function setupSensitivitySelector() {
+          const mainBtn = document.getElementById('sensitivity-btn');
+          const popup = document.getElementById('sensitivity-popup');
+          const slider = document.getElementById('sensitivity-slider');
+          const valueSpan = document.getElementById('sensitivity-value');
+          
+          // Toggle popup on main button click
+          mainBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const isVisible = popup.style.display === 'flex';
+              
+              if (isVisible) {
+                  popup.style.display = 'none';
+              } else {
+                  // Position popup to the right of the button
+                  const rect = mainBtn.getBoundingClientRect();
+                  popup.style.left = (rect.right + 5) + 'px';
+                  popup.style.top = rect.top + 'px';
+                  
+                  // Update slider to current value
+                  slider.value = Math.round(draw_settings.sensitivity);
+                  valueSpan.textContent = Math.round(draw_settings.sensitivity);
+                  
+                  popup.style.display = 'flex';
+              }
+          });
+          
+          // Handle slider input
+          slider.addEventListener('input', function() {
+              const value = parseInt(this.value);
+              
+              // Update sensitivity setting
+              draw_settings.sensitivity = value;
+              
+              // Update value display
+              valueSpan.textContent = value;
+              
+              // Update button text
+              mainBtn.textContent = value;
+          });
+          
+          // Save on change (when user releases slider)
+          slider.addEventListener('change', function() {
+              saveSettings();
+          });
+          
+          // Close popup when clicking outside
+          document.addEventListener('click', function(e) {
+              if (popup.style.display === 'flex' && 
+                  !popup.contains(e.target) && 
+                  e.target !== mainBtn) {
+                  popup.style.display = 'none';
+              }
+          });
+      }
+
+      // Update sensitivity button based on current settings
+      function updateSensitivityButton() {
+          const mainBtn = document.getElementById('sensitivity-btn');
+          if (mainBtn) {
+              mainBtn.textContent = Math.round(draw_settings.sensitivity);
+          }
+      }
+
       // Setup path mode selector popup
       function setupPathModeSelector() {
           const mainBtn = document.getElementById('path-mode-main-btn');
@@ -3850,6 +3954,9 @@
           
           // Path mode selector popup
           setupPathModeSelector();
+          
+          // Sensitivity selector popup
+          setupSensitivitySelector();
           
           // Page navigation
           document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
