@@ -676,7 +676,7 @@ const STROKE_STYLES = {
 };
 
 function createStroke ( styleTemplate ) {
-    return [ ... styleTemplate ];
+    return structuredClone( styleTemplate );
 }
 
 function createPoint ( x, y, pressure = 0.5, timestamp = Date.now() ) {
