@@ -1488,7 +1488,7 @@
           } else {
               document.getElementById('timer-btn').classList.remove('active');
           }
-          update_shape_buttons();
+          updateShapeButton();
           updatePathModeButton();
           updateSensitivityButton();
           updateCapStyleButton();
@@ -3209,7 +3209,7 @@
           enterPasteMode();
       }
 
-      // Shape icons mapping (used by setupShapeSelector and update_shape_buttons)
+      // Shape icons mapping (used by setupShapeSelector and updateShapeButton)
       const shapeIcons = {
           'curve': '➿',
           'rectangle': '▭',
@@ -5180,7 +5180,7 @@
           }
       }
 
-      function update_shape_buttons() {
+      function updateShapeButton() {
           const mainBtn = document.getElementById('shape-main-btn');
           if (mainBtn && draw_settings.shape) {
               mainBtn.textContent = shapeIcons[draw_settings.shape];
@@ -5211,7 +5211,7 @@
       function set_shape_tool ( shape ) {
           draw_settings.shape = shape;
           set_pointer_handler( shape_to_ph( draw_settings.shape ) );
-          update_shape_buttons();
+          updateShapeButton();
       }
 
       
@@ -6349,7 +6349,6 @@
       window.addEventListener('DOMContentLoaded', init);
       setTool('chalk');
       updateKnobs();
-      update_shape_buttons();
     </script>
   </body>
 </html>
