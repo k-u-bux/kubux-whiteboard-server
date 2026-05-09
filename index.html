@@ -1414,6 +1414,7 @@
           selectionDeselectSidebar.style.display = isSelectionTool ? 'flex' : 'none';
           
           const shapeSelectionDiv = document.getElementById('shape-selection');
+          const pathModeSelectionDiv = document.getElementById('path-mode-selection');
           
           switch (draw_settings.tool) {
           case 'pen':
@@ -1424,8 +1425,7 @@
               opacitySelectionDiv.style.display = 'flex';
               sensitivitySelectionDiv.style.display = 'flex';
               timerToggleDiv.style.display = 'flex';
-              fillToggleDiv.style.display = 'flex';
-              loopToggleDiv.style.display = 'flex';
+              pathModeSelectionDiv.style.display = 'flex';
               shapeSelectionDiv.style.display = 'flex';
               break;
           case 'selection-rectangle':
@@ -1435,8 +1435,7 @@
               opacitySelectionDiv.style.display = 'none';
               sensitivitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
-              fillToggleDiv.style.display = 'none';
-              loopToggleDiv.style.display = 'none';
+              pathModeSelectionDiv.style.display = 'none';
               shapeSelectionDiv.style.display = 'none';
               break;
           case 'selection-stroke':
@@ -1445,8 +1444,7 @@
               opacitySelectionDiv.style.display = 'none';
               sensitivitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
-              fillToggleDiv.style.display = 'none';
-              loopToggleDiv.style.display = 'none';
+              pathModeSelectionDiv.style.display = 'none';
               shapeSelectionDiv.style.display = 'none';
               break;
           case 'eraser':
@@ -1455,8 +1453,7 @@
               opacitySelectionDiv.style.display = 'none';
               sensitivitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
-              fillToggleDiv.style.display = 'none';
-              loopToggleDiv.style.display = 'none';
+              pathModeSelectionDiv.style.display = 'none';
               shapeSelectionDiv.style.display = 'none';
               break;
           }
@@ -1733,14 +1730,6 @@
       const opacitySelectionDiv = document.getElementById('opacity-selection');
       const sensitivitySelectionDiv = document.getElementById('sensitivity-selection');
       const timerToggleDiv = document.getElementById('timer-toggle');
-      const fillToggleDiv = document.getElementById('fill-toggle');
-      const loopToggleDiv = document.getElementById('loop-toggle');
-      const curveSelectionDiv = document.getElementById('curve-selection');
-      const circleSelectionDiv = document.getElementById('circle-selection');
-      const rectangleSelectionDiv = document.getElementById('rectangle-selection');
-      const horizontalSelectionDiv = document.getElementById('horizontal-selection');
-      const verticalSelectionDiv = document.getElementById('vertical-selection');
-      const lineSelectionDiv = document.getElementById('line-selection');
       
       // Selection actions UI (sidebar)
       const selectionActionsSidebar = document.getElementById('selection-actions-sidebar');
