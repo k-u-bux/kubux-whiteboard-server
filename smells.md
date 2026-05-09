@@ -2,28 +2,7 @@
 
 This document catalogs defensive programming patterns that may be masking underlying bugs rather than properly handling edge cases.
 
-## 1. Fallback Patterns in server.js
-
-**Pattern**: `const boardId = data.boardId || ws.boardId`
-
-**Locations** (5 instances):
-- `messageHandlers[FULL_PAGE_REQUESTS.TYPE]`: Line ~650
-- `messageHandlers[MOD_ACTION_PROPOSALS.TYPE]`: Line ~550
-- Error context in MOD_ACTION_PROPOSALS catch block
-- `messageHandlers[REPLAY_REQUESTS.TYPE]`: Line ~750
-- `routeMessage` function
-
-**Smell**: 
-- If `data.boardId` is missing, why? Should this be an error?
-- If `ws.boardId` is undefined, the fallback silently fails later
-- The pattern suggests uncertainty about where boardId comes from
-- The original bug ("Cannot read properties of undefined (reading 'pageOrder')") occurred because this fallback chain resulted in undefined
-
-**Questions**:
-- When is boardId expected in the message vs stored in ws?
-- Should missing boardId be a protocol violation?
-
-## 2. Silent Early Returns in index.html
+## 1. Silent Early Returns in index.html
 
 **Pattern**: `if (!condition) return;`
 
@@ -71,7 +50,7 @@ if (!pasteMode || pastedElements.length === 0) return;
 - Hard to debug "nothing happened" scenarios
 - No logging or user feedback
 
-## 3. Try-Catch Blocks That Swallow Errors (index.html)
+## 2. Try-Catch Blocks That Swallow Errors (index.html)
 
 **Count**: 9 instances
 
@@ -123,7 +102,7 @@ try {
 ```
 **Smell**: hideError() then showError() - suggests error banner state management issues
 
-## 4. Assert Statements in server.js
+## 3. Assert Statements in server.js
 
 **Count**: 11 instances
 
@@ -151,7 +130,7 @@ try {
 - Or are they conditions that could occur with malicious/buggy clients?
 - Should server send DECLINE messages instead of crashing?
 
-## 5. Disabled Debugging Code
+## 4. Disabled Debugging Code
 
 **Location**: server.js, `flag_and_fix_inconsistent_state()` function
 
@@ -173,7 +152,7 @@ function flag_and_fix_inconsistent_state( page, msg ) {
 - Are those bugs still present but now undetected?
 - The "fix" silently overwrites state - hiding the root cause
 
-## 6. Error Message Handling Pattern
+## 5. Error Message Handling Pattern
 
 **Pattern**: WebSocket error handling in index.html
 
@@ -190,7 +169,7 @@ ws.onerror = (error) => {
 - User sees "check your connection" for all errors
 - Actual error only in console (users don't see it)
 
-## 7. State Fallback Pattern
+## 6. State Fallback Pattern
 
 **Pattern**: Using previous state when new state is unavailable
 
@@ -212,7 +191,6 @@ if (cachedPage && cachedPage.hash === data.hash) {
 
 | Category | Count | Severity |
 |----------|-------|----------|
-| Fallback patterns (server.js) | 5 | HIGH - led to actual bug |
 | Silent early returns (index.html) | 29 | MEDIUM - hard to debug |
 | Silent early returns (server.js) | 9 | MEDIUM - hard to debug |
 | Try-catch swallowing errors | 9 | MEDIUM - silent failures |
@@ -221,30 +199,26 @@ if (cachedPage && cachedPage.hash === data.hash) {
 
 ## Recommendations
 
-1. **Replace fallback patterns with explicit error handling**
-   - `data.boardId || ws.boardId` should error if both are undefined
-   - Log when fallback is used
-
-2. **Add logging to early returns**
+1. **Add logging to early returns**
    - At minimum, debug log why function returned early
    - Consider returning error codes instead of void
 
-3. **Don't swallow errors in try-catch**
+2. **Don't swallow errors in try-catch**
    - Log all errors with context
    - Consider showing user-facing errors for critical failures
    - Don't silently fix data corruption
 
-4. **Replace asserts with proper error responses**
+3. **Replace asserts with proper error responses**
    - Send DECLINE messages to clients
    - Log assertion failures for investigation
    - Don't crash server for client errors
 
-5. **Investigate disabled debugging code**
+4. **Investigate disabled debugging code**
    - Re-enable flag_and_fix_inconsistent_state()
    - Find and fix the root cause of state inconsistencies
    - Don't silently patch over bugs
 
-6. **Add telemetry/metrics**
+5. **Add telemetry/metrics**
    - Track cache hit rates
    - Track error frequencies
    - Monitor fallback pattern usage
