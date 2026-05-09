@@ -384,7 +384,8 @@ const ELEMENT = {
 const PEN_TYPES = {
     MARKER: 0,
     PENCIL: 1,
-    BRUSH: 2
+    HIGHLIGHTER: 2,
+    BRUSH: 3
 };
 
 const CAP_STYLES = {
@@ -652,7 +653,7 @@ const STROKE_STYLES = {
         1.0,                  // opacity
         CAP_STYLES.ROUND,      // capStyle
         JOIN_STYLES.BEVEL,    // joinStyle
-        [0],                  // dashPattern
+        [2,2],                  // dashPattern
         1.0,                  // pressureSensitivity
         1,                    // layer
         PEN_TYPES.MARKER      // penType
