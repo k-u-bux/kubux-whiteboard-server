@@ -5079,6 +5079,7 @@
           
           // Dash pattern
           const dashPattern = element[shared.ELEMENT.DASH_PATTERN];
+          debugLog( 'element = ', {element} );
           if ( dashPattern ) {
               context.setLineDash(dashPattern);
               debugLog( 'Set line dash', {dashPattern} );
