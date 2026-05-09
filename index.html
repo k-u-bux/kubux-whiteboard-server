@@ -643,7 +643,7 @@
       }
       
       /* Shape popup menu - horizontal */
-      #shape-popup-menu {
+      #shape-popup-menu, #path-mode-popup-menu {
           position: fixed;
           background-color: #f0f0f0;
           border: 1px solid #ccc;
@@ -789,11 +789,15 @@
         <div class="tool-section sidebar-section" id="timer-toggle">
           <button class="shape-btn" id="timer-btn" title="Timer">🕐</button>
         </div>
-        <div class="tool-section sidebar-section" id="loop-toggle">
-          <button class="shape-btn" id="loop-btn" title="open stroke / closed loop"></button>
+        <div class="tool-section sidebar-section" id="path-mode-selection">
+          <button class="shape-btn" id="path-mode-main-btn" title="Path Mode (click to select)">➰</button>
         </div>
-        <div class="tool-section sidebar-section" id="fill-toggle">
-          <button class="shape-btn" id="fill-btn" title="draw / fill"></button>
+        
+        <!-- Path mode popup menu (horizontal) -->
+        <div id="path-mode-popup-menu" style="display: none;">
+          <button class="shape-btn path-mode-option" data-loop="false" data-fill="false" title="Open path">➰</button>
+          <button class="shape-btn path-mode-option" data-loop="true" data-fill="false" title="Closed path">□</button>
+          <button class="shape-btn path-mode-option" data-loop="true" data-fill="true" title="Filled shape">■</button>
         </div>
         
         <!-- Selection action buttons (shown when selection tool is active) -->
@@ -1346,17 +1350,8 @@
           } else {
               document.getElementById('timer-btn').classList.remove('active');
           }
-          if ( draw_settings.fill ) { 
-              document.getElementById('fill-btn').innerHTML = '■';
-          } else {
-              document.getElementById('fill-btn').innerHTML = '□';
-          }
-          if ( draw_settings.loop ) { 
-              document.getElementById('loop-btn').innerHTML = '🔄';
-          } else {
-              document.getElementById('loop-btn').innerHTML = '⤴';
-          }
           update_shape_buttons();
+          updatePathModeButton();
       }
       
       // updateKnobs();
@@ -3073,6 +3068,86 @@
           'line': '／'
       };
 
+      // Path mode icons mapping
+      const pathModeIcons = {
+          'open-draw': '➰',
+          'closed-draw': '□',
+          'closed-fill': '■'
+      };
+
+      // Get path mode key from loop and fill settings
+      function getPathModeKey(loop, fill) {
+          if (!loop && !fill) return 'open-draw';
+          if (loop && !fill) return 'closed-draw';
+          if (loop && fill) return 'closed-fill';
+          // Invalid state - default to open-draw
+          return 'open-draw';
+      }
+
+      // Setup path mode selector popup
+      function setupPathModeSelector() {
+          const mainBtn = document.getElementById('path-mode-main-btn');
+          const popup = document.getElementById('path-mode-popup-menu');
+          const pathModeOptions = document.querySelectorAll('.path-mode-option');
+          
+          // Toggle popup on main button click
+          mainBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const isVisible = popup.style.display === 'flex';
+              
+              if (isVisible) {
+                  popup.style.display = 'none';
+              } else {
+                  // Position popup to the right of the button
+                  const rect = mainBtn.getBoundingClientRect();
+                  popup.style.left = (rect.right + 5) + 'px';
+                  popup.style.top = rect.top + 'px';
+                  popup.style.display = 'flex';
+              }
+          });
+          
+          // Handle path mode option clicks
+          pathModeOptions.forEach(option => {
+              option.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                  const loop = this.getAttribute('data-loop') === 'true';
+                  const fill = this.getAttribute('data-fill') === 'true';
+                  
+                  // Update settings
+                  draw_settings.loop = loop;
+                  draw_settings.fill = fill;
+                  
+                  // Update main button icon
+                  const modeKey = getPathModeKey(loop, fill);
+                  mainBtn.textContent = pathModeIcons[modeKey];
+                  
+                  // Close popup
+                  popup.style.display = 'none';
+                  
+                  // Save settings
+                  saveSettings();
+              });
+          });
+          
+          // Close popup when clicking outside
+          document.addEventListener('click', function(e) {
+              if (popup.style.display === 'flex' && 
+                  !popup.contains(e.target) && 
+                  e.target !== mainBtn) {
+                  popup.style.display = 'none';
+              }
+          });
+      }
+
+      // Update path mode button based on current settings
+      function updatePathModeButton() {
+          const mainBtn = document.getElementById('path-mode-main-btn');
+          if (mainBtn) {
+              const modeKey = getPathModeKey(draw_settings.loop, draw_settings.fill);
+              mainBtn.textContent = pathModeIcons[modeKey];
+          }
+      }
+
       // Setup shape selector popup
       function setupShapeSelector() {
           const mainBtn = document.getElementById('shape-main-btn');
@@ -3762,20 +3837,11 @@
               saveSettings();
           });
           
-          document.getElementById('loop-btn').addEventListener('click', () => {
-              draw_settings.loop = ( ! draw_settings.loop );
-              updateKnobs();
-              saveSettings();
-          });
-          
-          document.getElementById('fill-btn').addEventListener('click', () => {
-              draw_settings.fill = ( ! draw_settings.fill );
-              updateKnobs();
-              saveSettings();
-          });
-          
           // Shape selector popup
           setupShapeSelector();
+          
+          // Path mode selector popup
+          setupPathModeSelector();
           
           // Page navigation
           document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
