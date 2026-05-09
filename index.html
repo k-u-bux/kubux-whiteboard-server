@@ -1227,6 +1227,11 @@
           }
       }
       
+      function debugPrint ( banner, value ) {
+          debugLog( banner, {value} );
+          return  value;
+      }
+
       // settings
       let eraser_settings = {
           tool: "eraser",
@@ -1247,7 +1252,7 @@
           fill: false,
           loop: false,
           shape: 'curve',
-          stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
+          stroke: debugPrint( 'pen stroke', shared.createStroke( shared.STROKE_STYLES.PEN ) )
       };
       let chalk_settings = {
           tool: "chalk",
