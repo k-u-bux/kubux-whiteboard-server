@@ -1359,6 +1359,8 @@
       let pen_settings = {
           tool: "pen", 
           opacity: 1.0,
+          cap_style: shared.CAP_STYLES.ROUND,
+          join_style: shared.JOIN_STYLES.ROUND,
           sensitivity: 3.0,
           width: 2,
           color: "blue",
@@ -1371,6 +1373,8 @@
       let chalk_settings = {
           tool: "chalk",
           opacity: 1.0,
+          cap_style: shared.CAP_STYLES.BUTT,
+          join_style: shared.JOIN_STYLES.ROUND,
           sensitivity: 0.0,
           width: 3,
           color: "black",
@@ -1383,6 +1387,8 @@
       let highlighter_settings = {
           tool: "highlighter",
           opacity: 0.2,
+          cap_style: shared.CAP_STYLES.SQUARE,
+          join_style: shared.JOIN_STYLES.ROUND,
           sensitivity: 0.0,
           width: 24,
           color: "yellow",
@@ -1436,6 +1442,8 @@
           result[shared.ELEMENT.WIDTH] = settings.width;
           result[shared.ELEMENT.COLOR] = settings.color;
           result[shared.ELEMENT.OPACITY] = settings.opacity;
+          result[shared.ELEMENT.CAP_STYLE] = settings.cap_style;
+          result[shared.ELEMENT.JOIN_STYLE] = settings.join_style;
           result[shared.ELEMENT.SENSITIVITY] = settings.sensitivity;
           result[shared.ELEMENT.LAYER] = Number(activeLayer);
           return result;
@@ -3367,7 +3375,7 @@
                   e.stopPropagation();
                   const capStyle = this.getAttribute('data-cap-style');
                   
-                  draw_settings.stroke[shared.ELEMENT.CAP_STYLE] = shared.CAP_STYLES[capStyle.toUpperCase()];
+                  draw_settings.cap_style = shared.CAP_STYLES[capStyle.toUpperCase()];
                   mainBtn.innerHTML = capStyleIcons[capStyle];
                   popup.style.display = 'none';
                   saveSettings();
@@ -3408,7 +3416,7 @@
                   e.stopPropagation();
                   const joinStyle = this.getAttribute('data-join-style');
                   
-                  draw_settings.stroke[shared.ELEMENT.JOIN_STYLE] = shared.JOIN_STYLES[joinStyle.toUpperCase()];
+                  draw_settings.join_style = shared.JOIN_STYLES[joinStyle.toUpperCase()];
                   mainBtn.innerHTML = joinStyleIcons[joinStyle];
                   popup.style.display = 'none';
                   saveSettings();
@@ -3427,8 +3435,8 @@
       // Update cap style button based on current settings
       function updateCapStyleButton() {
           const mainBtn = document.getElementById('cap-style-btn');
-          if (mainBtn && draw_settings.stroke) {
-              const capStyleIndex = draw_settings.stroke[shared.ELEMENT.CAP_STYLE];
+          if (mainBtn && draw_settings.cap_style !== undefined) {
+              const capStyleIndex = draw_settings.cap_style;
               const capStyleName = shared.CAP_STYLE_STRINGS[capStyleIndex];
               mainBtn.innerHTML = capStyleIcons[capStyleName];
           }
@@ -3437,8 +3445,8 @@
       // Update join style button based on current settings
       function updateJoinStyleButton() {
           const mainBtn = document.getElementById('join-style-btn');
-          if (mainBtn && draw_settings.stroke) {
-              const joinStyleIndex = draw_settings.stroke[shared.ELEMENT.JOIN_STYLE];
+          if (mainBtn && draw_settings.join_style !== undefined) {
+              const joinStyleIndex = draw_settings.join_style;
               const joinStyleName = shared.JOIN_STYLE_STRINGS[joinStyleIndex];
               mainBtn.innerHTML = joinStyleIcons[joinStyleName];
           }
