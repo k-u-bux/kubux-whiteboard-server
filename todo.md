@@ -10,11 +10,12 @@ This document contains actionable items for improving code quality, security, pe
 
 ### Security
 
-- [x] **Re-enable HTTPS in production** (server.js)
-  - Uncomment HTTPS server configuration
-  - Ensure SSL certificates are properly configured
-  - Test WebSocket over WSS protocol
-  - Location: `server.js:~330`
+- [x] **HTTPS via reverse proxy** (docker-compose.yml)
+  - SSL termination handled by nginx-proxy with Let's Encrypt
+  - Server runs plain HTTP on port 80 behind the proxy
+  - WebSocket upgraded to WSS through the proxy
+  - The commented-out HTTPS config in server.js is a development artifact, not used in production
+  - Location: `docker-compose.yml`, `README.md "Mode 2: Docker with Reverse Proxy"`
 
 - [x] **Add salt/pepper to password hashing** (server.js)
   - Implement per-user salt for password hashes
@@ -299,11 +300,11 @@ Current performance is acceptable for typical use cases but degrades with:
 
 These items provide maximum impact with minimal effort:
 
-1. Re-enable HTTPS (critical security, 5 min)
-2. Add message validation (stability, 2 hours)
-3. Document magic numbers (maintainability, 1 hour)
-4. Add UUID validation (security, 30 min)
-5. Implement exponential backoff for reconnection (stability, 1 hour)
+1. Add message validation (stability, 2 hours)
+2. Document magic numbers (maintainability, 1 hour)
+3. Add UUID validation (security, 30 min)
+4. Implement exponential backoff for reconnection (stability, 1 hour)
+5. Cache hit/miss logging (observability, 30 min)
 
 ---
 
