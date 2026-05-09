@@ -1349,6 +1349,7 @@
 
       function switch_settings ( the_settings ) {
           draw_settings = the_settings;
+          debugLog( 'draw_settings = ', {draw_settings} );
           updateKnobs();
           
           // Hide/show selection action buttons
@@ -5054,7 +5055,6 @@
       }
 
 
-
       function push_settings(context, element) {
           const transform = element[shared.ELEMENT.TRANSFORM];
           context.transform(
@@ -5079,13 +5079,13 @@
           
           // Dash pattern
           const dashPattern = element[shared.ELEMENT.DASH_PATTERN];
-          debugLog( 'element = ', {element} );
+          // debugLog( 'element = ', {element} );
           if ( dashPattern ) {
               context.setLineDash(dashPattern);
-              debugLog( 'Set line dash', {dashPattern} );
+              // debugLog( 'Set line dash', {dashPattern} );
           } else {
               context.setLineDash([]);
-              debugLog( 'Unset line dash. dashPattern = ', {dashPattern} );
+              // debugLog( 'Unset line dash. dashPattern = ', {dashPattern} );
           }
       }
 
