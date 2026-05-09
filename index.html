@@ -4705,56 +4705,56 @@
       }
 
       function update_shape_buttons () {
-          switch ( draw_settings.shape ) {
-          case 'curve':
-              document.getElementById('curve-btn').classList.add('active');
-              document.getElementById('rectangle-btn').classList.remove('active');
-              document.getElementById('circle-btn').classList.remove('active');
-              document.getElementById('horizontal-btn').classList.remove('active');
-              document.getElementById('vertical-btn').classList.remove('active');
-              document.getElementById('line-btn').classList.remove('active');
-              break;
-          case 'rectangle':
-              document.getElementById('curve-btn').classList.remove('active');
-              document.getElementById('rectangle-btn').classList.add('active');
-              document.getElementById('circle-btn').classList.remove('active');
-              document.getElementById('horizontal-btn').classList.remove('active');
-              document.getElementById('vertical-btn').classList.remove('active');
-              document.getElementById('line-btn').classList.remove('active');
-              break;
-          case 'circle':
-              document.getElementById('curve-btn').classList.remove('active');
-              document.getElementById('rectangle-btn').classList.remove('active');
-              document.getElementById('circle-btn').classList.add('active');
-              document.getElementById('horizontal-btn').classList.remove('active');
-              document.getElementById('vertical-btn').classList.remove('active');
-              document.getElementById('line-btn').classList.remove('active');
-              break;
-          case 'horizontal':
-              document.getElementById('curve-btn').classList.remove('active');
-              document.getElementById('rectangle-btn').classList.remove('active');
-              document.getElementById('circle-btn').classList.remove('active');
-              document.getElementById('horizontal-btn').classList.add('active');
-              document.getElementById('vertical-btn').classList.remove('active');
-              document.getElementById('line-btn').classList.remove('active');
-              break;
-          case 'vertical':
-              document.getElementById('curve-btn').classList.remove('active');
-              document.getElementById('rectangle-btn').classList.remove('active');
-              document.getElementById('circle-btn').classList.remove('active');
-              document.getElementById('horizontal-btn').classList.remove('active');
-              document.getElementById('vertical-btn').classList.add('active');
-              document.getElementById('line-btn').classList.remove('active');
-              break;
-          case 'line':
-              document.getElementById('curve-btn').classList.remove('active');
-              document.getElementById('rectangle-btn').classList.remove('active');
-              document.getElementById('circle-btn').classList.remove('active');
-              document.getElementById('horizontal-btn').classList.remove('active');
-              document.getElementById('vertical-btn').classList.remove('active');
-              document.getElementById('line-btn').classList.add('active');
-              break;
-          }
+          // switch ( draw_settings.shape ) {
+          // case 'curve':
+          //     document.getElementById('curve-btn').classList.add('active');
+          //     document.getElementById('rectangle-btn').classList.remove('active');
+          //     document.getElementById('circle-btn').classList.remove('active');
+          //     document.getElementById('horizontal-btn').classList.remove('active');
+          //     document.getElementById('vertical-btn').classList.remove('active');
+          //     document.getElementById('line-btn').classList.remove('active');
+          //     break;
+          // case 'rectangle':
+          //     document.getElementById('curve-btn').classList.remove('active');
+          //     document.getElementById('rectangle-btn').classList.add('active');
+          //     document.getElementById('circle-btn').classList.remove('active');
+          //     document.getElementById('horizontal-btn').classList.remove('active');
+          //     document.getElementById('vertical-btn').classList.remove('active');
+          //     document.getElementById('line-btn').classList.remove('active');
+          //     break;
+          // case 'circle':
+          //     document.getElementById('curve-btn').classList.remove('active');
+          //     document.getElementById('rectangle-btn').classList.remove('active');
+          //     document.getElementById('circle-btn').classList.add('active');
+          //     document.getElementById('horizontal-btn').classList.remove('active');
+          //     document.getElementById('vertical-btn').classList.remove('active');
+          //     document.getElementById('line-btn').classList.remove('active');
+          //     break;
+          // case 'horizontal':
+          //     document.getElementById('curve-btn').classList.remove('active');
+          //     document.getElementById('rectangle-btn').classList.remove('active');
+          //     document.getElementById('circle-btn').classList.remove('active');
+          //     document.getElementById('horizontal-btn').classList.add('active');
+          //     document.getElementById('vertical-btn').classList.remove('active');
+          //     document.getElementById('line-btn').classList.remove('active');
+          //     break;
+          // case 'vertical':
+          //     document.getElementById('curve-btn').classList.remove('active');
+          //     document.getElementById('rectangle-btn').classList.remove('active');
+          //     document.getElementById('circle-btn').classList.remove('active');
+          //     document.getElementById('horizontal-btn').classList.remove('active');
+          //     document.getElementById('vertical-btn').classList.add('active');
+          //     document.getElementById('line-btn').classList.remove('active');
+          //     break;
+          // case 'line':
+          //     document.getElementById('curve-btn').classList.remove('active');
+          //     document.getElementById('rectangle-btn').classList.remove('active');
+          //     document.getElementById('circle-btn').classList.remove('active');
+          //     document.getElementById('horizontal-btn').classList.remove('active');
+          //     document.getElementById('vertical-btn').classList.remove('active');
+          //     document.getElementById('line-btn').classList.add('active');
+          //     break;
+          // }
       }
 
       function shape_to_ph ( shape ) {
