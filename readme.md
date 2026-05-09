@@ -10,11 +10,18 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Multi-page support** - Create and navigate between multiple pages in a whiteboard
 - **Spectator mode** - You can send invites that enable viewing (including navigation) but not editing
 - **Rich drawing tools** - Pen, highlighter, and chalk tools with customizable properties
-- **Shape tools** - Draw circles, rectangles, horizontal/vertical/diagonal lines
+- **Shape tools** - Draw circles, rectangles, curves, and horizontal/vertical/diagonal lines
+- **Advanced stroke controls** - Cap style (round/butt/square), join style (round/bevel/miter), and dash patterns (solid/dashed/dotted/longdash/dashdot)
+- **Pressure sensitivity** - Adjustable sensitivity levels (0-9) for variable-width strokes
+- **Path modes** - Open paths, closed paths, and filled shapes
 - **Selection tools** - Rectangle, lasso, and stroke-based selection with cut/copy/paste
 - **Layer system** - Organize content across 8 separate layers with visibility control
 - **PDF export** - Export single pages or entire whiteboards as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
+- **Board navigation** - Switch between multiple boards, copy shareable links, create new boards from within the app
+- **Timer** - Built-in timer for timed drawing sessions
+- **Progressive Web App (PWA)** - Install as a standalone app on tablets and mobile devices
+- **Offline service worker** - Offline support via service worker caching
 
 ## Installation
 
@@ -192,26 +199,43 @@ A new board will be created and the URL will change to point towards that board.
 - **Zooming** - Use the zoom controls or mouse wheel to zoom in/out
 - **Undo/Redo** - Use the undo (↩) and redo (↪) buttons or keyboard shortcuts (Ctrl+Z, Ctrl+Y)
 - **Page Management** - Add new pages, navigate between pages using the controls at the top
+- **Board Navigation** - Click the folder icon (🗂️) to open the board navigation overlay, where you can copy board links, create new boards, or navigate to different boards by URL/UUID
 
 ### Tool Options
 
 - **Color** - Select from predefined colors or open the color picker for custom colors
-- **Width** - Adjust the stroke width using the slider
+- **Width** - Adjust the stroke width using the slider (1-20)
 - **Opacity** - Control transparency with the opacity slider
-- **Shape Mode** - Toggle between freeform drawing and shape modes (rectangle, circle, etc.)
+- **Shape Mode** - Toggle between freeform drawing and shape modes (curve, rectangle, circle, horizontal/vertical/diagonal lines)
+- **Pressure Sensitivity** - Adjust sensitivity (0-9) for variable-width strokes based on input pressure
+
+### Advanced Drawing Controls
+
+The sidebar provides access to additional stroke properties:
+
+- **Path Mode** - Choose between open paths (➰), closed paths (□), and filled shapes (■)
+- **Cap Style** - Select round, butt, or square end caps for strokes
+- **Join Style** - Select round, bevel, or miter corner joins
+- **Dash Pattern** - Choose from solid, dashed, dotted, long dash, and dash-dot patterns
 
 ### Layers
 
-- The whiteboard supports 8 separate drawing layers
-- Toggle layer visibility using the eye icons
-- Select active drawing layer using the layer buttons
+- The whiteboard supports 8 separate drawing layers (numbered 1-8)
+- Toggle layer visibility using the eye icons in the top toolbar
+- Select active drawing layer using the number buttons below the visibility row
+- Move selected elements between layers
 
 ### Selection and Clipboard
 
-- Use the selection tools to select content
+- Use the selection tools (rectangle, lasso, stroke) to select content
 - Cut, copy, or move selected elements
 - Move elements between layers
 - Transform selections with scaling and rotation
+
+### Timer
+
+- Toggle the timer (🕐) in the sidebar to display a countdown timer
+- Configure duration by clicking the timer button
 
 ## Technical Overview
 
@@ -221,17 +245,18 @@ The system uses a client-server architecture with WebSockets for real-time commu
 
 Key components:
 - **server.js** - WebSocket server handling client connections and message routing
-- **shared.js** - Common code used by both client and server
+- **shared.js** - Common code used by both client and server, including data structures, hashing, geometry, and PDF rendering
 - **index.html** - Web client interface with integrated JavaScript
 
 ### Protocol
 
 The communication protocol between clients and the server uses:
 - WebSockets for real-time data exchange
-- JSON message format with support for complex data types
+- JSON message format with support for complex data types (Map, Set, BigInt)
 - Hash-chain verification for ensuring state consistency
 - Optimistic local updates for responsive UI
 - Replay mechanism for resolving inconsistencies
+- Sparse hash snapshots for efficient verification
 
 For detailed protocol documentation, see [protocol.md](protocol.md).
 
@@ -242,6 +267,47 @@ The client uses an optimized two-canvas rendering approach:
 - Foreground canvas for interactive elements (current stroke, selection, etc.)
 - Incremental updates when possible for better performance
 
+### Server Architecture
+
+- **Dual-mode operation**: Direct mode (standalone) or proxy mode (behind nginx)
+- **Page caching**: LRU cache (max 10 pages) with automatic eviction and persistence
+- **Board caching**: LRU cache (max 10 boards) with automatic eviction and persistence
+- **Periodic persistence**: State is saved to disk every 10 seconds
+- **Ping mechanism**: Server pings connected clients every 5 seconds for state verification
+- **Page deletion mapping**: When a page is deleted, a redirect chain maps the old UUID to its replacement
+- **Graceful shutdown**: SIGTERM and SIGINT handlers persist state before exit
+
+### Client Architecture
+
+- **IndexedDB storage**: Pages are cached locally for persistence
+- **Server hash validation**: Cached pages are validated against server hashes
+- **Replay-based reconciliation**: When hash mismatches are detected, the client requests replay data from the server
+- **Cache optimization**: Only re-render changed elements when possible
+
+### Security
+
+- **scrypt password hashing**: Memory-hard KDF resistant to brute force and rainbow table attacks
+- **Password-protected editing**: Editing requires a board-specific password
+- **Credential-based board creation**: Creation requires a server-level credential
+- **No-auth viewing**: Viewing is possible without any authentication
+- **Request validation**: Server validates all incoming requests for proper structure
+- **Path traversal protection**: Hidden files and non-whitelisted paths are blocked
+- **HSTS headers**: Added for HTTPS deployments behind reverse proxy
+
+### File Serve Strategy
+
+Only the root path (`/`) and a strict whitelist of PWA files are served:
+- `/manifest.json`, `/sw.js`, `/icon-192.png`, `/icon-512.png`, `/apple-touch-icon.png`, `/favicon.ico`, `/robots.txt`
+- The server embeds `shared.js` directly into `index.html` at request time to avoid serving raw JavaScript files
+
+## Progressive Web App Support
+
+The application includes full PWA support:
+- **manifest.json**: Defines app name, icons, and display mode (standalone)
+- **Service worker (sw.js)**: Caches application resources for offline use
+- **Icons**: Multiple icon sizes (192x192, 512x512) and apple-touch-icon for iOS
+- When installed on a tablet, the standalone mode removes browser UI, maximizing available canvas space
+
 ## Development
 
 ### Project Structure
@@ -249,14 +315,22 @@ The client uses an optimized two-canvas rendering approach:
 ```
 kubux-whiteboard-server/
 ├── server.js           # Main WebSocket server
-├── shared.js           # Shared code between client and server
+├── shared.js           # Shared code (data structures, hashing, PDF, geometry)
 ├── index.html          # Web client (HTML, CSS, and JavaScript)
 ├── protocol.md         # Protocol documentation
 ├── package.json        # Project configuration and dependencies
-└── data/               # Data storage directory
-    └── *.board/*.page  # Board and page data
-└── conf/               # Configuration directory
-    └── passwd.json     # Password file
+├── Dockerfile          # Docker image definition
+├── docker-compose.yml  # Docker deployment template
+├── flake.nix           # Nix flake for reproducible dev environment
+├── passwd_hash         # Password hashing utility
+├── data/               # Data storage directory
+│   ├── *.board         # Board data files
+│   ├── *.page          # Page data files
+│   └── to_be_removed.json  # Deletion redirect mapping
+├── conf/               # Configuration directory
+│   └── passwd.json     # Password file
+└── logs/               # Log files
+    └── debug.log       # Server debug log
 ```
 
 
