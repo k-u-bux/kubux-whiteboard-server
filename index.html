@@ -836,7 +836,9 @@
         <div class="tool-section sidebar-section" id="cap-style-selection">
           <button class="shape-btn" id="cap-style-btn" title="Cap Style (click to select)">
             <svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;">
-              <line x1="20" y1="50" x2="80" y2="50" stroke="currentColor" stroke-width="20" stroke-linecap="round"/>
+              <line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+              <circle cx="30" cy="50" r="15" fill="currentColor"/>
+              <circle cx="70" cy="50" r="15" fill="currentColor"/>
             </svg>
           </button>
         </div>
@@ -845,21 +847,23 @@
         <div id="cap-style-popup-menu" style="display: none;">
           <button class="shape-btn cap-style-option" data-cap-style="round" title="Round cap">
             <svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;">
-              <line x1="20" y1="50" x2="80" y2="50" stroke="currentColor" stroke-width="20" stroke-linecap="round"/>
+              <line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+              <circle cx="30" cy="50" r="15" fill="currentColor"/>
+              <circle cx="70" cy="50" r="15" fill="currentColor"/>
             </svg>
           </button>
           <button class="shape-btn cap-style-option" data-cap-style="butt" title="Butt cap">
             <svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;">
-              <line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="20" stroke-linecap="butt"/>
-              <line x1="30" y1="35" x2="30" y2="65" stroke="currentColor" stroke-width="2"/>
-              <line x1="70" y1="35" x2="70" y2="65" stroke="currentColor" stroke-width="2"/>
+              <line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="6" stroke-linecap="butt"/>
+              <rect x="26" y="20" width="8" height="60" fill="currentColor"/>
+              <rect x="66" y="20" width="8" height="60" fill="currentColor"/>
             </svg>
           </button>
           <button class="shape-btn cap-style-option" data-cap-style="square" title="Square cap">
             <svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;">
-              <line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="20" stroke-linecap="square"/>
-              <line x1="30" y1="35" x2="30" y2="65" stroke="currentColor" stroke-width="2"/>
-              <line x1="70" y1="35" x2="70" y2="65" stroke="currentColor" stroke-width="2"/>
+              <line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="6" stroke-linecap="square"/>
+              <rect x="33" y="20" width="8" height="60" fill="currentColor"/>
+              <rect x="59" y="20" width="8" height="60" fill="currentColor"/>
             </svg>
           </button>
         </div>
@@ -3183,9 +3187,9 @@
 
       // Cap style icons mapping
       const capStyleIcons = {
-          'round': '<svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;"><line x1="20" y1="50" x2="80" y2="50" stroke="currentColor" stroke-width="20" stroke-linecap="round"/></svg>',
-          'butt': '<svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;"><line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="20" stroke-linecap="butt"/><line x1="30" y1="35" x2="30" y2="65" stroke="currentColor" stroke-width="2"/><line x1="70" y1="35" x2="70" y2="65" stroke="currentColor" stroke-width="2"/></svg>',
-          'square': '<svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;"><line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="20" stroke-linecap="square"/><line x1="30" y1="35" x2="30" y2="65" stroke="currentColor" stroke-width="2"/><line x1="70" y1="35" x2="70" y2="65" stroke="currentColor" stroke-width="2"/></svg>'
+          'round': '<svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;"><line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><circle cx="30" cy="50" r="15" fill="currentColor"/><circle cx="70" cy="50" r="15" fill="currentColor"/></svg>',
+          'butt': '<svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;"><line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="6" stroke-linecap="butt"/><rect x="26" y="20" width="8" height="60" fill="currentColor"/><rect x="66" y="20" width="8" height="60" fill="currentColor"/></svg>',
+          'square': '<svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;"><line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="6" stroke-linecap="square"/><rect x="33" y="20" width="8" height="60" fill="currentColor"/><rect x="59" y="20" width="8" height="60" fill="currentColor"/></svg>'
       };
 
       // Join style icons mapping  
