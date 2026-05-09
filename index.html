@@ -1365,12 +1365,12 @@
           join_style: shared.JOIN_STYLES.ROUND,
           sensitivity: 0.0,
           dash_pattern: [],
+          width: 2,
           color: "#ff0000",
           undo: false,
           fill: false,
           loop: false,
-          shape: 'curve',
-          width: 2
+          shape: 'curve'
       };
       let pen_settings = {
           tool: "pen", 
@@ -1384,8 +1384,7 @@
           undo: false,
           fill: false,
           loop: false,
-          shape: 'curve',
-          stroke: debugPrint( 'pen stroke', shared.createStroke( shared.STROKE_STYLES.PEN ) )
+          shape: 'curve'
       };
       let chalk_settings = {
           tool: "chalk",
@@ -1399,8 +1398,7 @@
           undo: false,
           fill: false,
           loop: false,
-          shape: 'curve',
-          stroke: shared.createStroke( shared.STROKE_STYLES.CHALK )
+          shape: 'curve'
       };
       let highlighter_settings = {
           tool: "highlighter",
@@ -1414,8 +1412,7 @@
           undo: true,
           fill: false,
           loop: false,
-          shape: 'curve',
-          stroke: shared.createStroke( shared.STROKE_STYLES.HIGHLIGHTER )
+          shape: 'curve'
       };
       let selection_rectangle_settings = {
           tool: "selection-rectangle",
@@ -1429,8 +1426,7 @@
           undo: false,
           fill: true,  // Fill to select everything inside
           loop: true,
-          shape: 'rectangle',
-          stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
+          shape: 'rectangle'
       };
       let selection_lasso_settings = {
           tool: "selection-lasso",
@@ -1444,8 +1440,7 @@
           undo: false,
           fill: true,  // Fill to select everything inside
           loop: true,
-          shape: 'curve',
-          stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
+          shape: 'curve'
       };
       let selection_stroke_settings = {
           tool: "selection-stroke",
@@ -1459,14 +1454,13 @@
           undo: false,
           fill: false,
           loop: false,
-          shape: 'curve',
-          stroke: shared.createStroke( shared.STROKE_STYLES.PEN )
+          shape: 'curve'
       };
 
       let draw_settings = chalk_settings;
 
       function createStroke ( settings ) {
-          const result = debugPrint( 'stroke settings = ', shared.createStroke( settings.stroke ) );
+          const result = shared.createStroke( shared.STROKE_STYLES.CHALK );
           result[shared.ELEMENT.WIDTH] = settings.width;
           result[shared.ELEMENT.COLOR] = settings.color;
           result[shared.ELEMENT.OPACITY] = settings.opacity;
