@@ -760,6 +760,16 @@
     
     <div class="app-container">
       <div class="sidebar">
+        <!-- Shape popup menu (horizontal) -->
+        <div id="shape-popup-menu" style="display: none;">
+          <button class="shape-btn shape-option" data-shape="curve" title="Curve path">➿</button>
+          <button class="shape-btn shape-option" data-shape="rectangle" title="Rectangle path">▭</button>
+          <button class="shape-btn shape-option" data-shape="circle" title="Circle path">◯</button>
+          <button class="shape-btn shape-option" data-shape="horizontal" title="Horizontal line">─</button>
+          <button class="shape-btn shape-option" data-shape="vertical" title="Vertical line">│</button>
+          <button class="shape-btn shape-option" data-shape="line" title="Straight line">／</button>
+        </div>
+        <!-- Color pickers -->
         <div class="tool-section sidebar-section" id="color-selection">
           <div class="color-swatch" title="Press and hold to open color picker" style="background-color: black;" data-color="black"></div>
           <div class="color-swatch" title="Press and hold to open color picker" style="background-color: red;" data-color="red"></div>
@@ -784,16 +794,6 @@
         </div>
         <div class="tool-section sidebar-section" id="shape-selection">
           <button class="shape-btn" id="shape-main-btn" title="Shape Tool (click to select)">➿</button>
-        </div>
-        
-        <!-- Shape popup menu (horizontal) -->
-        <div id="shape-popup-menu" style="display: none;">
-          <button class="shape-btn shape-option" data-shape="curve" title="Curve path">➿</button>
-          <button class="shape-btn shape-option" data-shape="rectangle" title="Rectangle path">▭</button>
-          <button class="shape-btn shape-option" data-shape="circle" title="Circle path">◯</button>
-          <button class="shape-btn shape-option" data-shape="horizontal" title="Horizontal line">─</button>
-          <button class="shape-btn shape-option" data-shape="vertical" title="Vertical line">│</button>
-          <button class="shape-btn shape-option" data-shape="line" title="Straight line">／</button>
         </div>
         
         <!-- Selection action buttons (shown when selection tool is active) -->
