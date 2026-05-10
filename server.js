@@ -345,7 +345,7 @@ function loadOrCreatePage(pageId, create=true) {
 
 // page cache
 const pageCache = new Map();
-const pageCacheMax = 10;
+const pageCacheMax = 24;
 const evictablePages = new Set();
 
 function usePage(pageId, create=true) {
