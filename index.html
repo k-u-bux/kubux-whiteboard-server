@@ -1175,7 +1175,7 @@
               
               while (lruOrder.length > LRU_MAX_SIZE) {
                   const lruKey = lruOrder.shift();
-                  delete dummyStorage[ lrukey ];
+                  delete dummyStorage[ lruKey ];
               }
               
               dummyStorage[ key ] = value;
