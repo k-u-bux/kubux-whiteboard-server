@@ -922,7 +922,7 @@ function describePage(ws, boardId, pageId, delta, do_switch, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
         };
         if ( do_switch ) {
-            ws.pageId = pageId;
+            ws.pageId = resolvedPageId;
         }
         ws.send(serialize(response));
         releasePage(resolvedPageId);
@@ -1074,7 +1074,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, r
         resolvedPageId = findPage( board, pageId, delta );
         if ( resolvedPageId !== pageId && delta == 0 ) {
             debug.log( "handling full page request, page lost", `${resolvedPageId} vs. ${pageId}, delta = ${delta}`)
-            sendPageLost( ws, boardId, pageId, resolvedPageId, requestId );
+            const do_switch = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
+            sendPageLost( ws, boardId, pageId, resolvedPageId, do_switch, requestId );
         } else {
             debug.log( "handling full page request, full page", `${resolvedPageId} vs. ${pageId}, delta = ${delta}`)
             const do_switch = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
