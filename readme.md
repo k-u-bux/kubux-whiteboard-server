@@ -19,7 +19,7 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **PDF export** - Export single pages or entire whiteboards as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
 - **Board navigation** - Switch between multiple boards, copy shareable links, create new boards from within the app
-- **Timer** - Built-in timer for timed drawing sessions
+- **Timer** - Times auto-undo.
 - **Progressive Web App (PWA)** - Install as a standalone app on tablets and mobile devices
 - **Offline service worker** - Offline support via service worker caching
 
@@ -234,8 +234,8 @@ The sidebar provides access to additional stroke properties:
 
 ### Timer
 
-- Toggle the timer (🕐) in the sidebar to display a countdown timer
-- Configure duration by clicking the timer button
+- Toggle the timer (🕐) in the sidebar to auto-undo drawing within a few seconds: think of temporarilry highlighting an element during a presentation).
+
 
 ## Technical Overview
 
