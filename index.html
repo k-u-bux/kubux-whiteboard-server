@@ -1175,7 +1175,7 @@
               
               while (lruOrder.length > LRU_MAX_SIZE) {
                   const lruKey = lruOrder.shift();
-                  delete dummyStorage[ key ];
+                  delete dummyStorage[ lrukey ];
               }
               
               dummyStorage[ key ] = value;
@@ -2863,7 +2863,7 @@
           const page_nr = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PAGE_NR];
           const n_pages = data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TOTAL_PAGES];
           let pageHashes = [ shared.hashAny( pageUuid ) ];
-          for ( let i = 0; i < history.length; ++ i ) {
+          for ( let i = 0; i < pageHist.length; ++ i ) {
               pageHashes.push( shared.hashNext( pageHashes[ i ], pageHist[ i ] ) );
           }
           pagesMetaData[ pageUuid ] = [ page_nr, n_pages ];
