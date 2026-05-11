@@ -4547,7 +4547,7 @@
           document.getElementById('selection-lasso-tool').classList.remove('active');
           document.getElementById('selection-stroke-tool').classList.remove('active');
           document.getElementById('hand-tool').classList.remove('active');
-          document.getElementById(`${tool}-tool`).classList.add('active');
+          // document.getElementById(`${tool}-tool`).classList.add('active');
           
           // Clear selection when switching away from selection tools
           const isSelectionTool = (tool === 'selection-rectangle' || tool === 'selection-lasso' || tool === 'selection-stroke');
@@ -4560,41 +4560,49 @@
           // Update cursor
           switch (tool) {
           case 'chalk':
-              canvas.style.cursor = 'crosshair';
+               document.getElementById('chalk-tool').classList.add('active');
+               canvas.style.cursor = 'crosshair';
               switch_settings( chalk_settings );
               set_pointer_handler( shape_to_ph( chalk_settings.shape ) );
               break;
           case 'pen':
+              document.getElementById('pen-tool').classList.add('active');
               canvas.style.cursor = 'crosshair';
               switch_settings( pen_settings );
               set_pointer_handler( shape_to_ph( pen_settings.shape ) );
               break;
           case 'highlighter':
+              document.getElementById('highlighter-tool').classList.add('active');
               canvas.style.cursor = 'crosshair';
               switch_settings( highlighter_settings );
               set_pointer_handler( shape_to_ph( highlighter_settings.shape ) );
               break;
           case 'eraser':
+              document.getElementById('eraser-tool').classList.add('active');
               canvas.style.cursor = 'cell';
               switch_settings( eraser_settings );
               set_pointer_handler( erase_path_pointer_handler );
               break;
           case 'selection-rectangle':
+              document.getElementById('selection-rectangle-tool').classList.add('active');
               canvas.style.cursor = 'crosshair';
               switch_settings( selection_rectangle_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           case 'selection-lasso':
+              document.getElementById('selection-lasso-tool').classList.add('active');
               canvas.style.cursor = 'crosshair';
               switch_settings( selection_lasso_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           case 'selection-stroke':
+              document.getElementById('selection-stroke-tool').classList.add('active');
               canvas.style.cursor = 'crosshair';
               switch_settings( selection_stroke_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           case 'hand':
+              document.getElementById('hand-tool').classList.add('active');
               canvas.style.cursor = 'grab';
               set_pointer_handler( hand_pointer_handler );
               break;
