@@ -3019,14 +3019,14 @@
       }
       
       function startResetTool () {
-          // scheduleResetTool( DEFAULT_DELTA, DEFAULT_OMEGA );
+          scheduleResetTool( DEFAULT_DELTA, DEFAULT_OMEGA );
       }
       
       function stopResetTool () {
-          // if ( modeResetTimerId !== null ) {
-          //     clearTimeout( modeResetTimerId );
-          //     modeResetTimerId = null;
-          // }
+          if ( modeResetTimerId !== null ) {
+              clearTimeout( modeResetTimerId );
+              modeResetTimerId = null;
+          }
       }
 
       
