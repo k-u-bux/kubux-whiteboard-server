@@ -4556,53 +4556,47 @@
               isDeselectMode = false;
               deselectToggleBtn.classList.remove('active');
           }
-          
+
+          stopResetTool();
+                                    
           // Update cursor
           switch (tool) {
           case 'chalk':
-              stopResetTool();
               canvas.style.cursor = 'crosshair';
               switch_settings( chalk_settings );
               set_pointer_handler( shape_to_ph( chalk_settings.shape ) );
               break;
           case 'pen':
-              stopResetTool();
               canvas.style.cursor = 'crosshair';
               switch_settings( pen_settings );
               set_pointer_handler( shape_to_ph( pen_settings.shape ) );
               break;
           case 'highlighter':
-              stopResetTool();
               canvas.style.cursor = 'crosshair';
               switch_settings( highlighter_settings );
               set_pointer_handler( shape_to_ph( highlighter_settings.shape ) );
               break;
           case 'eraser':
-              startResetTool();
               canvas.style.cursor = 'cell';
               switch_settings( eraser_settings );
               set_pointer_handler( erase_path_pointer_handler );
               break;
           case 'selection-rectangle':
-              stopResetTool();
               canvas.style.cursor = 'crosshair';
               switch_settings( selection_rectangle_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           case 'selection-lasso':
-              stopResetTool();
               canvas.style.cursor = 'crosshair';
               switch_settings( selection_lasso_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           case 'selection-stroke':
-              stopResetTool();
               canvas.style.cursor = 'crosshair';
               switch_settings( selection_stroke_settings );
               set_pointer_handler( selection_pointer_handler );
               break;
           case 'hand':
-              startResetTool();
               canvas.style.cursor = 'grab';
               set_pointer_handler( hand_pointer_handler );
               break;
