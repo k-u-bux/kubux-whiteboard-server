@@ -2285,9 +2285,9 @@
           
           // Update board ID and URL if necessary
           boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD];
-          firstPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE];
-          lastPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.LAST_PAGE];
-          numPages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES];
+          const firstPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE];
+          const lastPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.LAST_PAGE];
+          const numPages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES];
           const urlParams = new URLSearchParams(window.location.search);
           
           if (urlParams.get('credential')) {
@@ -2401,8 +2401,8 @@
           });
           
           pagesMetaData[ pageUuid ] = [ pageNumber, pageTotal ];
-          pageData = loadPageFromCache( pageUuid );
-          pageHashes = [ shared.hashAny( pageUuid ) ];
+          const pageData = loadPageFromCache( pageUuid );
+          const pageHashes = [ shared.hashAny( pageUuid ) ];
           for ( let i = 0; i < pageData['history'].length; ++ i ) {
               pageHashes.push( shared.hashNext( pageHashes[ i ], pageData['history'][ i ] ) );
           }
@@ -2425,7 +2425,7 @@
       // Handle page lost response (page deletion with redirection)
       function handlePageLost(data) {
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID];
-          replacementPage = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE];
+          const replacementPage = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE];
           const lost = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.LOST];
           pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.PAGE_NR];
           totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TOTAL_PAGES];
