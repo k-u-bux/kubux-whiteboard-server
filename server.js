@@ -1305,7 +1305,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 type: MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE,
                 [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE]: pageUuid,
                 [MESSAGES.SERVER_TO_CLIENT.REPLAY.BEFORE_HASH]: page.hashes[past],
-                [MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH]: page.hashes[ page.hashes.length - 1 ],
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH]: page.hashes[ page.history.length ],
                 [MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE]: replayActions,
                 [MESSAGES.SERVER_TO_CLIENT.REPLAY.PRESENT]: page.present,
                 [MESSAGES.SERVER_TO_CLIENT.REPLAY.CURRENT_HASH]: page.hashes[page.present],
