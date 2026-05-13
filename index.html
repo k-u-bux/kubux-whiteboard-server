@@ -2112,10 +2112,10 @@
           
           ws.onmessage = (event) => {
               try {
-                  debugLog('Received event: ', event); 
+                  // debugLog('Received event: ', event); 
                   const data = shared.deserialize(event.data);
                   if ( data ) {
-                      debugLog('Received message: ', data);
+                      // debugLog('Received message: ', data);
                       
                       // Handle message based on type
                       switch (data.type) {
