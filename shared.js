@@ -520,16 +520,16 @@ function is_invalid_FULL_PAGE_REQUEST_message(data) {
     if (!boardId || !isUuid(boardId)) return true;
     
     const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE];
-    if (pageId !== undefined && !isUuid(pageId)) return true;
+    if (!pageId || !isUuid(pageId)) return true;
     
     const requestId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID];
     if (!requestId || !isUuid(requestId)) return true;
     
     const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA];
-    if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
+    if (delta === undefined || typeof delta !== 'number' || !Number.isFinite(delta)) return true;
     
     const register = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
-    if (register !== undefined && typeof register !== 'boolean') return true;
+    if (!register === undefined || typeof register !== 'boolean') return true;
     
     return false;
 }
