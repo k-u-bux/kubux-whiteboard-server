@@ -1199,12 +1199,12 @@
       function loadItem(key) {
           try {
               const itemData = dummyStorage[ key ];
-              if (itemData === null) {
+              if ( itemData === undefined || itemData === null ) {
                   return null;
               }
               
               const existingIndex = lruOrder.indexOf(key);
-              if (existingIndex !== -1) {
+              if ( existingIndex !== -1 ) {
                   lruOrder.splice(existingIndex, 1);
                   lruOrder.push(key);
               }
@@ -2745,9 +2745,14 @@
     
           if ( pageUuid !== currentPageUuid || cache_only ) {
               pageData = loadPageFromCache( pageUuid );
-              pageData['hashes'] = [ shared.hashAny( pageUuid ) ];
-              for ( let i = 0; i < pageData['history'].length; ++ i ) {
-                  pageData['hashes'].push( shared.hashNext( pageData['hashes'][ i ], pageData['history'][ i ] ) );
+              if ( pageData ) {
+                  pageData['hashes'] = [ shared.hashAny( pageUuid ) ];
+                  for ( let i = 0; i < pageData['history'].length; ++ i ) {
+                      pageData['hashes'].push( shared.hashNext( pageData['hashes'][ i ], pageData['history'][ i ] ) );
+                  }
+              } else {
+                  requestFullPage(pageUuid, do_switch);
+                  return null;                  
               }
           } else {
               pageData = {
