@@ -2617,11 +2617,11 @@
               return;
           }
           if ( beforeIndex >= verifiedIndex ) {
-              debugLog(`found beoreIndex=${afterIndex} with verfiedIndex=${verifiedIndex}`);
+              debugLog(`found beforeIndex=${afterIndex} with verifiedIndex=${verifiedIndex}`);
               verifiedIndex = beforeIndex;
               const [ action ] = history.splice( actionIndex, 1 );
               history.splice( verifiedIndex, 0, action );
-              ++ verfiedIndex;
+              ++ verifiedIndex;
               hashes[ verifiedIndex ] = afterHash;
               updateSyncStatus();
               updateUndoRedoButtons();
