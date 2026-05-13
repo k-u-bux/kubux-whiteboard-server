@@ -350,7 +350,7 @@ const evictablePages = new Set();
 
 function usePage(pageId, create=true) {
     if (!pageCache.has(pageId)) {
-        page = loadOrCreatePage(pageId, create);
+        const page = loadOrCreatePage(pageId, create);
         if ( page ) {
             pageCache.set(pageId, page );
         }
@@ -1072,7 +1072,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, r
     const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA];
     debug.log( "[SERVER] handling full page request", `pageId = ${pageId}, delta = ${delta}`)
     if ( pageId != undefined && isUuid( pageId ) && delta != undefined ) {
-        resolvedPageId = findPage( board, pageId, delta );
+        const resolvedPageId = findPage( board, pageId, delta );
         if ( resolvedPageId !== pageId && delta == 0 ) {
             debug.log( "handling full page request, page lost", `${resolvedPageId} vs. ${pageId}, delta = ${delta}`)
             const do_switch = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
@@ -1366,7 +1366,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
     const pageId = existingPage(pageUuid, board);
 
     if ( do_register ) {
-        ws.pageId = pageUuid;
+        ws.pageId = pageId;
     }
 
     if (pageId !== pageUuid) {
