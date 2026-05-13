@@ -1296,19 +1296,36 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             ws.send(serialize(acceptMessage));
             logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
             
-            // Broadcast to other clients
-            const infoMessage = {
-                type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageUuid,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: totalPages,
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: false, 
-                [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
+            const replayActions = [];
+            const past = max( 0, pagePresent - 2 );
+            for (let time = past; time < page.history.length; ++time) {
+                replayActions.push(page.history[time]);
+            }
+            const replayMessage = {
+                type: MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE,
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE]: pageUuid,
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.BEFORE_HASH]: hashes[past],
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.AFTER_HASH]: pageHash,
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE]: replayActions,
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.PRESENT]: page.present,
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.CURRENT_HASH]: page.hashes[page.present],
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR]: pageNr,
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES]: totalPages,
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID]: actionId,
+                [MESSAGES.SERVER_TO_CLIENT.REPLAY.SWITCH]: false
             };
+            // const infoMessage = {
+            //     type: MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE,
+            //     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE]: pageUuid,
+            //     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]: pageHash,
+            //     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
+            //     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
+            //     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: totalPages,
+            //     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: false, 
+            //     [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
+            // };
  
-            broadcastMessageToBoard(infoMessage, boardId, ws);
+            broadcastMessageToBoard(replayMessage, boardId, ws);
         } else {
             const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, reason);
             ws.send(serialize(declineMessage));
