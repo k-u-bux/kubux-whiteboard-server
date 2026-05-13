@@ -1297,7 +1297,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
             
             const replayActions = [];
-            const past = max( 0, pagePresent - 2 );
+            const past = Math.max( 0, pagePresent - 2 );
             for (let time = past; time < page.history.length; ++time) {
                 replayActions.push(page.history[time]);
             }
