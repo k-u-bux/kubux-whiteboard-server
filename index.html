@@ -6108,21 +6108,28 @@
               const pdfH = canvasFormat ? canvasFormat.h : canvas.height;
               const pdfCtx = builder.new_page(pdfW, pdfH);
               
-              if ( !canvasFormat ) {
-                  pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
-              } else {
-                  pdfCtx.transform(1, 0, 0, 1, 0, 0);
-              }
-              
-              // Render all visible elements as vectors
-              shared.render_all_visible_elements(visualState, (element) => {
-                  if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
-                      renderElement(pdfCtx, element);
-                  }
-              });
-              
-              // Download the PDF
-              builder.download_in_browser(`board_${boardId}_page_${pageNr}_${timestamp}.pdf`);
+               if ( !canvasFormat ) {
+                   pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+               } else {
+                   pdfCtx.transform(1, 0, 0, 1, 0, 0);
+                   pdfCtx.save();
+                   pdfCtx.rect(0, 0, canvasFormat.w, canvasFormat.h);
+                   pdfCtx.clip();
+               }
+               
+               // Render all visible elements as vectors
+               shared.render_all_visible_elements(visualState, (element) => {
+                   if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
+                       renderElement(pdfCtx, element);
+                   }
+               });
+               
+               if ( canvasFormat ) {
+                   pdfCtx.restore();
+               }
+               
+               // Download the PDF
+               builder.download_in_browser(`board_${boardId}_page_${pageNr}_${timestamp}.pdf`);
               
           } catch (err) {
               showError(`PDF export failed: ${err.message}`);
@@ -6281,11 +6288,16 @@
                   const pdfBoardH = canvasFormat ? canvasFormat.h * 0.75 : canvas.height;
                   const pdfCtx = builder.new_page(pdfBoardW, pdfBoardH);
                   
-                  if ( !canvasFormat ) {
-                      pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
-                  }
-                  
-                  // Compile visual state for this page
+                   if ( !canvasFormat ) {
+                       pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+                   } else {
+                       pdfCtx.transform(1, 0, 0, 1, 0, 0);
+                       pdfCtx.save();
+                       pdfCtx.rect(0, 0, canvasFormat.w, canvasFormat.h);
+                       pdfCtx.clip();
+                   }
+                   
+                   // Compile visual state for this page
                   const pageVisualState = shared.createEmptyVisualState();
                   const pageActions = pageData.history.slice(0, pageData.present);
                   for (const action of pageActions) {
@@ -6298,8 +6310,12 @@
                           renderElement(pdfCtx, element);
                       }
                   });
+
+                  if ( canvasFormat ) {
+                      pdfCtx.restore();
+                  }
               }
-              
+
               // Download the complete multi-page PDF
               builder.download_in_browser(`board_${boardId}_${timestamp}.pdf`);
               hideError();
