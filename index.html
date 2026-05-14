@@ -6104,15 +6104,14 @@
               // Create PDF with vector rendering
               const builder = shared.PDFBuilder();
               
-              // If a format is set, use its dimensions as the PDF page size (converted to points at 72 DPI)
-              const pdfW = canvasFormat ? canvasFormat.w * 0.75 : canvas.width;
-              const pdfH = canvasFormat ? canvasFormat.h * 0.75 : canvas.height;
+              const pdfW = canvasFormat ? canvasFormat.w : canvas.width;
+              const pdfH = canvasFormat ? canvasFormat.h : canvas.height;
               const pdfCtx = builder.new_page(pdfW, pdfH);
               
-              // If a format is set, do not translate (origin 0,0 maps to PDF origin)
-              // Otherwise use zoom/pan transform
               if ( !canvasFormat ) {
                   pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+              } else {
+                  pdfCtx.transform(1, 0, 0, 1, 0, 0);
               }
               
               // Render all visible elements as vectors
