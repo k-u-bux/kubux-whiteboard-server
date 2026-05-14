@@ -703,6 +703,55 @@
           min-width: 20px;
           font-weight: bold;
       }
+      
+      /* Zoom popup menu */
+      #zoom-popup-menu {
+          position: fixed;
+          background-color: #f0f0f0;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          padding: 4px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          z-index: 1000;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
+      
+      #zoom-popup-menu .popup-option {
+          width: 100px;
+          height: 28px;
+          margin: 0;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 8px;
+          border: none;
+          background-color: transparent;
+          border-radius: 3px;
+          font-size: 13px;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      
+      #zoom-popup-menu .popup-option:hover {
+          background-color: #e0e0e0;
+      }
+      
+      #zoom-popup-menu .popup-option:disabled {
+          color: #999;
+          cursor: not-allowed;
+      }
+      
+      #zoom-popup-menu .popup-option:disabled:hover {
+          background-color: transparent;
+      }
+      
+      .popup-separator {
+          height: 1px;
+          background-color: #ccc;
+          margin: 2px 4px;
+      }
     </style>
   </head>
   <body>
@@ -727,12 +776,24 @@
         <button class="tool-btn" id="delete-page" title="Delete Page">➖</button>
       </div>
       
-      <div class="tool-section">
+      <div class="tool-section" id="zoom-section">
         <button class="tool-btn" id="zoom-out">-</button>
-        <span id="zoom-level">100%</span>
+        <button class="tool-btn" id="zoom-menu-btn">100%</button>
         <button class="tool-btn" id="zoom-in">+</button>
         <button class="tool-btn" id="hand-tool" title="Pan (Hand Tool)">✋</button>
         <button class="tool-btn" id="reset-view" title="Reset View (Center, 100%)">⌖</button>
+        <div id="zoom-popup-menu" style="display:none;">
+          <button class="popup-option" data-zoom="fit-width">fit width</button>
+          <button class="popup-option" data-zoom="fit-height">fit height</button>
+          <div class="popup-separator"></div>
+          <button class="popup-option" data-zoom="0.50">50%</button>
+          <button class="popup-option" data-zoom="0.75">75%</button>
+          <button class="popup-option" data-zoom="1.00">100%</button>
+          <button class="popup-option" data-zoom="1.25">125%</button>
+          <button class="popup-option" data-zoom="1.50">150%</button>
+          <button class="popup-option" data-zoom="1.75">175%</button>
+          <button class="popup-option" data-zoom="2.00">200%</button>
+        </div>
       </div>
       
       <div class="tool-section">
@@ -1918,7 +1979,7 @@
       // const widthValue = document.getElementById('width-value');
       const opacitySelector = document.getElementById('opacity-selector');
       // const opacityValue = document.getElementById('opacity-value');
-      const zoomLevelDisplay = document.getElementById('zoom-level');
+      const zoomLevelDisplay = document.getElementById('zoom-menu-btn');
       const pageInfo = document.getElementById('page-info');
       const errorBanner = document.getElementById('error-banner');
       const errorMessage = document.getElementById('error-message');
@@ -3693,6 +3754,77 @@
           }
       }
 
+      // Setup zoom menu popup
+      function setupZoomMenu() {
+          const menuBtn = document.getElementById('zoom-menu-btn');
+          const popup = document.getElementById('zoom-popup-menu');
+          const options = document.querySelectorAll('#zoom-popup-menu .popup-option');
+          
+          // Toggle popup on button click
+          menuBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const isVisible = popup.style.display === 'flex';
+              
+              if (isVisible) {
+                  popup.style.display = 'none';
+              } else {
+                  const rect = menuBtn.getBoundingClientRect();
+                  popup.style.left = rect.left + 'px';
+                  popup.style.top = (rect.bottom + 2) + 'px';
+                  popup.style.display = 'flex';
+                  
+                  // Update disabled state for fit-width/fit-height
+                  updateZoomMenuDisabled();
+              }
+          });
+          
+          // Handle option clicks
+          options.forEach(option => {
+              option.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                  const zoom = this.getAttribute('data-zoom');
+                  
+                  if (zoom === 'fit-width' && canvasFormat) {
+                      const containerW = container.clientWidth;
+                      zoomLevel = containerW / canvasFormat.w;
+                  } else if (zoom === 'fit-height' && canvasFormat) {
+                      const containerH = container.clientHeight;
+                      zoomLevel = containerH / canvasFormat.h;
+                  } else {
+                      zoomLevel = parseFloat(zoom);
+                  }
+                  
+                  zoomLevel = Math.max(0.5, Math.min(3, zoomLevel));
+                  zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+                  applyZoom();
+                  requestRedraw();
+                  saveSettings();
+                  
+                  popup.style.display = 'none';
+              });
+          });
+          
+          // Close popup when clicking outside
+          document.addEventListener('click', function(e) {
+              if (popup.style.display === 'flex' && 
+                  !popup.contains(e.target) && 
+                  e.target !== menuBtn) {
+                  popup.style.display = 'none';
+              }
+          });
+          
+          // Update fit-width/fit-height disabled state
+          function updateZoomMenuDisabled() {
+              const fitW = popup.querySelector('[data-zoom="fit-width"]');
+              const fitH = popup.querySelector('[data-zoom="fit-height"]');
+              if (fitW) fitW.disabled = !canvasFormat;
+              if (fitH) fitH.disabled = !canvasFormat;
+          }
+          
+          // Expose update function so format-select can call it
+          document.updateZoomMenuDisabled = updateZoomMenuDisabled;
+      }
+
       // Setup shape selector popup
       function setupShapeSelector() {
           const mainBtn = document.getElementById('shape-main-btn');
@@ -4400,6 +4532,9 @@
           // Dash pattern selector popup
           setupDashPatternSelector();
           
+          // Zoom menu popup
+          setupZoomMenu();
+          
           // Page navigation
           document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
@@ -4418,8 +4553,8 @@
           });
           
           // Zoom controls
-          document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.1));
-          document.getElementById('zoom-out').addEventListener('click', () => adjustZoom(-0.1));
+          document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.05));
+          document.getElementById('zoom-out').addEventListener('click', () => adjustZoom(-0.05));
           document.getElementById('reset-view').addEventListener('click', resetView);
           
           // Undo/Redo buttons
@@ -4462,6 +4597,7 @@
               backgroundValid = false;
               requestRedraw();
               saveSettings();
+              if (document.updateZoomMenuDisabled) document.updateZoomMenuDisabled();
           });
           
           // Export PDF buttons
