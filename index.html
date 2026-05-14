@@ -786,6 +786,22 @@
       #format-popup-menu .popup-option:hover {
           background-color: #e0e0e0;
       }
+      
+      /* Fixed widths for menu buttons to prevent layout jitter */
+      #zoom-menu-btn {
+          min-width: 6ch;
+          text-align: center;
+      }
+      
+      #format-menu-btn {
+          min-width: 12ch;
+          text-align: center;
+      }
+      
+      #page-info {
+          min-width: 16ch;
+          text-align: center;
+      }
     </style>
   </head>
   <body>
@@ -798,6 +814,23 @@
       <div class="tool-section" id="export-pdf">
         <button class="tool-btn" id="pdf-btn" title="Export Current Page to PDF">📃</button>
         <button class="tool-btn" id="pdf-board-btn" title="Export Entire Board to PDF">📚</button>
+      </div>
+
+      <div class="tool-section" id="format-section">
+        <button class="tool-btn" id="format-menu-btn" style="width:auto;padding:0 8px;">∞:∞</button>
+        <div id="format-popup-menu" style="display:none;">
+          <button class="popup-option" data-format="none">∞:∞</button>
+          <button class="popup-option" data-format="A4-portrait">A4</button>
+          <button class="popup-option" data-format="A4-landscape">A4 wide</button>
+          <button class="popup-option" data-format="letter-portrait">Letter</button>
+          <button class="popup-option" data-format="letter-landscape">Letter wide</button>
+          <button class="popup-option" data-format="legal-portrait">Legal</button>
+          <button class="popup-option" data-format="legal-landscape">Legal wide</button>
+          <button class="popup-option" data-format="16:9">16:9</button>
+          <button class="popup-option" data-format="4:3">4:3</button>
+          <button class="popup-option" data-format="2:1">2:1</button>
+          <button class="popup-option" data-format="custom">Custom…</button>
+        </div>
       </div>
 
       <div class="tool-section page-controls">
@@ -827,23 +860,6 @@
           <button class="popup-option" data-zoom="1.50">150%</button>
           <button class="popup-option" data-zoom="1.75">175%</button>
           <button class="popup-option" data-zoom="2.00">200%</button>
-        </div>
-      </div>
-      
-      <div class="tool-section" id="format-section">
-        <button class="tool-btn" id="format-menu-btn" style="width:auto;padding:0 8px;">∞:∞</button>
-        <div id="format-popup-menu" style="display:none;">
-          <button class="popup-option" data-format="none">∞:∞</button>
-          <button class="popup-option" data-format="A4-portrait">A4</button>
-          <button class="popup-option" data-format="A4-landscape">A4 wide</button>
-          <button class="popup-option" data-format="letter-portrait">Letter</button>
-          <button class="popup-option" data-format="letter-landscape">Letter wide</button>
-          <button class="popup-option" data-format="legal-portrait">Legal</button>
-          <button class="popup-option" data-format="legal-landscape">Legal wide</button>
-          <button class="popup-option" data-format="16:9">16:9</button>
-          <button class="popup-option" data-format="4:3">4:3</button>
-          <button class="popup-option" data-format="2:1">2:1</button>
-          <button class="popup-option" data-format="custom">Custom…</button>
         </div>
       </div>
       
