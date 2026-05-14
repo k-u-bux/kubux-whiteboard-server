@@ -202,6 +202,12 @@ const MESSAGES = {
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
+        BOARD_INFO_REQUEST: {
+            TYPE: 'board-info-request',
+            BOARD: 'board-uuid',
+            REGISTER: 'register',
+            REQUEST_ID: 'requestId'
+        },
         REGISTER_PAGE: {
             TYPE: 'register-page',
             BOARD: 'board-uuid',
@@ -264,6 +270,12 @@ const MESSAGES = {
             FIRST_PAGE: 'first-page-uuid',
             LAST_PAGE: 'last-page-uuid',
             TOTAL_PAGES: 'totalPages',
+            REQUEST_ID: 'requestId'
+        },
+        BOARD_INFO: {
+            TYPE: 'board-info',
+            BOARD: 'board-uuid',
+            PAGES: 'pages',
             REQUEST_ID: 'requestId'
         },
         PAGE_REGISTERED: {
