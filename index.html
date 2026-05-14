@@ -2872,6 +2872,12 @@
           }          
 
           requestFullPage( pageUuid, do_switch );
+          
+          // If overview is visible, re-render thumbnails when data arrives
+          const overviewEl = document.getElementById('page-overview');
+          if (overviewEl && overviewEl.classList.contains('visible')) {
+              renderThumbnails();
+          }
       }
       
       // Handle page lost response (page deletion with redirection)
@@ -3313,6 +3319,12 @@
           }
           debugLog("Replay applied successfully", pageData);
 
+          // If overview is visible, re-render thumbnails when data arrives
+          const overviewEl = document.getElementById('page-overview');
+          if (overviewEl && overviewEl.classList.contains('visible')) {
+              renderThumbnails();
+          }
+
           return pageData;
       }
       
@@ -3376,6 +3388,12 @@
               
               // Save current page position to settings
               saveSettings();
+          }
+          
+          // If overview is visible, re-render thumbnails when data arrives
+          const overviewEl = document.getElementById('page-overview');
+          if (overviewEl && overviewEl.classList.contains('visible')) {
+              renderThumbnails();
           }
       }
       
