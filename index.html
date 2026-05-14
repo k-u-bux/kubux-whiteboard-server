@@ -1895,9 +1895,9 @@
           'letter-landscape': { w: 1056, h: 816 },
           'legal-portrait': { w: 816, h: 1344 },
           'legal-landscape': { w: 1344, h: 816 },
-          '16:9': { w: 1920, h: 1080 },
-          '4:3': { w: 1024, h: 768 },
-          '2:1': { w: 1200, h: 600 },
+          '16:9': { w: 1123, h: 632 },
+          '4:3': { w: 1123, h: 842 },
+          '2:1': { w: 1123, h: 562 },
       };
       let canvasFormat = null; // null = no format, else { w, h }
 
@@ -4162,6 +4162,11 @@
                   }
                   
                   updateFormatButton();
+                  // Auto zoom to fit width when a format is selected
+                  zoomLevel = container.clientWidth / canvasFormat.w;
+                  zoomLevel = Math.max(0.5, Math.min(3, zoomLevel));
+                  zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+                  applyZoom();
                   backgroundValid = false;
                   requestRedraw();
                   saveSettings();
