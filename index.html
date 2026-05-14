@@ -493,8 +493,23 @@
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 15px 20px;
+          padding: 8px 12px;
           border-bottom: 1px solid #ddd;
+          gap: 8px;
+      }
+      
+      #page-menu-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          flex: 1;
+      }
+      
+      #page-menu-current-label {
+          font-size: 14px;
+          font-weight: bold;
+          margin: 0 6px;
+          min-width: 60px;
       }
       
       #page-menu-title {
@@ -951,7 +966,13 @@
     <div id="page-menu-overlay">
       <div id="page-menu-window">
         <div id="page-menu-header">
-          <h3 id="page-menu-title">Go to Page</h3>
+          <div id="page-menu-toolbar">
+            <button id="page-menu-move-up" class="tool-btn" title="Move current page up">▲</button>
+            <button id="page-menu-move-down" class="tool-btn" title="Move current page down">▼</button>
+            <span id="page-menu-current-label">Page 1</span>
+            <input type="number" id="page-menu-move-to" min="1" value="1" style="width:50px;padding:2px 4px;">
+            <button id="page-menu-move-btn" class="tool-btn" title="Move current page to position">Move</button>
+          </div>
           <button id="page-menu-close">×</button>
         </div>
         <div id="page-menu-list">
@@ -1592,6 +1613,7 @@
       let currentPageUuid = null;
       let pageNr = 1;
       let totalPages = 1;
+      let serverPageOrder = [];
       let connectionEstablished = false;
       
       // Reconnection with exponential backoff
@@ -2146,12 +2168,15 @@
                       case shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE:
                           handleReplayMessage(data);
                           break;
-                      case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
-                          handlePingMessage(data);
-                          break;
-                      case "error":
-                          handleErrorMessage(data);
-                          break;
+                       case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
+                           handlePingMessage(data);
+                           break;
+                       case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE:
+                           handleBoardInfo(data);
+                           break;
+                       case "error":
+                           handleErrorMessage(data);
+                           break;
                       default:
                           console.error('Unknown message type:', data.type);
                       }
@@ -2171,6 +2196,40 @@
           showError(`Server error: ${data.message}`);
       }
       
+      // Handle board info response (page order for shuffle)
+      function handleBoardInfo(data) {
+          const pages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES];
+          if ( pages ) {
+              serverPageOrder = pages;
+          }
+          // Refresh the page menu if open
+          const overlay = document.getElementById('page-menu-overlay');
+          if ( overlay.style.display === 'block' ) {
+              rebuildPageMenu();
+          }
+      }
+
+      function requestBoardInfo() {
+          const requestId = createRequestId();
+          sendMessage({
+              type: shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REGISTER]: false,
+              [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REQUEST_ID]: requestId
+          });
+      }
+
+      function sendShuffleProposal( newOrder ) {
+          sendMessage({
+              type: shared.MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.PASSWORD]: passwd,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.BEFORE]: serverPageOrder,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.AFTER]: newOrder,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.REQUEST_ID]: createRequestId()
+          });
+      }
+
       // Create a new board with credentials
       function createBoard(credential) {
           const requestId = createRequestId();
@@ -6213,7 +6272,6 @@
       function openPageMenu() {
           const overlay = document.getElementById('page-menu-overlay');
           const menuWindow = document.getElementById('page-menu-window');
-          const menuList = document.getElementById('page-menu-list');
           
           // Get button position
           const buttonRect = pageInfo.getBoundingClientRect();
@@ -6221,6 +6279,32 @@
           // Position menu below button
           menuWindow.style.left = buttonRect.left + 'px';
           menuWindow.style.top = (buttonRect.bottom + 5) + 'px';
+          
+          // Request latest board info before showing menu
+          requestBoardInfo();
+          
+          // Build the menu
+          rebuildPageMenu();
+          
+          overlay.style.display = 'block';
+      }
+      
+      function rebuildPageMenu() {
+          const menuList = document.getElementById('page-menu-list');
+          const moveUpBtn = document.getElementById('page-menu-move-up');
+          const moveDownBtn = document.getElementById('page-menu-move-down');
+          const currentLabel = document.getElementById('page-menu-current-label');
+          const moveToInput = document.getElementById('page-menu-move-to');
+          const moveBtn = document.getElementById('page-menu-move-btn');
+          
+          // Update toolbar
+          currentLabel.textContent = `Page ${pageNr}`;
+          moveToInput.value = pageNr;
+          moveToInput.max = totalPages;
+          
+          // Enable/disable move buttons based on position
+          moveUpBtn.disabled = pageNr <= 1;
+          moveDownBtn.disabled = pageNr >= totalPages;
           
           // Clear existing items
           menuList.innerHTML = '';
@@ -6244,14 +6328,43 @@
               
               menuList.appendChild(item);
           }
-          
-          overlay.style.display = 'block';
       }
       
       function closePageMenu() {
           const overlay = document.getElementById('page-menu-overlay');
           overlay.style.display = 'none';
       }
+      
+      // Wire up page menu toolbar events
+      document.addEventListener('DOMContentLoaded', function() {
+          document.getElementById('page-menu-move-up').addEventListener('click', function() {
+              if (pageNr <= 1) return;
+              const idx = serverPageOrder.indexOf(currentPageUuid);
+              if (idx < 0) return;
+              const newOrder = [...serverPageOrder];
+              [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+              sendShuffleProposal(newOrder);
+          });
+          
+          document.getElementById('page-menu-move-down').addEventListener('click', function() {
+              if (pageNr >= totalPages) return;
+              const idx = serverPageOrder.indexOf(currentPageUuid);
+              if (idx < 0) return;
+              const newOrder = [...serverPageOrder];
+              [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+              sendShuffleProposal(newOrder);
+          });
+          
+          document.getElementById('page-menu-move-btn').addEventListener('click', function() {
+              const targetPos = parseInt(document.getElementById('page-menu-move-to').value);
+              if (isNaN(targetPos) || targetPos < 1 || targetPos > totalPages) return;
+              const idx = serverPageOrder.indexOf(currentPageUuid);
+              if (idx < 0) return;
+              const newOrder = serverPageOrder.filter(id => id !== currentPageUuid);
+              newOrder.splice(targetPos - 1, 0, currentPageUuid);
+              sendShuffleProposal(newOrder);
+          });
+      });
       
       // Board Navigation Functions
       function openBoardNavigation() {
