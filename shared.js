@@ -1211,6 +1211,14 @@ function PDFContext2D(pageContent, pageHeight, builder) {
             }
         },
 
+        // --- Path Construction / clipping ---
+        rect(x, y, w, h) {
+            addCommand(`${x} ${invertY(y + h)} ${w} ${h} re`);
+        },
+        clip() {
+            addCommand('W n');
+        },
+
         // --- Shape Shortcuts ---
         fillRect(x, y, w, h) {
             // PDF's 're' operator uses bottom-left as origin
