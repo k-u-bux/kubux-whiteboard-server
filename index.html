@@ -802,6 +802,117 @@
           min-width: 16ch;
           text-align: center;
       }
+      
+      /* Page Overview Mode */
+      #page-overview {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: #2d2d2d;
+          display: none;
+          flex-direction: column;
+          z-index: 3000;
+      }
+      
+      #page-overview.visible {
+          display: flex;
+      }
+      
+      #overview-topbar {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 1em;
+          padding: 0.5em;
+          background-color: #444;
+          flex-shrink: 0;
+      }
+      
+      .overview-btn {
+          padding: 0.4em 1.2em;
+          border: none;
+          border-radius: 4px;
+          font-size: 1em;
+          cursor: pointer;
+          font-family: inherit;
+      }
+      
+      .overview-btn.confirm {
+          background-color: #4CAF50;
+          color: white;
+      }
+      
+      .overview-btn.confirm:hover {
+          background-color: #45a049;
+      }
+      
+      .overview-btn.cancel {
+          background-color: #888;
+          color: white;
+      }
+      
+      .overview-btn.cancel:hover {
+          background-color: #666;
+      }
+      
+      #overview-grid {
+          flex: 1;
+          overflow-y: auto;
+          padding: 1em;
+          display: flex;
+          flex-wrap: wrap;
+          align-content: flex-start;
+          gap: 1em;
+          justify-content: center;
+      }
+      
+      .overview-thumb {
+          width: 18em;
+          background-color: #fff;
+          border-radius: 4px;
+          padding: 0.5em;
+          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          transition: box-shadow 0.15s;
+          user-select: none;
+      }
+      
+      .overview-thumb:hover {
+          box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      }
+      
+      .overview-thumb.selected {
+          outline: 3px solid #4CAF50;
+          outline-offset: 2px;
+      }
+      
+      .overview-thumb.drag-over {
+          outline: 3px dashed #0078d7;
+          outline-offset: 2px;
+      }
+      
+      .overview-thumb canvas {
+          width: 100%;
+          height: auto;
+          display: block;
+          background-color: #fff;
+          border-radius: 2px;
+      }
+      
+      .overview-thumb-label {
+          text-align: center;
+          margin-top: 0.3em;
+          font-size: 0.85em;
+          color: #666;
+      }
+      
+      body.overview-active .toolbar,
+      body.overview-active .sidebar,
+      body.overview-active .app-container {
+          display: none;
+      }
     </style>
   </head>
   <body>
@@ -1108,6 +1219,15 @@
           <!-- Page list items will be dynamically generated -->
         </div>
       </div>
+    </div>
+
+    <!-- Page Overview Mode -->
+    <div id="page-overview">
+      <div id="overview-topbar">
+        <button class="overview-btn confirm" id="overview-confirm">✓ Confirm</button>
+        <button class="overview-btn cancel" id="overview-cancel">✕ Cancel</button>
+      </div>
+      <div id="overview-grid"></div>
     </div>
 
     <!-- Board Navigation Overlay -->
@@ -6666,6 +6786,21 @@
           // Clear existing items
           menuList.innerHTML = '';
           
+          // Add overview item
+          const overviewItem = document.createElement('div');
+          overviewItem.className = 'page-menu-item';
+          overviewItem.textContent = '☐☐ Overview';
+          overviewItem.addEventListener('click', function() {
+              closePageMenu();
+              enterOverviewMode();
+          });
+          menuList.appendChild(overviewItem);
+          
+          // Separator
+          const sep = document.createElement('div');
+          sep.className = 'popup-separator';
+          menuList.appendChild(sep);
+          
           // Generate page items
           for (let i = 1; i <= totalPages; i++) {
               const item = document.createElement('div');
@@ -6691,6 +6826,194 @@
           const overlay = document.getElementById('page-menu-overlay');
           overlay.style.display = 'none';
       }
+      
+      // Page Overview Mode
+      function enterOverviewMode() {
+          const overview = document.getElementById('page-overview');
+          const grid = document.getElementById('overview-grid');
+          
+          // Show overview, hide normal UI
+          document.body.classList.add('overview-active');
+          overview.classList.add('visible');
+          
+          // Build thumbnails
+          grid.innerHTML = '';
+          
+          // Use serverPageOrder if available, otherwise build from page numbers
+          const pageOrder = serverPageOrder.length > 0 ? serverPageOrder : [];
+          
+          // For each page, create a thumbnail placeholder
+          for (let i = 0; i < totalPages; i++) {
+              const thumb = document.createElement('div');
+              thumb.className = 'overview-thumb';
+              thumb.draggable = true;
+              thumb.dataset.index = i;
+              
+              const canvas = document.createElement('canvas');
+              canvas.width = 200;
+              canvas.height = 150;
+              canvas.style.width = '100%';
+              canvas.style.height = 'auto';
+              thumb.appendChild(canvas);
+              
+              const label = document.createElement('div');
+              label.className = 'overview-thumb-label';
+              label.textContent = `Page ${i + 1}`;
+              thumb.appendChild(label);
+              
+              // Click to select
+              thumb.addEventListener('click', function(e) {
+                  if (e.ctrlKey || e.metaKey) {
+                      this.classList.toggle('selected');
+                  } else if (e.shiftKey) {
+                      // Range select
+                      const all = grid.querySelectorAll('.overview-thumb');
+                      let started = false;
+                      all.forEach(t => {
+                          if (t === this || t.classList.contains('selected')) {
+                              started = !started;
+                          }
+                          if (started) t.classList.add('selected');
+                      });
+                      this.classList.add('selected');
+                  } else {
+                      // Single select
+                      grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('selected'));
+                      this.classList.add('selected');
+                  }
+              });
+              
+              // Drag and drop
+              thumb.addEventListener('dragstart', function(e) {
+                  e.dataTransfer.setData('text/plain', this.dataset.index);
+                  this.classList.add('drag-over');
+              });
+              
+              thumb.addEventListener('dragend', function(e) {
+                  this.classList.remove('drag-over');
+              });
+              
+              thumb.addEventListener('dragover', function(e) {
+                  e.preventDefault();
+                  grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
+                  this.classList.add('drag-over');
+              });
+              
+              thumb.addEventListener('dragleave', function(e) {
+                  this.classList.remove('drag-over');
+              });
+              
+              thumb.addEventListener('drop', function(e) {
+                  e.preventDefault();
+                  grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
+                  
+                  const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                  const toIdx = parseInt(this.dataset.index);
+                  if (fromIdx === toIdx) return;
+                  
+                  // Reorder DOM
+                  const thumbs = grid.querySelectorAll('.overview-thumb');
+                  const fromEl = thumbs[fromIdx];
+                  const toEl = thumbs[toIdx];
+                  
+                  if (fromIdx < toIdx) {
+                      toEl.parentNode.insertBefore(fromEl, toEl.nextSibling);
+                  } else {
+                      toEl.parentNode.insertBefore(fromEl, toEl);
+                  }
+                  
+                  // Update indices
+                  grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
+                      t.dataset.index = idx;
+                      t.querySelector('.overview-thumb-label').textContent = `Page ${idx + 1}`;
+                  });
+              });
+              
+              grid.appendChild(thumb);
+          }
+          
+          // Try to render thumbnails from cached data
+          renderThumbnails();
+          
+          // Request page data for uncached pages
+          requestThumbnailData();
+      }
+      
+      function exitOverviewMode(confirmed) {
+          if (confirmed) {
+              // Build new order from current thumbnail positions
+              const grid = document.getElementById('overview-grid');
+              const thumbs = grid.querySelectorAll('.overview-thumb');
+              const newOrder = [];
+              
+              thumbs.forEach(thumb => {
+                  const idx = parseInt(thumb.dataset.index);
+                  if (idx >= 0 && idx < serverPageOrder.length) {
+                      newOrder.push(serverPageOrder[idx]);
+                  }
+              });
+              
+              if (newOrder.length > 0 && JSON.stringify(newOrder) !== JSON.stringify(serverPageOrder)) {
+                  sendShuffleProposal(newOrder);
+              }
+          }
+          
+          // Hide overview, restore normal UI
+          document.body.classList.remove('overview-active');
+          document.getElementById('page-overview').classList.remove('visible');
+      }
+      
+      function renderThumbnails() {
+          const grid = document.getElementById('overview-grid');
+          const thumbs = grid.querySelectorAll('.overview-thumb');
+          
+          thumbs.forEach((thumb, idx) => {
+              const canvas = thumb.querySelector('canvas');
+              const ctx = canvas.getContext('2d');
+              
+              // Try to get page data from cache
+              const pageUuid = serverPageOrder[idx];
+              if (!pageUuid) return;
+              
+              const pageData = loadPageFromCache(pageUuid);
+              if (!pageData || !pageData.history || pageData.history.length === 0) return;
+              
+              // Render to offscreen canvas
+              const visualState = shared.createEmptyVisualState();
+              const actions = pageData.history.slice(0, pageData.present);
+              for (const action of actions) {
+                  shared.commitEdit(visualState, action);
+              }
+              
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              
+              shared.render_all_visible_elements(visualState, (element) => {
+                  renderElement(ctx, element);
+              });
+          });
+      }
+      
+      function requestThumbnailData() {
+          // For pages not in cache, request data
+          const grid = document.getElementById('overview-grid');
+          const thumbs = grid.querySelectorAll('.overview-thumb');
+          
+          thumbs.forEach((thumb, idx) => {
+              const pageUuid = serverPageOrder[idx];
+              if (!pageUuid) return;
+              
+              const pageData = loadPageFromCache(pageUuid);
+              if (pageData && pageData.history && pageData.history.length > 0) return; // Already cached
+              
+              // Request page info for this page
+              requestPageInfo(pageUuid, false);
+          });
+      }
+      
+      // Wire up overview confirm/cancel buttons
+      document.getElementById('overview-confirm').addEventListener('click', () => exitOverviewMode(true));
+      document.getElementById('overview-cancel').addEventListener('click', () => exitOverviewMode(false));
       
       // Wire up page menu toolbar events
       document.addEventListener('DOMContentLoaded', function() {
