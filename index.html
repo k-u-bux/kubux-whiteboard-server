@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+an yiu<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8">
@@ -6964,6 +6964,10 @@
           const grid = document.getElementById('overview-grid');
           console.log('overview element:', overview, 'grid element:', grid);
           
+          // Snapshot viewport dimensions BEFORE hiding the container
+          window._overviewViewportW = container.clientWidth;
+          window._overviewViewportH = container.clientHeight;
+          
           // Show overview, hide normal UI
           document.body.classList.add('overview-active');
           overview.classList.add('visible');
@@ -6973,7 +6977,7 @@
           if (canvasFormat) {
               thumbH = Math.round(200 * canvasFormat.h / canvasFormat.w);
           } else {
-              thumbH = Math.round(200 * container.clientHeight / container.clientWidth);
+              thumbH = Math.round(200 * window._overviewViewportH / window._overviewViewportW);
           }
           if (thumbH < 1) thumbH = 150;
           
@@ -7129,8 +7133,10 @@
           } else {
               srcX = -panX / zoomLevel;
               srcY = -panY / zoomLevel;
-              srcW = container.clientWidth / zoomLevel;
-              srcH = container.clientHeight / zoomLevel;
+              const vw = window._overviewViewportW || container.clientWidth;
+              const vh = window._overviewViewportH || container.clientHeight;
+              srcW = (vw || canvas.width) / zoomLevel;
+              srcH = (vh || canvas.height) / zoomLevel;
           }
           
           thumbs.forEach((thumb, idx) => {
