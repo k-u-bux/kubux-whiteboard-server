@@ -7103,10 +7103,8 @@ an yiu<!DOCTYPE html>
               const newOrder = [];
               
               thumbs.forEach(thumb => {
-                  const idx = parseInt(thumb.dataset.index);
-                  if (idx >= 0 && idx < serverPageOrder.length) {
-                      newOrder.push(serverPageOrder[idx]);
-                  }
+                  const uuid = thumb.dataset.pageUuid;
+                  if (uuid) newOrder.push(uuid);
               });
               
               if (newOrder.length > 0 && JSON.stringify(newOrder) !== JSON.stringify(serverPageOrder)) {
