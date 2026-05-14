@@ -6829,8 +6829,10 @@
       
       // Page Overview Mode
       function enterOverviewMode() {
+          console.log('enterOverviewMode called');
           const overview = document.getElementById('page-overview');
           const grid = document.getElementById('overview-grid');
+          console.log('overview element:', overview, 'grid element:', grid);
           
           // Show overview, hide normal UI
           document.body.classList.add('overview-active');
@@ -7011,12 +7013,12 @@
           });
       }
       
-      // Wire up overview confirm/cancel buttons
-      document.getElementById('overview-confirm').addEventListener('click', () => exitOverviewMode(true));
-      document.getElementById('overview-cancel').addEventListener('click', () => exitOverviewMode(false));
-      
       // Wire up page menu toolbar events
       document.addEventListener('DOMContentLoaded', function() {
+          // Wire up overview confirm/cancel buttons
+          document.getElementById('overview-confirm').addEventListener('click', () => exitOverviewMode(true));
+          document.getElementById('overview-cancel').addEventListener('click', () => exitOverviewMode(false));
+          
           document.getElementById('page-menu-move-up').addEventListener('click', function() {
               if (pageNr <= 1) return;
               const idx = serverPageOrder.indexOf(currentPageUuid);
