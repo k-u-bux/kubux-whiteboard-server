@@ -736,6 +736,23 @@
       </div>
       
       <div class="tool-section">
+        <label for="format-select" style="font-size:12px;margin-right:4px;">Format:</label>
+        <select id="format-select" style="padding:2px 4px;font-size:12px;">
+          <option value="none">None</option>
+          <option value="A4-portrait">A4 Portrait</option>
+          <option value="A4-landscape">A4 Landscape</option>
+          <option value="letter-portrait">Letter Portrait</option>
+          <option value="letter-landscape">Letter Landscape</option>
+          <option value="legal-portrait">Legal Portrait</option>
+          <option value="legal-landscape">Legal Landscape</option>
+          <option value="16:9">16:9</option>
+          <option value="4:3">4:3</option>
+          <option value="2:1">2:1</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      
+      <div class="tool-section">
         <button class="tool-btn tooltip" id="undo-btn" title="Undo" disabled>↩
           <span class="tooltiptext">Undo (Ctrl+Z)</span>
         </button>
@@ -1286,6 +1303,7 @@
                   panX: panX,
                   panY: panY,
                   colorSwatches: [],
+                  canvasFormat: canvasFormat,
                   // Page position
                   currentPageUuid: currentPageUuid,
                   pageNr: pageNr,
@@ -1345,6 +1363,29 @@
                           btn.classList.add('active');
                       }
                   });
+              }
+              
+              // Restore canvas format
+              if (settings.canvasFormat !== undefined) {
+                  canvasFormat = settings.canvasFormat;
+                  // Update the select element to match
+                  const formatSelect = document.getElementById('format-select');
+                  if ( canvasFormat ) {
+                      // Find matching preset
+                      let found = false;
+                      for ( const [key, fmt] of Object.entries(CANVAS_FORMATS) ) {
+                          if ( fmt.w === canvasFormat.w && fmt.h === canvasFormat.h ) {
+                              formatSelect.value = key;
+                              found = true;
+                              break;
+                          }
+                      }
+                      if ( !found ) {
+                          formatSelect.value = 'custom';
+                      }
+                  } else {
+                      formatSelect.value = 'none';
+                  }
               }
               
               // Restore zoom level
@@ -1604,6 +1645,20 @@
               break;
           }
       };
+
+      // Canvas format definitions (dimensions in canvas pixels at 96 DPI)
+      const CANVAS_FORMATS = {
+          'A4-portrait': { w: 794, h: 1123 },
+          'A4-landscape': { w: 1123, h: 794 },
+          'letter-portrait': { w: 816, h: 1056 },
+          'letter-landscape': { w: 1056, h: 816 },
+          'legal-portrait': { w: 816, h: 1344 },
+          'legal-landscape': { w: 1344, h: 816 },
+          '16:9': { w: 1920, h: 1080 },
+          '4:3': { w: 1024, h: 768 },
+          '2:1': { w: 1200, h: 600 },
+      };
+      let canvasFormat = null; // null = no format, else { w, h }
 
       // Globals for board state
       let ws = null;
@@ -4387,6 +4442,28 @@
               }
           });
           
+          // Format select
+          document.getElementById('format-select').addEventListener('change', function() {
+              const val = this.value;
+              if (val === 'none') {
+                  canvasFormat = null;
+              } else if (val === 'custom') {
+                  const w = parseInt(prompt('Width (px):', '800'));
+                  const h = parseInt(prompt('Height (px):', '600'));
+                  if (w > 0 && h > 0) {
+                      canvasFormat = { w, h };
+                  } else {
+                      this.value = 'none';
+                      canvasFormat = null;
+                  }
+              } else {
+                  canvasFormat = CANVAS_FORMATS[val];
+              }
+              backgroundValid = false;
+              requestRedraw();
+              saveSettings();
+          });
+          
           // Export PDF buttons
           document.getElementById('pdf-btn').addEventListener('click', exportPageToPDF);
           document.getElementById('pdf-board-btn').addEventListener('click', exportBoardToPDF);
@@ -5855,10 +5932,22 @@
           backgroundCtx.save();
           backgroundCtx.setTransform(1, 0, 0, 1, 0, 0);
           backgroundCtx.clearRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+          
+          // If a format is set, draw grey background outside the format rectangle
+          if ( canvasFormat ) {
+              backgroundCtx.fillStyle = '#e0e0e0';
+              backgroundCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+          }
           backgroundCtx.restore();
           
           // Apply zoom and pan to background
           backgroundCtx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+
+          // If a format is set, draw white rectangle for the drawing area
+          if ( canvasFormat ) {
+              backgroundCtx.fillStyle = 'white';
+              backgroundCtx.fillRect(0, 0, canvasFormat.w, canvasFormat.h);
+          }
           
           // Render all visible elements to background
           shared.render_all_visible_elements(visualState, (element) => {
@@ -6014,10 +6103,17 @@
               
               // Create PDF with vector rendering
               const builder = shared.PDFBuilder();
-              const pdfCtx = builder.new_page(canvas.width, canvas.height);
               
-              // Apply zoom transformation
-              pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+              // If a format is set, use its dimensions as the PDF page size (converted to points at 72 DPI)
+              const pdfW = canvasFormat ? canvasFormat.w * 0.75 : canvas.width;
+              const pdfH = canvasFormat ? canvasFormat.h * 0.75 : canvas.height;
+              const pdfCtx = builder.new_page(pdfW, pdfH);
+              
+              // If a format is set, do not translate (origin 0,0 maps to PDF origin)
+              // Otherwise use zoom/pan transform
+              if ( !canvasFormat ) {
+                  pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+              }
               
               // Render all visible elements as vectors
               shared.render_all_visible_elements(visualState, (element) => {
@@ -6181,11 +6277,14 @@
                   
                   if ( !pageData ) continue;
                   
-                  // Create new page in PDF
-                  const pdfCtx = builder.new_page(canvas.width, canvas.height);
+                  // Use format dimensions if set, else canvas size
+                  const pdfBoardW = canvasFormat ? canvasFormat.w * 0.75 : canvas.width;
+                  const pdfBoardH = canvasFormat ? canvasFormat.h * 0.75 : canvas.height;
+                  const pdfCtx = builder.new_page(pdfBoardW, pdfBoardH);
                   
-                  // Apply zoom and pan transformation
-                  pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+                  if ( !canvasFormat ) {
+                      pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+                  }
                   
                   // Compile visual state for this page
                   const pageVisualState = shared.createEmptyVisualState();
