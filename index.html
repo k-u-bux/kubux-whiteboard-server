@@ -893,6 +893,10 @@
           outline-offset: 2px;
       }
       
+      .overview-thumb {
+          position: relative;
+      }
+       
       .overview-thumb canvas {
           width: 100%;
           height: auto;
@@ -900,14 +904,36 @@
           background-color: #fff;
           border-radius: 2px;
       }
-      
+       
+      .overview-thumb-spinner {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 24px;
+          height: 24px;
+          margin: -12px 0 0 -12px;
+          border: 3px solid #ddd;
+          border-top: 3px solid #0078d7;
+          border-radius: 50%;
+          animation: overview-spin 0.8s linear infinite;
+          display: none;
+      }
+       
+      .overview-thumb-spinner.active {
+          display: block;
+      }
+       
+      @keyframes overview-spin {
+          to { transform: rotate(360deg); }
+      }
+       
       .overview-thumb-label {
           text-align: center;
           margin-top: 0.3em;
           font-size: 0.85em;
           color: #666;
       }
-      
+       
       body.overview-active .toolbar,
       body.overview-active .sidebar,
       body.overview-active .app-container {
@@ -2473,10 +2499,106 @@
               serverPageOrder = pages;
           }
           // Refresh the page menu if open
-          const overlay = document.getElementById('page-menu-overlay');
-          if ( overlay.style.display === 'block' ) {
+          const menuOverlay = document.getElementById('page-menu-overlay');
+          if ( menuOverlay.style.display === 'block' ) {
               rebuildPageMenu();
           }
+          // If overview is active, add any new pages and re-render thumbnails
+          const overviewEl = document.getElementById('page-overview');
+          if ( overviewEl.classList.contains('visible') ) {
+              const grid = document.getElementById('overview-grid');
+              const existing = grid.querySelectorAll('.overview-thumb');
+              const existingUuids = new Set();
+              existing.forEach(t => { if (t.dataset.pageUuid) existingUuids.add(t.dataset.pageUuid); });
+              
+              // Append thumbnails for pages not yet in the grid
+              if ( pages ) {
+                  pages.forEach((uuid, idx) => {
+                      if (!existingUuids.has(uuid)) {
+                          const thumb = document.createElement('div');
+                          thumb.className = 'overview-thumb';
+                          thumb.draggable = true;
+                          thumb.dataset.index = existing.length;
+                          thumb.dataset.pageUuid = uuid;
+                          
+                          const canvas = document.createElement('canvas');
+                          canvas.width = 200; canvas.height = 150;
+                          canvas.style.width = '100%'; canvas.style.height = 'auto';
+                          thumb.appendChild(canvas);
+                          
+                          const spinner = document.createElement('div');
+                          spinner.className = 'overview-thumb-spinner';
+                          thumb.appendChild(spinner);
+                          
+                          const label = document.createElement('div');
+                          label.className = 'overview-thumb-label';
+                          label.textContent = `Page ${existing.length + 1}`;
+                          thumb.appendChild(label);
+                          
+                          // Clone event listeners from existing thumbs by re-adding them inline
+                          thumb.addEventListener('click', function(e) {
+                              if (e.ctrlKey || e.metaKey) { this.classList.toggle('selected'); }
+                              else if (e.shiftKey) {
+                                  const all = grid.querySelectorAll('.overview-thumb');
+                                  let started = false;
+                                  all.forEach(t => {
+                                      if (t === this || t.classList.contains('selected')) started = !started;
+                                      if (started) t.classList.add('selected');
+                                  });
+                                  this.classList.add('selected');
+                              } else {
+                                  grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('selected'));
+                                  this.classList.add('selected');
+                              }
+                          });
+                          // Drag/drop listeners
+                          thumb.addEventListener('dragstart', function(e) { 
+                              e.dataTransfer.setData('text/plain', this.dataset.index);
+                              this.classList.add('drag-over');
+                          });
+                          thumb.addEventListener('dragend', function(e) { this.classList.remove('drag-over'); });
+                          thumb.addEventListener('dragover', function(e) {
+                              e.preventDefault();
+                              grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
+                              this.classList.add('drag-over');
+                          });
+                          thumb.addEventListener('dragleave', function(e) { this.classList.remove('drag-over'); });
+                          thumb.addEventListener('drop', handleThumbDrop);
+                          
+                          grid.appendChild(thumb);
+                      }
+                  });
+              }
+              
+              // Re-render all thumbnails (data may have arrived from page_info responses)
+              renderThumbnails();
+          }
+      }
+      
+      // Drag-drop handler for thumbnails (extracted for reuse)
+      function handleThumbDrop(e) {
+          e.preventDefault();
+          const grid = document.getElementById('overview-grid');
+          grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
+          
+          const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+          const toIdx = parseInt(this.dataset.index);
+          if (fromIdx === toIdx) return;
+          
+          const thumbs = grid.querySelectorAll('.overview-thumb');
+          const fromEl = thumbs[fromIdx];
+          const toEl = thumbs[toIdx];
+          
+          if (fromIdx < toIdx) {
+              toEl.parentNode.insertBefore(fromEl, toEl.nextSibling);
+          } else {
+              toEl.parentNode.insertBefore(fromEl, toEl);
+          }
+          
+          grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
+              t.dataset.index = idx;
+              t.querySelector('.overview-thumb-label').textContent = `Page ${idx + 1}`;
+          });
       }
 
       function requestBoardInfo() {
@@ -6827,6 +6949,13 @@
           overlay.style.display = 'none';
       }
       
+      // Build a page order from pagesMetaData (sorted by pageNr) as fallback
+      function buildPageOrderFromMeta() {
+          return Object.entries(pagesMetaData)
+              .sort((a, b) => a[1][0] - b[1][0])
+              .map(([uuid]) => uuid);
+      }
+
       // Page Overview Mode
       function enterOverviewMode() {
           console.log('enterOverviewMode called');
@@ -6841,8 +6970,8 @@
           // Build thumbnails
           grid.innerHTML = '';
           
-          // Use serverPageOrder if available, otherwise build from page numbers
-          const pageOrder = serverPageOrder.length > 0 ? serverPageOrder : [];
+          // Use serverPageOrder if available, otherwise build from pagesMetaData
+          const pageOrder = serverPageOrder.length > 0 ? serverPageOrder : buildPageOrderFromMeta();
           
           // For each page, create a thumbnail placeholder
           for (let i = 0; i < totalPages; i++) {
@@ -6851,12 +6980,23 @@
               thumb.draggable = true;
               thumb.dataset.index = i;
               
+              // Store the page UUID on the element
+              const pageUuid = i < pageOrder.length ? pageOrder[i] : null;
+              if (pageUuid) {
+                  thumb.dataset.pageUuid = pageUuid;
+              }
+              
               const canvas = document.createElement('canvas');
               canvas.width = 200;
               canvas.height = 150;
               canvas.style.width = '100%';
               canvas.style.height = 'auto';
               thumb.appendChild(canvas);
+              
+              // Add spinner overlay
+              const spinner = document.createElement('div');
+              spinner.className = 'overview-thumb-spinner';
+              thumb.appendChild(spinner);
               
               const label = document.createElement('div');
               label.className = 'overview-thumb-label';
@@ -6972,13 +7112,23 @@
           thumbs.forEach((thumb, idx) => {
               const canvas = thumb.querySelector('canvas');
               const ctx = canvas.getContext('2d');
+              const spinner = thumb.querySelector('.overview-thumb-spinner');
               
-              // Try to get page data from cache
-              const pageUuid = serverPageOrder[idx];
-              if (!pageUuid) return;
+              // Read pageUuid from the thumb's dataset
+              const pageUuid = thumb.dataset.pageUuid;
+              if (!pageUuid) {
+                  spinner.classList.add('active');
+                  return;
+              }
               
               const pageData = loadPageFromCache(pageUuid);
-              if (!pageData || !pageData.history || pageData.history.length === 0) return;
+              if (!pageData || !pageData.history || pageData.history.length === 0) {
+                  spinner.classList.add('active');
+                  return;
+              }
+              
+              // Data is available — hide spinner and render
+              spinner.classList.remove('active');
               
               // Render to offscreen canvas
               const visualState = shared.createEmptyVisualState();
@@ -6995,14 +7145,14 @@
               });
           });
       }
-      
+       
       function requestThumbnailData() {
           // For pages not in cache, request data
           const grid = document.getElementById('overview-grid');
           const thumbs = grid.querySelectorAll('.overview-thumb');
           
           thumbs.forEach((thumb, idx) => {
-              const pageUuid = serverPageOrder[idx];
+              const pageUuid = thumb.dataset.pageUuid;
               if (!pageUuid) return;
               
               const pageData = loadPageFromCache(pageUuid);
