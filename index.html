@@ -4162,11 +4162,13 @@
                   }
                   
                   updateFormatButton();
-                  // Auto zoom to fit width when a format is selected
-                  zoomLevel = container.clientWidth / canvasFormat.w;
-                  zoomLevel = Math.max(0.5, Math.min(3, zoomLevel));
-                  zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
-                  applyZoom();
+                  if (canvasFormat) {
+                      // Auto zoom to fit width when a format is selected
+                      zoomLevel = container.clientWidth / canvasFormat.w;
+                      zoomLevel = Math.max(0.5, Math.min(3, zoomLevel));
+                      zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+                      applyZoom();
+                  }
                   backgroundValid = false;
                   requestRedraw();
                   saveSettings();
