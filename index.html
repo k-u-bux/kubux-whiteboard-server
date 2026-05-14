@@ -7161,20 +7161,22 @@
                   shared.commitEdit(vs, action);
               }
               
-              ctx.fillStyle = 'white';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              // Render at full resolution on an offscreen canvas, then scale down
+              const offscreen = document.createElement('canvas');
+              offscreen.width = Math.ceil(srcW);
+              offscreen.height = Math.ceil(srcH);
+              const offCtx = offscreen.getContext('2d');
               
-              // Compute uniform scale to fit source rectangle into thumbnail canvas
-              const scale = Math.min(canvas.width / srcW, canvas.height / srcH);
-              
-              ctx.save();
-              ctx.setTransform(scale, 0, 0, scale, -srcX * scale, -srcY * scale);
+              offCtx.fillStyle = 'white';
+              offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
               
               shared.render_all_visible_elements(vs, (element) => {
-                  renderElement(ctx, element);
+                  renderElement(offCtx, element);
               });
               
-              ctx.restore();
+              ctx.imageSmoothingEnabled = true;
+              ctx.drawImage(offscreen, 0, 0, offscreen.width, offscreen.height,
+                            0, 0, canvas.width, canvas.height);
           });
       }
        
