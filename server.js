@@ -185,6 +185,7 @@ const {
     hashAny, 
     hashNext, 
     isUuid,
+    isEqual,
     serialize, 
     deserialize,
     createEmptyVisualState, 
@@ -202,7 +203,9 @@ const {
     is_invalid_CREATE_BOARD_message,
     is_invalid_FULL_PAGE_REQUEST_message,
     is_invalid_REPLAY_REQUEST_message,
-    is_invalid_MOD_ACTION_PROPOSALS_message
+    is_invalid_MOD_ACTION_PROPOSALS_message,
+    is_invalid_BOARD_INFO_REQUEST_message,
+    is_invalid_SHUFFLE_PROPOSAL_message
 } = require('./shared');
 
 
@@ -989,6 +992,140 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
     } else {
         debug.error( `Client ${clientId} wants to register invalid board ${boardId}` );
     }
+};
+
+// Handler for board info request
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_BOARD_INFO_REQUEST_message( data ) ) {
+        debug.log(`[SERVER] dropped board info request from `, ws.clientId);
+        return;
+    }
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.BOARD];
+    ws.boardId = boardId;
+    const do_register = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REGISTER];
+
+    const board = useBoard( boardId, false );
+    if ( board ) {
+        if ( do_register ) {
+            ws.boardId = boardId;
+            ws.pageId = board.pageOrder[0];
+            debug.log(`[SERVER] Client ${ws.clientId} registered with board via board-info-request: ${boardId}`);
+        }
+
+        const message = {
+            type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(message));
+        logSentMessage(message.type, message, requestId, ws.clientId);
+    }
+    releaseBoard(boardId);
+};
+
+// Handler for shuffle proposal
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_SHUFFLE_PROPOSAL_message( data ) ) {
+        debug.log(`[SERVER] dropped shuffle proposal from `, ws.clientId);
+        return;
+    }
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.BOARD];
+    if ( ws.boardId !== boardId ) {
+        debug.log(`[SERVER] Client ${ws.clientId} not registered for board ${boardId}, dropping shuffle proposal`);
+        return;
+    }
+    const password = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.PASSWORD];
+    const before = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.BEFORE];
+    const after = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.AFTER];
+
+    const board = useBoard( boardId, false );
+    if ( !board ) {
+        debug.log(`[SERVER] Cannot find board ${boardId}`);
+        releaseBoard(boardId);
+        return;
+    }
+
+    // Password check
+    if ( !password || password != board.passwd ) {
+        debug.log(`[SERVER] Shuffle proposal declined: unauthorized`);
+        // decline: send BOARD_INFO with current state
+        const declineMessage = {
+            type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(declineMessage));
+        logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
+        releaseBoard(boardId);
+        return;
+    }
+
+    // Sync check: client's BEFORE must match current state
+    if ( !isEqual( before, board.pageOrder ) ) {
+        debug.log(`[SERVER] Shuffle proposal declined: out of sync`);
+        // decline: send BOARD_INFO with current state
+        const declineMessage = {
+            type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(declineMessage));
+        logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
+        releaseBoard(boardId);
+        return;
+    }
+
+    // Permutation check: AFTER must contain the same UUIDs
+    if ( before.length !== after.length ) {
+        debug.log(`[SERVER] Shuffle proposal declined: length mismatch`);
+        const declineMessage = {
+            type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(declineMessage));
+        logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
+        releaseBoard(boardId);
+        return;
+    }
+
+    const beforeSet = new Set( before );
+    const afterSet = new Set( after );
+    if ( beforeSet.size !== afterSet.size || ![...beforeSet].every( id => afterSet.has( id ) ) ) {
+        debug.log(`[SERVER] Shuffle proposal declined: not a valid permutation`);
+        const declineMessage = {
+            type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
+        };
+        ws.send(serialize(declineMessage));
+        logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
+        releaseBoard(boardId);
+        return;
+    }
+
+    // Accept: apply the permutation and persist
+    debug.log(`[SERVER] Shuffle proposal accepted: reordering pages`);
+    board.pageOrder = after;
+    persistBoard( boardId );
+
+    const acceptMessage = {
+        type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
+        [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
+        [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+        [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
+    };
+
+    releaseBoard(boardId);
+
+    // Broadcast to all subscribers on this board (including proposer)
+    broadcastMessageToBoard(acceptMessage, boardId);
+    logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
 };
 
 // Handler for page registration

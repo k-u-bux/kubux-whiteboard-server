@@ -238,6 +238,14 @@ const MESSAGES = {
             REGISTER: 'register',
             REQUEST_ID: 'requestId'
         },
+        SHUFFLE_PROPOSAL: {
+            TYPE: 'shuffle-proposal',
+            BOARD: 'board-uuid',
+            PASSWORD: 'passwd',
+            BEFORE: 'before',
+            AFTER: 'after',
+            REQUEST_ID: 'requestId'
+        },
         MOD_ACTION_PROPOSALS: {
             TYPE: 'mod-action-proposals',
             PASSWORD: 'passwd',
@@ -586,6 +594,44 @@ function is_invalid_REPLAY_REQUEST_message(data) {
     const register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
     if (register === undefined || typeof register !== 'boolean') return true;
     
+    return false;
+}
+
+function is_invalid_BOARD_INFO_REQUEST_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.BOARD];
+    if (!boardId || !isUuid(boardId)) return true;
+
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+
+    const register = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REGISTER];
+    if (register !== undefined && typeof register !== 'boolean') return true;
+
+    return false;
+}
+
+function is_invalid_SHUFFLE_PROPOSAL_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    const password = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.PASSWORD];
+    if (!password || typeof password !== 'string') return true;
+
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.BOARD];
+    if (!boardId || !isUuid(boardId)) return true;
+
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+
+    const before = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.BEFORE];
+    if (!Array.isArray(before) || before.length < 1) return true;
+    if (!before.every(id => isUuid(id))) return true;
+
+    const after = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.AFTER];
+    if (!Array.isArray(after) || after.length < 1) return true;
+    if (!after.every(id => isUuid(id))) return true;
+
     return false;
 }
 
@@ -1489,6 +1535,8 @@ if (typeof module !== 'undefined' && module.exports) {
         is_invalid_FULL_PAGE_REQUEST_message,
         is_invalid_REPLAY_REQUEST_message,
         is_invalid_MOD_ACTION_PROPOSALS_message,
+        is_invalid_BOARD_INFO_REQUEST_message,
+        is_invalid_SHUFFLE_PROPOSAL_message,
         // transforms
         createIdentityTransform,
         applyTransform,
