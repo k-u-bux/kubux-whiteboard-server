@@ -752,6 +752,40 @@
           background-color: #ccc;
           margin: 2px 4px;
       }
+      
+      /* Format popup menu */
+      #format-popup-menu {
+          position: fixed;
+          background-color: #f0f0f0;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          padding: 4px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          z-index: 1000;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
+      
+      #format-popup-menu .popup-option {
+          width: 100px;
+          height: 28px;
+          margin: 0;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 8px;
+          border: none;
+          background-color: transparent;
+          border-radius: 3px;
+          font-size: 13px;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      
+      #format-popup-menu .popup-option:hover {
+          background-color: #e0e0e0;
+      }
     </style>
   </head>
   <body>
@@ -796,21 +830,21 @@
         </div>
       </div>
       
-      <div class="tool-section">
-        <label for="format-select" style="font-size:12px;margin-right:4px;">Format:</label>
-        <select id="format-select" style="padding:2px 4px;font-size:12px;">
-          <option value="none">None</option>
-          <option value="A4-portrait">A4 Portrait</option>
-          <option value="A4-landscape">A4 Landscape</option>
-          <option value="letter-portrait">Letter Portrait</option>
-          <option value="letter-landscape">Letter Landscape</option>
-          <option value="legal-portrait">Legal Portrait</option>
-          <option value="legal-landscape">Legal Landscape</option>
-          <option value="16:9">16:9</option>
-          <option value="4:3">4:3</option>
-          <option value="2:1">2:1</option>
-          <option value="custom">Custom…</option>
-        </select>
+      <div class="tool-section" id="format-section">
+        <button class="tool-btn" id="format-menu-btn" style="width:auto;padding:0 8px;">∞:∞</button>
+        <div id="format-popup-menu" style="display:none;">
+          <button class="popup-option" data-format="none">∞:∞</button>
+          <button class="popup-option" data-format="A4-portrait">A4</button>
+          <button class="popup-option" data-format="A4-landscape">A4 wide</button>
+          <button class="popup-option" data-format="letter-portrait">Letter</button>
+          <button class="popup-option" data-format="letter-landscape">Letter wide</button>
+          <button class="popup-option" data-format="legal-portrait">Legal</button>
+          <button class="popup-option" data-format="legal-landscape">Legal wide</button>
+          <button class="popup-option" data-format="16:9">16:9</button>
+          <button class="popup-option" data-format="4:3">4:3</button>
+          <button class="popup-option" data-format="2:1">2:1</button>
+          <button class="popup-option" data-format="custom">Custom…</button>
+        </div>
       </div>
       
       <div class="tool-section">
@@ -1429,24 +1463,7 @@
               // Restore canvas format
               if (settings.canvasFormat !== undefined) {
                   canvasFormat = settings.canvasFormat;
-                  // Update the select element to match
-                  const formatSelect = document.getElementById('format-select');
-                  if ( canvasFormat ) {
-                      // Find matching preset
-                      let found = false;
-                      for ( const [key, fmt] of Object.entries(CANVAS_FORMATS) ) {
-                          if ( fmt.w === canvasFormat.w && fmt.h === canvasFormat.h ) {
-                              formatSelect.value = key;
-                              found = true;
-                              break;
-                          }
-                      }
-                      if ( !found ) {
-                          formatSelect.value = 'custom';
-                      }
-                  } else {
-                      formatSelect.value = 'none';
-                  }
+                  updateFormatButton();
               }
               
               // Restore zoom level
@@ -3825,6 +3842,99 @@
           document.updateZoomMenuDisabled = updateZoomMenuDisabled;
       }
 
+      // Setup format menu popup
+      function setupFormatMenu() {
+          const menuBtn = document.getElementById('format-menu-btn');
+          const popup = document.getElementById('format-popup-menu');
+          const options = document.querySelectorAll('#format-popup-menu .popup-option');
+          
+          // Toggle popup on button click
+          menuBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const isVisible = popup.style.display === 'flex';
+              
+              if (isVisible) {
+                  popup.style.display = 'none';
+              } else {
+                  const rect = menuBtn.getBoundingClientRect();
+                  popup.style.left = rect.left + 'px';
+                  popup.style.top = (rect.bottom + 2) + 'px';
+                  popup.style.display = 'flex';
+              }
+          });
+          
+          // Handle option clicks
+          options.forEach(option => {
+              option.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                  const val = this.getAttribute('data-format');
+                  
+                  if (val === 'none') {
+                      canvasFormat = null;
+                  } else if (val === 'custom') {
+                      const w = parseInt(prompt('Width (px):', '800'));
+                      const h = parseInt(prompt('Height (px):', '600'));
+                      if (w > 0 && h > 0) {
+                          canvasFormat = { w, h };
+                      } else {
+                          popup.style.display = 'none';
+                          return;
+                      }
+                  } else {
+                      canvasFormat = CANVAS_FORMATS[val];
+                  }
+                  
+                  updateFormatButton();
+                  backgroundValid = false;
+                  requestRedraw();
+                  saveSettings();
+                  if (document.updateZoomMenuDisabled) document.updateZoomMenuDisabled();
+                  
+                  popup.style.display = 'none';
+              });
+          });
+          
+          // Close popup when clicking outside
+          document.addEventListener('click', function(e) {
+              if (popup.style.display === 'flex' && 
+                  !popup.contains(e.target) && 
+                  e.target !== menuBtn) {
+                  popup.style.display = 'none';
+              }
+          });
+      }
+      
+      // Update format button text based on current canvasFormat
+      function updateFormatButton() {
+          const btn = document.getElementById('format-menu-btn');
+          if (!btn) return;
+          
+          if (!canvasFormat) {
+              btn.textContent = '∞:∞';
+              return;
+          }
+          
+          // Check if it matches a named preset
+          for (const [key, fmt] of Object.entries(CANVAS_FORMATS)) {
+              if (fmt.w === canvasFormat.w && fmt.h === canvasFormat.h) {
+                  switch (key) {
+                      case 'A4-portrait': btn.textContent = 'A4'; return;
+                      case 'A4-landscape': btn.textContent = 'A4 wide'; return;
+                      case 'letter-portrait': btn.textContent = 'Letter'; return;
+                      case 'letter-landscape': btn.textContent = 'Letter wide'; return;
+                      case 'legal-portrait': btn.textContent = 'Legal'; return;
+                      case 'legal-landscape': btn.textContent = 'Legal wide'; return;
+                      case '16:9': btn.textContent = '16:9'; return;
+                      case '4:3': btn.textContent = '4:3'; return;
+                      case '2:1': btn.textContent = '2:1'; return;
+                  }
+              }
+          }
+          
+          // Custom format: show dimensions
+          btn.textContent = `${canvasFormat.w}×${canvasFormat.h}`;
+      }
+
       // Setup shape selector popup
       function setupShapeSelector() {
           const mainBtn = document.getElementById('shape-main-btn');
@@ -4535,6 +4645,9 @@
           // Zoom menu popup
           setupZoomMenu();
           
+          // Format menu popup
+          setupFormatMenu();
+          
           // Page navigation
           document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
@@ -4575,29 +4688,6 @@
               if (e.target === this) {
                   closeBoardNavigation();
               }
-          });
-          
-          // Format select
-          document.getElementById('format-select').addEventListener('change', function() {
-              const val = this.value;
-              if (val === 'none') {
-                  canvasFormat = null;
-              } else if (val === 'custom') {
-                  const w = parseInt(prompt('Width (px):', '800'));
-                  const h = parseInt(prompt('Height (px):', '600'));
-                  if (w > 0 && h > 0) {
-                      canvasFormat = { w, h };
-                  } else {
-                      this.value = 'none';
-                      canvasFormat = null;
-                  }
-              } else {
-                  canvasFormat = CANVAS_FORMATS[val];
-              }
-              backgroundValid = false;
-              requestRedraw();
-              saveSettings();
-              if (document.updateZoomMenuDisabled) document.updateZoomMenuDisabled();
           });
           
           // Export PDF buttons
