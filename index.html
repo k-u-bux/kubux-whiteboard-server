@@ -869,7 +869,7 @@
       }
       
       .overview-thumb {
-          width: 18em;
+          width: calc((100% - 4 * 1em) / 5);
           background-color: #fff;
           border-radius: 4px;
           padding: 0.5em;
@@ -6968,6 +6968,15 @@
           document.body.classList.add('overview-active');
           overview.classList.add('visible');
           
+          // Determine thumbnail aspect ratio
+          let thumbW = 200, thumbH;
+          if (canvasFormat) {
+              thumbH = Math.round(200 * canvasFormat.h / canvasFormat.w);
+          } else {
+              thumbH = Math.round(200 * container.clientHeight / container.clientWidth);
+          }
+          if (thumbH < 1) thumbH = 150; // fallback
+          
           // Build thumbnails
           grid.innerHTML = '';
           
@@ -6988,8 +6997,8 @@
               }
               
               const canvas = document.createElement('canvas');
-              canvas.width = 200;
-              canvas.height = 150;
+              canvas.width = thumbW;
+              canvas.height = thumbH;
               canvas.style.width = '100%';
               canvas.style.height = 'auto';
               thumb.appendChild(canvas);
@@ -7110,6 +7119,20 @@
           const grid = document.getElementById('overview-grid');
           const thumbs = grid.querySelectorAll('.overview-thumb');
           
+          // Determine source rectangle (page coordinates) that each thumbnail shows
+          let srcX, srcY, srcW, srcH;
+          if (canvasFormat) {
+              srcX = 0;
+              srcY = 0;
+              srcW = canvasFormat.w;
+              srcH = canvasFormat.h;
+          } else {
+              srcX = -panX / zoomLevel;
+              srcY = -panY / zoomLevel;
+              srcW = container.clientWidth / zoomLevel;
+              srcH = container.clientHeight / zoomLevel;
+          }
+          
           thumbs.forEach((thumb, idx) => {
               const canvas = thumb.querySelector('canvas');
               const ctx = canvas.getContext('2d');
@@ -7141,9 +7164,20 @@
               ctx.fillStyle = 'white';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
               
+              // Compute scale to fit source rectangle into thumbnail canvas
+              const scaleX = canvas.width / srcW;
+              const scaleY = canvas.height / srcH;
+              const scale = Math.min(scaleX, scaleY);
+              
+              // Apply translate * scale: map (srcX, srcY) -> (0, 0) and scale down
+              ctx.save();
+              ctx.setTransform(scale, 0, 0, scale, -srcX * scale, -srcY * scale);
+              
               shared.render_all_visible_elements(visualState, (element) => {
                   renderElement(ctx, element);
               });
+              
+              ctx.restore();
           });
       }
        
