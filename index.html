@@ -7086,18 +7086,16 @@
           // Use serverPageOrder if available, otherwise build from pagesMetaData
           const pageOrder = serverPageOrder.length > 0 ? serverPageOrder : buildPageOrderFromMeta();
           
-          // For each page, create a thumbnail placeholder
-          for (let i = 0; i < totalPages; i++) {
+           // For each page, create a thumbnail placeholder
+           for (let i = 0; i < pageOrder.length; i++) {
               const thumb = document.createElement('div');
               thumb.className = 'overview-thumb';
               thumb.draggable = true;
               thumb.dataset.index = i;
               
               // Store the page UUID on the element
-              const pageUuid = i < pageOrder.length ? pageOrder[i] : null;
-              if (pageUuid) {
-                  thumb.dataset.pageUuid = pageUuid;
-              }
+              const pageUuid = pageOrder[i];
+              thumb.dataset.pageUuid = pageUuid;
               
               const canvas = document.createElement('canvas');
               canvas.width = thumbW;
