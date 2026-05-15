@@ -2516,75 +2516,10 @@
           if ( menuOverlay.style.display === 'block' ) {
               rebuildPageMenu();
           }
-          // If overview is active, add any new pages and re-render thumbnails
+          // If overview is active, refresh the grid
           const overviewEl = document.getElementById('page-overview');
           if ( overviewEl.classList.contains('visible') ) {
-              const grid = document.getElementById('overview-grid');
-              const existing = grid.querySelectorAll('.overview-thumb');
-              const existingUuids = new Set();
-              existing.forEach(t => { if (t.dataset.pageUuid) existingUuids.add(t.dataset.pageUuid); });
-              
-              // Append thumbnails for pages not yet in the grid
-              if ( pages ) {
-                  pages.forEach((uuid, idx) => {
-                      if (!existingUuids.has(uuid)) {
-                          const thumb = document.createElement('div');
-                          thumb.className = 'overview-thumb';
-                          thumb.draggable = true;
-                          thumb.dataset.index = existing.length;
-                          thumb.dataset.pageUuid = uuid;
-                          
-                          const canvas = document.createElement('canvas');
-                          canvas.width = 200; canvas.height = 150;
-                          canvas.style.width = '100%'; canvas.style.height = 'auto';
-                          thumb.appendChild(canvas);
-                          
-                          const spinner = document.createElement('div');
-                          spinner.className = 'overview-thumb-spinner';
-                          thumb.appendChild(spinner);
-                          
-                          const label = document.createElement('div');
-                          label.className = 'overview-thumb-label';
-                          const checkbox = document.createElement('input');
-                          checkbox.type = 'checkbox';
-                          checkbox.addEventListener('change', function(e) {
-                              e.stopPropagation();
-                              thumb.classList.toggle('selected', this.checked);
-                          });
-                          label.appendChild(checkbox);
-                          label.appendChild(document.createTextNode(` Page ${existing.length + 1}`));
-                          thumb.appendChild(label);
-                          
-                          // Click on canvas → navigate to page
-                          canvas.addEventListener('click', function(e) {
-                              e.stopPropagation();
-                              const uuid = thumb.dataset.pageUuid;
-                              if (uuid) {
-                                  navigatePageUuid(uuid);
-                                  exitOverviewMode(false);
-                              }
-                          });
-                          // Drag/drop listeners
-                          thumb.addEventListener('dragstart', function(e) { 
-                              e.dataTransfer.setData('text/plain', this.dataset.index);
-                              this.classList.add('drag-over');
-                          });
-                          thumb.addEventListener('dragend', function(e) { this.classList.remove('drag-over'); });
-                          thumb.addEventListener('dragover', function(e) {
-                              e.preventDefault();
-                              grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
-                              this.classList.add('drag-over');
-                          });
-                          thumb.addEventListener('dragleave', function(e) { this.classList.remove('drag-over'); });
-                          thumb.addEventListener('drop', handleThumbDrop);
-                          
-                          grid.appendChild(thumb);
-                      }
-                  });
-              }
-              
-              // Re-render all thumbnails (data may have arrived from page_info responses)
-              renderThumbnails();
+              refreshOverviewGrid();
           }
       }
       
@@ -2917,6 +2852,13 @@
               pageNr,
               totalPages
           });
+
+          // If overview is active, update the grid and skip joinPage
+          const overviewEl = document.getElementById('page-overview');
+          if (overviewEl && overviewEl.classList.contains('visible')) {
+              refreshOverviewGrid();
+              return;
+          }
 
           joinPage( currentPageUuid, pageNr, totalPages );
       }
@@ -7009,6 +6951,117 @@
               .map(([uuid]) => uuid);
       }
 
+      // Sync overview grid with serverPageOrder and totalPages
+      function refreshOverviewGrid() {
+          const overviewEl = document.getElementById('page-overview');
+          if (!overviewEl || !overviewEl.classList.contains('visible')) return;
+          
+          const grid = document.getElementById('overview-grid');
+          const pageOrder = serverPageOrder.length > 0 ? serverPageOrder : buildPageOrderFromMeta();
+          
+          // Build a set of UUIDs that should be in the grid
+          const neededUuids = new Set(pageOrder);
+          
+          // Remove thumbnails for pages no longer in the order
+          const existing = grid.querySelectorAll('.overview-thumb');
+          existing.forEach(t => {
+              const uuid = t.dataset.pageUuid;
+              if (uuid && !neededUuids.has(uuid)) {
+                  t.parentNode.removeChild(t);
+              }
+          });
+          
+          // Add thumbnails for new pages
+          const existingUuids = new Set();
+          grid.querySelectorAll('.overview-thumb').forEach(t => {
+              if (t.dataset.pageUuid) existingUuids.add(t.dataset.pageUuid);
+          });
+          
+          pageOrder.forEach((uuid, idx) => {
+              if (!existingUuids.has(uuid)) {
+                  const thumb = document.createElement('div');
+                  thumb.className = 'overview-thumb';
+                  thumb.draggable = true;
+                  thumb.dataset.index = idx;
+                  thumb.dataset.pageUuid = uuid;
+                  
+                  const canvas = document.createElement('canvas');
+                  canvas.width = 200; canvas.height = 150;
+                  canvas.style.width = '100%'; canvas.style.height = 'auto';
+                  thumb.appendChild(canvas);
+                  
+                  const spinner = document.createElement('div');
+                  spinner.className = 'overview-thumb-spinner';
+                  thumb.appendChild(spinner);
+                  
+                  const label = document.createElement('div');
+                  label.className = 'overview-thumb-label';
+                  const checkbox = document.createElement('input');
+                  checkbox.type = 'checkbox';
+                  checkbox.addEventListener('change', function(e) {
+                      e.stopPropagation();
+                      thumb.classList.toggle('selected', this.checked);
+                  });
+                  label.appendChild(checkbox);
+                  label.appendChild(document.createTextNode(` Page ${idx + 1}`));
+                  thumb.appendChild(label);
+                  
+                  canvas.addEventListener('click', function(e) {
+                      e.stopPropagation();
+                      const uuid = thumb.dataset.pageUuid;
+                      if (uuid) {
+                          navigatePageUuid(uuid);
+                          exitOverviewMode(false);
+                      }
+                  });
+                  
+                  thumb.addEventListener('dragstart', function(e) {
+                      e.dataTransfer.setData('text/plain', this.dataset.index);
+                      this.classList.add('drag-over');
+                  });
+                  thumb.addEventListener('dragend', function(e) { this.classList.remove('drag-over'); });
+                  thumb.addEventListener('dragover', function(e) {
+                      e.preventDefault();
+                      grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
+                      this.classList.add('drag-over');
+                  });
+                  thumb.addEventListener('dragleave', function(e) { this.classList.remove('drag-over'); });
+                  thumb.addEventListener('drop', handleThumbDrop);
+                  
+                  grid.appendChild(thumb);
+              }
+          });
+          
+          // Re-order thumbnails to match serverPageOrder
+          const currentThumbs = grid.querySelectorAll('.overview-thumb');
+          const thumbMap = new Map();
+          currentThumbs.forEach(t => {
+              if (t.dataset.pageUuid) thumbMap.set(t.dataset.pageUuid, t);
+          });
+          
+          // Re-append in correct order
+          pageOrder.forEach((uuid, idx) => {
+              const t = thumbMap.get(uuid);
+              if (t) {
+                  grid.appendChild(t); // no-op if already last, moves if not
+              }
+          });
+          
+          // Re-index labels
+          grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
+              t.dataset.index = idx;
+              const label = t.querySelector('.overview-thumb-label');
+              if (label.childNodes.length >= 2) {
+                  label.childNodes[1].textContent = ` Page ${idx + 1}`;
+              } else {
+                  label.textContent = `Page ${idx + 1}`;
+              }
+          });
+          
+          // Re-render thumbnails from cache
+          renderThumbnails();
+      }
+      
       // Page Overview Mode
       function enterOverviewMode() {
           console.log('enterOverviewMode called');
@@ -7271,7 +7324,6 @@
           });
           
           // Send one DELETE_PAGE proposal per UUID
-          let sent = 0;
           uuids.forEach(uuid => {
               const actionUuid = shared.generateUuid();
               const deleteAction = {
@@ -7288,16 +7340,7 @@
               };
               pending_register_action(actionUuid);
               sendMessage(proposal);
-              sent++;
           });
-          
-          if (sent > 0) {
-              // Refresh overview after a short delay for server responses
-              setTimeout(() => {
-                  requestBoardInfo();
-                  enterOverviewMode();
-              }, 500);
-          }
       }
       
       // Overview: move selected pages to front (start of list)
