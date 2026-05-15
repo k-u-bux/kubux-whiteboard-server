@@ -2533,23 +2533,23 @@
                           
                           const label = document.createElement('div');
                           label.className = 'overview-thumb-label';
-                          label.textContent = `Page ${existing.length + 1}`;
+                          const checkbox = document.createElement('input');
+                          checkbox.type = 'checkbox';
+                          checkbox.addEventListener('change', function(e) {
+                              e.stopPropagation();
+                              thumb.classList.toggle('selected', this.checked);
+                          });
+                          label.appendChild(checkbox);
+                          label.appendChild(document.createTextNode(` Page ${existing.length + 1}`));
                           thumb.appendChild(label);
                           
-                          // Clone event listeners from existing thumbs by re-adding them inline
-                          thumb.addEventListener('click', function(e) {
-                              if (e.ctrlKey || e.metaKey) { this.classList.toggle('selected'); }
-                              else if (e.shiftKey) {
-                                  const all = grid.querySelectorAll('.overview-thumb');
-                                  let started = false;
-                                  all.forEach(t => {
-                                      if (t === this || t.classList.contains('selected')) started = !started;
-                                      if (started) t.classList.add('selected');
-                                  });
-                                  this.classList.add('selected');
-                              } else {
-                                  grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('selected'));
-                                  this.classList.add('selected');
+                          // Click on canvas → navigate to page
+                          canvas.addEventListener('click', function(e) {
+                              e.stopPropagation();
+                              const uuid = thumb.dataset.pageUuid;
+                              if (uuid) {
+                                  navigatePageUuid(uuid);
+                                  exitOverviewMode(false);
                               }
                           });
                           // Drag/drop listeners
@@ -6098,6 +6098,15 @@
           registerPage( currentPageUuid, delta) ;
       }
       
+      function navigatePageUuid(pageId) {
+          savePageToCache(currentPageUuid, {
+              history: history,
+              present: present,
+              hash: hashes[present]
+          });
+          registerPage(pageId, 0);
+      }
+      
 
       // drawing / rendering
       // ===================
@@ -7037,32 +7046,27 @@
               spinner.className = 'overview-thumb-spinner';
               thumb.appendChild(spinner);
               
-              const label = document.createElement('div');
-              label.className = 'overview-thumb-label';
-              label.textContent = `Page ${i + 1}`;
-              thumb.appendChild(label);
-              
-              // Click to select
-              thumb.addEventListener('click', function(e) {
-                  if (e.ctrlKey || e.metaKey) {
-                      this.classList.toggle('selected');
-                  } else if (e.shiftKey) {
-                      // Range select
-                      const all = grid.querySelectorAll('.overview-thumb');
-                      let started = false;
-                      all.forEach(t => {
-                          if (t === this || t.classList.contains('selected')) {
-                              started = !started;
-                          }
-                          if (started) t.classList.add('selected');
-                      });
-                      this.classList.add('selected');
-                  } else {
-                      // Single select
-                      grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('selected'));
-                      this.classList.add('selected');
-                  }
-              });
+               const label = document.createElement('div');
+               label.className = 'overview-thumb-label';
+               const checkbox = document.createElement('input');
+               checkbox.type = 'checkbox';
+               checkbox.addEventListener('change', function(e) {
+                   e.stopPropagation();
+                   thumb.classList.toggle('selected', this.checked);
+               });
+               label.appendChild(checkbox);
+               label.appendChild(document.createTextNode(` Page ${i + 1}`));
+               thumb.appendChild(label);
+               
+               // Click on canvas → navigate to page
+               canvas.addEventListener('click', function(e) {
+                   e.stopPropagation();
+                   const uuid = thumb.dataset.pageUuid;
+                   if (uuid) {
+                       navigatePageUuid(uuid);
+                       exitOverviewMode(false);
+                   }
+               });
               
               // Drag and drop
               thumb.addEventListener('dragstart', function(e) {
