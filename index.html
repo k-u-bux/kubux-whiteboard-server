@@ -4901,7 +4901,7 @@
           // Page navigation
           document.getElementById('first-page').addEventListener('click', () => navigatePage(1-pageNr));
           document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
-          document.getElementById('page-info').addEventListener('click', openPageMenu);
+          document.getElementById('page-info').addEventListener('click', enterOverviewMode);
           document.getElementById('next-page').addEventListener('click', () => navigatePage(1));
           document.getElementById('last-page').addEventListener('click', () => navigatePage(totalPages-pageNr));
           document.getElementById('add-page').addEventListener('click', addNewPage);
