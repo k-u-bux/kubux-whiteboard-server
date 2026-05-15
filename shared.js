@@ -723,7 +723,7 @@ const STROKE_STYLES = {
         "#000000",            // color
         24,                   // width
         createIdentityTransform(), // transform
-        0.0,                  // opacity
+        0.3,                  // opacity
         CAP_STYLES.SQUARE,    // capStyle
         JOIN_STYLES.ROUND,    // joinStyle
         [],                   // dashPattern
