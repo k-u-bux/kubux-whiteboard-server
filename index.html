@@ -2510,7 +2510,14 @@
       function handleBoardInfo(data) {
           const pages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES];
           if ( pages ) {
+              const newPageNr = pages.index( currentPageUuid );
+              if ( newPageNr < 0 ) {
+                  requestPageInfo( currentPageUuid );
+                  return;
+              }
               serverPageOrder = pages;
+              totalPages = pages.length;
+              pageNr = newPageNr;
           }
           // Refresh the page menu if open
           const menuOverlay = document.getElementById('page-menu-overlay');
