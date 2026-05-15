@@ -6946,6 +6946,62 @@
       }
 
       // Sync overview grid with serverPageOrder and totalPages
+      function createThumbnailElement(uuid, index, thumbW, thumbH) {
+          const thumb = document.createElement('div');
+          thumb.className = 'overview-thumb';
+          thumb.draggable = true;
+          thumb.dataset.index = index;
+          thumb.dataset.pageUuid = uuid;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = thumbW;
+          canvas.height = thumbH;
+          canvas.style.cssText = 'width:100%;height:auto';
+          thumb.appendChild(canvas);
+
+          const spinner = document.createElement('div');
+          spinner.className = 'overview-thumb-spinner';
+          thumb.appendChild(spinner);
+
+          const label = document.createElement('div');
+          label.className = 'overview-thumb-label';
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.addEventListener('change', function(e) {
+              e.stopPropagation();
+              thumb.classList.toggle('selected', this.checked);
+          });
+          label.appendChild(checkbox);
+          label.appendChild(document.createTextNode(` Page ${index + 1}`));
+          thumb.appendChild(label);
+
+          // Click on canvas → navigate to page
+          canvas.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const uuid = thumb.dataset.pageUuid;
+              if (uuid) {
+                  navigatePageUuid(uuid);
+                  exitOverviewMode(false);
+              }
+          });
+
+          // Drag and drop
+          thumb.addEventListener('dragstart', function(e) {
+              e.dataTransfer.setData('text/plain', this.dataset.index);
+              this.classList.add('drag-over');
+          });
+          thumb.addEventListener('dragend', function() { this.classList.remove('drag-over'); });
+          thumb.addEventListener('dragover', function(e) {
+              e.preventDefault();
+              document.querySelectorAll('#overview-grid .overview-thumb').forEach(t => t.classList.remove('drag-over'));
+              this.classList.add('drag-over');
+          });
+          thumb.addEventListener('dragleave', function() { this.classList.remove('drag-over'); });
+          thumb.addEventListener('drop', handleThumbDrop);
+
+          return thumb;
+      }
+
       function refreshOverviewGrid() {
           const overviewEl = document.getElementById('page-overview');
           if (!overviewEl || !overviewEl.classList.contains('visible')) return;
@@ -6971,58 +7027,12 @@
               if (t.dataset.pageUuid) existingUuids.add(t.dataset.pageUuid);
           });
           
+          const tw = window._overviewThumbW || 200;
+          const th = window._overviewThumbH || 150;
+          
           pageOrder.forEach((uuid, idx) => {
               if (!existingUuids.has(uuid)) {
-                  const thumb = document.createElement('div');
-                  thumb.className = 'overview-thumb';
-                  thumb.draggable = true;
-                  thumb.dataset.index = idx;
-                  thumb.dataset.pageUuid = uuid;
-                  
-                  const canvas = document.createElement('canvas');
-                  canvas.width = 200; canvas.height = 150;
-                  canvas.style.width = '100%'; canvas.style.height = 'auto';
-                  thumb.appendChild(canvas);
-                  
-                  const spinner = document.createElement('div');
-                  spinner.className = 'overview-thumb-spinner';
-                  thumb.appendChild(spinner);
-                  
-                  const label = document.createElement('div');
-                  label.className = 'overview-thumb-label';
-                  const checkbox = document.createElement('input');
-                  checkbox.type = 'checkbox';
-                  checkbox.addEventListener('change', function(e) {
-                      e.stopPropagation();
-                      thumb.classList.toggle('selected', this.checked);
-                  });
-                  label.appendChild(checkbox);
-                  label.appendChild(document.createTextNode(` Page ${idx + 1}`));
-                  thumb.appendChild(label);
-                  
-                  canvas.addEventListener('click', function(e) {
-                      e.stopPropagation();
-                      const uuid = thumb.dataset.pageUuid;
-                      if (uuid) {
-                          navigatePageUuid(uuid);
-                          exitOverviewMode(false);
-                      }
-                  });
-                  
-                  thumb.addEventListener('dragstart', function(e) {
-                      e.dataTransfer.setData('text/plain', this.dataset.index);
-                      this.classList.add('drag-over');
-                  });
-                  thumb.addEventListener('dragend', function(e) { this.classList.remove('drag-over'); });
-                  thumb.addEventListener('dragover', function(e) {
-                      e.preventDefault();
-                      grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
-                      this.classList.add('drag-over');
-                  });
-                  thumb.addEventListener('dragleave', function(e) { this.classList.remove('drag-over'); });
-                  thumb.addEventListener('drop', handleThumbDrop);
-                  
-                  grid.appendChild(thumb);
+                  grid.appendChild(createThumbnailElement(uuid, idx, tw, th));
               }
           });
           
@@ -7054,6 +7064,9 @@
           
           // Re-render thumbnails from cache
           renderThumbnails();
+          
+          // Request data for uncached thumbnails
+          requestThumbnailData();
       }
       
       // Page Overview Mode
@@ -7088,102 +7101,7 @@
           
            // For each page, create a thumbnail placeholder
            for (let i = 0; i < pageOrder.length; i++) {
-              const thumb = document.createElement('div');
-              thumb.className = 'overview-thumb';
-              thumb.draggable = true;
-              thumb.dataset.index = i;
-              
-              // Store the page UUID on the element
-              const pageUuid = pageOrder[i];
-              thumb.dataset.pageUuid = pageUuid;
-              
-              const canvas = document.createElement('canvas');
-              canvas.width = thumbW;
-              canvas.height = thumbH;
-              canvas.style.width = '100%';
-              canvas.style.height = 'auto';
-              thumb.appendChild(canvas);
-              
-              // Add spinner overlay
-              const spinner = document.createElement('div');
-              spinner.className = 'overview-thumb-spinner';
-              thumb.appendChild(spinner);
-              
-               const label = document.createElement('div');
-               label.className = 'overview-thumb-label';
-               const checkbox = document.createElement('input');
-               checkbox.type = 'checkbox';
-               checkbox.addEventListener('change', function(e) {
-                   e.stopPropagation();
-                   thumb.classList.toggle('selected', this.checked);
-               });
-               label.appendChild(checkbox);
-               label.appendChild(document.createTextNode(` Page ${i + 1}`));
-               thumb.appendChild(label);
-               
-               // Click on canvas → navigate to page
-               canvas.addEventListener('click', function(e) {
-                   e.stopPropagation();
-                   const uuid = thumb.dataset.pageUuid;
-                   if (uuid) {
-                       navigatePageUuid(uuid);
-                       exitOverviewMode(false);
-                   }
-               });
-              
-              // Drag and drop
-              thumb.addEventListener('dragstart', function(e) {
-                  e.dataTransfer.setData('text/plain', this.dataset.index);
-                  this.classList.add('drag-over');
-              });
-              
-              thumb.addEventListener('dragend', function(e) {
-                  this.classList.remove('drag-over');
-              });
-              
-              thumb.addEventListener('dragover', function(e) {
-                  e.preventDefault();
-                  grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
-                  this.classList.add('drag-over');
-              });
-              
-              thumb.addEventListener('dragleave', function(e) {
-                  this.classList.remove('drag-over');
-              });
-              
-              thumb.addEventListener('drop', function(e) {
-                  e.preventDefault();
-                  grid.querySelectorAll('.overview-thumb').forEach(t => t.classList.remove('drag-over'));
-                  
-                  const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-                  const toIdx = parseInt(this.dataset.index);
-                  if (fromIdx === toIdx) return;
-                  
-                  // Reorder DOM
-                  const thumbs = grid.querySelectorAll('.overview-thumb');
-                  const fromEl = thumbs[fromIdx];
-                  const toEl = thumbs[toIdx];
-                  
-                  if (fromIdx < toIdx) {
-                      toEl.parentNode.insertBefore(fromEl, toEl.nextSibling);
-                  } else {
-                      toEl.parentNode.insertBefore(fromEl, toEl);
-                  }
-                  
-                  // Update indices
-                  grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
-                      t.dataset.index = idx;
-                      const label = t.querySelector('.overview-thumb-label');
-                      // Preserve checkbox if present, only update the text node
-                      if (label.childNodes.length >= 2) {
-                          label.childNodes[1].textContent = ` Page ${idx + 1}`;
-                      } else {
-                          label.textContent = `Page ${idx + 1}`;
-                      }
-                  });
-              });
-              
-              grid.appendChild(thumb);
+              grid.appendChild(createThumbnailElement(pageOrder[i], i, thumbW, thumbH));
           }
           
           // Try to render thumbnails from cached data
