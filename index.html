@@ -2808,7 +2808,6 @@
               pageUuid, pageNumber, pageTotal
           });
           
-          // (a) Update cache — always
           pagesMetaData[ pageUuid ] = [ pageNumber, pageTotal ];
           const pageData = loadPageFromCache( pageUuid );
           const pageHashes = [ shared.hashAny( pageUuid ) ];
@@ -2823,22 +2822,12 @@
                   pageData['present'] = index;
                   pageData['hash'] = snapshot;
                   savePageToCache( pageUuid, pageData );
-                  // (b) Page view — only if in page mode and this is our page or we're navigating
-                  if ( !isOverviewActive() && ( do_switch || pageUuid === currentPageUuid ) ) {
-                      requestReplay( pageUuid, true );
-                  }
-                  // (c) Overview — if overview is visible
-                  refreshOverviewIfActive();
+                  requestReplay( pageUuid, do_switch );
                   return;
               }
           }          
 
-          // (b) Page view — only if in page mode
-          if ( !isOverviewActive() && ( do_switch || pageUuid === currentPageUuid ) ) {
-              requestFullPage( pageUuid, true );
-          }
-          // (c) Overview — if overview is visible
-          refreshOverviewIfActive();
+          requestFullPage( pageUuid, do_switch );
       }
       
       // Handle page lost response (page deletion with redirection)
@@ -2911,8 +2900,9 @@
       function handlePingMessage(data) {
           if ( Date.now() > RESPONSE_TIMEOUT + pending_timer ) {
               pending_actions.clear();
-          }                                                                  
-          if ( pending_actions.size > 0 ) { 
+          }
+          // In overview mode, always process pings regardless of pending actions
+          if ( !isOverviewActive() && pending_actions.size > 0 ) { 
             debugLog( "exit handlePingMessage because of pending actions" );
             return; 
           }
