@@ -822,12 +822,17 @@
       
       #overview-topbar {
           display: flex;
-          justify-content: center;
+          justify-content: space-between;
           align-items: center;
           gap: 1em;
           padding: 0.5em;
           background-color: #444;
           flex-shrink: 0;
+      }
+      
+      .overview-topbar-left, .overview-topbar-right {
+          display: flex;
+          gap: 0.5em;
       }
       
       .overview-btn {
@@ -1251,8 +1256,15 @@
     <!-- Page Overview Mode -->
     <div id="page-overview">
       <div id="overview-topbar">
-        <button class="overview-btn confirm" id="overview-confirm">✓ Confirm</button>
-        <button class="overview-btn cancel" id="overview-cancel">✕ Cancel</button>
+        <div class="overview-topbar-left">
+          <button class="overview-btn" id="overview-delete">🗑 Delete</button>
+          <button class="overview-btn" id="overview-move-front">⬆ Front</button>
+          <button class="overview-btn" id="overview-move-back">⬇ Back</button>
+        </div>
+        <div class="overview-topbar-right">
+          <button class="overview-btn confirm" id="overview-confirm">✓ Confirm</button>
+          <button class="overview-btn cancel" id="overview-cancel">✕ Cancel</button>
+        </div>
       </div>
       <div id="overview-grid"></div>
     </div>
@@ -7242,11 +7254,116 @@
           });
       }
       
+      // Overview: delete selected pages
+      function overviewDeleteSelected() {
+          const grid = document.getElementById('overview-grid');
+          const checked = grid.querySelectorAll('.overview-thumb.selected');
+          if (checked.length === 0) return;
+          
+          const msg = checked.length === 1
+              ? 'Delete the selected page? This cannot be undone.'
+              : `Delete ${checked.length} selected pages? This cannot be undone.`;
+          if (!confirm(msg)) return;
+          
+          const uuids = [];
+          checked.forEach(t => {
+              if (t.dataset.pageUuid) uuids.push(t.dataset.pageUuid);
+          });
+          
+          // Send one DELETE_PAGE proposal per UUID
+          let sent = 0;
+          uuids.forEach(uuid => {
+              const actionUuid = shared.generateUuid();
+              const deleteAction = {
+                  type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
+                  [shared.MOD_ACTIONS.UUID]: actionUuid
+              };
+              const proposal = {
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: uuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deleteAction,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: shared.hashAny(uuid)
+              };
+              pending_register_action(actionUuid);
+              sendMessage(proposal);
+              sent++;
+          });
+          
+          if (sent > 0) {
+              // Refresh overview after a short delay for server responses
+              setTimeout(() => {
+                  requestBoardInfo();
+                  enterOverviewMode();
+              }, 500);
+          }
+      }
+      
+      // Overview: move selected pages to front (end of list)
+      function overviewMoveSelectedToFront() {
+          const grid = document.getElementById('overview-grid');
+          const checked = grid.querySelectorAll('.overview-thumb.selected');
+          if (checked.length === 0) return;
+          
+          // Collect selected elements in order, remove from DOM, re-append at end
+          const selected = [];
+          checked.forEach(t => selected.push(t));
+          
+          selected.forEach(t => {
+              t.parentNode.removeChild(t);
+              grid.appendChild(t);
+          });
+          
+          // Re-index
+          grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
+              t.dataset.index = idx;
+              const label = t.querySelector('.overview-thumb-label');
+              if (label.childNodes.length >= 2) {
+                  label.childNodes[1].textContent = ` Page ${idx + 1}`;
+              } else {
+                  label.textContent = `Page ${idx + 1}`;
+              }
+          });
+      }
+      
+      // Overview: move selected pages to back (start of list)
+      function overviewMoveSelectedToBack() {
+          const grid = document.getElementById('overview-grid');
+          const checked = grid.querySelectorAll('.overview-thumb.selected');
+          if (checked.length === 0) return;
+          
+          // Collect selected elements in reverse order, remove from DOM, prepend at start
+          const selected = [];
+          checked.forEach(t => selected.push(t));
+          
+          // Prepend in reverse order so they appear in original order at the front
+          for (let i = selected.length - 1; i >= 0; i--) {
+              const t = selected[i];
+              t.parentNode.removeChild(t);
+              grid.insertBefore(t, grid.firstChild);
+          }
+          
+          // Re-index
+          grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
+              t.dataset.index = idx;
+              const label = t.querySelector('.overview-thumb-label');
+              if (label.childNodes.length >= 2) {
+                  label.childNodes[1].textContent = ` Page ${idx + 1}`;
+              } else {
+                  label.textContent = `Page ${idx + 1}`;
+              }
+          });
+      }
+      
       // Wire up page menu toolbar events
       document.addEventListener('DOMContentLoaded', function() {
-          // Wire up overview confirm/cancel buttons
+          // Wire up overview buttons
           document.getElementById('overview-confirm').addEventListener('click', () => exitOverviewMode(true));
           document.getElementById('overview-cancel').addEventListener('click', () => exitOverviewMode(false));
+          document.getElementById('overview-delete').addEventListener('click', overviewDeleteSelected);
+          document.getElementById('overview-move-front').addEventListener('click', overviewMoveSelectedToFront);
+          document.getElementById('overview-move-back').addEventListener('click', overviewMoveSelectedToBack);
           
           document.getElementById('page-menu-move-up').addEventListener('click', function() {
               if (pageNr <= 1) return;
