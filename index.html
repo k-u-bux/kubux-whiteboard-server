@@ -2518,12 +2518,22 @@
               rebuildPageMenu();
           }
           // If overview is active, refresh the grid
-          const overviewEl = document.getElementById('page-overview');
-          if ( overviewEl.classList.contains('visible') ) {
-              refreshOverviewGrid();
-          }
+          refreshOverviewIfActive();
       }
       
+      // Helper to check if overview mode is active
+      function isOverviewActive() {
+          const overview = document.getElementById('page-overview');
+          return overview && overview.classList.contains('visible');
+      }
+      
+      // Helper to refresh overview if it's active
+      function refreshOverviewIfActive() {
+          if (isOverviewActive()) {
+              requestBoardInfo();
+          }
+      }
+
       // Drag-drop handler for thumbnails (extracted for reuse)
       function handleThumbDrop(e) {
           e.preventDefault();
@@ -2798,6 +2808,7 @@
               pageUuid, pageNumber, pageTotal
           });
           
+          // (a) Update cache — always
           pagesMetaData[ pageUuid ] = [ pageNumber, pageTotal ];
           const pageData = loadPageFromCache( pageUuid );
           const pageHashes = [ shared.hashAny( pageUuid ) ];
@@ -2812,18 +2823,22 @@
                   pageData['present'] = index;
                   pageData['hash'] = snapshot;
                   savePageToCache( pageUuid, pageData );
-                  requestReplay( pageUuid, do_switch );
+                  // (b) Page view — only if in page mode and this is our page or we're navigating
+                  if ( !isOverviewActive() && ( do_switch || pageUuid === currentPageUuid ) ) {
+                      requestReplay( pageUuid, true );
+                  }
+                  // (c) Overview — if overview is visible
+                  refreshOverviewIfActive();
                   return;
               }
           }          
 
-          requestFullPage( pageUuid, do_switch );
-          
-          // If overview is visible, request updated page order
-          const overviewEl = document.getElementById('page-overview');
-          if (overviewEl && overviewEl.classList.contains('visible')) {
-              requestBoardInfo();
+          // (b) Page view — only if in page mode
+          if ( !isOverviewActive() && ( do_switch || pageUuid === currentPageUuid ) ) {
+              requestFullPage( pageUuid, true );
           }
+          // (c) Overview — if overview is visible
+          refreshOverviewIfActive();
       }
       
       // Handle page lost response (page deletion with redirection)
@@ -2846,13 +2861,13 @@
               totalPages
           });
 
-          // If overview is active, request updated page order and skip joinPage
-          const overviewEl = document.getElementById('page-overview');
-          if (overviewEl && overviewEl.classList.contains('visible')) {
-              requestBoardInfo();
+          // (c) Overview — if overview is visible, refresh and skip joinPage
+          if (isOverviewActive()) {
+              refreshOverviewIfActive();
               return;
           }
 
+          // (b) Page view — navigate to the page
           joinPage( currentPageUuid, pageNr, totalPages );
       }
 
@@ -2939,11 +2954,8 @@
                pagesMetaData[ currentPageUuid ] = [ pageNr, totalPages ];
                updatePageInfo();
                
-               // If overview is active, request updated page order
-               const overviewEl = document.getElementById('page-overview');
-               if (overviewEl && overviewEl.classList.contains('visible')) {
-                   requestBoardInfo();
-               }
+               // (c) Overview — if overview is visible
+               refreshOverviewIfActive();
            }
            
            // Check if our hash is out of sync with server
@@ -3255,7 +3267,8 @@
               hash: pageData['hashes'][pageData['present']]
           });
           
-          if ( do_switch || currentPageUuid === pageUuid ) {
+          // (b) Page view — only if in page mode and this is our page
+          if ( !isOverviewActive() && ( do_switch || currentPageUuid === pageUuid ) ) {
               currentPageUuid = pageUuid;
               history = pageData['history'];
               present = pageData['present'];
@@ -3272,17 +3285,11 @@
               // Update UI
               updateSyncStatus();
               updateUndoRedoButtons();
-              
-              // Cache verification successful - reset flag
-              // cacheVerificationInProgress = false;
           }
           debugLog("Replay applied successfully", pageData);
 
-          // If overview is visible, request updated page order
-          const overviewEl = document.getElementById('page-overview');
-          if (overviewEl && overviewEl.classList.contains('visible')) {
-              requestBoardInfo();
-          }
+          // (c) Overview — if overview is visible
+          refreshOverviewIfActive();
 
           return pageData;
       }
@@ -3310,7 +3317,8 @@
               hash: pageHashes[pagePres]
           } );
           
-          if ( do_switch ) {
+          // (b) Page view — only if in page mode and do_switch is set
+          if ( !isOverviewActive() && do_switch ) {
               currentPageUuid = pageUuid;
               history = pageHist;
               present = pagePres;
@@ -3349,11 +3357,8 @@
               saveSettings();
           }
           
-          // If overview is visible, request updated page order
-          const overviewEl = document.getElementById('page-overview');
-          if (overviewEl && overviewEl.classList.contains('visible')) {
-              requestBoardInfo();
-          }
+          // (c) Overview — if overview is visible
+          refreshOverviewIfActive();
       }
       
       // Request a full page from the server
