@@ -690,6 +690,9 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
 
     const pageId = existingPage(requestedPageId, board);
     if ( pageId != requestedPageId ) {
+        sendPageLost(ws, board, requestedPageId, pageId, do_switch, requestId );
+        releaseBoard(boardId);
+        return;
     }
     const page = usePage(pageId);
     if (page) {
@@ -753,10 +756,7 @@ function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
     logSentMessage(message.type, message, requestId, ws.clientId);
 }
 
-function sendPageLost(ws, boardId, requestedPageId, foundPageId, do_switch, requestId) {
-    const board = useBoard(boardId);
-    if ( ! board ) { return; }
-    const pageId = existingPage(requestedPageId, board);
+function sendPageLost(ws, board, requestedPageId, pageId, do_switch, requestId) {
     const pageNr = board.pageOrder.indexOf(pageId) + 1;
     const totalPages = board.pageOrder.length;
     const message = {
@@ -768,7 +768,6 @@ function sendPageLost(ws, boardId, requestedPageId, foundPageId, do_switch, requ
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.SWITCH]: do_switch,
         [MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.REQUEST_ID]: requestId
     };
-    releaseBoard(boardId);
     if ( do_switch ) {
         ws.pageId = pageId;
     }
@@ -1213,7 +1212,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, r
         if ( resolvedPageId !== pageId && delta == 0 ) {
             debug.log( "handling full page request, page lost", `${resolvedPageId} vs. ${pageId}, delta = ${delta}`)
             const do_switch = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
-            sendPageLost( ws, boardId, pageId, resolvedPageId, do_switch, requestId );
+            sendPageLost( ws, board, pageId, resolvedPageId, do_switch, requestId );
         } else {
             debug.log( "handling full page request, full page", `${resolvedPageId} vs. ${pageId}, delta = ${delta}`)
             const do_switch = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
@@ -1227,6 +1226,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, r
 };
 
 function flag_and_fix_inconsistent_state( page, msg ) {
+    // this is dead in production. the function is a debug tool.
     return;
     const current_visible = compileVisualState( page.history.slice( 0, page.present ) ).visible;
     const visible = page.state.visible;
@@ -1508,7 +1508,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
 
     if (pageId !== pageUuid) {
         debug.log(`[SERVER] Hash ${pageUuid} has been replaced by ${pageId}.`);
-        sendPageLost( ws, boardId, pageUuid, pageId, do_register, requestId )
+        sendPageLost( ws, board, pageUuid, pageId, do_register, requestId )
         releaseBoard(boardId);
         return;
     }
@@ -1602,6 +1602,7 @@ wss.on('connection', (ws, req) => {
 function periodicallyPersist () {
     persistAllBoards();
     persistAllPages();
+    persistDeletionMap();
 }
 
 const intervalPersist = setInterval( periodicallyPersist, 10000 );
@@ -1613,6 +1614,7 @@ function shutdown(signal) {
   clearInterval( intervalPersist );
   persistAllBoards();
   persistAllPages();
+  persistDeletionMap();
   httpServer.close(() => {
     debug.log('Server connections closed. Exiting process.');
     process.exit(0);

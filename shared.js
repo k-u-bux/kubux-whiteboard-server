@@ -549,7 +549,7 @@ function is_invalid_FULL_PAGE_REQUEST_message(data) {
     if (delta === undefined || typeof delta !== 'number' || !Number.isFinite(delta)) return true;
     
     const register = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
-    if (!register === undefined || typeof register !== 'boolean') return true;
+    if (register === undefined || typeof register !== 'boolean') return true;
     
     return false;
 }
