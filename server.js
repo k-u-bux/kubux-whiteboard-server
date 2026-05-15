@@ -1382,9 +1382,16 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             releasePage(newPageId);
             debug.log(`[SERVER]: add new page ${newPageId} behind ${pageUuid}`);
             board.pageOrder.splice(board.pageOrder.indexOf(pageUuid) + 1, 0, newPageId);
+            const board_info_message = {
+                type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
+                [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
+                [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+                [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
+            };
             releaseBoard(boardId);
             sendFullPage(ws, boardId, newPageId, true, requestId);
             sendPingToBoard( boardId );
+            broadcastMessageToBoard( ws, boardId, board_info_message );
             return;
         case MOD_ACTIONS.DELETE_PAGE.TYPE:
             releasePage(pageUuid);
