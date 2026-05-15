@@ -2826,10 +2826,10 @@
 
           requestFullPage( pageUuid, do_switch );
           
-          // If overview is visible, re-render thumbnails when data arrives
+          // If overview is visible, request updated page order
           const overviewEl = document.getElementById('page-overview');
           if (overviewEl && overviewEl.classList.contains('visible')) {
-              renderThumbnails();
+              requestBoardInfo();
           }
       }
       
@@ -2853,10 +2853,10 @@
               totalPages
           });
 
-          // If overview is active, update the grid and skip joinPage
+          // If overview is active, request updated page order and skip joinPage
           const overviewEl = document.getElementById('page-overview');
           if (overviewEl && overviewEl.classList.contains('visible')) {
-              refreshOverviewGrid();
+              requestBoardInfo();
               return;
           }
 
@@ -3285,10 +3285,10 @@
           }
           debugLog("Replay applied successfully", pageData);
 
-          // If overview is visible, re-render thumbnails when data arrives
+          // If overview is visible, request updated page order
           const overviewEl = document.getElementById('page-overview');
           if (overviewEl && overviewEl.classList.contains('visible')) {
-              renderThumbnails();
+              requestBoardInfo();
           }
 
           return pageData;
@@ -3356,10 +3356,10 @@
               saveSettings();
           }
           
-          // If overview is visible, re-render thumbnails when data arrives
+          // If overview is visible, request updated page order
           const overviewEl = document.getElementById('page-overview');
           if (overviewEl && overviewEl.classList.contains('visible')) {
-              renderThumbnails();
+              requestBoardInfo();
           }
       }
       
@@ -7344,7 +7344,6 @@
                   [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deleteAction,
                   [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: shared.hashAny(uuid)
               };
-              pending_register_action(actionUuid);
               sendMessage(proposal);
           });
       }
