@@ -2596,10 +2596,16 @@
               toEl.parentNode.insertBefore(fromEl, toEl);
           }
           
-          grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
-              t.dataset.index = idx;
-              t.querySelector('.overview-thumb-label').textContent = `Page ${idx + 1}`;
-          });
+              grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
+                  t.dataset.index = idx;
+                  const label = t.querySelector('.overview-thumb-label');
+                  // Preserve checkbox if present, only update the text node
+                  if (label.childNodes.length >= 2) {
+                      label.childNodes[1].textContent = ` Page ${idx + 1}`;
+                  } else {
+                      label.textContent = `Page ${idx + 1}`;
+                  }
+              });
       }
 
       function requestBoardInfo() {
@@ -7110,7 +7116,13 @@
                   // Update indices
                   grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
                       t.dataset.index = idx;
-                      t.querySelector('.overview-thumb-label').textContent = `Page ${idx + 1}`;
+                      const label = t.querySelector('.overview-thumb-label');
+                      // Preserve checkbox if present, only update the text node
+                      if (label.childNodes.length >= 2) {
+                          label.childNodes[1].textContent = ` Page ${idx + 1}`;
+                      } else {
+                          label.textContent = `Page ${idx + 1}`;
+                      }
                   });
               });
               
