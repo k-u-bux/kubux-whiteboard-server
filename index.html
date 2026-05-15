@@ -2510,7 +2510,7 @@
       function handleBoardInfo(data) {
           const pages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES];
           if ( pages ) {
-              const newPageNr = pages.index( currentPageUuid );
+              const newPageNr = pages.indexOf( currentPageUuid );
               if ( newPageNr < 0 ) {
                   requestPageInfo( currentPageUuid );
                   requestBoardInfo( boardId );
