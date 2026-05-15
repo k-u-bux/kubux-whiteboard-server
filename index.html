@@ -2939,15 +2939,21 @@
               return;
           }
 
-         // Update page info if needed
-          if (pageNr !== pingPageNr || totalPages !== pingTotalPages) {
-              pageNr = pingPageNr;
-              totalPages = pingTotalPages;
-              pagesMetaData[ currentPageUuid ] = [ pageNr, totalPages ];
-              updatePageInfo();
-          }
-          
-          // Check if our hash is out of sync with server
+          // Update page info if needed
+           if (pageNr !== pingPageNr || totalPages !== pingTotalPages) {
+               pageNr = pingPageNr;
+               totalPages = pingTotalPages;
+               pagesMetaData[ currentPageUuid ] = [ pageNr, totalPages ];
+               updatePageInfo();
+               
+               // If overview is active, request updated page order
+               const overviewEl = document.getElementById('page-overview');
+               if (overviewEl && overviewEl.classList.contains('visible')) {
+                   requestBoardInfo();
+               }
+           }
+           
+           // Check if our hash is out of sync with server
           // Look for matching hash in our hash chain
           let matchingIndex = hashes.indexOf( pingPageHash );
           
