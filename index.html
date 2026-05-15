@@ -7121,7 +7121,7 @@
               }
               
               const pageData = loadPageFromCache(pageUuid);
-              if (!pageData || !pageData.history || pageData.history.length === 0) {
+              if (!pageData || !pageData.history) {
                   spinner.classList.add('active');
                   return;
               }
