@@ -7093,6 +7093,10 @@
           }
           if (thumbH < 1) thumbH = 150;
           
+          // Save for refreshOverviewGrid to use when adding new thumbnails
+          window._overviewThumbW = thumbW;
+          window._overviewThumbH = thumbH;
+          
           // Build thumbnails
           grid.innerHTML = '';
           
