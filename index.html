@@ -2513,6 +2513,7 @@
               const newPageNr = pages.index( currentPageUuid );
               if ( newPageNr < 0 ) {
                   requestPageInfo( currentPageUuid );
+                  requestBoardInfo( boardId );
                   return;
               }
               serverPageOrder = pages;
