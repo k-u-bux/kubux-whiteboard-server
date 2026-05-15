@@ -923,6 +923,7 @@
           border-radius: 50%;
           animation: overview-spin 0.8s linear infinite;
           display: none;
+          pointer-events: none;
       }
        
       .overview-thumb-spinner.active {
@@ -2785,14 +2786,6 @@
       
       // Handle page info response (metadata only)
       function handlePageInfo(data) {
-          if ( Date.now() > RESPONSE_TIMEOUT + pending_timer ) {
-              pending_actions.clear();
-          }                                                                  
-          if ( pending_actions.size > 0 ) { 
-            debugLog( "exit handlePageInfo because of pending actions" );
-            return; 
-          }
-
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID];
           const pageUuid = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE];
           const pageNumber = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
