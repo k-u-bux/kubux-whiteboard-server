@@ -7300,20 +7300,21 @@
           }
       }
       
-      // Overview: move selected pages to front (end of list)
+      // Overview: move selected pages to front (start of list)
       function overviewMoveSelectedToFront() {
           const grid = document.getElementById('overview-grid');
           const checked = grid.querySelectorAll('.overview-thumb.selected');
           if (checked.length === 0) return;
           
-          // Collect selected elements in order, remove from DOM, re-append at end
+          // Collect selected elements in reverse order, prepend at start
           const selected = [];
           checked.forEach(t => selected.push(t));
           
-          selected.forEach(t => {
+          for (let i = selected.length - 1; i >= 0; i--) {
+              const t = selected[i];
               t.parentNode.removeChild(t);
-              grid.appendChild(t);
-          });
+              grid.insertBefore(t, grid.firstChild);
+          }
           
           // Re-index
           grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
@@ -7327,22 +7328,20 @@
           });
       }
       
-      // Overview: move selected pages to back (start of list)
+      // Overview: move selected pages to back (end of list)
       function overviewMoveSelectedToBack() {
           const grid = document.getElementById('overview-grid');
           const checked = grid.querySelectorAll('.overview-thumb.selected');
           if (checked.length === 0) return;
           
-          // Collect selected elements in reverse order, remove from DOM, prepend at start
+          // Collect selected elements in order, re-append at end
           const selected = [];
           checked.forEach(t => selected.push(t));
           
-          // Prepend in reverse order so they appear in original order at the front
-          for (let i = selected.length - 1; i >= 0; i--) {
-              const t = selected[i];
+          selected.forEach(t => {
               t.parentNode.removeChild(t);
-              grid.insertBefore(t, grid.firstChild);
-          }
+              grid.appendChild(t);
+          });
           
           // Re-index
           grid.querySelectorAll('.overview-thumb').forEach((t, idx) => {
