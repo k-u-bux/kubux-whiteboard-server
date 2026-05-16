@@ -3273,20 +3273,12 @@
                   pageData['hashes'].push(newHash);
               }
               
-              // Verify final hash matches afterHash
-              const finalHash = pageData['hashes'][pageData['hashes'].length - 1];
-              if (finalHash !== afterHash) {
-                  debugLog("Hash mismatch after replay", {
-                      calculatedHash: finalHash,
-                      expectedHash: afterHash
-                  });
-                  requestFullPage(pageUuid, do_switch);
-                  return null;
-              }
           }
           
           // Update present position
-          pageData['present'] = serverPresent;          
+          pageData['present'] = serverPresent;
+          
+          // Verify hash at server's present position matches
           
           if (pageData['hashes'][pageData['present']] !== currentHash) {
               debugLog("Current hash mismatch after replay", {
