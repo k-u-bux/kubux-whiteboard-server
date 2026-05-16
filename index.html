@@ -2511,12 +2511,15 @@
           const pages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES];
           debugLog( "Received Board Info: ", pages );
           if ( pages ) {
+              debugLog( "considering new page order" );
               const newPageNr = pages.indexOf( currentPageUuid );
               if ( newPageNr < 0 ) {
+                  debugLog( "current page not found: " currentPageUuid );
                   requestPageInfo( currentPageUuid );
                   requestBoardInfo( boardId );
                   return;
               }
+              debugLog( "update data" );
               serverPageOrder = pages;
               totalPages = pages.length;
               pageNr = newPageNr;
