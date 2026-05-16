@@ -2447,7 +2447,7 @@
                   debugLog('Received event: ', event); 
                   const data = shared.deserialize(event.data);
                   if ( data ) {
-                      debugLog('Received message: ', data);
+                      debugLog('Received message of type: ', data.type);
                       
                       // Handle message based on type
                       switch (data.type) {
