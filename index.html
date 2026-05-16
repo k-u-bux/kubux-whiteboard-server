@@ -6062,6 +6062,22 @@
               present: present,
               hash: hashes[present]
           });
+          
+          // Optimistic switch: load target page from cache immediately
+          // so the canvas doesn't flash old content while waiting for server
+          const targetData = loadPageFromCache(pageId, false);
+          if (targetData) {
+              currentPageUuid = pageId;
+              history = targetData.history;
+              present = targetData.present;
+              hashes = [ shared.hashAny(pageId) ];
+              for (let i = 0; i < history.length; i++) {
+                  hashes.push(shared.hashNext(hashes[i], history[i]));
+              }
+              verifiedIndex = present;
+              updateVisualState();
+          }
+          
           registerPage(pageId, 0);
       }
       
