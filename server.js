@@ -195,6 +195,7 @@ const {
     commitGroup, 
     MESSAGES, 
     MOD_ACTIONS, 
+    NULL_UUID,
     ELEMENT, 
     POINT,
     is_invalid_REGISTER_BOARD_message,
