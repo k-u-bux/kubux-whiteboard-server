@@ -7166,16 +7166,15 @@
           // For pages not in cache, request data
           const grid = document.getElementById('overview-grid');
           const thumbs = grid.querySelectorAll('.overview-thumb');
-          
-          thumbs.forEach((thumb, idx) => {
+          thumbs.forEach( ( thumb, idx ) => {
               const pageUuid = thumb.dataset.pageUuid;
-              if (!pageUuid) return;
-              
-              const pageData = loadPageFromCache(pageUuid);
-              if (pageData && pageData.history && pageData.history.length > 0) return; // Already cached
-              
-              // Request page info for this page
-              requestPageInfo(pageUuid, false);
+              if ( ! pageUuid ) { 
+                  console.error( "thumbnail should know its uuid" );
+                  return; 
+              }
+              const pageData = loadPageFromCache( pageUuid );
+              if ( pageData ) { return; }
+              requestFullPage( pageUuid, false );
           });
       }
       
