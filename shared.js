@@ -40,6 +40,8 @@ function recent_snapshots ( n ) {
 
 
 // uuid
+const NULL_UUID = '00000000-0000-4000-8000-000000000000';
+
 function generateUuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         const r = Math.random() * 16 | 0;
@@ -1509,6 +1511,7 @@ if (typeof module !== 'undefined' && module.exports) {
         PORT,
         recent_snapshots,
         // uuid
+        NULL_UUID,
         generateUuid,
         isUuid,
         // serialization
@@ -1588,6 +1591,7 @@ else if (typeof window !== 'undefined') {
         PORT,
         recent_snapshots,
         // uuid
+        NULL_UUID,
         generateUuid,
         isUuid,
         // serialization

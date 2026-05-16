@@ -5963,7 +5963,7 @@
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: pageId,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: newPageAction,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: shared.hashAny(pageId)
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: shared.NULL_UUID
           };
           sendMessage(proposal);
       }
@@ -7274,7 +7274,7 @@
           
           // Send one DELETE_PAGE proposal per UUID
           uuids.forEach(uuid => {
-              deletePageUuid( boardId, uuid, shared.hashAny( uuid ) );
+              deletePageUuid( boardId, uuid, shared.NULL_UUID );
           });
       }
       
