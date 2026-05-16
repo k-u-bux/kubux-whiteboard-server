@@ -7038,7 +7038,7 @@
           // 2. Interleaving: Find and insert brand-new elements from the server
           pageOrder.forEach((uuid, serverIdx) => {
               // Check if this server element already exists locally
-              const existingThumb = grid.querySelector(`[data-page-uuid]="${uuid}"]`);
+              const existingThumb = grid.querySelector(`[data-pageUuid]="${uuid}"]`);
               debugLog( "existingThumb = ", existingThumb );
               if (existingThumb) return; // Skip: local order/permutation must be preserved
       
