@@ -1259,6 +1259,7 @@
       <div id="overview-topbar">
         <div class="overview-topbar-left">
           <button class="overview-btn" id="overview-delete">🗑 Delete</button>
+          <button class="overview-btn" id="overview-add-page">➕ Add</button>
           <button class="overview-btn" id="overview-move-front">⬆ Front</button>
           <button class="overview-btn" id="overview-move-back">⬇ Back</button>
         </div>
@@ -5948,28 +5949,27 @@
       }
       
       // Add a new page
-      function addNewPage() {
+      function insertPageAfter(passwd, boardId, pageId) {
           const actionUuid = shared.generateUuid();
-          
           const newPageAction = {
               type: shared.MOD_ACTIONS.NEW_PAGE.TYPE,
               [shared.MOD_ACTIONS.UUID]: actionUuid
           };
-          
-          // Create proposal
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: pageId,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: newPageAction,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: shared.hashAny(pageId)
           };
-          
-          // Send to server - no optimistic update for page operations
           sendMessage(proposal);
       }
- 
+
+      function addNewPage() {
+          insertPageAfter(passwd, boardId, currentPageUuid);
+      }
+  
       function deletePageUuid( boardUuid, pageUuid, beforeHash ) {    
           const actionUuid = shared.generateUuid();
           const deletePageAction = {
@@ -7210,6 +7210,13 @@
           });
       }
       
+      function overviewAddPage() {
+          const lastUuid = serverPageOrder[serverPageOrder.length - 1];
+          if (lastUuid) {
+              insertPageAfter(passwd, boardId, lastUuid);
+          }
+      }
+
       // Overview: delete selected pages
       function overviewDeleteSelected() {
           const grid = document.getElementById('overview-grid');
@@ -7260,6 +7267,7 @@
           document.getElementById('overview-confirm').addEventListener('click', () => exitOverviewMode(true));
           document.getElementById('overview-cancel').addEventListener('click', () => exitOverviewMode(false));
           document.getElementById('overview-delete').addEventListener('click', overviewDeleteSelected);
+          document.getElementById('overview-add-page').addEventListener('click', overviewAddPage);
           document.getElementById('overview-move-front').addEventListener('click', () => overviewMoveSelected(true));
           document.getElementById('overview-move-back').addEventListener('click', () => overviewMoveSelected(false));
           
