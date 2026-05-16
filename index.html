@@ -7098,6 +7098,7 @@
 
       // Page Overview Mode
       function enterOverviewMode() {
+          commitCurrentPage();
           const overview = document.getElementById('page-overview');
           const grid = document.getElementById('overview-grid');
           if (grid) {
