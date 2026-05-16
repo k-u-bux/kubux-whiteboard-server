@@ -1409,11 +1409,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 board.pageOrder.splice(index, 1);
                 const newPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 1)];
                 deletionMap[pageUuid] = newPageId;
-                const message = board_info_message( boardId, board, requestId );
+                const message = boardInfo( boardId, board, requestId );
                 releaseBoard(boardId);
                 sendPageInfo(ws, boardId, newPageId, true, requestId);
-                sendPingToBoard( boardId );
-                broadcastMessageToBoard( ws, boardId, message );
+                sendPingToBoard( boardId, clientId );
+                broadcastMessageToBoard( ws, boardId, message, clientId );
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
                 const newPageId = generateSecureUuid();
@@ -1421,11 +1421,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 const newPage = createPage(newPageId);
                 releasePage( newPageId );
                 board.pageOrder[ index ] = newPageId;
-                const message = board_info_message( boardId, board, requestId );
+                const message = boardInfo( boardId, board, requestId );
                 releaseBoard( boardId );
                 sendFullPage( ws, boardId, newPageId, true, requestId );
-                sendPingToBoard( boardId );
-                broadcastMessageToBoard( ws, boardId, message );
+                sendPingToBoard( boardId, clientId );
+                broadcastMessageToBoard( ws, boardId, message, clientId );
             }
             return;
         default:
