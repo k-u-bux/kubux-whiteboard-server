@@ -1615,16 +1615,16 @@ wss.on('connection', (ws, req) => {
     debug.log(`[SERVER] New WebSocket connection established`);
     
     if (!pingTimer) {
-        pingTimer = setInterval(() => {
+        pingTimer = setInterval( () => {
             sendPing();
-        }, pingInterval);
+        }, pingInterval );
     }
 
-    if (!boardTimer) {
-        boardTimer = setInterval(() => {
-            sendBoardInfo();
-        }, boardInterval);
-    }
+    // if (!boardTimer) {
+    //     boardTimer = setInterval( () => {
+    //         sendBoardInfo();
+    //     }, boardInterval );
+    // }
 
     ws.on('message', message => routeMessage(ws, message));
     
