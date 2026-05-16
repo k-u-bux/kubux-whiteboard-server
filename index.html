@@ -7077,7 +7077,11 @@
       // Page Overview Mode
       function enterOverviewMode() {
           const overview = document.getElementById('page-overview');
-          
+          const grid = document.getElementById('overview-grid');
+          if (grid) {
+              grid.innerHTML = ''; // Forces a complete rebuild, killing local mutations
+          }
+
           // Snapshot viewport dimensions BEFORE hiding the container
           overviewThumbState.viewportW = container.clientWidth;
           overviewThumbState.viewportH = container.clientHeight;
