@@ -1400,7 +1400,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             releaseBoard( boardId );
             sendFullPage(ws, boardId, newPageId, true, requestId);
             sendPingToBoard( boardId );
-            broadcastMessageToBoard( ws, boardId, message );
+            broadcastMessageToBoard( message, boardId, ws );
             return;
         case MOD_ACTIONS.DELETE_PAGE.TYPE:
             releasePage(pageUuid);
@@ -1413,7 +1413,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 releaseBoard(boardId);
                 sendPageInfo(ws, boardId, newPageId, true, requestId);
                 sendPingToBoard( boardId, clientId );
-                broadcastMessageToBoard( ws, boardId, message, clientId );
+                broadcastMessageToBoard( message, boardId, ws );
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
                 const newPageId = generateSecureUuid();
@@ -1425,7 +1425,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 releaseBoard( boardId );
                 sendFullPage( ws, boardId, newPageId, true, requestId );
                 sendPingToBoard( boardId, clientId );
-                broadcastMessageToBoard( ws, boardId, message, clientId );
+                broadcastMessageToBoard( message, boardId, ws );
             }
             return;
         default:
