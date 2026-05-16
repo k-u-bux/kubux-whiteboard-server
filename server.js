@@ -1396,7 +1396,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             releasePage(newPageId);
             debug.log(`[SERVER]: add new page ${newPageId} behind ${pageUuid}`);
             board.pageOrder.splice(board.pageOrder.indexOf(pageUuid) + 1, 0, newPageId);
-            const message = board_info_message( boardId, board, requestId );
+            const message = boardInfo( boardId, board, requestId );
             releaseBoard( boardId );
             sendFullPage(ws, boardId, newPageId, true, requestId);
             sendPingToBoard( boardId );
