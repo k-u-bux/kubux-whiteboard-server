@@ -2509,6 +2509,7 @@
       // Handle board info response (page order for shuffle)
       function handleBoardInfo(data) {
           const pages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES];
+          debugLog( "Received Board Info: ", pages );
           if ( pages ) {
               const newPageNr = pages.indexOf( currentPageUuid );
               if ( newPageNr < 0 ) {
