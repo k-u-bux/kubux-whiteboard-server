@@ -1262,6 +1262,8 @@
           <button class="overview-btn" id="overview-add-page">➕ Add</button>
           <button class="overview-btn" id="overview-move-front">⬆ Front</button>
           <button class="overview-btn" id="overview-move-back">⬇ Back</button>
+          <button class="overview-btn" id="overview-export-selected">📄 Export Selected</button>
+          <button class="overview-btn" id="overview-export-all">📚 Export All</button>
         </div>
         <div class="overview-topbar-right">
           <button class="overview-btn confirm" id="overview-confirm">✓ Confirm</button>
@@ -6612,20 +6614,17 @@
           }
       }
 
-      async function exportBoardToPDF() {
+      async function exportPagesToPDF(pageUuids, filename) {
           try {
-              const timestamp = getTimestampForFilename();
-              
-              // Create PDF with vector rendering
               const builder = shared.PDFBuilder();
-              
-              // Snapshot current page number for delta calculations
               const startPageNr = pageNr;
-              
-              // Iterate through each page sequentially
-              for (let i = 1; i <= totalPages; i++) {
-                  showError(`Exporting page ${i}/${totalPages}...`);
-                  
+
+              for (let idx = 0; idx < pageUuids.length; idx++) {
+                  const pageUuid = pageUuids[idx];
+                  showError(`Exporting page ${idx + 1}/${pageUuids.length}...`);
+
+                  const pageDelta = serverPageOrder.indexOf(pageUuid) - serverPageOrder.indexOf(currentPageUuid);
+
                   // Request and wait for page info
                   const pageInfo = await new Promise((resolve) => {
                       const requestId = createRequestId();
@@ -6674,7 +6673,7 @@
                           type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD]: boardId,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE]: currentPageUuid,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: i - startPageNr,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: pageDelta,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER]: false,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
                       };
@@ -6684,7 +6683,8 @@
                   
                   if (!pageInfo) continue;
                  
-                  const pageUuid = pageInfo['pageId'];
+                  const actualPageUuid = pageInfo['pageId'];
+                  pagesMetaData[ actualPageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
                   pagesMetaData[ pageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
                   const pageSnapshots = pageInfo['pageSnapshots'];
                   touchPageInCache( pageUuid );
@@ -6791,20 +6791,44 @@
                   }
               }
 
-              // Download the complete multi-page PDF
-              builder.download_in_browser(`board_${boardId}_${timestamp}.pdf`);
-              hideError();
-              
-          } catch (err) {
-              hideError();
-              showError(`PDF export failed: ${err.message}`);
-              console.error('PDF export error:', err);
-          }
-      }
+               builder.download_in_browser(filename);
+               hideError();
+               
+           } catch (err) {
+               hideError();
+               showError(`PDF export failed: ${err.message}`);
+               console.error('PDF export error:', err);
+           }
+       }
 
-      
-      // Copy current board link to clipboard
-      function copyBoardLink() {
+       function exportBoardToPDF() {
+           const pageUuids = serverPageOrder.length > 0 ? [...serverPageOrder] : buildPageOrderFromMeta();
+           const timestamp = getTimestampForFilename();
+           exportPagesToPDF(pageUuids, `board_${boardId}_${timestamp}.pdf`);
+       }
+
+       function overviewExportSelected() {
+           const grid = document.getElementById('overview-grid');
+           const checked = grid.querySelectorAll('.overview-thumb.selected');
+           if (checked.length === 0) return;
+           const uuids = Array.from(checked).map(t => t.dataset.pageUuid).filter(Boolean);
+           if (uuids.length === 0) return;
+           const timestamp = getTimestampForFilename();
+           exportPagesToPDF(uuids, `board_${boardId}_selected_${timestamp}.pdf`);
+       }
+
+       function overviewExportAll() {
+           const grid = document.getElementById('overview-grid');
+           const thumbs = grid.querySelectorAll('.overview-thumb');
+           const uuids = Array.from(thumbs).map(t => t.dataset.pageUuid).filter(Boolean);
+           if (uuids.length === 0) return;
+           const timestamp = getTimestampForFilename();
+           exportPagesToPDF(uuids, `board_${boardId}_all_${timestamp}.pdf`);
+       }
+
+       
+       // Copy current board link to clipboard
+       function copyBoardLink() {
           if (!boardId) {
               alert('No board is currently loaded');
               return;
@@ -7268,6 +7292,8 @@
           document.getElementById('overview-cancel').addEventListener('click', () => exitOverviewMode(false));
           document.getElementById('overview-delete').addEventListener('click', overviewDeleteSelected);
           document.getElementById('overview-add-page').addEventListener('click', overviewAddPage);
+          document.getElementById('overview-export-selected').addEventListener('click', overviewExportSelected);
+          document.getElementById('overview-export-all').addEventListener('click', overviewExportAll);
           document.getElementById('overview-move-front').addEventListener('click', () => overviewMoveSelected(true));
           document.getElementById('overview-move-back').addEventListener('click', () => overviewMoveSelected(false));
           
