@@ -7053,7 +7053,7 @@
               let referenceElement = null;
               for (let i = serverIdx + 1; i < pageOrder.length; i++) {
                   const nextUuid = pageOrder[i];
-                  const matchingLocalThumb = grid.querySelector(`[data-uuid="${nextUuid}"]`);
+                  const matchingLocalThumb = grid.querySelector(`[data-page-uuid="${nextUuid}"]`);
                   if (matchingLocalThumb) {
                       referenceElement = matchingLocalThumb;
                       break; // Found the closest downstream anchor
@@ -7064,10 +7064,8 @@
               grid.insertBefore(newThumb, referenceElement);
           });
       
-          // 3. Re-index: Correct data-index attributes to match the new combined DOM layout
-          Array.from(grid.querySelectorAll('.overview-thumb')).forEach((thumb, idx) => {
-              thumb.dataset.index = idx;
-          });
+          // 3. Re-index: Correct data-index and labels to match the new combined DOM layout
+          reindexThumbnails();
           
           // Trigger render pipelines
           renderThumbnails();
