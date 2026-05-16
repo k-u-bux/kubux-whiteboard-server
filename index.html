@@ -3306,44 +3306,38 @@
               hash: pageHashes[pagePres]
           } );
           
-          // (b) Page view — only if in page mode and do_switch is set
-          if ( !isOverviewActive() && do_switch ) {
+          if ( do_switch ) {
               currentPageUuid = pageUuid;
               history = pageHist;
               present = pagePres;
               hashes = pageHashes;
-              
-              // Set verified index to present
-              verifiedIndex = present;
-              
-              // Recompile visual state
-              updateVisualState();
-              
-              // Update page info
               pageNr = page_nr;
               totalPages = n_pages;
-              updatePageInfo();
-              
-              // Update UI
-              updateSyncStatus();
-              updateUndoRedoButtons();
-              
-              // Save this page to cache
               commitCurrentPage();
+              verifiedIndex = present;
               
-              // After loading initial page, check if we should restore saved position
-              if (!hasRestoredSavedPosition && window.savedPagePosition) {
-                  hasRestoredSavedPosition = true;
+              if ( ! isOverviewActive() ) {
+                  // Recompile visual state
+                  updateVisualState();
+                  // Update UI
+                  updatePageInfo();
+                  updateSyncStatus();
+                  updateUndoRedoButtons();
                   
-                  // If the saved page is different from current, navigate to it
-                  if (window.savedPagePosition.uuid !== currentPageUuid) {
-                      debugLog('Restoring saved page position', window.savedPagePosition);
-                      requestFullPage(window.savedPagePosition.uuid, true);
+                  // After loading initial page, check if we should restore saved position
+                  if (!hasRestoredSavedPosition && window.savedPagePosition) {
+                      hasRestoredSavedPosition = true;
+                      
+                      // If the saved page is different from current, navigate to it
+                      if (window.savedPagePosition.uuid !== currentPageUuid) {
+                          debugLog('Restoring saved page position', window.savedPagePosition);
+                          requestFullPage(window.savedPagePosition.uuid, true);
+                      }
                   }
+                  
+                  // Save current page position to settings
+                  saveSettings();
               }
-              
-              // Save current page position to settings
-              saveSettings();
           }
           
           // (c) Overview — if overview is visible
@@ -6022,9 +6016,9 @@
           saveItem( pageUuid, pageData );
       }
       
-      function loadPageFromCache(pageUuid) {
+      function loadPageFromCache( pageUuid, create_on_miss = true ) {
           const result = loadItem(pageUuid);
-          if ( result ) {
+          if ( ! create_on_miss ) {
               return result;
           } else {
               return {
@@ -7172,7 +7166,7 @@
                   console.error( "thumbnail should know its uuid" );
                   return; 
               }
-              const pageData = loadPageFromCache( pageUuid );
+              const pageData = loadPageFromCache( pageUuid, false );
               if ( pageData ) { return; }
               requestFullPage( pageUuid, false );
           });
