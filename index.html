@@ -7019,23 +7019,51 @@
       }
 
       function refreshOverviewGrid() {
-          console.error( "refresh grid" );
           const overviewEl = document.getElementById('page-overview');
           if (!overviewEl || !overviewEl.classList.contains('visible')) return;
           
           const grid = document.getElementById('overview-grid');
           const pageOrder = serverPageOrder.length > 0 ? serverPageOrder : buildPageOrderFromMeta();
-          
-          // Rebuild grid from scratch
-          grid.innerHTML = '';
+          const newOrderSet = new Set(pageOrder);
+      
+          // 1. Remove elements that are no longer present in the new order
+          const existingThumbs = Array.from(grid.querySelectorAll('.overview-thumb'));
+          existingThumbs.forEach(thumb => {
+              const uuid = thumb.dataset.uuid; // Assumes your elements store their identifier
+              if (!newOrderSet.has(uuid)) {
+                  thumb.remove();
+              }
+          });
+      
+          // 2. Synchronize order and insert new elements
           pageOrder.forEach((uuid, idx) => {
-              grid.appendChild(createThumbnailElement(uuid, idx, overviewThumbState.w, overviewThumbState.h));
+              // Query the current state of the DOM at this specific position
+              const currentThumbAtPosition = grid.children[idx];
+      
+              if (currentThumbAtPosition && currentThumbAtPosition.dataset.uuid === uuid) {
+                  // Element is already in the correct position; verify its index attribute
+                  currentThumbAtPosition.dataset.index = idx;
+                  return;
+              }
+      
+              // Find if the element exists elsewhere in the grid (moved element)
+              let existingThumb = grid.querySelector(`[data-uuid="${uuid}"]`);
+      
+              if (!existingThumb) {
+                  // It's a brand new element: create it
+                  existingThumb = createThumbnailElement(uuid, idx, overviewThumbState.w, overviewThumbState.h);
+              } else {
+                  // It's an existing element that needs to be relocated; update its index
+                  existingThumb.dataset.index = idx;
+              }
+      
+              // Insert or move the element to the correct position
+              // If currentThumbAtPosition is undefined, insertBefore appends to the end
+              grid.insertBefore(existingThumb, currentThumbAtPosition);
           });
           
-          // Re-render thumbnails from cache
+          // Re-render and request data
           renderThumbnails();
-          
-          // Request data for uncached thumbnails
           requestThumbnailData();
       }
       
