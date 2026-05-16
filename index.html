@@ -1418,7 +1418,7 @@
       const LRU_MAX_SIZE = 24;
       let lruOrder = [];
 
-      let pagesMetaData = {}
+      let pagesMetaData = {};
 
 /*
       function saveItem(key, value) {
@@ -1485,7 +1485,8 @@
       }
 */ 
 
-      let dummyStorage = {}
+      let dummyStorage = {};
+
       function saveItem(key, value) {
           try {
               const existingIndex = lruOrder.indexOf(key);
@@ -1531,7 +1532,7 @@
       
       function removeItem(key) {
           try {
-              if ( dummyStorage[ key ] === null ) {
+              if ( dummyStorage[key] === undefined || dummyStorage[ key ] === null ) {
                   return false;
               }
               
