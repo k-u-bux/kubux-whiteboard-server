@@ -846,7 +846,7 @@ function broadcastBoardInfo( boardId, board, requestId ) {
 
 function sendBoardInfo() {
     wss.clients.forEach(client => {
-        if ( client.readyState === WebSocket.OPEN && client.boardId ) {
+        if ( client.readyState === WebSocket.OPEN && client.boardId && client.pageId ) {
             const boardId = client.boardId;
             const board = useBoard( boardId, false );
             if ( board ) {
@@ -1617,7 +1617,7 @@ wss.on('connection', (ws, req) => {
 
     if (!boardTimer) {
         boardTimer = setInterval( () => {
-            // sendBoardInfo();
+            sendBoardInfo();
         }, boardInterval );
     }
 
