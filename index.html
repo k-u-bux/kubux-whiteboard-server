@@ -5972,27 +5972,33 @@
           // Send to server - no optimistic update for page operations
           sendMessage(proposal);
       }
+ 
+      function deletePageUuid( boardUuid, pageUuid, beforeHash ) {    
+          const actionUuid = shared.generateUuid();
+          const deletePageAction = {
+              type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
+              [shared.MOD_ACTIONS.UUID]: actionUuid
+          };
+          const proposal = {
+              type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: pageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deletePageAction,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: beforeHash
+          };
+          sendMessage(proposal);
+      }
       
+      
+     
       // Delete current page
       function deletePage() {    
           const confirmation = window.confirm(
               'Are you sure you want to permanently delete the current page? This action cannot be undone.'
           );
           if ( confirmation ) {
-              const actionUuid = shared.generateUuid();
-              const deletePageAction = {
-                  type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: actionUuid
-              };
-              const proposal = {
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deletePageAction,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present]
-              };
-              sendMessage(proposal);
+              deletePageUuid( boardId, currentPageUuid, hashes[ present ] );
           }
       }
       
@@ -7047,13 +7053,14 @@
           overviewThumbState.viewportH = container.clientHeight;
           
           // Determine thumbnail aspect ratio
-          let thumbW = 200, thumbH;
+          let thumbW, thumbH;
           if (canvasFormat) {
-              thumbH = Math.round(200 * canvasFormat.h / canvasFormat.w);
+              thumbW = Math.round( canvasFormat.w / 6 );
+              thumbH = Math.round( canvasFormat.h / 6 );
           } else {
-              thumbH = Math.round(200 * overviewThumbState.viewportH / overviewThumbState.viewportW);
+              thumbW = Math.round( container.clientWidth / 6 );
+              thumbH = Math.round( container.clienTHeight / 6 );
           }
-          if (thumbH < 1) thumbH = 150;
           overviewThumbState.w = thumbW;
           overviewThumbState.h = thumbH;
           
@@ -7190,20 +7197,7 @@
           
           // Send one DELETE_PAGE proposal per UUID
           uuids.forEach(uuid => {
-              const actionUuid = shared.generateUuid();
-              const deleteAction = {
-                  type: shared.MOD_ACTIONS.DELETE_PAGE.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: actionUuid
-              };
-              const proposal = {
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: uuid,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: deleteAction,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: shared.hashAny(uuid)
-              };
-              sendMessage(proposal);
+              deletePageUuid( boardId, uuid, shared.hashAny( uuid ) );
           });
       }
       
