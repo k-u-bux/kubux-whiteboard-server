@@ -3130,7 +3130,7 @@
           console.error(`Server declined action ${declinedActionUuid}: ${reason}`);
           
           // Find the declined action in our history
-          const actionIndex = history.findIndex(action => action.uuid === declinedActionUuid);
+          const actionIndex = history.findIndex(action => action[shared.MOD_ACTIONS.UUID] === declinedActionUuid);
           
           if (actionIndex !== -1) {
               // If the action is in our history, we need to remove it and all subsequent actions
