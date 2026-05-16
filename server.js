@@ -662,18 +662,18 @@ function logSentMessage(type, payload, requestId = 'N/A', clientId = 'unknown' )
     debug.log(`[SERVER > CLIENT] Sending message of type '${type}' to '${clientId}' in response to '${requestId}' with payload:`, payload);
 }
 
-function broadcastMessageToBoard(message, boardId, excludeWs = null) {
+function broadcastMessageToBoard( message, boardId, excludeWs = null ) {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && client.boardId === boardId && client !== excludeWs) {
-            client.send(serialize(message));
+            client.send( serialize( message ) );
         }
     });
 }
 
-function broadcastMessageToPage(message, pageId, excludeWs = null) {
+function broadcastMessageToPage( message, pageId, excludeWs = null ) {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && client.pageId === pageId && client !== excludeWs) {
-            client.send(serialize(message));
+            client.send( serialize( message ) );
         }
     });
 }
@@ -827,6 +827,20 @@ function sendPingToBoard ( boardId ) {
     });
 }
 
+function boardInfo ( boardId, board, requestId ) {
+    const board_info_message = {
+        type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
+        [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
+        [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+        [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
+    };
+    return ( board_info_message );
+}
+
+function broadcastBoardInfo( boardId, board, requestId ) {
+    const message = boardInfo( boardId, board, requestId );
+    broadcastMessageToBoard( message, boardId );
+}
 
 // Message handlers
 const messageHandlers = {};
@@ -1382,16 +1396,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             releasePage(newPageId);
             debug.log(`[SERVER]: add new page ${newPageId} behind ${pageUuid}`);
             board.pageOrder.splice(board.pageOrder.indexOf(pageUuid) + 1, 0, newPageId);
-            const board_info_message = {
-                type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
-                [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
-                [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
-                [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
-            };
-            releaseBoard(boardId);
+            const message = board_info_message( boardId, board, requestId );
+            releaseBoard( boardId );
             sendFullPage(ws, boardId, newPageId, true, requestId);
             sendPingToBoard( boardId );
-            broadcastMessageToBoard( ws, boardId, board_info_message );
+            broadcastMessageToBoard( ws, boardId, message );
             return;
         case MOD_ACTIONS.DELETE_PAGE.TYPE:
             releasePage(pageUuid);
@@ -1400,9 +1409,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 board.pageOrder.splice(index, 1);
                 const newPageId = board.pageOrder[Math.min(index, board.pageOrder.length - 1)];
                 deletionMap[pageUuid] = newPageId;
+                const message = board_info_message( boardId, board, requestId );
                 releaseBoard(boardId);
                 sendPageInfo(ws, boardId, newPageId, true, requestId);
                 sendPingToBoard( boardId );
+                broadcastMessageToBoard( ws, boardId, message );
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
                 const newPageId = generateSecureUuid();
@@ -1410,9 +1421,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 const newPage = createPage(newPageId);
                 releasePage( newPageId );
                 board.pageOrder[ index ] = newPageId;
+                const message = board_info_message( boardId, board, requestId );
                 releaseBoard( boardId );
                 sendFullPage( ws, boardId, newPageId, true, requestId );
                 sendPingToBoard( boardId );
+                broadcastMessageToBoard( ws, boardId, message );
             }
             return;
         default:
