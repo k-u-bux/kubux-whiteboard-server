@@ -2514,7 +2514,7 @@
               debugLog( "considering new page order" );
               const newPageNr = pages.indexOf( currentPageUuid );
               if ( newPageNr < 0 ) {
-                  debugLog( "current page not found: " currentPageUuid );
+                  debugLog( "current page not found: ", currentPageUuid );
                   requestPageInfo( currentPageUuid );
                   requestBoardInfo( boardId );
                   return;
