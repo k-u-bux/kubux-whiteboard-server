@@ -7024,49 +7024,51 @@
           
           const grid = document.getElementById('overview-grid');
           const pageOrder = serverPageOrder.length > 0 ? serverPageOrder : buildPageOrderFromMeta();
-          const newOrderSet = new Set(pageOrder);
+          const serverOrderSet = new Set(pageOrder);
       
-          // 1. Remove elements that are no longer present in the new order
+          // 1. Eviction: Remove elements that no longer exist on the server
           const existingThumbs = Array.from(grid.querySelectorAll('.overview-thumb'));
           existingThumbs.forEach(thumb => {
-              const uuid = thumb.dataset.uuid; // Assumes your elements store their identifier
-              if (!newOrderSet.has(uuid)) {
+              if (!serverOrderSet.has(thumb.dataset.uuid)) {
                   thumb.remove();
               }
           });
       
-          // 2. Synchronize order and insert new elements
-          pageOrder.forEach((uuid, idx) => {
-              // Query the current state of the DOM at this specific position
-              const currentThumbAtPosition = grid.children[idx];
+          // 2. Interleaving: Find and insert brand-new elements from the server
+          pageOrder.forEach((uuid, serverIdx) => {
+              // Check if this server element already exists locally
+              const existingThumb = grid.querySelector(`[data-uuid="${uuid}"]`);
+              if (existingThumb) return; // Skip: local order/permutation must be preserved
       
-              if (currentThumbAtPosition && currentThumbAtPosition.dataset.uuid === uuid) {
-                  // Element is already in the correct position; verify its index attribute
-                  currentThumbAtPosition.dataset.index = idx;
-                  return;
+              // Element is brand new. Instantiate it.
+              const newThumb = createThumbnailElement(uuid, serverIdx, overviewThumbState.w, overviewThumbState.h);
+      
+              // Find where it belongs relative to the server order.
+              // Scan forward in the server array to find the next surviving neighbor.
+              let referenceElement = null;
+              for (let i = serverIdx + 1; i < pageOrder.length; i++) {
+                  const nextUuid = pageOrder[i];
+                  const matchingLocalThumb = grid.querySelector(`[data-uuid="${nextUuid}"]`);
+                  if (matchingLocalThumb) {
+                      referenceElement = matchingLocalThumb;
+                      break; // Found the closest downstream anchor
+                  }
               }
       
-              // Find if the element exists elsewhere in the grid (moved element)
-              let existingThumb = grid.querySelector(`[data-uuid="${uuid}"]`);
+              // Insert before the anchor, or append to the end if no downstream anchor exists
+              grid.insertBefore(newThumb, referenceElement);
+          });
       
-              if (!existingThumb) {
-                  // It's a brand new element: create it
-                  existingThumb = createThumbnailElement(uuid, idx, overviewThumbState.w, overviewThumbState.h);
-              } else {
-                  // It's an existing element that needs to be relocated; update its index
-                  existingThumb.dataset.index = idx;
-              }
-      
-              // Insert or move the element to the correct position
-              // If currentThumbAtPosition is undefined, insertBefore appends to the end
-              grid.insertBefore(existingThumb, currentThumbAtPosition);
+          // 3. Re-index: Correct data-index attributes to match the new combined DOM layout
+          Array.from(grid.querySelectorAll('.overview-thumb')).forEach((thumb, idx) => {
+              thumb.dataset.index = idx;
           });
           
-          // Re-render and request data
+          // Trigger render pipelines
           renderThumbnails();
           requestThumbnailData();
       }
-      
+
       // Page Overview Mode
       function enterOverviewMode() {
           const overview = document.getElementById('page-overview');
