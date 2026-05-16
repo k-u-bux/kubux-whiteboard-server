@@ -848,16 +848,12 @@ function broadcastBoardInfo( boardId, board, requestId ) {
 function sendBoardInfo() {
     wss.clients.forEach(client => {
         if ( client.readyState === WebSocket.OPEN && client.boardId ) {
-            try {
-                const boardId = client.boardId;
-                const board = useBoard( boardId, false );
-                if ( board ) {
-                    const message = boardInfo( boardId, board, NULL_UUID );
-                    releaseBoard( boardId );
-                    client.send( serialize( message ) );
-                }
-            } catch (e) {
-                debug.error('[SERVER] sendBoardInfo error:', e.message);
+            const boardId = client.boardId;
+            const board = useBoard( boardId, false );
+            if ( board ) {
+                const message = boardInfo( boardId, board, NULL_UUID );
+                releaseBoard( boardId );
+                client.send( serialize( message ) );
             }
         }
     });
