@@ -2300,6 +2300,33 @@
       function createRequestId() {
           return shared.generateUuid();
       }
+
+      // Pending request dispatch system -- replaces fragile ws.onmessage hijacking
+      const pendingRequests = new Map();
+      const REQUEST_TIMEOUT = 5000;
+
+      function sendWithCallback(request) {
+          const requestId = request[shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]
+                        || request[shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]
+                        || request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID]
+                        || request['requestId'];
+          return new Promise((resolve, reject) => {
+              const timer = setTimeout(() => {
+                  pendingRequests.delete(requestId);
+                  reject(new Error(`Request ${requestId} timed out`));
+              }, REQUEST_TIMEOUT);
+              pendingRequests.set(requestId, { resolve, reject, timer });
+              ws.send(shared.serialize(request));
+          });
+      }
+
+      function cleanupPendingRequests() {
+          for (const [id, entry] of pendingRequests) {
+              clearTimeout(entry.timer);
+              entry.reject(new Error('WebSocket disconnected'));
+          }
+          pendingRequests.clear();
+      }
       
       // Show synchronization status
       function updateSyncStatus() {
@@ -2435,6 +2462,7 @@
           ws.onclose = () => {
               debugLog('Disconnected from server');
               connectionEstablished = false;
+              cleanupPendingRequests();
               
               // Schedule automatic reconnection with exponential backoff
               scheduleReconnect();
@@ -2451,6 +2479,20 @@
                   // debugLog('Received event: ', event); 
                   const data = shared.deserialize(event.data);
                   if ( data ) {
+                      // Check if this message matches a pending request
+                      const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]
+                                     || data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID]
+                                     || data[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.REQUEST_ID]
+                                     || data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]
+                                     || data['requestId'];
+                      if ( requestId && pendingRequests.has(requestId) ) {
+                          const entry = pendingRequests.get(requestId);
+                          clearTimeout(entry.timer);
+                          pendingRequests.delete(requestId);
+                          entry.resolve(data);
+                          return;
+                      }
+                      
                       // debugLog('Received message of type: ', data.type);
                       
                       // Handle message based on type
@@ -6644,60 +6686,27 @@
                   showError(`Exporting page ${idx + 1}/${pageUuids.length}...`);
 
                   // Request and wait for page info
-                  const pageInfo = await new Promise((resolve) => {
-                      const requestId = createRequestId();
-                      const originalHandler = ws.onmessage;
-                      
-                      ws.onmessage = (event) => {
-                          try {
-                              const data = shared.deserialize(event.data);
-                              debugLog('requestId = ', data.requestId)
-                              if ( data 
-                                   &&
-                                   data.type === shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TYPE
-                                   &&
-                                   requestId === data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID] ) {
-                                  const pageId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE];
-                                  const pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR];
-                                  const pageTotal = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES];
-                                  const pageSnapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS];
-                                  
-                                  debugLog('Got page info: ', {
-                                      'pageId': pageId,
-                                      'pageNr': pageNr,
-                                      'pageTotal': pageTotal,
-                                      'pageSnapshots': pageSnapshots
-                                   });
-
-                                  ws.onmessage = originalHandler;
-                                  resolve({
-                                      'pageId': pageId,
-                                      'pageNr': pageNr,
-                                      'pageTotal': pageTotal,
-                                      'pageSnapshots': pageSnapshots
-                                  });
-                              } else {
-                                  debugLog('Delegating:', event);
-                                  originalHandler.call(ws, event);
-                              }
-                          } catch (error) {
-                              ws.onmessage = originalHandler;
-                              console.error('Error getting page:', error);
-                              resolve(null);
-                          }
-                      };
-                      
-                      const request = {
+                  let pageInfo;
+                  try {
+                      pageInfo = await sendWithCallback({
                           type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD]: boardId,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE]: pageUuid,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: 0,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER]: false,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: createRequestId()
+                      });
+                      pageInfo = {
+                          'pageId': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE],
+                          'pageNr': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR],
+                          'pageTotal': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES],
+                          'pageSnapshots': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]
                       };
-                      debugLog( 'Asking for page info: ', request );
-                      ws.send(shared.serialize(request));
-                  });
+                      debugLog('Got page info: ', pageInfo);
+                  } catch (err) {
+                      console.warn(`Skipping page ${pageUuid}: ${err.message}`);
+                      continue;
+                  }
                   
                   if (!pageInfo) continue;
                  
@@ -6731,48 +6740,22 @@
                   savePageToCache( pageUuid, initialPageData );
 
                   // Request and wait for page data
-                  const pageData = await new Promise((resolve) => {
-                      const requestId = createRequestId();
-                      const originalHandler = ws.onmessage;
-                      
-                      ws.onmessage = (event) => {
-                          try {
-                              const data = shared.deserialize(event.data);
-                              debugLog('requestId = ', data.requestId)
-                              if ( data 
-                                   &&
-                                   data.type === shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TYPE
-                                   &&
-                                   requestId === data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.REQUEST_ID] ) {
-
-                                  const result = handleReplayMessage( data, true );
-                                  ws.onmessage = originalHandler;
-
-                                  resolve( result );
-                              } else {
-                                  debugLog('Delegating:', event);
-                                  originalHandler.call(ws, event);
-                              }
-                          } catch (error) {
-                              ws.onmessage = originalHandler;
-                              console.error('Error getting page:', error);
-                              resolve( null );
-                          }
-                      };
-                      
-                      const request = {
+                  let pageData;
+                  try {
+                      pageData = await sendWithCallback({
                           type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: initialPageData[ 'present' ],
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: initialPageData[ 'hash' ],
                           [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER]: false,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: requestId
-                      };
-
-                      ws.send(shared.serialize(request));
-
-                  });
+                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: createRequestId()
+                      });
+                      pageData = handleReplayMessage( pageData, true );
+                  } catch (err) {
+                      console.warn(`Skipping replay for page ${pageUuid}: ${err.message}`);
+                      continue;
+                  }
                   
                   if ( !pageData ) continue;
                   
