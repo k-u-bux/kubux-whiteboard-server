@@ -848,10 +848,12 @@ function sendBoardInfo() {
     wss.clients.forEach(client => {
         if ( client.readyState === WebSocket.OPEN && client.boardId ) {
             const boardId = client.boardId;
-            const board = useBoard( boardId );
-            const message = boardInfo( boardId, board, NULL_UUID );
-            releaseBoard( boardId );
-            client.send( serialize( message ) );
+            const board = useBoard( boardId, false );
+            if ( board ) {
+                const message = boardInfo( boardId, board, NULL_UUID );
+                releaseBoard( boardId );
+                client.send( serialize( message ) );
+            }
         }
     });
 }
@@ -863,7 +865,6 @@ const messageHandlers = {};
 function createNewBoard(ws, clientId, requestId) {
     const boardId = generateSecureUuid();
     const board = createBoard(boardId);
-    ws.boardId = boardId;
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
         ws.clientId = clientId; // Store client ID for tracking
@@ -1028,7 +1029,6 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.TYPE] = (ws, data, 
         return;
     }
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.BOARD];
-    ws.boardId = boardId;
     const do_register = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REGISTER];
 
     const board = useBoard( boardId, false );
@@ -1165,7 +1165,6 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.TYPE] = (ws, data, reque
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD];
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.PAGE];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA];
-    ws.boardId = boardId;
     if ( boardId && isUuid( boardId ) && pageId && isUuid( pageId ) ) {
         registerPage(ws, boardId, clientId, pageId, delta, requestId);
     } else {
@@ -1180,7 +1179,6 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
         return;
     }
     let boardId =    data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD];
-    ws.boardId = boardId;
     let pageId =     data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE];
     let delta =      data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
     let do_switch =  data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER];
@@ -1227,7 +1225,6 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, r
     }
     debug.log( `[SERVER] handling full page request, requestId = ${requestId}, data = `, data )
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD];
-    ws.boardId = boardId;
     if ( ! boardId ) { return; }
     if ( ! isUuid( boardId ) ) { return; }
     const board = useBoard( boardId );
@@ -1346,7 +1343,6 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     }
     try {
         const boardId = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD];
-        ws.boardId = boardId;
         const password = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD];
         const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE];
         const action = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD];
@@ -1527,7 +1523,6 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
         return;
     }
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
-    ws.boardId = boardId;
     const pageUuid = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE];
     const present = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT];
     const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
@@ -1620,11 +1615,11 @@ wss.on('connection', (ws, req) => {
         }, pingInterval );
     }
 
-    // if (!boardTimer) {
-    //     boardTimer = setInterval( () => {
-    //         sendBoardInfo();
-    //     }, boardInterval );
-    // }
+    if (!boardTimer) {
+        boardTimer = setInterval( () => {
+            sendBoardInfo();
+        }, boardInterval );
+    }
 
     ws.on('message', message => routeMessage(ws, message));
     
