@@ -3008,8 +3008,7 @@
               return;
           }
 
-          const actionIndex = history.findIndex(action => action.uuid === acceptedActionUuid, undefined, verifiedIndex);
-          
+          const actionIndex = history.findIndex(action => action[shared.MOD_ACTIONS.UUID] === acceptedActionUuid);
           if ( actionIndex === -1 ) {
               // Action not found in our history - request replay
               debugLog(`Accepted action ${acceptedActionUuid} not found in our history`);
@@ -3029,8 +3028,8 @@
               return;
           }
 
-          const afterIndex = hashes.findIndex( hash => hash == afterHash, undefined, verifiedIndex );
-          const beforeIndex = hashes.findIndex( hash => hash === beforeHash, undefined, verifiedIndex );
+          const afterIndex = hashes.indexOf( afterHash );
+          const beforeIndex = hashes.indexOf( beforeHash );
 
           if ( afterIndex > verifiedIndex ) {
               debugLog(`found afterIndex=${afterIndex} with verifiedIndex=${verifiedIndex}`);
@@ -3041,7 +3040,7 @@
               return;
           }
           if ( beforeIndex >= verifiedIndex ) {
-              debugLog(`found beforeIndex=${afterIndex} with verifiedIndex=${verifiedIndex}`);
+              debugLog(`found beforeIndex=${beforeIndex} with verifiedIndex=${verifiedIndex}`);
               verifiedIndex = beforeIndex;
               const [ action ] = history.splice( actionIndex, 1 );
               history.splice( verifiedIndex, 0, action );
@@ -6623,8 +6622,6 @@
                   const pageUuid = pageUuids[idx];
                   showError(`Exporting page ${idx + 1}/${pageUuids.length}...`);
 
-                  const pageDelta = serverPageOrder.indexOf(pageUuid) - serverPageOrder.indexOf(currentPageUuid);
-
                   // Request and wait for page info
                   const pageInfo = await new Promise((resolve) => {
                       const requestId = createRequestId();
@@ -6672,8 +6669,8 @@
                       const request = {
                           type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD]: boardId,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE]: currentPageUuid,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: pageDelta,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE]: pageUuid,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: 0,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER]: false,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]: requestId
                       };
@@ -6688,7 +6685,7 @@
                   pagesMetaData[ pageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
                   const pageSnapshots = pageInfo['pageSnapshots'];
                   touchPageInCache( pageUuid );
-                  initialPageData = loadPageFromCache( pageUuid );
+                  let initialPageData = loadPageFromCache( pageUuid );
                   pageHashes = [ shared.hashAny( pageUuid ) ];
                   for ( let i = 0; i < initialPageData['history'].length; ++ i ) {
                       pageHashes.push( shared.hashNext( pageHashes[ i ], initialPageData['history'][ i ] ) );

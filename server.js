@@ -1412,7 +1412,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 const message = boardInfo( boardId, board, requestId );
                 releaseBoard(boardId);
                 sendPageInfo(ws, boardId, newPageId, true, requestId);
-                sendPingToBoard( boardId, clientId );
+                sendPingToBoard( boardId );
                 broadcastMessageToBoard( message, boardId );
             } else {
                 const index = board.pageOrder.indexOf(pageUuid);                
@@ -1424,7 +1424,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
                 const message = boardInfo( boardId, board, requestId );
                 releaseBoard( boardId );
                 sendFullPage( ws, boardId, newPageId, true, requestId );
-                sendPingToBoard( boardId, clientId );
+                sendPingToBoard( boardId );
                 broadcastMessageToBoard( message, boardId );
             }
             return;
