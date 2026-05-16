@@ -3262,26 +3262,28 @@
               hash: pageData['hashes'][pageData['present']]
           });
           
-          // (b) Page view — only if in page mode and this is our page
-          if ( !isOverviewActive() && ( do_switch || currentPageUuid === pageUuid ) ) {
-              currentPageUuid = pageUuid;
-              history = pageData['history'];
-              present = pageData['present'];
-              hashes = pageData['hashes'];
-              // Recompile visual state
-              updateVisualState();
-              // Update verified index to match present after replay
-              verifiedIndex = present;
-              // Update page info
-              pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR];
-              totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES];
-              updatePageInfo();
-              
-              // Update UI
-              updateSyncStatus();
-              updateUndoRedoButtons();
-          }
-          debugLog("Replay applied successfully", pageData);
+           // (b) Page view — only if in page mode and this is our page
+           if ( do_switch || currentPageUuid === pageUuid ) {
+               currentPageUuid = pageUuid;
+               history = pageData['history'];
+               present = pageData['present'];
+               hashes = pageData['hashes'];
+               // Recompile visual state (always — needed even in overview mode
+               // for when overview closes and the canvas is revealed)
+               updateVisualState();
+               // Update verified index to match present after replay
+               verifiedIndex = present;
+               // Update page info
+               pageNr = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.PAGE_NR];
+               totalPages = data[shared.MESSAGES.SERVER_TO_CLIENT.REPLAY.TOTAL_PAGES];
+               
+               if ( !isOverviewActive() ) {
+                   updatePageInfo();
+                   updateSyncStatus();
+                   updateUndoRedoButtons();
+               }
+           }
+           debugLog("Replay applied successfully", pageData);
 
           // (c) Overview — if overview is visible
           refreshOverviewIfActive();
@@ -3312,23 +3314,25 @@
               hash: pageHashes[pagePres]
           } );
           
-          if ( do_switch ) {
-              currentPageUuid = pageUuid;
-              history = pageHist;
-              present = pagePres;
-              hashes = pageHashes;
-              pageNr = page_nr;
-              totalPages = n_pages;
-              commitCurrentPage();
-              verifiedIndex = present;
-              
-              if ( ! isOverviewActive() ) {
-                  // Recompile visual state
-                  updateVisualState();
-                  // Update UI
-                  updatePageInfo();
-                  updateSyncStatus();
-                  updateUndoRedoButtons();
+           if ( do_switch ) {
+               currentPageUuid = pageUuid;
+               history = pageHist;
+               present = pagePres;
+               hashes = pageHashes;
+               pageNr = page_nr;
+               totalPages = n_pages;
+               commitCurrentPage();
+               verifiedIndex = present;
+               
+               // Recompile visual state (always — needed even in overview mode
+               // for when overview closes and the canvas is revealed)
+               updateVisualState();
+               
+               if ( ! isOverviewActive() ) {
+                   // Update UI
+                   updatePageInfo();
+                   updateSyncStatus();
+                   updateUndoRedoButtons();
                   
                   // After loading initial page, check if we should restore saved position
                   if (!hasRestoredSavedPosition && window.savedPagePosition) {

@@ -229,7 +229,9 @@ const credentials = [];
 const deletionMap = {};
 const clients = {}; // Map client IDs to WebSocket instances
 const pingInterval = 5000;
+const boardInterval = 5000;
 let pingTimer;
+let boardTimer;
 
 function initializeGlobals() {
     const filePath = getPasswdFilePath();
@@ -840,6 +842,18 @@ function boardInfo ( boardId, board, requestId ) {
 function broadcastBoardInfo( boardId, board, requestId ) {
     const message = boardInfo( boardId, board, requestId );
     broadcastMessageToBoard( message, boardId );
+}
+
+function sendBoardInfo() {
+    wss.clients.forEach(client => {
+        if ( client.readyState === WebSocket.OPEN && client.boardId ) {
+            const boardId = client.boardId;
+            const board = useBoard( boardId );
+            const message = boardInfo( boardId, board, NULL_UUID );
+            releaseBoard( boardId );
+            client.send( serialize( message ) );
+        }
+    });
 }
 
 // Message handlers
@@ -1604,6 +1618,12 @@ wss.on('connection', (ws, req) => {
         pingTimer = setInterval(() => {
             sendPing();
         }, pingInterval);
+    }
+
+    if (!boardTimer) {
+        boardTimer = setInterval(() => {
+            sendBoardInfo();
+        }, boardInterval);
     }
 
     ws.on('message', message => routeMessage(ws, message));
