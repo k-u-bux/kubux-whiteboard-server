@@ -7060,7 +7060,7 @@
       }
 
       function refreshOverviewGrid() {
-          console.error( "refresh grid" );
+          // console.error( "refresh grid" );
           const overviewEl = document.getElementById('page-overview');
           if (!overviewEl || !overviewEl.classList.contains('visible')) return;
           
@@ -7080,26 +7080,21 @@
           pageOrder.forEach((uuid, serverIdx) => {
               // Check if this server element already exists locally
               const existingThumb = grid.querySelector(`[data-page-uuid="${uuid}"]`);
-              debugLog( "existingThumb = ", existingThumb );
               if (existingThumb) return; // Skip: local order/permutation must be preserved
       
               // Element is brand new. Instantiate it.
               const newThumb = createThumbnailElement(uuid, serverIdx, overviewThumbState.w, overviewThumbState.h);
-      
-              // Find where it belongs relative to the server order.
-              // Scan forward in the server array to find the next surviving neighbor.
-              let referenceElement = null;
-              for (let i = serverIdx + 1; i < pageOrder.length; i++) {
-                  const nextUuid = pageOrder[i];
-                  const matchingLocalThumb = grid.querySelector(`[data-page-uuid="${nextUuid}"]`);
+              // Find predecessor in server order that exists in DOM, insert after it
+              let referenceSibling = null;
+              for (let i = serverIdx - 1; i >= 0; i--) {
+                  const prevUuid = pageOrder[i];
+                  const matchingLocalThumb = grid.querySelector(`[data-page-uuid="${prevUuid}"]`);
                   if (matchingLocalThumb) {
-                      referenceElement = matchingLocalThumb;
-                      break; // Found the closest downstream anchor
+                      referenceSibling = matchingLocalThumb.nextSibling;
+                      break;
                   }
               }
-      
-              // Insert before the anchor, or append to the end if no downstream anchor exists
-              grid.insertBefore(newThumb, referenceElement);
+              grid.insertBefore(newThumb, referenceSibling);
           });
       
           // 3. Re-index: Correct data-index and labels to match the new combined DOM layout
