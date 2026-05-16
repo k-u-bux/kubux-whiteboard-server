@@ -2567,12 +2567,11 @@
       }
 
       function requestBoardInfo() {
-          const requestId = createRequestId();
           sendMessage({
               type: shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.BOARD]: boardId,
               [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REGISTER]: false,
-              [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REQUEST_ID]: requestId
+              [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REQUEST_ID]: createRequestId()
           });
       }
 
@@ -7020,6 +7019,7 @@
       }
 
       function refreshOverviewGrid() {
+          console.error( "refresh grid" );
           const overviewEl = document.getElementById('page-overview');
           if (!overviewEl || !overviewEl.classList.contains('visible')) return;
           
