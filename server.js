@@ -1617,7 +1617,7 @@ wss.on('connection', (ws, req) => {
 
     if (!boardTimer) {
         boardTimer = setInterval( () => {
-            sendBoardInfo();
+            // sendBoardInfo();
         }, boardInterval );
     }
 
