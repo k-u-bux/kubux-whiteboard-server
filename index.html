@@ -6757,7 +6757,10 @@
                       continue;
                   }
                   
-                  if ( !pageData ) continue;
+                  if ( !pageData ) {
+                      console.warn(`Skipping page ${pageUuid}: replay returned no data (hash chain mismatch)`);
+                      continue;
+                  }
                   
                   // Use format dimensions if set, else canvas size
                   const pdfBoardW = canvasFormat ? canvasFormat.w * 0.75 : canvas.width;
