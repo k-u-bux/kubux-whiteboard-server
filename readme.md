@@ -7,7 +7,8 @@ A real-time collaborative whiteboard application designed for mathematics educat
 ## Features
 
 - **Real-time collaboration** - Multiple users can simultaneously work on the same whiteboard
-- **Multi-page support** - Create and navigate between multiple pages in a whiteboard
+- **Multi-page support** - Create, delete, and reorder pages in a whiteboard
+- **Page Overview Mode** - Grid of page thumbnails with drag-and-drop reordering, batch delete, and multi-page PDF export
 - **Spectator mode** - You can send invites that enable viewing (including navigation) but not editing
 - **Rich drawing tools** - Pen, highlighter, and chalk tools with customizable properties
 - **Shape tools** - Draw circles, rectangles, curves, and horizontal/vertical/diagonal lines
@@ -16,10 +17,11 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Path modes** - Open paths, closed paths, and filled shapes
 - **Selection tools** - Rectangle, lasso, and stroke-based selection with cut/copy/paste
 - **Layer system** - Organize content across 8 separate layers with visibility control
-- **PDF export** - Export single pages or entire whiteboards as vector PDFs
+- **PDF export** - Export single pages, selected pages, or entire whiteboards as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
 - **Board navigation** - Switch between multiple boards, copy shareable links, create new boards from within the app
-- **Timer** - Times auto-undo.
+- **Timer** - Times auto-undo for temporary annotations during presentations
+- **Page caching** - Client-side LRU cache for fast page switching with server hash verification
 - **Progressive Web App (PWA)** - Install as a standalone app on tablets and mobile devices
 - **Offline service worker** - Offline support via service worker caching
 
@@ -198,8 +200,11 @@ A new board will be created and the URL will change to point towards that board.
 - **Navigation** - Use the hand tool (✋) to pan around the canvas
 - **Zooming** - Use the zoom controls or mouse wheel to zoom in/out
 - **Undo/Redo** - Use the undo (↩) and redo (↪) buttons or keyboard shortcuts (Ctrl+Z, Ctrl+Y)
-- **Page Management** - Add new pages, navigate between pages using the controls at the top
+- **Page Management** - Add new pages, delete pages, navigate between pages using the controls at the top. Click the page info label ("Page X of Y") to open the page menu for reordering and quick navigation.
 - **Board Navigation** - Click the folder icon (🗂️) to open the board navigation overlay, where you can copy board links, create new boards, or navigate to different boards by URL/UUID
+- **Keyboard Shortcuts**:
+  - `Ctrl+Z` — Undo
+  - `Ctrl+Y` or `Ctrl+Shift+Z` — Redo
 
 ### Tool Options
 
@@ -232,6 +237,30 @@ The sidebar provides access to additional stroke properties:
 - Move elements between layers
 - Transform selections with scaling and rotation
 
+### Page Management
+
+- **Add Page** — Click the "+" button to insert a new page after the current page
+- **Delete Page** — Click the "−" button to delete the current page (with confirmation dialog)
+- **Page Menu** — Click the page info label ("Page X of Y") to open the page menu:
+  - **Overview** — Enter overview mode (see below)
+  - **Go to page** — Navigate directly to any page by number
+  - **Move up/down** — Reorder the current page
+  - **Move to position** — Jump the current page to a specific position
+- **Keyboard Shortcuts** — Use the page navigation buttons (first, prev, next, last) in the toolbar
+
+### Overview Mode
+
+Overview mode displays all pages as thumbnails in a grid, enabling batch operations:
+
+- **Enter** — Click the page info label and select "Overview", or click the page info label directly
+- **Navigate** — Click any thumbnail to jump to that page
+- **Reorder** — Drag and drop thumbnails to reorder pages
+- **Delete** — Select pages via checkboxes and click "Delete"
+- **Add** — Click "Add" to insert a new page at the end
+- **Move to Front/Back** — Select pages and move them to the beginning or end of the board
+- **Export** — Export selected pages or all pages as a multi-page PDF
+- **Confirm/Cancel** — Confirm to apply reordering, cancel to discard
+
 ### Timer
 
 - Toggle the timer (🕐) in the sidebar to auto-undo drawing within a few seconds: think of temporarilry highlighting an element during a presentation).
@@ -257,6 +286,8 @@ The communication protocol between clients and the server uses:
 - Optimistic local updates for responsive UI
 - Replay mechanism for resolving inconsistencies
 - Sparse hash snapshots for efficient verification
+- Board info messages for page order synchronization
+- Shuffle proposals for collaborative page reordering
 
 For detailed protocol documentation, see [protocol.md](protocol.md).
 
@@ -273,16 +304,17 @@ The client uses an optimized two-canvas rendering approach:
 - **Page caching**: LRU cache (max 10 pages) with automatic eviction and persistence
 - **Board caching**: LRU cache (max 10 boards) with automatic eviction and persistence
 - **Periodic persistence**: State is saved to disk every 10 seconds
-- **Ping mechanism**: Server pings connected clients every 5 seconds for state verification
+- **Ping mechanism**: Server pings connected clients every 5 seconds for state verification, including hash snapshots for efficient reconciliation
 - **Page deletion mapping**: When a page is deleted, a redirect chain maps the old UUID to its replacement
 - **Graceful shutdown**: SIGTERM and SIGINT handlers persist state before exit
 
 ### Client Architecture
 
-- **IndexedDB storage**: Pages are cached locally for persistence
-- **Server hash validation**: Cached pages are validated against server hashes
+- **In-memory LRU cache**: Pages are cached locally (max 24 entries) for fast switching
+- **Server hash validation**: Cached pages are validated against server hashes via snapshots
 - **Replay-based reconciliation**: When hash mismatches are detected, the client requests replay data from the server
 - **Cache optimization**: Only re-render changed elements when possible
+- **Optimistic pre-render**: Navigating to a page shows cached data immediately while server confirms
 
 ### Security
 
