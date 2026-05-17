@@ -23,7 +23,6 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Timer** - Times auto-undo for temporary annotations during presentations
 - **Page caching** - Client-side LRU cache for fast page switching with server hash verification
 - **Progressive Web App (PWA)** - Install as a standalone app on tablets and mobile devices
-- **Offline service worker** - Offline support via service worker caching
 
 ## Installation
 
@@ -335,9 +334,6 @@ Only the root path (`/`) and a strict whitelist of PWA files are served:
 ## Progressive Web App Support
 
 The application includes full PWA support:
-- **manifest.json**: Defines app name, icons, and display mode (standalone)
-- **Service worker (sw.js)**: Caches application resources for offline use
-- **Icons**: Multiple icon sizes (192x192, 512x512) and apple-touch-icon for iOS
 - When installed on a tablet, the standalone mode removes browser UI, maximizing available canvas space
 
 ## Development
