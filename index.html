@@ -6768,8 +6768,8 @@
                   }
                   
                   // Use format dimensions if set, else canvas size
-                  const pdfBoardW = canvasFormat ? canvasFormat.w * 0.75 : canvas.width;
-                  const pdfBoardH = canvasFormat ? canvasFormat.h * 0.75 : canvas.height;
+                  const pdfBoardW = canvasFormat ? canvasFormat.w : canvas.width;
+                  const pdfBoardH = canvasFormat ? canvasFormat.h : canvas.height;
                   const pdfCtx = builder.new_page(pdfBoardW, pdfBoardH);
                   
                    if ( !canvasFormat ) {
