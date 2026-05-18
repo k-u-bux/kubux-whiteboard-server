@@ -2973,6 +2973,8 @@
           const pingSnapshots = data[shared.MESSAGES.SERVER_TO_CLIENT.PING.SNAPSHOTS];
           
           debugLog('Received ping', {
+              pageNr: pageNr,
+              totalPages: totalPages,
               serverPageUuid: pingPageUuid, 
               serverPageHash: pingPageHash, 
               serverPageNr: pingPageNr, 
