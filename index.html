@@ -971,7 +971,9 @@
           <button class="popup-option" data-format="legal-portrait">Legal</button>
           <button class="popup-option" data-format="legal-landscape">Legal wide</button>
           <button class="popup-option" data-format="16:9">16:9</button>
+          <button class="popup-option" data-format="16:10">16:10</button>
           <button class="popup-option" data-format="4:3">4:3</button>
+          <button class="popup-option" data-format="3:2">3:2</button>
           <button class="popup-option" data-format="2:1">2:1</button>
           <button class="popup-option" data-format="custom">Custom…</button>
         </div>
@@ -1913,7 +1915,9 @@
           'legal-portrait': { w: 612, h: 1008 },
           'legal-landscape': { w: 1008, h: 612 },
           '16:9': { w: 842, h: 474 },
+          '16:10': { w: 842, h: 526 },
           '4:3': { w: 842, h: 632 },
+          '3:2': { w: 842, h: 561 },
           '2:1': { w: 842, h: 421 },
       };
       let canvasFormat = null; // null = no format, else { w, h }
@@ -4213,7 +4217,9 @@
                       case 'legal-portrait': btn.textContent = 'Legal'; return;
                       case 'legal-landscape': btn.textContent = 'Legal wide'; return;
                       case '16:9': btn.textContent = '16:9'; return;
+                      case '16:10': btn.textContent = '16:10'; return;
                       case '4:3': btn.textContent = '4:3'; return;
+                      case '3:2': btn.textContent = '3:2'; return;
                       case '2:1': btn.textContent = '2:1'; return;
                   }
               }
