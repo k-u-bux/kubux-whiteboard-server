@@ -2560,14 +2560,14 @@
               debugLog( "considering new page order" );
  
               // stay on the last page
-              if ( pageNr === totalPages && totalPages < pages.length ) {
-                  debugLog('Server indicates the board has grown. Stay on the last page');
-                  serverPageOrder = pages;
-                  totalPages = pages.length;
-                  pageNr = totalPages;
-                  requestFullPage( pages[ totalPages - 1 ], true, 0 );
-                  return;
-              }
+              // if ( pageNr === totalPages && totalPages < pages.length ) {
+              //     debugLog('Server indicates the board has grown. Stay on the last page');
+              //     serverPageOrder = pages;
+              //     totalPages = pages.length;
+              //     pageNr = totalPages;
+              //     requestFullPage( pages[ totalPages - 1 ], true, 0 );
+              //     return;
+              // }
 
               const newPageNr = pages.indexOf( currentPageUuid );
               if ( newPageNr < 0 ) {
