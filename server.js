@@ -951,7 +951,7 @@ function describePage(ws, boardId, pageId, delta, do_switch, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]: snapshots,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR]: pageNr,
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES]: board.pageOrder.length,
-            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REGISTER]: do_switch,           
+            [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SWITCH]: do_switch,           
             [MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]: requestId
         };
         if ( do_switch ) {

@@ -2560,14 +2560,14 @@
               debugLog( "considering new page order" );
  
               // stay on the last page
-              // if ( pageNr === totalPages && totalPages < pages.length ) {
-              //     debugLog('Server indicates the board has grown. Stay on the last page');
-              //     serverPageOrder = pages;
-              //     totalPages = pages.length;
-              //     pageNr = totalPages;
-              //     requestFullPage( pages[ totalPages - 1 ], true, 0 );
-              //     return;
-              // }
+              if ( pageNr === totalPages && totalPages < pages.length ) {
+                  debugLog('Server indicates the board has grown. Stay on the last page');
+                  serverPageOrder = pages;
+                  totalPages = pages.length;
+                  pageNr = totalPages;
+                  requestFullPage( pages[ totalPages - 1 ], true, 0 );
+                  return;
+              }
 
               const newPageNr = pages.indexOf( currentPageUuid );
               if ( newPageNr < 0 ) {
@@ -2984,13 +2984,6 @@
               pingSnapshots: pingSnapshots
           });
           
-          // Check if we are on the wrong page
-          if (currentPageUuid !== pingPageUuid) {
-              debugLog('Server indicates we should be on a different page');
-              requestPageInfo(pingPageUuid, true);
-              return;
-          }
-          
           // stay on the last page
           if ( pageNr === totalPages && totalPages < pingTotalPages ) {
               debugLog('Server indicates the board has grown. Stay on the last page');
@@ -2998,6 +2991,13 @@
               return;
           }
 
+          // Check if we are on the wrong page
+          if (currentPageUuid !== pingPageUuid) {
+              debugLog('Server indicates we should be on a different page');
+              requestPageInfo(pingPageUuid, true);
+              return;
+          }
+          
           // Update page info if needed
            if (pageNr !== pingPageNr || totalPages !== pingTotalPages) {
                pageNr = pingPageNr;
