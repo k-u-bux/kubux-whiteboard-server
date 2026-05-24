@@ -206,7 +206,9 @@ const {
     is_invalid_REPLAY_REQUEST_message,
     is_invalid_MOD_ACTION_PROPOSALS_message,
     is_invalid_BOARD_INFO_REQUEST_message,
-    is_invalid_SHUFFLE_PROPOSAL_message
+    is_invalid_SHUFFLE_PROPOSAL_message,
+    is_invalid_SET_BOARD_TITLE_message,
+    is_invalid_GET_BOARDS_REQUEST_message
 } = require('./shared');
 
 
@@ -226,13 +228,22 @@ const getFilePath = (uuid,ext) => path.join(DATA_DIR, `${uuid}.${ext}`);
 
 
 // Server state structures
-const credentials = [];
+const credentials = []; // format: [["username", "salt:hash"], ...]
 const deletionMap = {};
 const clients = {}; // Map client IDs to WebSocket instances
 const pingInterval = 5000;
 const boardInterval = 5000;
 let pingTimer;
 let boardTimer;
+
+function resolveUser(password) {
+    for (const [username, storedHash] of credentials) {
+        if (verifyPassword(password, storedHash)) {
+            return username;
+        }
+    }
+    return null;
+}
 
 function initializeGlobals() {
     const filePath = getPasswdFilePath();
@@ -249,6 +260,11 @@ function initializeGlobals() {
         Object.assign(deletionMap, parsedMap);
         debug.log(`[SERVER] Loaded ${Object.keys(deletionMap).length} deletion mappings`);
     }
+}
+
+function persistCredentials() {
+    const filePath = getPasswdFilePath();
+    fs.writeFileSync(filePath, JSON.stringify(credentials, null, 2), 'utf8');
 }
 
 function persistDeletionMap() {
@@ -296,7 +312,7 @@ const saveBoard = (boardId, board) => saveItem(boardId, board, 'board', isUuid);
 const savePage = (pageId, page) => saveItem(pageId, page, 'page', isUuid);
 
 
-function createBoard(boardId) {
+function createBoard(boardId, owner, title) {
     if ( ! isUuid( boardId ) ) { 
         debug.log( `refuse to create a board with ID ${boardId}.` );
         return null; 
@@ -306,7 +322,10 @@ function createBoard(boardId) {
     const password = generatePasswd();
     const board = {
         passwd: password,
-        pageOrder: [pageId]
+        pageOrder: [pageId],
+        owner: owner,
+        title: title,
+        createdAt: Date.now()
     };
     saveBoard(boardId, board);
     return board;
@@ -328,11 +347,11 @@ function createPage(pageId) {
     return (page);
 }
 
-function loadOrCreateBoard(boardId, create=true) {
+function loadOrCreateBoard(boardId, create=true, owner=null, title=null) {
     let board = loadBoard(boardId);
     if (board) { return board; }
     if ( create ) {
-        return createBoard(boardId);
+        return createBoard(boardId, owner, title);
     } else {
         return null;
     }
@@ -515,7 +534,7 @@ function isValidRequest(req) {
 
     // 2. Query Parameter Validation
     const queryKeys = Object.keys(urlParts.query);
-    const allowedKeys = ['board', 'passwd', 'credential'];
+    const allowedKeys = ['board', 'passwd', 'credential', 'title'];
 
     // Ensure all keys used are in the whitelist
     const hasInvalidParams = queryKeys.some(key => !allowedKeys.includes(key));
@@ -835,6 +854,8 @@ function boardInfo ( boardId, board, requestId ) {
         type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
         [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
         [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
+        [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TITLE]: board.title || null,
+        [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.CREATED_AT]: board.createdAt || null,
         [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
     };
     return ( board_info_message );
@@ -863,9 +884,9 @@ function sendBoardInfo() {
 const messageHandlers = {};
 
 
-function createNewBoard(ws, clientId, requestId) {
+function createNewBoard(ws, clientId, owner, title, requestId) {
     const boardId = generateSecureUuid();
-    const board = createBoard(boardId);
+    const board = createBoard(boardId, owner, title);
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
         ws.clientId = clientId; // Store client ID for tracking
@@ -882,6 +903,8 @@ function createNewBoard(ws, clientId, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD]: boardId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD]: board.passwd,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE_ID]: ws.pageId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TITLE]: board.title,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.CREATED_AT]: board.createdAt,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
         };
         ws.send(serialize(response));
@@ -1040,12 +1063,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.TYPE] = (ws, data, 
             debug.log(`[SERVER] Client ${ws.clientId} registered with board via board-info-request: ${boardId}`);
         }
 
-        const message = {
-            type: MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.BOARD]: boardId,
-            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
-            [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
-        };
+        const message = boardInfo( boardId, board, requestId );
         ws.send(serialize(message));
         logSentMessage(message.type, message, requestId, ws.clientId);
     }
@@ -1198,25 +1216,16 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
     }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
+    let title = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TITLE];
     
-    // Check credentials using scrypt
-    let isAuthorized = false;
-    
-    for (const storedHash of credentials) {
-        if (verifyPassword(password, storedHash)) {
-            isAuthorized = true;
-            debug.log(`[SERVER] Client ${clientId} authenticated successfully`);
-            break;
-        }
-    }
-    
-    if (!isAuthorized) {
+    const owner = resolveUser(password);
+    if (!owner) {
         debug.log(`[SERVER] Client ${clientId} failed authentication`);
         return;
     }
     
-    debug.log(`[SERVER] Client ${clientId} is allowed to create boards`);
-    createNewBoard(ws, clientId, requestId);
+    debug.log(`[SERVER] Client ${clientId} authenticated as '${owner}', creating board with title '${title}'`);
+    createNewBoard(ws, clientId, owner, title, requestId);
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, requestId) => {
@@ -1516,6 +1525,95 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             sendDeclineMessage(errorContext, `Server error: ${error.message}`, requestId);
         }
     }
+};
+
+// Handler for set-board-title
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_SET_BOARD_TITLE_message( data ) ) {
+        debug.log(`[SERVER] dropped set-board-title from `, ws.clientId);
+        return;
+    }
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.BOARD];
+    const password = data[MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.PASSWORD];
+    const title = data[MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.TITLE];
+
+    const owner = resolveUser(password);
+    if (!owner) {
+        debug.log(`[SERVER] set-board-title declined: unauthorized`);
+        return;
+    }
+
+    const board = useBoard( boardId, false );
+    if ( !board ) {
+        debug.log(`[SERVER] set-board-title: board not found ${boardId}`);
+        releaseBoard(boardId);
+        return;
+    }
+
+    if ( board.owner !== owner ) {
+        debug.log(`[SERVER] set-board-title declined: '${owner}' is not owner of board ${boardId}`);
+        releaseBoard(boardId);
+        return;
+    }
+
+    board.title = title;
+    persistBoard( boardId );
+
+    const message = boardInfo( boardId, board, requestId );
+    releaseBoard( boardId );
+
+    // Broadcast updated board info to all subscribers on this board
+    broadcastMessageToBoard( message, boardId );
+    logSentMessage(message.type, message, requestId, ws.clientId);
+};
+
+// Handler for get-boards-request
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.GET_BOARDS_REQUEST.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_GET_BOARDS_REQUEST_message( data ) ) {
+        debug.log(`[SERVER] dropped get-boards-request from `, ws.clientId);
+        return;
+    }
+    const password = data[MESSAGES.CLIENT_TO_SERVER.GET_BOARDS_REQUEST.PASSWORD];
+
+    const owner = resolveUser(password);
+    if (!owner) {
+        debug.log(`[SERVER] get-boards-request declined: unauthorized`);
+        return;
+    }
+
+    // Scan all board files in data directory
+    const boards = [];
+    try {
+        const files = fs.readdirSync(DATA_DIR);
+        for (const file of files) {
+            if (file.endsWith('.board')) {
+                const boardId = file.slice(0, -6); // remove '.board'
+                if (isUuid(boardId)) {
+                    const board = loadBoard(boardId);
+                    if (board && board.owner === owner) {
+                        boards.push({
+                            board: boardId,
+                            title: board.title || null,
+                            createdAt: board.createdAt || null
+                        });
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        debug.error(`[SERVER] Error scanning boards: ${err.message}`);
+    }
+
+    // Sort by creation time, newest first
+    boards.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    const response = {
+        type: MESSAGES.SERVER_TO_CLIENT.BOARDS_OWNED_BY.TYPE,
+        [MESSAGES.SERVER_TO_CLIENT.BOARDS_OWNED_BY.BOARDS]: boards,
+        [MESSAGES.SERVER_TO_CLIENT.BOARDS_OWNED_BY.REQUEST_ID]: requestId
+    };
+    ws.send(serialize(response));
+    logSentMessage(response.type, response, requestId, ws.clientId);
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requestId) => {

@@ -230,6 +230,7 @@ const MESSAGES = {
             TYPE: 'create-board',
             PASSWORD: 'passwd',
             CLIENT_ID: 'clientId',
+            TITLE: 'title',
             REQUEST_ID: 'requestId'
         },
         FULL_PAGE_REQUEST: {
@@ -246,6 +247,18 @@ const MESSAGES = {
             PASSWORD: 'passwd',
             BEFORE: 'before',
             AFTER: 'after',
+            REQUEST_ID: 'requestId'
+        },
+        SET_BOARD_TITLE: {
+            TYPE: 'set-board-title',
+            BOARD: 'board-uuid',
+            PASSWORD: 'passwd',
+            TITLE: 'title',
+            REQUEST_ID: 'requestId'
+        },
+        GET_BOARDS_REQUEST: {
+            TYPE: 'get-boards-request',
+            PASSWORD: 'passwd',
             REQUEST_ID: 'requestId'
         },
         MOD_ACTION_PROPOSALS: {
@@ -272,6 +285,8 @@ const MESSAGES = {
             BOARD: 'board-uuid',
             PASSWORD: 'passwd',
             FIRST_PAGE: 'first-page-uuid',
+            TITLE: 'title',
+            CREATED_AT: 'createdAt',
             REQUEST_ID: 'requestId'
         },
         BOARD_REGISTERED: {
@@ -286,6 +301,13 @@ const MESSAGES = {
             TYPE: 'board-info',
             BOARD: 'board-uuid',
             PAGES: 'pages',
+            TITLE: 'title',
+            CREATED_AT: 'createdAt',
+            REQUEST_ID: 'requestId'
+        },
+        BOARDS_OWNED_BY: {
+            TYPE: 'boards-owned-by',
+            BOARDS: 'boards',
             REQUEST_ID: 'requestId'
         },
         PAGE_REGISTERED: {
@@ -530,7 +552,34 @@ function is_invalid_CREATE_BOARD_message(data) {
     
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     if (clientId !== undefined && typeof clientId !== 'string') return true;
+
+    const title = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TITLE];
+    if (!title || typeof title !== 'string') return true;
     
+    return false;
+}
+
+function is_invalid_SET_BOARD_TITLE_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.BOARD];
+    if (!boardId || !isUuid(boardId)) return true;
+
+    const password = data[MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.PASSWORD];
+    if (!password || typeof password !== 'string') return true;
+
+    const title = data[MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.TITLE];
+    if (!title || typeof title !== 'string') return true;
+
+    return false;
+}
+
+function is_invalid_GET_BOARDS_REQUEST_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    const password = data[MESSAGES.CLIENT_TO_SERVER.GET_BOARDS_REQUEST.PASSWORD];
+    if (!password || typeof password !== 'string') return true;
+
     return false;
 }
 
@@ -1548,6 +1597,8 @@ if (typeof module !== 'undefined' && module.exports) {
         is_invalid_MOD_ACTION_PROPOSALS_message,
         is_invalid_BOARD_INFO_REQUEST_message,
         is_invalid_SHUFFLE_PROPOSAL_message,
+        is_invalid_SET_BOARD_TITLE_message,
+        is_invalid_GET_BOARDS_REQUEST_message,
         // transforms
         createIdentityTransform,
         applyTransform,

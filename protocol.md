@@ -182,13 +182,14 @@ The server validates:
 
 ### `create-board`
 
-Create a new board (requires server-level credential).
+Create a new board (requires server-level credential). The credential is resolved to a username for ownership tracking.
 
 ```json
 {
   "type": "create-board",
   "password": "<credential>",
   "client-id": "<client-uuid>",
+  "title": "<board-title>",
   "requestId": "<request-uuid>"
 }
 ```
@@ -197,20 +198,75 @@ Create a new board (requires server-level credential).
 
 ---
 
+### `set-board-title`
+
+Set the title of a board. Only the owner (identified by credential) can change the title.
+
+```json
+{
+  "type": "set-board-title",
+  "board": "<board-uuid>",
+  "password": "<credential>",
+  "title": "<new-title>",
+  "requestId": "<request-uuid>"
+}
+```
+
+The server resolves the credential to a username, checks `board.owner === username`, updates the title, persists, and broadcasts `board-info` to all subscribers on that board. The `board-info` carries the `requestId`, so the requesting client can correlate.
+
+---
+
+### `get-boards-request`
+
+Request a list of all boards owned by the user identified by the credential.
+
+```json
+{
+  "type": "get-boards-request",
+  "password": "<credential>",
+  "requestId": "<request-uuid>"
+}
+```
+
+**Response:** `boards-owned-by`
+
+---
+
 ## Server → Client Messages
 
 ### `board-created`
 
-Sent in response to a successful board creation.
+Sent in response to a successful board creation. Now includes `title` and `createdAt`.
 
 ```json
 {
   "type": "board-created",
   "board": "<new-board-uuid>",
   "password": "<new-board-password>",
+  "title": "<board-title>",
+  "createdAt": <unix-timestamp-ms>,
   "requestId": "<request-uuid>"
 }
 ```
+
+---
+
+### `boards-owned-by`
+
+Response to `get-boards-request`. Contains a list of boards owned by the requesting user.
+
+```json
+{
+  "type": "boards-owned-by",
+  "boards": [
+    { "board": "<board-uuid>", "title": "...", "createdAt": <ts> },
+    ...
+  ],
+  "requestId": "<request-uuid>"
+}
+```
+
+Boards are sorted by creation time (newest first).
 
 ---
 
@@ -388,13 +444,15 @@ The `snapshots` array contains spaced hashes from the page's hash chain, enablin
 
 ### `board-info`
 
-Contains the current page order of a board. Sent in response to `board-info-request` or broadcast after a successful `shuffle-proposal`.
+Contains the current page order, title, and creation time of a board. Sent in response to `board-info-request`, broadcast after a successful `shuffle-proposal`, or broadcast after a successful `set-board-title`.
 
 ```json
 {
   "type": "board-info",
   "board": "<board-uuid>",
   "pages": ["<page-uuid>", ...],
+  "title": "<board-title>",
+  "createdAt": <unix-timestamp-ms>,
   "requestId": "<request-uuid>"
 }
 ```
@@ -643,7 +701,9 @@ MESSAGES.CLIENT_TO_SERVER = {
   MOD_ACTION_PROPOSALS:  { TYPE: "mod-action-proposals" },
   BOARD_INFO_REQUEST:    { TYPE: "board-info-request" },
   SHUFFLE_PROPOSAL:      { TYPE: "shuffle-proposal" },
-  CREATE_BOARD:          { TYPE: "create-board" }
+  CREATE_BOARD:          { TYPE: "create-board" },
+  SET_BOARD_TITLE:       { TYPE: "set-board-title" },
+  GET_BOARDS_REQUEST:    { TYPE: "get-boards-request" }
 };
 
 // Server → Client
@@ -658,7 +718,8 @@ MESSAGES.SERVER_TO_CLIENT = {
   ACCEPT:           { TYPE: "accept" },
   DECLINE:          { TYPE: "decline" },
   PING:             { TYPE: "ping" },
-  BOARD_INFO:       { TYPE: "board-info" }
+  BOARD_INFO:       { TYPE: "board-info" },
+  BOARDS_OWNED_BY:  { TYPE: "boards-owned-by" }
 };
 ```
 
@@ -676,6 +737,8 @@ is_invalid_REPLAY_REQUEST_message(data)
 is_invalid_MOD_ACTION_PROPOSALS_message(data)
 is_invalid_BOARD_INFO_REQUEST_message(data)
 is_invalid_SHUFFLE_PROPOSAL_message(data)
+is_invalid_SET_BOARD_TITLE_message(data)
+is_invalid_GET_BOARDS_REQUEST_message(data)
 ```
 
 Each validation function checks:
@@ -702,6 +765,14 @@ Server may return DECLINE with reasons:
 ---
 
 ## Changelog
+
+### Version 4.0 (May 2026)
+- Added `title` field to `create-board` and `board-created` messages for board naming
+- Added `set-board-title` message for owner-only title editing (broadcasts `board-info` on success)
+- Added `get-boards-request` / `boards-owned-by` messages for listing boards by owner
+- Added `title` and `createdAt` fields to `board-info` message
+- Credential storage format changed: `["hash", ...]` → `[["user", "hash"], ...]`
+- Board model extended: `{ ..., owner, title, createdAt }`
 
 ### Version 3.0 (May 2026)
 - Added `board-info-request` / `board-info` messages for page order synchronization

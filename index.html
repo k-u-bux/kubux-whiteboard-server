@@ -625,6 +625,70 @@
           color: #333;
       }
       
+      /* My Boards list styles */
+      .board-list {
+          max-height: 300px;
+          overflow-y: auto;
+      }
+      
+      .board-list-empty {
+          text-align: center;
+          color: #999;
+          padding: 20px;
+          font-size: 13px;
+      }
+      
+      .board-list-item {
+          display: flex;
+          align-items: center;
+          padding: 8px 10px;
+          border-bottom: 1px solid #f0f0f0;
+          gap: 8px;
+      }
+      
+      .board-list-item:last-child {
+          border-bottom: none;
+      }
+      
+      .board-list-title {
+          flex: 1;
+          font-weight: 500;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+      }
+      
+      .board-list-date {
+          font-size: 12px;
+          color: #999;
+          white-space: nowrap;
+      }
+      
+      .board-list-nav-btn {
+          padding: 4px 8px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          background: #fff;
+          cursor: pointer;
+          font-size: 12px;
+      }
+      
+      .board-list-nav-btn:hover {
+          background: #f0f0f0;
+      }
+      
+      .board-nav-section h3 {
+          margin: 0 0 15px 0;
+          font-size: 16px;
+          color: #333;
+      }
+      
+      .board-nav-section h3 {
+          margin: 0 0 15px 0;
+          font-size: 16px;
+          color: #333;
+      }
+      
       .board-nav-form {
           display: flex;
           flex-direction: column;
@@ -1283,6 +1347,14 @@
           <button id="board-nav-close">×</button>
         </div>
         
+        <!-- My Boards Section -->
+        <div class="board-nav-section">
+          <h3>My Boards</h3>
+          <div id="my-boards-list" class="board-list">
+            <div class="board-list-empty">Enter credential below and open to see your boards</div>
+          </div>
+        </div>
+
         <!-- Copy Link Section -->
         <div class="board-nav-section">
           <h3>Current Board</h3>
@@ -2531,6 +2603,9 @@
                        case shared.MESSAGES.SERVER_TO_CLIENT.PING.TYPE:
                            handlePingMessage(data);
                            break;
+                       case shared.MESSAGES.SERVER_TO_CLIENT.BOARDS_OWNED_BY.TYPE:
+                           handleBoardsOwnedBy(data);
+                           break;
                        case shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.TYPE:
                            handleBoardInfo(data);
                            break;
@@ -2650,19 +2725,106 @@
           });
       }
 
-      // Create a new board with credentials
+      // Create a new board with credentials and optional title
       function createBoard(credential) {
           const requestId = createRequestId();
+          
+          // Read title from URL parameter, default to "Whiteboard"
+          const urlParams = new URLSearchParams(window.location.search);
+          const title = urlParams.get('title') || 'Whiteboard';
           
           const createMessage = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD]: credential,
               [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID]: clientId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TITLE]: title,
               [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.REQUEST_ID]: requestId
           };
           
           debugLog('Sending board creation request:', createMessage);
           ws.send(shared.serialize(createMessage));
+      }
+      
+      // Request list of boards owned by the current credential
+      function getMyBoards(credential) {
+          const requestId = createRequestId();
+          sendMessage({
+              type: shared.MESSAGES.CLIENT_TO_SERVER.GET_BOARDS_REQUEST.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.GET_BOARDS_REQUEST.PASSWORD]: credential,
+              [shared.MESSAGES.CLIENT_TO_SERVER.GET_BOARDS_REQUEST.REQUEST_ID]: requestId
+          });
+      }
+
+      // Change the title of the current board
+      function setBoardTitle(boardId, credential, title) {
+          const requestId = createRequestId();
+          sendMessage({
+              type: shared.MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.PASSWORD]: credential,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.TITLE]: title,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SET_BOARD_TITLE.REQUEST_ID]: requestId
+          });
+      }
+      
+      // Send a get-boards-request when opening board nav
+      function refreshMyBoardsList() {
+          const credentialInput = document.getElementById('new-board-credential-input');
+          const credential = credentialInput.value.trim();
+          if (credential) {
+              getMyBoards(credential);
+          }
+      }
+      
+      // Populate the My Boards list from a boards-owned-by response
+      function populateMyBoardsList(boards) {
+          const list = document.getElementById('my-boards-list');
+          list.innerHTML = '';
+          
+          if (!boards || boards.length === 0) {
+              list.innerHTML = '<div class="board-list-empty">No boards found</div>';
+              return;
+          }
+          
+          for (const entry of boards) {
+              const item = document.createElement('div');
+              item.className = 'board-list-item';
+              
+              const titleSpan = document.createElement('span');
+              titleSpan.className = 'board-list-title';
+              titleSpan.textContent = entry.title || 'untitled';
+              
+              const createdAtSpan = document.createElement('span');
+              createdAtSpan.className = 'board-list-date';
+              if (entry.createdAt) {
+                  const d = new Date(entry.createdAt);
+                  createdAtSpan.textContent = d.toLocaleDateString();
+              }
+              
+              const navBtn = document.createElement('button');
+              navBtn.className = 'board-list-nav-btn';
+              navBtn.textContent = '▶';
+              navBtn.title = 'Navigate to this board';
+              
+              // Build URL with board ID, preserve passwd and credential
+              const boardUrl = `${window.location.origin}${window.location.pathname}?board=${entry.board}&passwd=${passwd || ''}`;
+              
+              navBtn.onclick = () => {
+                  window.location.href = boardUrl;
+              };
+              
+              item.appendChild(titleSpan);
+              item.appendChild(createdAtSpan);
+              item.appendChild(navBtn);
+              list.appendChild(item);
+          }
+      }
+      
+      // Handle boards-owned-by response
+      function handleBoardsOwnedBy(data) {
+          const boards = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARDS_OWNED_BY.BOARDS];
+          debugLog('Received boards owned by user:', boards);
+          populateMyBoardsList(boards);
       }
       
       // Handle board creation response
@@ -7352,6 +7514,9 @@
           if (boardId) {
               document.getElementById('board-id-input').value = boardId;
           }
+          
+          // Refresh My Boards list
+          setTimeout(refreshMyBoardsList, 100);
       }
       
       function closeBoardNavigation() {
