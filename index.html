@@ -5328,7 +5328,7 @@
                   currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
               }
               currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
-              currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width * zoomLevel;
+              currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width / zoomLevel;
               currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
           },
