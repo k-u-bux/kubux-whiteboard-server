@@ -4279,18 +4279,11 @@
               option.addEventListener('click', function(e) {
                   e.stopPropagation();
                   const shape = this.getAttribute('data-shape');
-                  
-                  // Update the settings and handler
                   set_shape_tool(shape);
-                  
-                  // Update main button icon
                   mainBtn.textContent = shapeIcons[shape];
-                  
-                  // Close popup
                   popup.style.display = 'none';
-                  
-                  // Save settings
                   saveSettings();
+                  updatePenSlotKnobs();
               });
           });
           
