@@ -5216,7 +5216,12 @@
           }
 
           // Update UI - remove active from all tools
-          document.querySelectorAll('.pen-slot').forEach(btn => btn.classList.remove('active'));
+          document.getElementById('pen-slot-0').classList.remove('active');
+          document.getElementById('pen-slot-1').classList.remove('active');
+          document.getElementById('pen-slot-2').classList.remove('active');
+          document.getElementById('pen-slot-3').classList.remove('active');
+          document.getElementById('pen-slot-4').classList.remove('active');
+          document.getElementById('pen-slot-5').classList.remove('active');
           document.getElementById('eraser-tool').classList.remove('active');
           document.getElementById('selection-rectangle-tool').classList.remove('active');
           document.getElementById('selection-lasso-tool').classList.remove('active');
