@@ -1084,9 +1084,12 @@
       </div>
       
       <div class="tool-section">
-        <button class="tool-btn" id="chalk-tool" title="Chalk"><span style="filter: grayscale(100%) invert(100%);">🖍️</span></button>
-        <button class="tool-btn active" id="pen-tool" title="Pen">✏️</button>
-        <button class="tool-btn" id="highlighter-tool" title="Highlighter">🖌️</button>
+        <button class="tool-btn active" id="pen-slot-0" title="Pen 1">∿</button>
+        <button class="tool-btn" id="pen-slot-1" title="Pen 2">▭</button>
+        <button class="tool-btn" id="pen-slot-2" title="Pen 3">◯</button>
+        <button class="tool-btn" id="pen-slot-3" title="Pen 4">─</button>
+        <button class="tool-btn" id="pen-slot-4" title="Pen 5">│</button>
+        <button class="tool-btn" id="pen-slot-5" title="Pen 6">／</button>
         <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
       </div>
 
@@ -1147,11 +1150,11 @@
     <div class="app-container">
       <div class="sidebar">
         <div class="tool-section sidebar-section" id="shape-selection">
-          <button class="shape-btn" id="shape-main-btn" title="Shape Tool (click to select)">➿</button>
+          <button class="shape-btn" id="shape-main-btn" title="Shape Tool (click to select)">∿</button>
         </div>
         <!-- Shape popup menu (horizontal) -->
         <div id="shape-popup-menu" style="display: none;">
-          <button class="shape-btn shape-option" data-shape="curve" title="Curve path">➿</button>
+          <button class="shape-btn shape-option" data-shape="curve" title="Curve path">∿</button>
           <button class="shape-btn shape-option" data-shape="rectangle" title="Rectangle path">▭</button>
           <button class="shape-btn shape-option" data-shape="circle" title="Circle path">◯</button>
           <button class="shape-btn shape-option" data-shape="horizontal" title="Horizontal line">─</button>
@@ -1186,12 +1189,12 @@
           <button class="shape-btn" id="timer-btn" title="Timer">🕐</button>
         </div>
         <div class="tool-section sidebar-section" id="path-mode-selection">
-          <button class="shape-btn" id="path-mode-main-btn" title="Path Mode (click to select)">➰</button>
+          <button class="shape-btn" id="path-mode-main-btn" title="Path Mode (click to select)">∿</button>
         </div>
         
         <!-- Path mode popup menu (horizontal) -->
         <div id="path-mode-popup-menu" style="display: none;">
-          <button class="shape-btn path-mode-option" data-loop="false" data-fill="false" title="Open path">➰</button>
+          <button class="shape-btn path-mode-option" data-loop="false" data-fill="false" title="Open path">∿</button>
           <button class="shape-btn path-mode-option" data-loop="true" data-fill="false" title="Closed path">□</button>
           <button class="shape-btn path-mode-option" data-loop="true" data-fill="true" title="Filled shape">■</button>
         </div>
@@ -1639,9 +1642,12 @@
           
           try {
               const settings = {
-                  pen: pen_settings,
-                  chalk: chalk_settings,
-                  highlighter: highlighter_settings,
+                  pen1: pen1_settings,
+                  pen2: pen2_settings,
+                  pen3: pen3_settings,
+                  pen4: pen4_settings,
+                  pen5: pen5_settings,
+                  pen6: pen6_settings,
                   eraser: eraser_settings,
                   selectionRectangle: selection_rectangle_settings,
                   selectionLasso: selection_lasso_settings,
@@ -1684,9 +1690,12 @@
               const settings = JSON.parse(saved);
               
               // Restore tool settings
-              if (settings.pen) Object.assign(pen_settings, settings.pen);
-              if (settings.chalk) Object.assign(chalk_settings, settings.chalk);
-              if (settings.highlighter) Object.assign(highlighter_settings, settings.highlighter);
+              if (settings.pen1) Object.assign(pen1_settings, settings.pen1);
+              if (settings.pen2) Object.assign(pen2_settings, settings.pen2);
+              if (settings.pen3) Object.assign(pen3_settings, settings.pen3);
+              if (settings.pen4) Object.assign(pen4_settings, settings.pen4);
+              if (settings.pen5) Object.assign(pen5_settings, settings.pen5);
+              if (settings.pen6) Object.assign(pen6_settings, settings.pen6);
               if (settings.eraser) Object.assign(eraser_settings, settings.eraser);
               if (settings.selectionRectangle) Object.assign(selection_rectangle_settings, settings.selectionRectangle);
               if (settings.selectionLasso) Object.assign(selection_lasso_settings, settings.selectionLasso);
@@ -1784,40 +1793,18 @@
           sensitivity: 3.0,
           dash_pattern: [],
           width: 2,
-          color: "blue",
-          undo: false,
-          fill: false,
-          loop: false,
-          shape: 'curve'
-      };
-      let chalk_settings = {
-          tool: "chalk",
-          opacity: 1.0,
-          cap_style: shared.CAP_STYLES.ROUND,
-          join_style: shared.JOIN_STYLES.MITER,
-          sensitivity: 0.0,
-          dash_pattern: [],
-          width: 3,
           color: "black",
           undo: false,
           fill: false,
           loop: false,
           shape: 'curve'
       };
-      let highlighter_settings = {
-          tool: "highlighter",
-          opacity: 0.2,
-          cap_style: shared.CAP_STYLES.SQUARE,
-          join_style: shared.JOIN_STYLES.MITER,
-          sensitivity: 0.0,
-          dash_pattern: [],
-          width: 24,
-          color: "yellow",
-          undo: true,
-          fill: false,
-          loop: false,
-          shape: 'curve'
-      };
+      let pen1_settings = { ...pen_settings, shape: 'curve' };
+      let pen2_settings = { ...pen_settings, shape: 'rectangle' };
+      let pen3_settings = { ...pen_settings, shape: 'circle' };
+      let pen4_settings = { ...pen_settings, shape: 'horizontal' };
+      let pen5_settings = { ...pen_settings, shape: 'vertical' };
+      let pen6_settings = { ...pen_settings, shape: 'line' };
       let selection_rectangle_settings = {
           tool: "selection-rectangle",
           opacity: 0.3,
@@ -1861,7 +1848,7 @@
           shape: 'curve'
       };
 
-      let draw_settings = chalk_settings;
+      let draw_settings = pen1_settings;
 
       function createStroke ( settings ) {
           const result = shared.createStroke( shared.STROKE_STYLES.CHALK );
@@ -1876,10 +1863,43 @@
           return result;
       };
 
+
+      function getTextColor(bgColor) {
+          // Parse the color to RGB
+          const div = document.createElement('div');
+          div.style.color = bgColor;
+          document.body.appendChild(div);
+          const rgb = getComputedStyle(div).color; // "rgb(r, g, b)"
+          document.body.removeChild(div);
+          const [r, g, b] = rgb.match(/\d+/g).map(Number);
+          const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+          return luminance > 128 ? 'black' : 'white';
+      }
+
+
+      function updatePenSlotKnobs() {
+          document.getElementById('pen-slot-0').style.backgroundColor = pen1_settings.color;
+          document.getElementById('pen-slot-0').style.color = getTextColor( pen1_settings.color );
+          document.getElementById('pen-slot-0').textContent = shapeIcons[pen1_settings.shape];
+          document.getElementById('pen-slot-1').style.backgroundColor = pen2_settings.color;
+          document.getElementById('pen-slot-1').style.color = getTextColor( pen2_settings.color );
+          document.getElementById('pen-slot-1').textContent = shapeIcons[pen2_settings.shape];
+          document.getElementById('pen-slot-2').style.backgroundColor = pen3_settings.color;
+          document.getElementById('pen-slot-2').style.color = getTextColor( pen3_settings.color );
+          document.getElementById('pen-slot-2').textContent = shapeIcons[pen3_settings.shape];
+          document.getElementById('pen-slot-3').style.backgroundColor = pen4_settings.color;
+          document.getElementById('pen-slot-3').style.color = getTextColor( pen4_settings.color );
+          document.getElementById('pen-slot-3').textContent = shapeIcons[pen4_settings.shape];
+          document.getElementById('pen-slot-4').style.backgroundColor = pen5_settings.color;
+          document.getElementById('pen-slot-4').style.color = getTextColor( pen5_settings.color );
+          document.getElementById('pen-slot-4').textContent = shapeIcons[pen5_settings.shape];
+          document.getElementById('pen-slot-5').style.backgroundColor = pen6_settings.color;
+          document.getElementById('pen-slot-5').style.color = getTextColor( pen6_settings.color );
+          document.getElementById('pen-slot-5').textContent = shapeIcons[pen6_settings.shape];
+      }
+
       function updateKnobs () {
-          document.getElementById('chalk-tool').style.backgroundColor = chalk_settings.color;
-          document.getElementById('pen-tool').style.backgroundColor = pen_settings.color;
-          document.getElementById('highlighter-tool').style.backgroundColor = highlighter_settings.color;
+          updatePenSlotKnobs();
 
           widthSelector.style.setProperty('--thumb-size', draw_settings.width);
           // widthSelector.style.setProperty('--thumb-color', draw_settings.color);
@@ -1924,9 +1944,12 @@
           const dashPatternSelectionDiv = document.getElementById('dash-pattern-selection');
           
           switch (draw_settings.tool) {
-          case 'pen':
-          case 'chalk':
-          case 'highlighter':
+          case 'pen1':
+          case 'pen2':
+          case 'pen3':
+          case 'pen4':
+          case 'pen5':
+          case 'pen6':
               colorSelectionDiv.style.display = 'flex';
               widthSelectionDiv.style.display = 'flex';
               opacitySelectionDiv.style.display = 'flex';
@@ -2237,7 +2260,7 @@
       let visibleLayers = new Set([0, 1, 2, 3, 4, 5, 6, 7]); // All layers visible by default
       
       // Tool state
-      let currentTool = 'chalk';
+      let currentTool = 'pen1';
       let currentDefaultTool = currentTool;
       let eraserRadius = 20;
       let currentColor = '#000000';
@@ -3865,7 +3888,7 @@
 
       // Shape icons mapping (used by setupShapeSelector and updateShapeButton)
       const shapeIcons = {
-          'curve': '➿',
+          'curve': '∿',
           'rectangle': '▭',
           'circle': '◯',
           'horizontal': '─',
@@ -3875,7 +3898,7 @@
 
       // Path mode icons mapping
       const pathModeIcons = {
-          'open-draw': '➰',
+          'open-draw': '∿',
           'closed-draw': '□',
           'closed-fill': '■'
       };
@@ -4418,18 +4441,11 @@
               option.addEventListener('click', function(e) {
                   e.stopPropagation();
                   const shape = this.getAttribute('data-shape');
-                  
-                  // Update the settings and handler
                   set_shape_tool(shape);
-                  
-                  // Update main button icon
                   mainBtn.textContent = shapeIcons[shape];
-                  
-                  // Close popup
                   popup.style.display = 'none';
-                  
-                  // Save settings
                   saveSettings();
+                  updatePenSlotKnobs();
               });
           });
           
@@ -5033,9 +5049,12 @@
           reconnectButton.addEventListener('click', reconnectWebSocket);
           
           // Tool selection
-          document.getElementById('chalk-tool').addEventListener('click', () => setTool('chalk'));
-          document.getElementById('pen-tool').addEventListener('click', () => setTool('pen'));
-          document.getElementById('highlighter-tool').addEventListener('click', () => setTool('highlighter'));
+          document.getElementById('pen-slot-0').addEventListener('click', () => setTool('pen1'));
+          document.getElementById('pen-slot-1').addEventListener('click', () => setTool('pen2'));
+          document.getElementById('pen-slot-2').addEventListener('click', () => setTool('pen3'));
+          document.getElementById('pen-slot-3').addEventListener('click', () => setTool('pen4'));
+          document.getElementById('pen-slot-4').addEventListener('click', () => setTool('pen5'));
+          document.getElementById('pen-slot-5').addEventListener('click', () => setTool('pen6'));
           document.getElementById('eraser-tool').addEventListener('click', () => setTool('eraser'));
           document.getElementById('selection-rectangle-tool').addEventListener('click', () => setTool('selection-rectangle'));
           document.getElementById('selection-lasso-tool').addEventListener('click', () => setTool('selection-lasso'));
@@ -5367,14 +5386,17 @@
           }
           
           currentTool = tool;
-          if ( tool === 'chalk' || tool === 'pen' || tool === 'highlighter' ) { 
+          if ( tool.startsWith('pen') ) { 
               currentDefaultTool = tool; 
           }
 
           // Update UI - remove active from all tools
-          document.getElementById('chalk-tool').classList.remove('active');
-          document.getElementById('pen-tool').classList.remove('active');
-          document.getElementById('highlighter-tool').classList.remove('active');
+          document.getElementById('pen-slot-0').classList.remove('active');
+          document.getElementById('pen-slot-1').classList.remove('active');
+          document.getElementById('pen-slot-2').classList.remove('active');
+          document.getElementById('pen-slot-3').classList.remove('active');
+          document.getElementById('pen-slot-4').classList.remove('active');
+          document.getElementById('pen-slot-5').classList.remove('active');
           document.getElementById('eraser-tool').classList.remove('active');
           document.getElementById('selection-rectangle-tool').classList.remove('active');
           document.getElementById('selection-lasso-tool').classList.remove('active');
@@ -5392,23 +5414,41 @@
 
           // Update cursor
           switch (tool) {
-          case 'chalk':
+          case 'pen1':
               canvas.style.cursor = 'crosshair';
-              switch_settings( chalk_settings );
-              set_pointer_handler( shape_to_ph( chalk_settings.shape ) );
-              document.getElementById('chalk-tool').classList.add('active');
+              switch_settings( pen1_settings );
+              set_pointer_handler( shape_to_ph( pen1_settings.shape ) );
+              document.getElementById('pen-slot-0').classList.add('active');
               break;
-          case 'pen':
+          case 'pen2':
               canvas.style.cursor = 'crosshair';
-              switch_settings( pen_settings );
-              set_pointer_handler( shape_to_ph( pen_settings.shape ) );
-              document.getElementById('pen-tool').classList.add('active');
+              switch_settings( pen2_settings );
+              set_pointer_handler( shape_to_ph( pen2_settings.shape ) );
+              document.getElementById('pen-slot-1').classList.add('active');
               break;
-          case 'highlighter':
+          case 'pen3':
               canvas.style.cursor = 'crosshair';
-              switch_settings( highlighter_settings );
-              set_pointer_handler( shape_to_ph( highlighter_settings.shape ) );
-              document.getElementById('highlighter-tool').classList.add('active');
+              switch_settings( pen3_settings );
+              set_pointer_handler( shape_to_ph( pen3_settings.shape ) );
+              document.getElementById('pen-slot-2').classList.add('active');
+              break;
+          case 'pen4':
+              canvas.style.cursor = 'crosshair';
+              switch_settings( pen4_settings );
+              set_pointer_handler( shape_to_ph( pen4_settings.shape ) );
+              document.getElementById('pen-slot-3').classList.add('active');
+              break;
+          case 'pen5':
+              canvas.style.cursor = 'crosshair';
+              switch_settings( pen5_settings );
+              set_pointer_handler( shape_to_ph( pen5_settings.shape ) );
+              document.getElementById('pen-slot-4').classList.add('active');
+              break;
+          case 'pen6':
+              canvas.style.cursor = 'crosshair';
+              switch_settings( pen6_settings );
+              set_pointer_handler( shape_to_ph( pen6_settings.shape ) );
+              document.getElementById('pen-slot-5').classList.add('active');
               break;
           case 'eraser':
               canvas.style.cursor = 'cell';
@@ -7610,7 +7650,7 @@
       
       // Initialize the app
       window.addEventListener('DOMContentLoaded', init);
-      setTool('chalk');
+      setTool('pen1');
       updateKnobs();
     </script>
   </body>
