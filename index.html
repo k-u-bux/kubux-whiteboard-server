@@ -1020,7 +1020,7 @@
       </div>
       
       <div class="tool-section">
-        <button class="tool-btn active" id="pen-slot-0" title="Pen 1">➿</button>
+        <button class="tool-btn active" id="pen-slot-0" title="Pen 1"><svg viewBox="0 0 100 100" width="18" height="18"><path d="M 10,80 Q 30,20 50,50 T 90,30" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg></button>
         <button class="tool-btn" id="pen-slot-1" title="Pen 2">▭</button>
         <button class="tool-btn" id="pen-slot-2" title="Pen 3">◯</button>
         <button class="tool-btn" id="pen-slot-3" title="Pen 4">─</button>
@@ -1808,7 +1808,7 @@
       function updatePenSlotKnobs() {
           document.getElementById('pen-slot-0').style.backgroundColor = pen1_settings.color;
           document.getElementById('pen-slot-0').style.color = getTextColor( pen1_settings.color );
-          document.getElementById('pen-slot-0').textContent = shapeIcons[pen1_settings.shape];
+          document.getElementById('pen-slot-0').innerHTML = shapeIcons[pen1_settings.shape];
           document.getElementById('pen-slot-1').style.backgroundColor = pen2_settings.color;
           document.getElementById('pen-slot-1').style.color = getTextColor( pen2_settings.color );
           document.getElementById('pen-slot-1').textContent = shapeIcons[pen2_settings.shape];
@@ -3726,7 +3726,7 @@
 
       // Shape icons mapping (used by setupShapeSelector and updateShapeButton)
       const shapeIcons = {
-          'curve': '➿',
+          'curve': '<svg viewBox="0 0 100 100" width="18" height="18"><path d="M 10,80 Q 30,20 50,50 T 90,30" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
           'rectangle': '▭',
           'circle': '◯',
           'horizontal': '─',
