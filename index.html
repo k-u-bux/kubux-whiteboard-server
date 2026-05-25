@@ -1791,18 +1791,38 @@
           return result;
       };
 
+
+      function getTextColor(bgColor) {
+          // Parse the color to RGB
+          const div = document.createElement('div');
+          div.style.color = bgColor;
+          document.body.appendChild(div);
+          const rgb = getComputedStyle(div).color; // "rgb(r, g, b)"
+          document.body.removeChild(div);
+          const [r, g, b] = rgb.match(/\d+/g).map(Number);
+          const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+          return luminance > 128 ? 'black' : 'white';
+      }
+
+
       function updatePenSlotKnobs() {
           document.getElementById('pen-slot-0').style.backgroundColor = pen1_settings.color;
+          document.getElementById('pen-slot-0').style.color = getTextColor( pen1_settings.color );
           document.getElementById('pen-slot-0').textContent = shapeIcons[pen1_settings.shape];
           document.getElementById('pen-slot-1').style.backgroundColor = pen2_settings.color;
+          document.getElementById('pen-slot-1').style.color = getTextColor( pen2_settings.color );
           document.getElementById('pen-slot-1').textContent = shapeIcons[pen2_settings.shape];
           document.getElementById('pen-slot-2').style.backgroundColor = pen3_settings.color;
+          document.getElementById('pen-slot-2').style.color = getTextColor( pen3_settings.color );
           document.getElementById('pen-slot-2').textContent = shapeIcons[pen3_settings.shape];
           document.getElementById('pen-slot-3').style.backgroundColor = pen4_settings.color;
+          document.getElementById('pen-slot-3').style.color = getTextColor( pen4_settings.color );
           document.getElementById('pen-slot-3').textContent = shapeIcons[pen4_settings.shape];
           document.getElementById('pen-slot-4').style.backgroundColor = pen5_settings.color;
+          document.getElementById('pen-slot-4').style.color = getTextColor( pen5_settings.color );
           document.getElementById('pen-slot-4').textContent = shapeIcons[pen5_settings.shape];
           document.getElementById('pen-slot-5').style.backgroundColor = pen6_settings.color;
+          document.getElementById('pen-slot-5').style.color = getTextColor( pen6_settings.color );
           document.getElementById('pen-slot-5').textContent = shapeIcons[pen6_settings.shape];
       }
 
