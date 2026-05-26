@@ -44,6 +44,7 @@
 					border: 3px solid #f0f0f0;
 					background-color: #f0f0f0;
 					border-radius: 4px;
+					font-weight: bold;
       }
       
       .tool-btn:hover {
@@ -72,6 +73,7 @@
           border: 3px solid #f0f0f0;
           background-color: #f0f0f0;
           border-radius: 4px;
+          font-weight: bold;
       }
       
       .shape-btn:hover {
@@ -1021,7 +1023,7 @@
     <div class="toolbar">
       <div class="tool-section" id="export-pdf">
         <button class="tool-btn" id="pdf-btn" title="Export Current Page to PDF">📃</button>
-        <button class="tool-btn" id="pdf-board-btn" title="Export Entire Board to PDF">📚</button>
+        <!-- <button class="tool-btn" id="pdf-board-btn" title="Export Entire Board to PDF">📚</button> -->
       </div>
 
       <div class="tool-section" id="format-section">
@@ -1778,7 +1780,7 @@
           join_style: shared.JOIN_STYLES.MITER,
           sensitivity: 0.0,
           dash_pattern: [],
-          width: 2,
+          width: 4,
           color: "#ff0000",
           undo: false,
           fill: false,
@@ -1790,9 +1792,9 @@
           opacity: 1.0,
           cap_style: shared.CAP_STYLES.ROUND,
           join_style: shared.JOIN_STYLES.MITER,
-          sensitivity: 3.0,
+          sensitivity: 2.0,
           dash_pattern: [],
-          width: 2,
+          width: 4,
           color: "black",
           undo: false,
           fill: false,
@@ -1812,7 +1814,7 @@
           join_style: shared.JOIN_STYLES.ROUND,
           sensitivity: 0.0,
           dash_pattern: [],
-          width: 2,
+          width: 4,
           color: "#0078d7", // Selection blue
           undo: false,
           fill: true,  // Fill to select everything inside
@@ -1826,7 +1828,7 @@
           join_style: shared.JOIN_STYLES.ROUND,
           sensitivity: 0.0,
           dash_pattern: [],
-          width: 2,
+          width: 4,
           color: "#0078d7",
           undo: false,
           fill: true,  // Fill to select everything inside
@@ -1840,7 +1842,7 @@
           join_style: shared.JOIN_STYLES.ROUND,
           sensitivity: 0.0,
           dash_pattern: [],
-          width: 2,
+          width: 4,
           color: "#0078d7",
           undo: false,
           fill: false,
@@ -1944,12 +1946,7 @@
           const dashPatternSelectionDiv = document.getElementById('dash-pattern-selection');
           
           switch (draw_settings.tool) {
-          case 'pen1':
-          case 'pen2':
-          case 'pen3':
-          case 'pen4':
-          case 'pen5':
-          case 'pen6':
+          case 'pen':
               colorSelectionDiv.style.display = 'flex';
               widthSelectionDiv.style.display = 'flex';
               opacitySelectionDiv.style.display = 'flex';
@@ -5167,7 +5164,7 @@
           
           // Export PDF buttons
           document.getElementById('pdf-btn').addEventListener('click', exportPageToPDF);
-          document.getElementById('pdf-board-btn').addEventListener('click', exportBoardToPDF);
+          // document.getElementById('pdf-board-btn').addEventListener('click', exportBoardToPDF);
           
           // Canvas events
           canvas.addEventListener('pointerdown', handlePointerDown);
