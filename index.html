@@ -6779,22 +6779,28 @@
                           break;
                       }
                   }          
-                  debugLog("Preparing replay: ", {
-                              page: pageUuid,
-                              present: initialPageData['present'],
-                              hash: initialPageData['hash'],
-                              ourHashes: pageHashes
-                           });
                   savePageToCache( pageUuid, initialPageData );
 
                   // Request and wait for page data
                   let pageData = null;
                   if ( initialPageData['present'] === initialPageData['history'].length - 1 ) {
                       // Cache is already up to date with server — use it directly
+                      debugLog("Skip replay, data aleady cached: ", {
+                                  page: pageUuid,
+                                  present: initialPageData['present'],
+                                  hash: initialPageData['hash'],
+                                  ourHashes: pageHashes
+                               });
                       pageData = initialPageData;
                   } else {
                       try {
-                          pageData = await sendWithCallback({
+                          debugLog("Preparing replay: ", {
+                                      page: pageUuid,
+                                      present: initialPageData['present'],
+                                      hash: initialPageData['hash'],
+                                      ourHashes: pageHashes
+                                   });
+                                  pageData = await sendWithCallback({
                               type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
                               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
                               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
