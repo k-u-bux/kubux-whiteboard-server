@@ -6788,8 +6788,8 @@
                   savePageToCache( pageUuid, initialPageData );
 
                   // Request and wait for page data
-                  let pageData;
-                  if ( initialPageData['present'] === initialPageData['history'].length ) {
+                  let pageData = null;
+                  if ( initialPageData['present'] === initialPageData['history'].length - 1 ) {
                       // Cache is already up to date with server — use it directly
                       pageData = initialPageData;
                   } else {
