@@ -6789,20 +6789,25 @@
 
                   // Request and wait for page data
                   let pageData;
-                  try {
-                      pageData = await sendWithCallback({
-                          type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: initialPageData[ 'present' ],
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: initialPageData[ 'hash' ],
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER]: false,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: createRequestId()
-                      });
-                      pageData = handleReplayMessage( pageData, true );
-                  } catch (err) {
-                      console.warn(`Skipping replay for page ${pageUuid}: ${err.message}`);
-                      continue;
+                  if ( initialPageData['present'] === initialPageData['history'].length ) {
+                      // Cache is already up to date with server — use it directly
+                      pageData = initialPageData;
+                  } else {
+                      try {
+                          pageData = await sendWithCallback({
+                              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: initialPageData[ 'present' ],
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: initialPageData[ 'hash' ],
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER]: false,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: createRequestId()
+                          });
+                          pageData = handleReplayMessage( pageData, true );
+                      } catch (err) {
+                          console.warn(`Skipping replay for page ${pageUuid}: ${err.message}`);
+                          continue;
+                      }
                   }
                   
                   if ( !pageData ) {
