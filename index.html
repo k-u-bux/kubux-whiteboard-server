@@ -6783,7 +6783,8 @@
 
                   // Request and wait for page data
                   let pageData;
-                  if ( initialPageData['present'] === initialPageData['history'].length - 1 ) {
+                  if ( initialPageData['hash'] === pageSnapshots[ pageSnapshots.length - 1 ] ) {
+                          break; ) {
                       // Cache is already up to date with server — use it directly
                       debugLog("Skip replay, data aleady cached: ", {
                                   page: pageUuid,
