@@ -6782,7 +6782,7 @@
                   savePageToCache( pageUuid, initialPageData );
 
                   // Request and wait for page data
-                  let pageData = null;
+                  let pageData;
                   if ( initialPageData['present'] === initialPageData['history'].length - 1 ) {
                       // Cache is already up to date with server — use it directly
                       debugLog("Skip replay, data aleady cached: ", {
@@ -6793,14 +6793,14 @@
                                });
                       pageData = initialPageData;
                   } else {
+                      debugLog("Preparing replay: ", {
+                                  page: pageUuid,
+                                  present: initialPageData['present'],
+                                  hash: initialPageData['hash'],
+                                  ourHashes: pageHashes
+                               });
                       try {
-                          debugLog("Preparing replay: ", {
-                                      page: pageUuid,
-                                      present: initialPageData['present'],
-                                      hash: initialPageData['hash'],
-                                      ourHashes: pageHashes
-                                   });
-                                  pageData = await sendWithCallback({
+                          pageData = await sendWithCallback({
                               type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
                               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
                               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
