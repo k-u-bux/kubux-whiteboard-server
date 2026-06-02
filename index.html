@@ -5842,7 +5842,7 @@
                       currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
                   }
                   currentStroke[shared.ELEMENT.COLOR] = draw_settings.color;
-                  currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width;
+                  currentStroke[shared.ELEMENT.WIDTH] = draw_settings.width / zoomLevel;
                   currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
                   currentStroke[shared.ELEMENT.POINTS] = [ point, point, point, point ];
                   A = point;
@@ -6910,7 +6910,8 @@
                           'pageId': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE],
                           'pageNr': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.PAGE_NR],
                           'pageTotal': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.TOTAL_PAGES],
-                          'pageSnapshots': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS]
+                          'pageSnapshots': pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.SNAPSHOTS],
+                          'hash':  pageInfo[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.HASH]
                       };
                       debugLog('Got page info: ', pageInfo);
                   } catch (err) {
@@ -6923,7 +6924,8 @@
                   const actualPageUuid = pageInfo['pageId'];
                   pagesMetaData[ actualPageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
                   pagesMetaData[ pageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
-                  const pageSnapshots = pageInfo['pageSnapshots'];
+                  let pageSnapshots = pageInfo['pageSnapshots'];
+                  pageSnapshots.push( pageInfo['hash'] );
                   touchPageInCache( pageUuid );
                   let initialPageData = loadPageFromCache( pageUuid );
                   pageHashes = [ shared.hashAny( pageUuid ) ];
@@ -6941,30 +6943,41 @@
                           break;
                       }
                   }          
-                  debugLog("Preparing replay: ", {
-                              page: pageUuid,
-                              present: initialPageData['present'],
-                              hash: initialPageData['hash'],
-                              ourHashes: pageHashes
-                           });
                   savePageToCache( pageUuid, initialPageData );
 
                   // Request and wait for page data
                   let pageData;
-                  try {
-                      pageData = await sendWithCallback({
-                          type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: initialPageData[ 'present' ],
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: initialPageData[ 'hash' ],
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER]: false,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: createRequestId()
-                      });
-                      pageData = handleReplayMessage( pageData, true );
-                  } catch (err) {
-                      console.warn(`Skipping replay for page ${pageUuid}: ${err.message}`);
-                      continue;
+                  if ( initialPageData['hash'] === pageSnapshots[ pageSnapshots.length - 1 ] ) {
+                      // Cache is already up to date with server — use it directly
+                      debugLog("Skip replay, data aleady cached: ", {
+                                  page: pageUuid,
+                                  present: initialPageData['present'],
+                                  hash: initialPageData['hash'],
+                                  ourHashes: pageHashes
+                               });
+                      pageData = initialPageData;
+                  } else {
+                      debugLog("Preparing replay: ", {
+                                  page: pageUuid,
+                                  present: initialPageData['present'],
+                                  hash: initialPageData['hash'],
+                                  ourHashes: pageHashes
+                               });
+                      try {
+                          pageData = await sendWithCallback({
+                              type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: initialPageData[ 'present' ],
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: initialPageData[ 'hash' ],
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER]: false,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]: createRequestId()
+                          });
+                          pageData = handleReplayMessage( pageData, true );
+                      } catch (err) {
+                          console.warn(`Skipping replay for page ${pageUuid}: ${err.message}`);
+                          continue;
+                      }
                   }
                   
                   if ( !pageData ) {
