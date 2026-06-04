@@ -706,20 +706,6 @@
           font-weight: bold;
       }
       
-      /* Paste mode popup menu */
-      #paste-mode-popup-menu {
-          position: fixed;
-          background-color: #f0f0f0;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          padding: 4px;
-          display: flex;
-          flex-direction: row;
-          gap: 2px;
-          z-index: 1000;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      }
-      
       #paste-copies-selection, #paste-copies-x-selection, #paste-copies-y-selection {
           height: 120px;
           justify-content: center;
@@ -1257,18 +1243,15 @@
           <button class="shape-btn" id="deselect-toggle-btn" title="Deselect Mode">➖</button>
         </div>
         
-        <!-- Paste mode selection (shown when paste tool is active) -->
+        <!-- Paste mode selection (shown when paste tool is active) — inline buttons -->
         <div class="tool-section sidebar-section" id="paste-mode-selection" style="display: none;">
-          <button class="shape-btn" id="paste-mode-main-btn" title="Paste Mode (click to select)">✚</button>
-        </div>
-        <div id="paste-mode-popup-menu" style="display: none;">
-          <button class="shape-btn paste-mode-option" data-paste-mode="place" title="Place single copy">✚</button>
-          <button class="shape-btn paste-mode-option" data-paste-mode="open-path" title="Evenly along open path">∿</button>
-          <button class="shape-btn paste-mode-option" data-paste-mode="rectangle" title="Evenly in rectangle">▭</button>
-          <button class="shape-btn paste-mode-option" data-paste-mode="circle" title="Evenly around circle">◯</button>
-          <button class="shape-btn paste-mode-option" data-paste-mode="vertical" title="Evenly along vertical line">│</button>
-          <button class="shape-btn paste-mode-option" data-paste-mode="horizontal" title="Evenly along horizontal line">─</button>
-          <button class="shape-btn paste-mode-option" data-paste-mode="straight" title="Evenly along straight line">／</button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="place" title="Place single copy">✚</button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="open-path" title="Evenly along open path">∿</button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="rectangle" title="Evenly in rectangle">▭</button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="circle" title="Evenly around circle">◯</button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="vertical" title="Evenly along vertical line">│</button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="horizontal" title="Evenly along horizontal line">─</button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="straight" title="Evenly along straight line">／</button>
         </div>
         <div class="tool-section sidebar-section" id="paste-copies-selection" style="display: none;">
           <input type="range" id="paste-copies-slider" min="2" max="36" step="1" value="5">
@@ -4990,36 +4973,15 @@
           sendMessage(proposal);
       }
 
-      // Setup paste mode selector popup
-      function setupPasteModeSelector() {
-          const mainBtn = document.getElementById('paste-mode-main-btn');
-          const popup = document.getElementById('paste-mode-popup-menu');
-          const pasteModeOptions = document.querySelectorAll('.paste-mode-option');
+      // Setup paste mode inline button handlers
+      function setupPasteModeButtons() {
+          const buttons = document.querySelectorAll('.paste-mode-btn');
           
-          // Toggle popup on main button click
-          mainBtn.addEventListener('click', function(e) {
-              e.stopPropagation();
-              const isVisible = popup.style.display === 'flex';
-              
-              if (isVisible) {
-                  popup.style.display = 'none';
-              } else {
-                  const rect = mainBtn.getBoundingClientRect();
-                  popup.style.left = (rect.right + 5) + 'px';
-                  popup.style.top = rect.top + 'px';
-                  popup.style.display = 'flex';
-              }
-          });
-          
-          // Handle paste mode option clicks
-          pasteModeOptions.forEach(option => {
-              option.addEventListener('click', function(e) {
+          buttons.forEach(btn => {
+              btn.addEventListener('click', function(e) {
                   e.stopPropagation();
                   const mode = this.getAttribute('data-paste-mode');
-                  
                   const prevMode = paste_settings.pasteMode;
-                  paste_settings.pasteMode = mode;
-                  mainBtn.textContent = pasteModeIcons[mode];
                   
                   // Exit interactive paste mode when switching away from place
                   if (prevMode === 'place' && mode !== 'place' && pasteMode) {
@@ -5030,37 +4992,33 @@
                       enterPasteMode();
                   }
                   
-              // Show/hide appropriate slider sections
-              const singleSection = document.getElementById('paste-copies-selection');
-              const xSection = document.getElementById('paste-copies-x-selection');
-              const ySection = document.getElementById('paste-copies-y-selection');
-              
-              if (mode === 'rectangle') {
-                  singleSection.style.display = 'none';
-                  xSection.style.display = 'flex';
-                  ySection.style.display = 'flex';
-              } else if (mode === 'place') {
-                  singleSection.style.display = 'none';
-                  xSection.style.display = 'none';
-                  ySection.style.display = 'none';
-              } else {
-                  singleSection.style.display = 'flex';
-                  xSection.style.display = 'none';
-                  ySection.style.display = 'none';
-              }
+                  paste_settings.pasteMode = mode;
                   
-                  popup.style.display = 'none';
+                  // Update active class on buttons
+                  buttons.forEach(b => b.classList.remove('active'));
+                  this.classList.add('active');
+                  
+                  // Show/hide appropriate slider sections
+                  const singleSection = document.getElementById('paste-copies-selection');
+                  const xSection = document.getElementById('paste-copies-x-selection');
+                  const ySection = document.getElementById('paste-copies-y-selection');
+                  
+                  if (mode === 'rectangle') {
+                      singleSection.style.display = 'none';
+                      xSection.style.display = 'flex';
+                      ySection.style.display = 'flex';
+                  } else if (mode === 'place') {
+                      singleSection.style.display = 'none';
+                      xSection.style.display = 'none';
+                      ySection.style.display = 'none';
+                  } else {
+                      singleSection.style.display = 'flex';
+                      xSection.style.display = 'none';
+                      ySection.style.display = 'none';
+                  }
+                  
                   saveSettings();
               });
-          });
-          
-          // Close popup when clicking outside
-          document.addEventListener('click', function(e) {
-              if (popup.style.display === 'flex' && 
-                  !popup.contains(e.target) && 
-                  e.target !== mainBtn) {
-                  popup.style.display = 'none';
-              }
           });
           
           // Slider event listeners
@@ -5161,8 +5119,8 @@
           // Dash pattern selector popup
           setupDashPatternSelector();
           
-          // Paste mode selector popup
-          setupPasteModeSelector();
+          // Paste mode inline button handlers
+          setupPasteModeButtons();
           
           // Zoom menu popup
           setupZoomMenu();
