@@ -4374,7 +4374,7 @@
           cutBtn.addEventListener('click', () => { cutSelectedElements(); startResetTool(); } );
           copyBtn.addEventListener('click',  () => { copySelectedElements(); startResetTool(); } );
           moveBtn.addEventListener('click',  () => { moveSelectedElements(); startResetTool(); } );
-          pasteBtn.addEventListener('click', () => { stopResetTool(); setTool('paste'); startResetTool(); });
+          pasteBtn.addEventListener('click', () => { setTool('paste'); });
           moveLayerBtn.addEventListener('click', showMoveToLayerDialog);
           
           // Deselect toggle button
