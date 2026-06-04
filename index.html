@@ -720,7 +720,7 @@
           box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       }
       
-      #paste-copies-selection {
+      #paste-copies-selection, #paste-copies-x-selection, #paste-copies-y-selection {
           height: 120px;
           justify-content: center;
       }
@@ -1272,8 +1272,17 @@
         </div>
         <div class="tool-section sidebar-section" id="paste-copies-selection" style="display: none;">
           <input type="range" id="paste-copies-slider" min="2" max="36" step="1" value="5">
-          <input type="range" id="paste-copies-x-slider" min="2" max="36" step="1" value="3" style="display:none;">
-          <input type="range" id="paste-copies-y-slider" min="2" max="36" step="1" value="3" style="display:none;">
+          <span id="paste-copies-value" style="font-size:10px;">5</span>
+        </div>
+        <div class="tool-section sidebar-section" id="paste-copies-x-selection" style="display: none;">
+          <span id="paste-copies-x-label" style="font-size:10px;">X</span>
+          <input type="range" id="paste-copies-x-slider" min="2" max="36" step="1" value="3">
+          <span id="paste-copies-x-value" style="font-size:10px;">3</span>
+        </div>
+        <div class="tool-section sidebar-section" id="paste-copies-y-selection" style="display: none;">
+          <span id="paste-copies-y-label" style="font-size:10px;">Y</span>
+          <input type="range" id="paste-copies-y-slider" min="2" max="36" step="1" value="3">
+          <span id="paste-copies-y-value" style="font-size:10px;">3</span>
         </div>
       </div>
       
@@ -2068,6 +2077,7 @@
       
       // Paste mode state
       let pasteMode = false;
+      let pastePreviewPositions = [];
       let pastedElements = []; // Array of {uuid, originalElement, transform}
       let pasteBounds = null;
       let pasteTransform = null; // Current transform being applied to paste group
@@ -4992,24 +5002,24 @@
                   paste_settings.pasteMode = mode;
                   mainBtn.textContent = pasteModeIcons[mode];
                   
-                  // Show/hide appropriate sliders
-                  const singleSlider = document.getElementById('paste-copies-slider');
-                  const xSlider = document.getElementById('paste-copies-x-slider');
-                  const ySlider = document.getElementById('paste-copies-y-slider');
-                  
-                  if (mode === 'rectangle') {
-                      singleSlider.style.display = 'none';
-                      xSlider.style.display = 'block';
-                      ySlider.style.display = 'block';
-                  } else if (mode === 'place') {
-                      singleSlider.style.display = 'none';
-                      xSlider.style.display = 'none';
-                      ySlider.style.display = 'none';
-                  } else {
-                      singleSlider.style.display = 'block';
-                      xSlider.style.display = 'none';
-                      ySlider.style.display = 'none';
-                  }
+              // Show/hide appropriate slider sections
+              const singleSection = document.getElementById('paste-copies-selection');
+              const xSection = document.getElementById('paste-copies-x-selection');
+              const ySection = document.getElementById('paste-copies-y-selection');
+              
+              if (mode === 'rectangle') {
+                  singleSection.style.display = 'flex';
+                  xSection.style.display = 'flex';
+                  ySection.style.display = 'flex';
+              } else if (mode === 'place') {
+                  singleSection.style.display = 'none';
+                  xSection.style.display = 'none';
+                  ySection.style.display = 'none';
+              } else {
+                  singleSection.style.display = 'flex';
+                  xSection.style.display = 'none';
+                  ySection.style.display = 'none';
+              }
                   
                   popup.style.display = 'none';
                   saveSettings();
@@ -5028,18 +5038,21 @@
           // Slider event listeners
           document.getElementById('paste-copies-slider').addEventListener('input', function() {
               paste_settings.copies = parseInt(this.value);
+              document.getElementById('paste-copies-value').textContent = this.value;
           });
           document.getElementById('paste-copies-slider').addEventListener('change', function() {
               saveSettings();
           });
           document.getElementById('paste-copies-x-slider').addEventListener('input', function() {
               paste_settings.copiesX = parseInt(this.value);
+              document.getElementById('paste-copies-x-value').textContent = this.value;
           });
           document.getElementById('paste-copies-x-slider').addEventListener('change', function() {
               saveSettings();
           });
           document.getElementById('paste-copies-y-slider').addEventListener('input', function() {
               paste_settings.copiesY = parseInt(this.value);
+              document.getElementById('paste-copies-y-value').textContent = this.value;
           });
           document.getElementById('paste-copies-y-slider').addEventListener('change', function() {
               saveSettings();
@@ -6114,7 +6127,9 @@
       // ============================================================
 
       // Factory: creates a paste pointer handler for a given shape-drawing function
-      function paste_shape_pointer_handler_factory(make_path) {
+      function paste_shape_pointer_handler_factory(make_path, isFreehand) {
+          // For freehand modes (open-path), keep all raw accumulated points
+          let rawPoints = [];
           return {
               down: () => {
                   if (force_stylus && event.pointerType === "touch") return;
@@ -6123,7 +6138,9 @@
                   const y = (event.clientY - rect.top - panY) / zoomLevel;
                   const pressure = event.pressure !== undefined ? event.pressure : 0.5;
                   currentPath = [];
+                  rawPoints = [];
                   const point = shared.createPoint(x, y, pressure);
+                  rawPoints.push(point);
                   currentPath.push(point);
                   isDrawing = true;
                   currentStroke = createStroke(draw_settings);
@@ -6144,77 +6161,127 @@
                   const pressure = event.pressure !== undefined ? event.pressure : 0.5;
                   const point = shared.createPoint(x, y, pressure);
                   B = point;
-                  currentPath = make_path(A, B);
-                  currentStroke[shared.ELEMENT.POINTS] = currentPath;
+                  if (isFreehand) {
+                      rawPoints.push(point);
+                      currentPath = rawPoints;
+                  } else {
+                      currentPath = make_path(A, B);
+                  }
+                  currentStroke[shared.ELEMENT.POINTS] = isFreehand ? rawPoints : currentPath;
+                  
+                  // Compute preview positions for live placement preview
+                  const mode = paste_settings.pasteMode;
+                  let previewPositions = [];
+                  if (mode === 'open-path') {
+                      const pts = (isFreehand ? rawPoints : currentPath).map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                      previewPositions = samplePointsAlongPath(pts, paste_settings.copies);
+                  } else if (mode === 'rectangle') {
+                      const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                      for (const p of pts) {
+                          if (p[0] < minX) minX = p[0];
+                          if (p[1] < minY) minY = p[1];
+                          if (p[0] > maxX) maxX = p[0];
+                          if (p[1] > maxY) maxY = p[1];
+                      }
+                      previewPositions = samplePointsInRect(minX, minY, maxX, maxY, paste_settings.copiesX, paste_settings.copiesY);
+                  } else if (mode === 'circle') {
+                      const centerX = A[shared.POINT.X];
+                      const centerY = A[shared.POINT.Y];
+                      const radius = Math.sqrt(
+                          Math.pow(B[shared.POINT.X] - centerX, 2) +
+                          Math.pow(B[shared.POINT.Y] - centerY, 2)
+                      );
+                      previewPositions = samplePointsOnCircle(centerX, centerY, radius, paste_settings.copies);
+                  } else if (mode === 'vertical') {
+                      const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                      let minY = Infinity, maxY = -Infinity;
+                      let x = pts[0][0];
+                      for (const p of pts) {
+                          if (p[1] < minY) minY = p[1];
+                          if (p[1] > maxY) maxY = p[1];
+                      }
+                      previewPositions = samplePointsOnLine(x, minY, x, maxY, paste_settings.copies);
+                  } else if (mode === 'horizontal') {
+                      const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                      let minX = Infinity, maxX = -Infinity;
+                      let y = pts[0][1];
+                      for (const p of pts) {
+                          if (p[0] < minX) minX = p[0];
+                          if (p[0] > maxX) maxX = p[0];
+                      }
+                      previewPositions = samplePointsOnLine(minX, y, maxX, y, paste_settings.copies);
+                  } else if (mode === 'straight') {
+                      const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                      previewPositions = samplePointsOnLine(pts[0][0], pts[0][1], pts[pts.length-1][0], pts[pts.length-1][1], paste_settings.copies);
+                  }
+                  
+                  // Store preview positions for rendering
+                  pastePreviewPositions = previewPositions;
+                  
                   requestRedraw();
               },
               up: () => {
                   if (force_stylus && event.pointerType === "touch") return;
                   if (isDrawing) {
                       isDrawing = false;
-                      if (currentPath.length >= 1) {
-                          // Compute copy positions based on paste mode
-                          const mode = paste_settings.pasteMode;
-                          let positions = [];
-                          
-                          if (mode === 'place') {
-                              // Place single copy at cursor
-                              const rect = canvas.getBoundingClientRect();
-                              const x = (event.clientX - rect.left - panX) / zoomLevel;
-                              const y = (event.clientY - rect.top - panY) / zoomLevel;
-                              positions = [[x, y]];
-                          } else if (mode === 'open-path') {
-                              // Sample N points along the drawn path
-                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
-                              positions = samplePointsAlongPath(pts, paste_settings.copies);
-                          } else if (mode === 'rectangle') {
-                              // Use bounding box of drawn shape
-                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
-                              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                              for (const p of pts) {
-                                  if (p[0] < minX) minX = p[0];
-                                  if (p[1] < minY) minY = p[1];
-                                  if (p[0] > maxX) maxX = p[0];
-                                  if (p[1] > maxY) maxY = p[1];
-                              }
-                              positions = samplePointsInRect(minX, minY, maxX, maxY, paste_settings.copiesX, paste_settings.copiesY);
-                          } else if (mode === 'circle') {
-                              // Use center and radius from drawn circle
-                              const centerX = A[shared.POINT.X];
-                              const centerY = A[shared.POINT.Y];
-                              const radius = Math.sqrt(
-                                  Math.pow(B[shared.POINT.X] - centerX, 2) +
-                                  Math.pow(B[shared.POINT.Y] - centerY, 2)
-                              );
-                              positions = samplePointsOnCircle(centerX, centerY, radius, paste_settings.copies);
-                          } else if (mode === 'vertical') {
-                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
-                              let minY = Infinity, maxY = -Infinity;
-                              let x = pts[0][0];
-                              for (const p of pts) {
-                                  if (p[1] < minY) minY = p[1];
-                                  if (p[1] > maxY) maxY = p[1];
-                              }
-                              positions = samplePointsOnLine(x, minY, x, maxY, paste_settings.copies);
-                          } else if (mode === 'horizontal') {
-                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
-                              let minX = Infinity, maxX = -Infinity;
-                              let y = pts[0][1];
-                              for (const p of pts) {
-                                  if (p[0] < minX) minX = p[0];
-                                  if (p[0] > maxX) maxX = p[0];
-                              }
-                              positions = samplePointsOnLine(minX, y, maxX, y, paste_settings.copies);
-                          } else if (mode === 'straight') {
-                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
-                              positions = samplePointsOnLine(pts[0][0], pts[0][1], pts[pts.length-1][0], pts[pts.length-1][1], paste_settings.copies);
+                      const mode = paste_settings.pasteMode;
+                      let positions = [];
+                      
+                      if (mode === 'place') {
+                          const rect = canvas.getBoundingClientRect();
+                          const x = (event.clientX - rect.left - panX) / zoomLevel;
+                          const y = (event.clientY - rect.top - panY) / zoomLevel;
+                          positions = [[x, y]];
+                      } else if (mode === 'open-path') {
+                          const pts = (isFreehand ? rawPoints : currentPath).map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                          positions = samplePointsAlongPath(pts, paste_settings.copies);
+                      } else if (mode === 'rectangle') {
+                          const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                          for (const p of pts) {
+                              if (p[0] < minX) minX = p[0];
+                              if (p[1] < minY) minY = p[1];
+                              if (p[0] > maxX) maxX = p[0];
+                              if (p[1] > maxY) maxY = p[1];
                           }
-                          
-                          // Commit paste at computed positions
-                          commitMultiPaste(positions);
+                          positions = samplePointsInRect(minX, minY, maxX, maxY, paste_settings.copiesX, paste_settings.copiesY);
+                      } else if (mode === 'circle') {
+                          const centerX = A[shared.POINT.X];
+                          const centerY = A[shared.POINT.Y];
+                          const radius = Math.sqrt(
+                              Math.pow(B[shared.POINT.X] - centerX, 2) +
+                              Math.pow(B[shared.POINT.Y] - centerY, 2)
+                          );
+                          positions = samplePointsOnCircle(centerX, centerY, radius, paste_settings.copies);
+                      } else if (mode === 'vertical') {
+                          const pts = (isFreehand ? rawPoints : currentPath).map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                          let minY = Infinity, maxY = -Infinity;
+                          let x = pts[0][0];
+                          for (const p of pts) {
+                              if (p[1] < minY) minY = p[1];
+                              if (p[1] > maxY) maxY = p[1];
+                          }
+                          positions = samplePointsOnLine(x, minY, x, maxY, paste_settings.copies);
+                      } else if (mode === 'horizontal') {
+                          const pts = (isFreehand ? rawPoints : currentPath).map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                          let minX = Infinity, maxX = -Infinity;
+                          let y = pts[0][1];
+                          for (const p of pts) {
+                              if (p[0] < minX) minX = p[0];
+                              if (p[0] > maxX) maxX = p[0];
+                          }
+                          positions = samplePointsOnLine(minX, y, maxX, y, paste_settings.copies);
+                      } else if (mode === 'straight') {
+                          const pts = (isFreehand ? rawPoints : currentPath).map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                          positions = samplePointsOnLine(pts[0][0], pts[0][1], pts[pts.length-1][0], pts[pts.length-1][1], paste_settings.copies);
                       }
+                      
+                      pastePreviewPositions = [];
+                      commitMultiPaste(positions);
                   }
                   currentPath = [];
+                  rawPoints = [];
                   currentStroke = null;
               }
           };
@@ -6307,7 +6374,7 @@
           function getMakePathForMode(mode) {
               switch (mode) {
                   case 'place': return bbox_path; // fallback, not used
-                  case 'open-path': return straight_path; // draw a curve
+                  case 'open-path': return null; // freehand curve
                   case 'rectangle': return bbox_path;
                   case 'circle': return circle_path;
                   case 'vertical': return vertical_path;
@@ -6335,7 +6402,8 @@
                   
                   // For all other modes, delegate to the factory
                   const makePath = getMakePathForMode(mode);
-                  const ph = paste_shape_pointer_handler_factory(makePath);
+                  const isFreehand = (mode === 'open-path');
+                  const ph = paste_shape_pointer_handler_factory(makePath, isFreehand);
                   ph.down();
                   // Store the handler for move/up
                   handler._activeHandler = ph;
@@ -7169,6 +7237,22 @@
           // Draw paste highlights if in paste mode (active layer)
           if (pasteMode) {
               renderPasteHighlight();
+          }
+          
+          // Draw preview markers for multi-paste placement
+          if (pastePreviewPositions.length > 0 && currentStroke) {
+              ctx.save();
+              ctx.fillStyle = '#ff4500';
+              ctx.strokeStyle = '#fff';
+              ctx.lineWidth = 1.5;
+              const dotRadius = 4;
+              for (const pos of pastePreviewPositions) {
+                  ctx.beginPath();
+                  ctx.arc(pos[0], pos[1], dotRadius, 0, 2 * Math.PI);
+                  ctx.fill();
+                  ctx.stroke();
+              }
+              ctx.restore();
           }
       }
 
