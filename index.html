@@ -5017,8 +5017,18 @@
                   e.stopPropagation();
                   const mode = this.getAttribute('data-paste-mode');
                   
+                  const prevMode = paste_settings.pasteMode;
                   paste_settings.pasteMode = mode;
                   mainBtn.textContent = pasteModeIcons[mode];
+                  
+                  // Exit interactive paste mode when switching away from place
+                  if (prevMode === 'place' && mode !== 'place' && pasteMode) {
+                      exitPasteMode();
+                  }
+                  // Enter interactive paste mode when switching to place
+                  if (mode === 'place' && prevMode !== 'place' && clipboard.elements.length > 0) {
+                      enterPasteMode();
+                  }
                   
               // Show/hide appropriate slider sections
               const singleSection = document.getElementById('paste-copies-selection');
@@ -5515,7 +5525,14 @@
           case 'paste':
               canvas.style.cursor = 'crosshair';
               switch_settings( paste_settings );
-              set_pointer_handler( paste_shape_pointer_handler );
+              if (paste_settings.pasteMode === 'place') {
+                  if (clipboard.elements.length > 0) {
+                      enterPasteMode();
+                  }
+                  set_pointer_handler( paste_pointer_handler );
+              } else {
+                  set_pointer_handler( paste_shape_pointer_handler );
+              }
               document.getElementById('paste-btn').classList.add('active');
               break;
           case 'hand':
