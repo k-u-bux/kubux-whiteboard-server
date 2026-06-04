@@ -708,12 +708,15 @@
       
       #paste-copies-selection, #paste-copies-x-selection, #paste-copies-y-selection {
           height: 120px;
-          justify-content: center;
+          justify-content: flex-end;
       }
       
       #paste-copies-slider, #paste-copies-x-slider, #paste-copies-y-slider {
-          transform: rotate(90deg);
-          transform-origin: 50% 50%;
+          width: 8px;
+          height: 100px;
+          -webkit-appearance: slider-vertical;
+          appearance: slider-vertical;
+          writing-mode: bt-lr;
       }
       
       /* Zoom popup menu */
