@@ -1990,9 +1990,20 @@
               joinStyleSelectionDiv.style.display = 'none';
               dashPatternSelectionDiv.style.display = 'none';
               pasteModeSelectionDiv.style.display = 'flex';
-              pasteCopiesSelectionDiv.style.display = 'flex';
-              pasteCopiesXSelectionDiv.style.display = 'none';
-              pasteCopiesYSelectionDiv.style.display = 'none';
+              // Show correct sliders based on current paste mode
+              if (paste_settings.pasteMode === 'rectangle') {
+                  pasteCopiesSelectionDiv.style.display = 'none';
+                  pasteCopiesXSelectionDiv.style.display = 'flex';
+                  pasteCopiesYSelectionDiv.style.display = 'flex';
+              } else if (paste_settings.pasteMode === 'place') {
+                  pasteCopiesSelectionDiv.style.display = 'none';
+                  pasteCopiesXSelectionDiv.style.display = 'none';
+                  pasteCopiesYSelectionDiv.style.display = 'none';
+              } else {
+                  pasteCopiesSelectionDiv.style.display = 'flex';
+                  pasteCopiesXSelectionDiv.style.display = 'none';
+                  pasteCopiesYSelectionDiv.style.display = 'none';
+              }
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
