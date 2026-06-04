@@ -1990,6 +1990,13 @@
               joinStyleSelectionDiv.style.display = 'none';
               dashPatternSelectionDiv.style.display = 'none';
               pasteModeSelectionDiv.style.display = 'flex';
+              // Sync slider values from stored settings
+              document.getElementById('paste-copies-slider').value = paste_settings.copies;
+              document.getElementById('paste-copies-value').textContent = paste_settings.copies;
+              document.getElementById('paste-copies-x-slider').value = paste_settings.copiesX;
+              document.getElementById('paste-copies-x-value').textContent = paste_settings.copiesX;
+              document.getElementById('paste-copies-y-slider').value = paste_settings.copiesY;
+              document.getElementById('paste-copies-y-value').textContent = paste_settings.copiesY;
               // Show correct sliders based on current paste mode
               if (paste_settings.pasteMode === 'rectangle') {
                   pasteCopiesSelectionDiv.style.display = 'none';
