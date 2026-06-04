@@ -1997,12 +1997,6 @@
               // Show paste mode selection and copy count sliders
               document.getElementById('paste-mode-selection').style.display = 'flex';
               document.getElementById('paste-copies-selection').style.display = 'flex';
-              // Also show selection action buttons (cut, copy, move, layer, deselect)
-              selectionActionsSidebar.style.display = 'flex';
-              selectionCopySidebar.style.display = 'flex';
-              selectionMoveSidebar.style.display = 'flex';
-              selectionLayerSidebar.style.display = 'flex';
-              selectionDeselectSidebar.style.display = 'flex';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
@@ -5008,7 +5002,7 @@
               const ySection = document.getElementById('paste-copies-y-selection');
               
               if (mode === 'rectangle') {
-                  singleSection.style.display = 'flex';
+                  singleSection.style.display = 'none';
                   xSection.style.display = 'flex';
                   ySection.style.display = 'flex';
               } else if (mode === 'place') {
