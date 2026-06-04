@@ -6162,7 +6162,7 @@
                   currentPath.push(point);
                   isDrawing = true;
                   currentStroke = createStroke(draw_settings);
-                  currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
+                  currentStroke[shared.ELEMENT.PATH] = isFreehand ? shared.DRAWABLE.PATH.OPEN_PIECEWISE_LINEAR : shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
                   currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
                   currentStroke[shared.ELEMENT.COLOR] = '#888';
                   currentStroke[shared.ELEMENT.WIDTH] = 2 / zoomLevel;
