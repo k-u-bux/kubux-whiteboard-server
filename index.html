@@ -1957,6 +1957,10 @@
               capStyleSelectionDiv.style.display = 'flex';
               joinStyleSelectionDiv.style.display = 'flex';
               dashPatternSelectionDiv.style.display = 'flex';
+              pasteModeSelectionDiv.style.display = 'none';
+              pasteCopiesSelectionDiv.style.display = 'none';
+              pasteCopiesXSelectionDiv.style.display = 'none';
+              pasteCopiesYSelectionDiv.style.display = 'none';
               break;
           case 'selection-rectangle':
           case 'selection-lasso':
@@ -1970,6 +1974,10 @@
               capStyleSelectionDiv.style.display = 'none';
               joinStyleSelectionDiv.style.display = 'none';
               dashPatternSelectionDiv.style.display = 'none';
+              pasteModeSelectionDiv.style.display = 'none';
+              pasteCopiesSelectionDiv.style.display = 'none';
+              pasteCopiesXSelectionDiv.style.display = 'none';
+              pasteCopiesYSelectionDiv.style.display = 'none';
               break;
           case 'selection-stroke':
               colorSelectionDiv.style.display = 'none';
@@ -1982,6 +1990,10 @@
               capStyleSelectionDiv.style.display = 'none';
               joinStyleSelectionDiv.style.display = 'none';
               dashPatternSelectionDiv.style.display = 'none';
+              pasteModeSelectionDiv.style.display = 'none';
+              pasteCopiesSelectionDiv.style.display = 'none';
+              pasteCopiesXSelectionDiv.style.display = 'none';
+              pasteCopiesYSelectionDiv.style.display = 'none';
               break;
           case 'paste':
               colorSelectionDiv.style.display = 'none';
@@ -1994,9 +2006,10 @@
               capStyleSelectionDiv.style.display = 'none';
               joinStyleSelectionDiv.style.display = 'none';
               dashPatternSelectionDiv.style.display = 'none';
-              // Show paste mode selection and copy count sliders
-              document.getElementById('paste-mode-selection').style.display = 'flex';
-              document.getElementById('paste-copies-selection').style.display = 'flex';
+              pasteModeSelectionDiv.style.display = 'flex';
+              pasteCopiesSelectionDiv.style.display = 'flex';
+              pasteCopiesXSelectionDiv.style.display = 'none';
+              pasteCopiesYSelectionDiv.style.display = 'none';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
@@ -2009,6 +2022,10 @@
               capStyleSelectionDiv.style.display = 'none';
               joinStyleSelectionDiv.style.display = 'none';
               dashPatternSelectionDiv.style.display = 'none';
+              pasteModeSelectionDiv.style.display = 'none';
+              pasteCopiesSelectionDiv.style.display = 'none';
+              pasteCopiesXSelectionDiv.style.display = 'none';
+              pasteCopiesYSelectionDiv.style.display = 'none';
               break;
           }
       };
@@ -2309,6 +2326,13 @@
       const selectionMoveSidebar = document.getElementById('selection-move-sidebar');
       const selectionLayerSidebar = document.getElementById('selection-layer-sidebar');
       const selectionDeselectSidebar = document.getElementById('selection-deselect-sidebar');
+      
+      // Paste mode sidebar sections
+      const pasteModeSelectionDiv = document.getElementById('paste-mode-selection');
+      const pasteCopiesSelectionDiv = document.getElementById('paste-copies-selection');
+      const pasteCopiesXSelectionDiv = document.getElementById('paste-copies-x-selection');
+      const pasteCopiesYSelectionDiv = document.getElementById('paste-copies-y-selection');
+      
       const cutBtn = document.getElementById('cut-btn');
       const copyBtn = document.getElementById('copy-btn');
       const moveBtn = document.getElementById('move-btn');
