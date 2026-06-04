@@ -706,6 +706,20 @@
           font-weight: bold;
       }
       
+      /* Paste mode popup menu */
+      #paste-mode-popup-menu {
+          position: fixed;
+          background-color: #f0f0f0;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          padding: 4px;
+          display: flex;
+          flex-direction: row;
+          gap: 2px;
+          z-index: 1000;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
+      
       /* Zoom popup menu */
       #zoom-popup-menu {
           position: fixed;
@@ -1232,6 +1246,25 @@
         <div class="tool-section sidebar-section" id="selection-deselect-sidebar" style="display: none;">
           <button class="shape-btn" id="deselect-toggle-btn" title="Deselect Mode">➖</button>
         </div>
+        
+        <!-- Paste mode selection (shown when paste tool is active) -->
+        <div class="tool-section sidebar-section" id="paste-mode-selection" style="display: none;">
+          <button class="shape-btn" id="paste-mode-main-btn" title="Paste Mode (click to select)">✚</button>
+        </div>
+        <div id="paste-mode-popup-menu" style="display: none;">
+          <button class="shape-btn paste-mode-option" data-paste-mode="place" title="Place single copy">✚</button>
+          <button class="shape-btn paste-mode-option" data-paste-mode="open-path" title="Evenly along open path">∿</button>
+          <button class="shape-btn paste-mode-option" data-paste-mode="rectangle" title="Evenly in rectangle">▭</button>
+          <button class="shape-btn paste-mode-option" data-paste-mode="circle" title="Evenly around circle">◯</button>
+          <button class="shape-btn paste-mode-option" data-paste-mode="vertical" title="Evenly along vertical line">│</button>
+          <button class="shape-btn paste-mode-option" data-paste-mode="horizontal" title="Evenly along horizontal line">─</button>
+          <button class="shape-btn paste-mode-option" data-paste-mode="straight" title="Evenly along straight line">／</button>
+        </div>
+        <div class="tool-section sidebar-section" id="paste-copies-selection" style="display: none;">
+          <input type="range" id="paste-copies-slider" min="2" max="36" step="1" value="5">
+          <input type="range" id="paste-copies-x-slider" min="2" max="36" step="1" value="3" style="display:none;">
+          <input type="range" id="paste-copies-y-slider" min="2" max="36" step="1" value="3" style="display:none;">
+        </div>
       </div>
       
       <div class="main-content">
@@ -1589,10 +1622,11 @@
                   panY: panY,
                   colorSwatches: [],
                   canvasFormat: canvasFormat,
-                  // Page position
-                  currentPageUuid: currentPageUuid,
-                  pageNr: pageNr,
-                  totalPages: totalPages
+              paste: paste_settings,
+              // Page position
+              currentPageUuid: currentPageUuid,
+              pageNr: pageNr,
+              totalPages: totalPages
               };
               
               // Save color swatch customizations
@@ -1630,6 +1664,7 @@
               if (settings.selectionRectangle) Object.assign(selection_rectangle_settings, settings.selectionRectangle);
               if (settings.selectionLasso) Object.assign(selection_lasso_settings, settings.selectionLasso);
               if (settings.selectionStroke) Object.assign(selection_stroke_settings, settings.selectionStroke);
+              if (settings.paste) Object.assign(paste_settings, settings.paste);
               
               // Restore color swatches
               if (settings.colorSwatches) {
@@ -1778,6 +1813,24 @@
           shape: 'curve'
       };
 
+      // Paste mode settings
+      const pasteModeIcons = {
+          'place': '✚',
+          'open-path': '∿',
+          'rectangle': '▭',
+          'circle': '◯',
+          'vertical': '│',
+          'horizontal': '─',
+          'straight': '／'
+      };
+      let paste_settings = {
+          tool: "paste",
+          pasteMode: "place",
+          copies: 5,
+          copiesX: 3,
+          copiesY: 3
+      };
+
       let draw_settings = pen1_settings;
 
       function createStroke ( settings ) {
@@ -1910,6 +1963,27 @@
               capStyleSelectionDiv.style.display = 'none';
               joinStyleSelectionDiv.style.display = 'none';
               dashPatternSelectionDiv.style.display = 'none';
+              break;
+          case 'paste':
+              colorSelectionDiv.style.display = 'none';
+              widthSelectionDiv.style.display = 'none';
+              opacitySelectionDiv.style.display = 'none';
+              sensitivitySelectionDiv.style.display = 'none';
+              timerToggleDiv.style.display = 'none';
+              pathModeSelectionDiv.style.display = 'none';
+              shapeSelectionDiv.style.display = 'none';
+              capStyleSelectionDiv.style.display = 'none';
+              joinStyleSelectionDiv.style.display = 'none';
+              dashPatternSelectionDiv.style.display = 'none';
+              // Show paste mode selection and copy count sliders
+              document.getElementById('paste-mode-selection').style.display = 'flex';
+              document.getElementById('paste-copies-selection').style.display = 'flex';
+              // Also show selection action buttons (cut, copy, move, layer, deselect)
+              selectionActionsSidebar.style.display = 'flex';
+              selectionCopySidebar.style.display = 'flex';
+              selectionMoveSidebar.style.display = 'flex';
+              selectionLayerSidebar.style.display = 'flex';
+              selectionDeselectSidebar.style.display = 'flex';
               break;
           case 'eraser':
               colorSelectionDiv.style.display = 'none';
@@ -4300,7 +4374,7 @@
           cutBtn.addEventListener('click', () => { cutSelectedElements(); startResetTool(); } );
           copyBtn.addEventListener('click',  () => { copySelectedElements(); startResetTool(); } );
           moveBtn.addEventListener('click',  () => { moveSelectedElements(); startResetTool(); } );
-          pasteBtn.addEventListener('click', handlePasteClick);
+          pasteBtn.addEventListener('click', () => { stopResetTool(); setTool('paste'); startResetTool(); });
           moveLayerBtn.addEventListener('click', showMoveToLayerDialog);
           
           // Deselect toggle button
@@ -4878,6 +4952,90 @@
           sendMessage(proposal);
       }
 
+      // Setup paste mode selector popup
+      function setupPasteModeSelector() {
+          const mainBtn = document.getElementById('paste-mode-main-btn');
+          const popup = document.getElementById('paste-mode-popup-menu');
+          const pasteModeOptions = document.querySelectorAll('.paste-mode-option');
+          
+          // Toggle popup on main button click
+          mainBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const isVisible = popup.style.display === 'flex';
+              
+              if (isVisible) {
+                  popup.style.display = 'none';
+              } else {
+                  const rect = mainBtn.getBoundingClientRect();
+                  popup.style.left = (rect.right + 5) + 'px';
+                  popup.style.top = rect.top + 'px';
+                  popup.style.display = 'flex';
+              }
+          });
+          
+          // Handle paste mode option clicks
+          pasteModeOptions.forEach(option => {
+              option.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                  const mode = this.getAttribute('data-paste-mode');
+                  
+                  paste_settings.pasteMode = mode;
+                  mainBtn.textContent = pasteModeIcons[mode];
+                  
+                  // Show/hide appropriate sliders
+                  const singleSlider = document.getElementById('paste-copies-slider');
+                  const xSlider = document.getElementById('paste-copies-x-slider');
+                  const ySlider = document.getElementById('paste-copies-y-slider');
+                  
+                  if (mode === 'rectangle') {
+                      singleSlider.style.display = 'none';
+                      xSlider.style.display = 'block';
+                      ySlider.style.display = 'block';
+                  } else if (mode === 'place') {
+                      singleSlider.style.display = 'none';
+                      xSlider.style.display = 'none';
+                      ySlider.style.display = 'none';
+                  } else {
+                      singleSlider.style.display = 'block';
+                      xSlider.style.display = 'none';
+                      ySlider.style.display = 'none';
+                  }
+                  
+                  popup.style.display = 'none';
+                  saveSettings();
+              });
+          });
+          
+          // Close popup when clicking outside
+          document.addEventListener('click', function(e) {
+              if (popup.style.display === 'flex' && 
+                  !popup.contains(e.target) && 
+                  e.target !== mainBtn) {
+                  popup.style.display = 'none';
+              }
+          });
+          
+          // Slider event listeners
+          document.getElementById('paste-copies-slider').addEventListener('input', function() {
+              paste_settings.copies = parseInt(this.value);
+          });
+          document.getElementById('paste-copies-slider').addEventListener('change', function() {
+              saveSettings();
+          });
+          document.getElementById('paste-copies-x-slider').addEventListener('input', function() {
+              paste_settings.copiesX = parseInt(this.value);
+          });
+          document.getElementById('paste-copies-x-slider').addEventListener('change', function() {
+              saveSettings();
+          });
+          document.getElementById('paste-copies-y-slider').addEventListener('input', function() {
+              paste_settings.copiesY = parseInt(this.value);
+          });
+          document.getElementById('paste-copies-y-slider').addEventListener('change', function() {
+              saveSettings();
+          });
+      }
+
       // Set up event listeners
       function setupEventListeners() {
           // Reconnect button
@@ -4951,6 +5109,9 @@
           
           // Dash pattern selector popup
           setupDashPatternSelector();
+          
+          // Paste mode selector popup
+          setupPasteModeSelector();
           
           // Zoom menu popup
           setupZoomMenu();
@@ -5237,6 +5398,7 @@
           document.getElementById('selection-lasso-tool').classList.remove('active');
           document.getElementById('selection-stroke-tool').classList.remove('active');
           document.getElementById('hand-tool').classList.remove('active');
+          document.getElementById('paste-btn').classList.remove('active');
           // document.getElementById(`${tool}-tool`).classList.add('active');
           
           // Clear selection when switching away from selection tools
@@ -5308,6 +5470,12 @@
               switch_settings( selection_stroke_settings );
               set_pointer_handler( selection_pointer_handler );
               document.getElementById('selection-stroke-tool').classList.add('active');
+              break;
+          case 'paste':
+              canvas.style.cursor = 'crosshair';
+              switch_settings( paste_settings );
+              set_pointer_handler( paste_shape_pointer_handler );
+              document.getElementById('paste-btn').classList.add('active');
               break;
           case 'hand':
               canvas.style.cursor = 'grab';
@@ -5853,6 +6021,331 @@
               dragStartPoint = null;
           }
       };
+
+      // ============================================================
+      // Multi-paste geometric computation functions
+      // ============================================================
+
+      // Compute N evenly spaced points along a polyline using arc-length parameterization
+      function samplePointsAlongPath(points, N) {
+          if (points.length < 2 || N < 2) return [];
+          
+          // Compute cumulative arc lengths
+          const arcLengths = [0];
+          for (let i = 1; i < points.length; i++) {
+              const dx = points[i][0] - points[i-1][0];
+              const dy = points[i][1] - points[i-1][1];
+              arcLengths.push(arcLengths[i-1] + Math.sqrt(dx*dx + dy*dy));
+          }
+          const totalLength = arcLengths[arcLengths.length - 1];
+          if (totalLength < 0.001) return [];
+          
+          const result = [];
+          for (let k = 0; k < N; k++) {
+              const targetDist = (k / (N - 1)) * totalLength;
+              // Binary search for the segment containing targetDist
+              let lo = 0, hi = arcLengths.length - 1;
+              while (lo < hi - 1) {
+                  const mid = (lo + hi) >> 1;
+                  if (arcLengths[mid] <= targetDist) lo = mid;
+                  else hi = mid;
+              }
+              const segLen = arcLengths[hi] - arcLengths[lo];
+              const t = segLen > 0 ? (targetDist - arcLengths[lo]) / segLen : 0;
+              result.push([
+                  points[lo][0] + t * (points[hi][0] - points[lo][0]),
+                  points[lo][1] + t * (points[hi][1] - points[lo][1])
+              ]);
+          }
+          return result;
+      }
+
+      // Compute N evenly spaced points around a circle (regular N-gon, first at 12 o'clock)
+      function samplePointsOnCircle(centerX, centerY, radius, N) {
+          const result = [];
+          for (let k = 0; k < N; k++) {
+              const angle = -Math.PI/2 + (k / N) * 2 * Math.PI; // start at 12 o'clock
+              result.push([
+                  centerX + radius * Math.cos(angle),
+                  centerY + radius * Math.sin(angle)
+              ]);
+          }
+          return result;
+      }
+
+      // Compute MxN grid points in a rectangle
+      function samplePointsInRect(x1, y1, x2, y2, M, N) {
+          const result = [];
+          for (let i = 0; i < M; i++) {
+              for (let j = 0; j < N; j++) {
+                  const x = x1 + (i / (M - 1)) * (x2 - x1);
+                  const y = y1 + (j / (N - 1)) * (y2 - y1);
+                  result.push([x, y]);
+              }
+          }
+          return result;
+      }
+
+      // Compute N evenly spaced points along a straight line
+      function samplePointsOnLine(x1, y1, x2, y2, N) {
+          const result = [];
+          for (let k = 0; k < N; k++) {
+              const t = k / (N - 1);
+              result.push([
+                  x1 + t * (x2 - x1),
+                  y1 + t * (y2 - y1)
+              ]);
+          }
+          return result;
+      }
+
+      // ============================================================
+      // Paste shape pointer handler (multi-paste modes)
+      // ============================================================
+
+      // Factory: creates a paste pointer handler for a given shape-drawing function
+      function paste_shape_pointer_handler_factory(make_path) {
+          return {
+              down: () => {
+                  if (force_stylus && event.pointerType === "touch") return;
+                  const rect = canvas.getBoundingClientRect();
+                  const x = (event.clientX - rect.left - panX) / zoomLevel;
+                  const y = (event.clientY - rect.top - panY) / zoomLevel;
+                  const pressure = event.pressure !== undefined ? event.pressure : 0.5;
+                  currentPath = [];
+                  const point = shared.createPoint(x, y, pressure);
+                  currentPath.push(point);
+                  isDrawing = true;
+                  currentStroke = createStroke(draw_settings);
+                  currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
+                  currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.STROKE;
+                  currentStroke[shared.ELEMENT.COLOR] = '#888';
+                  currentStroke[shared.ELEMENT.WIDTH] = 2 / zoomLevel;
+                  currentStroke[shared.ELEMENT.OPACITY] = 0.5;
+                  currentStroke[shared.ELEMENT.POINTS] = [point, point, point, point];
+                  A = point;
+              },
+              move: () => {
+                  if (force_stylus && event.pointerType === "touch") return;
+                  if (!isDrawing) return;
+                  const rect = canvas.getBoundingClientRect();
+                  const x = (event.clientX - rect.left - panX) / zoomLevel;
+                  const y = (event.clientY - rect.top - panY) / zoomLevel;
+                  const pressure = event.pressure !== undefined ? event.pressure : 0.5;
+                  const point = shared.createPoint(x, y, pressure);
+                  B = point;
+                  currentPath = make_path(A, B);
+                  currentStroke[shared.ELEMENT.POINTS] = currentPath;
+                  requestRedraw();
+              },
+              up: () => {
+                  if (force_stylus && event.pointerType === "touch") return;
+                  if (isDrawing) {
+                      isDrawing = false;
+                      if (currentPath.length >= 1) {
+                          // Compute copy positions based on paste mode
+                          const mode = paste_settings.pasteMode;
+                          let positions = [];
+                          
+                          if (mode === 'place') {
+                              // Place single copy at cursor
+                              const rect = canvas.getBoundingClientRect();
+                              const x = (event.clientX - rect.left - panX) / zoomLevel;
+                              const y = (event.clientY - rect.top - panY) / zoomLevel;
+                              positions = [[x, y]];
+                          } else if (mode === 'open-path') {
+                              // Sample N points along the drawn path
+                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                              positions = samplePointsAlongPath(pts, paste_settings.copies);
+                          } else if (mode === 'rectangle') {
+                              // Use bounding box of drawn shape
+                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                              for (const p of pts) {
+                                  if (p[0] < minX) minX = p[0];
+                                  if (p[1] < minY) minY = p[1];
+                                  if (p[0] > maxX) maxX = p[0];
+                                  if (p[1] > maxY) maxY = p[1];
+                              }
+                              positions = samplePointsInRect(minX, minY, maxX, maxY, paste_settings.copiesX, paste_settings.copiesY);
+                          } else if (mode === 'circle') {
+                              // Use center and radius from drawn circle
+                              const centerX = A[shared.POINT.X];
+                              const centerY = A[shared.POINT.Y];
+                              const radius = Math.sqrt(
+                                  Math.pow(B[shared.POINT.X] - centerX, 2) +
+                                  Math.pow(B[shared.POINT.Y] - centerY, 2)
+                              );
+                              positions = samplePointsOnCircle(centerX, centerY, radius, paste_settings.copies);
+                          } else if (mode === 'vertical') {
+                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                              let minY = Infinity, maxY = -Infinity;
+                              let x = pts[0][0];
+                              for (const p of pts) {
+                                  if (p[1] < minY) minY = p[1];
+                                  if (p[1] > maxY) maxY = p[1];
+                              }
+                              positions = samplePointsOnLine(x, minY, x, maxY, paste_settings.copies);
+                          } else if (mode === 'horizontal') {
+                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                              let minX = Infinity, maxX = -Infinity;
+                              let y = pts[0][1];
+                              for (const p of pts) {
+                                  if (p[0] < minX) minX = p[0];
+                                  if (p[0] > maxX) maxX = p[0];
+                              }
+                              positions = samplePointsOnLine(minX, y, maxX, y, paste_settings.copies);
+                          } else if (mode === 'straight') {
+                              const pts = currentPath.map(p => [p[shared.POINT.X], p[shared.POINT.Y]]);
+                              positions = samplePointsOnLine(pts[0][0], pts[0][1], pts[pts.length-1][0], pts[pts.length-1][1], paste_settings.copies);
+                          }
+                          
+                          // Commit paste at computed positions
+                          commitMultiPaste(positions);
+                      }
+                  }
+                  currentPath = [];
+                  currentStroke = null;
+              }
+          };
+      }
+
+      // Commit paste with multiple copy positions
+      function commitMultiPaste(positions) {
+          if (!clipboard.elements.length || positions.length === 0) return;
+          
+          const actions = [];
+          const bounds = clipboard.bounds;
+          const centerX = bounds.x + bounds.width / 2;
+          const centerY = bounds.y + bounds.height / 2;
+          
+          positions.forEach((pos, idx) => {
+              const offsetX = pos[0] - centerX;
+              const offsetY = pos[1] - centerY;
+              
+              clipboard.elements.forEach(element => {
+                  const newElement = JSON.parse(JSON.stringify(element));
+                  const newUuid = shared.generateUuid();
+                  
+                  // Apply offset to points
+                  newElement[shared.ELEMENT.POINTS] = element[shared.ELEMENT.POINTS].map(point => {
+                      return [
+                          point[0] + offsetX,
+                          point[1] + offsetY,
+                          point[2]
+                      ];
+                  });
+                  
+                  // Set layer to current active layer
+                  newElement[shared.ELEMENT.LAYER] = Number(activeLayer);
+                  
+                  actions.push({
+                      type: shared.MOD_ACTIONS.DRAW.TYPE,
+                      [shared.MOD_ACTIONS.UUID]: newUuid,
+                      [shared.MOD_ACTIONS.DRAW.STROKE]: newElement
+                  });
+              });
+          });
+          
+          if (actions.length === 0) return;
+          
+          // Group all paste actions
+          const groupUuid = shared.generateUuid();
+          const groupAction = {
+              type: shared.MOD_ACTIONS.GROUP.TYPE,
+              [shared.MOD_ACTIONS.UUID]: groupUuid,
+              [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
+          };
+          
+          // If we are in the middle of history (after undoing), truncate future actions
+          if (present < history.length) {
+              history = history.slice(0, present);
+              hashes = hashes.slice(0, present + 1);
+          }
+          
+          // Add to history and advance present
+          history.push(groupAction);
+          present++;
+          
+          // Calculate placeholder hash
+          const placeholderHash = shared.generateUuid();
+          hashes.push(placeholderHash);
+          
+          // Create proposal
+          const proposal = {
+              type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
+          };
+          
+          // Update visual state and UI
+          updateVisualState();
+          updateUndoRedoButtons();
+          updateSyncStatus();
+          
+          // Send to server
+          pending_register_action(groupUuid);
+          sendMessage(proposal);
+      }
+
+      // The paste shape pointer handler uses the current paste mode's shape
+      const paste_shape_pointer_handler = (function() {
+          // Determine which shape to draw based on paste mode
+          function getMakePathForMode(mode) {
+              switch (mode) {
+                  case 'place': return bbox_path; // fallback, not used
+                  case 'open-path': return straight_path; // draw a curve
+                  case 'rectangle': return bbox_path;
+                  case 'circle': return circle_path;
+                  case 'vertical': return vertical_path;
+                  case 'horizontal': return horizontal_path;
+                  case 'straight': return straight_path;
+                  default: return bbox_path;
+              }
+          }
+          
+          // Create a handler that adapts to the current paste mode
+          const handler = {
+              down: () => {
+                  if (force_stylus && event.pointerType === "touch") return;
+                  
+                  const mode = paste_settings.pasteMode;
+                  
+                  if (mode === 'place') {
+                      // Place mode: just paste at click position, no shape drawing
+                      const rect = canvas.getBoundingClientRect();
+                      const x = (event.clientX - rect.left - panX) / zoomLevel;
+                      const y = (event.clientY - rect.top - panY) / zoomLevel;
+                      commitMultiPaste([[x, y]]);
+                      return;
+                  }
+                  
+                  // For all other modes, delegate to the factory
+                  const makePath = getMakePathForMode(mode);
+                  const ph = paste_shape_pointer_handler_factory(makePath);
+                  ph.down();
+                  // Store the handler for move/up
+                  handler._activeHandler = ph;
+              },
+              move: () => {
+                  if (force_stylus && event.pointerType === "touch") return;
+                  if (handler._activeHandler) {
+                      handler._activeHandler.move();
+                  }
+              },
+              up: () => {
+                  if (force_stylus && event.pointerType === "touch") return;
+                  if (handler._activeHandler) {
+                      handler._activeHandler.up();
+                      handler._activeHandler = null;
+                  }
+              }
+          };
+          return handler;
+      })();
 
       let pointer_handler = draw_path_pointer_handler;
 
