@@ -4994,6 +4994,13 @@
                   
                   paste_settings.pasteMode = mode;
                   
+                  // Update pointer handler based on mode
+                  if (mode === 'place') {
+                      set_pointer_handler(paste_pointer_handler);
+                  } else {
+                      set_pointer_handler(paste_shape_pointer_handler);
+                  }
+                  
                   // Update active class on buttons
                   buttons.forEach(b => b.classList.remove('active'));
                   this.classList.add('active');
