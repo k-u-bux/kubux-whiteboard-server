@@ -3833,6 +3833,7 @@
       
       // Move selected elements - cut + immediate paste mode
       function moveSelectedElements() {
+          commitSelectionModifications();
           if (selectedElements.length === 0) return;
           cutSelectedElements();
           enterPasteMode();
@@ -4631,12 +4632,15 @@
       }
 
       function cutSelectedElements() {
+          commitSelectionModifications();
+          if (selectedElements.length === 0) return;
           copySelectedElements();
           deleteSelectedElements();
           // updatePasteButton() already called by copySelectedElements()
       }
 
       function deleteSelectedElements() {
+          commitSelectionModifications();
           if (selectedElements.length === 0) return;
           
           // Create group of erase actions
