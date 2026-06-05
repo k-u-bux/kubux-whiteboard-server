@@ -2068,6 +2068,9 @@
       let currentStroke = null;
       let selectionStroke = null;
       let selectedElements = [];
+      let selectionPendingMods = false;   // true while selection property changes are pending
+      let selectionOriginalUuids = [];    // snapshot of selectedElements when pending mods started
+      let selectionPendingOverrides = {}; // uuid -> {property: value} accumulated overrides
       let isDraggingSelection = false;
       let selectionStartPoint = null;
       let selectionOriginalPoint = null; // Track original position for drag
@@ -3698,7 +3701,7 @@
                                     draw_settings.tool === 'selection-lasso' ||
                                     draw_settings.tool === 'selection-stroke');
           if (isSelectionTool && selectedElements.length > 0) {
-              modifySelectedElements({ width: parseFloat(penRadius) });
+              applySelectionProperty({ width: parseFloat(penRadius) });
               return;
           }
           draw_settings.width = parseFloat(penRadius);
@@ -3713,7 +3716,7 @@
                                     draw_settings.tool === 'selection-lasso' ||
                                     draw_settings.tool === 'selection-stroke');
           if (isSelectionTool && selectedElements.length > 0) {
-              modifySelectedElements({ opacity: opacity });
+              applySelectionProperty({ opacity: opacity });
               return;
           }
           draw_settings.opacity = opacity;
@@ -4168,7 +4171,7 @@
                                             draw_settings.tool === 'selection-lasso' ||
                                             draw_settings.tool === 'selection-stroke');
                   if (isSelectionTool && selectedElements.length > 0) {
-                      modifySelectedElements({ dash_pattern: DASH_PATTERNS[patternName] });
+                      applySelectionProperty({ dash_pattern: DASH_PATTERNS[patternName] });
                       return;
                   }
                   draw_settings.dash_pattern = DASH_PATTERNS[patternName];
@@ -4436,6 +4439,7 @@
 
       // Selection Functions
       function clearSelection() {
+          commitSelectionModifications();
           selectedElements = [];
           requestRedraw();
       }
@@ -4998,7 +5002,126 @@
           sendMessage(proposal);
       }
 
-      // Modify selected elements — changes color/width/dash etc. using ERASE+DRAW+GROUP
+      // Apply a property override to selected elements locally (no server proposal).
+      // Multiple changes accumulate; only the final state is committed on deselection.
+      function applySelectionProperty(overrides) {
+          if (selectedElements.length === 0) return;
+
+          // On first modification within this selection session, snapshot the uuids.
+          if (!selectionPendingMods) {
+              selectionPendingMods = true;
+              selectionOriginalUuids = [...selectedElements];
+              selectionPendingOverrides = {};
+          }
+
+          // Accumulate overrides for each selected element.
+          for (const uuid of selectedElements) {
+              if (!selectionPendingOverrides[uuid]) {
+                  selectionPendingOverrides[uuid] = {};
+              }
+              const element = visualState.element.get(uuid);
+              if (!element) continue;
+              if (overrides.color !== undefined) {
+                  element[shared.ELEMENT.COLOR] = overrides.color;
+                  selectionPendingOverrides[uuid].color = overrides.color;
+              }
+              if (overrides.width !== undefined) {
+                  element[shared.ELEMENT.WIDTH] = overrides.width;
+                  selectionPendingOverrides[uuid].width = overrides.width;
+              }
+              if (overrides.dash_pattern !== undefined) {
+                  element[shared.ELEMENT.DASH_PATTERN] = overrides.dash_pattern;
+                  selectionPendingOverrides[uuid].dash_pattern = overrides.dash_pattern;
+              }
+              if (overrides.opacity !== undefined) {
+                  element[shared.ELEMENT.OPACITY] = overrides.opacity;
+                  selectionPendingOverrides[uuid].opacity = overrides.opacity;
+              }
+          }
+
+          backgroundValid = false;
+          requestRedraw();
+      }
+
+      // Commit all accumulated selection property modifications as a single flat proposal.
+      function commitSelectionModifications() {
+          if (!selectionPendingMods || selectionOriginalUuids.length === 0) {
+              selectionPendingMods = false;
+              selectionOriginalUuids = [];
+              selectionPendingOverrides = {};
+              return;
+          }
+
+          // Build one flat list of [ERASE(uuid1), ERASE(uuid2), ..., DRAW(newUuid1, modified1), ...]
+          const actions = [];
+          const newUuids = [];
+
+          for (const uuid of selectionOriginalUuids) {
+              // Erase the original
+              actions.push(createEraseAction(uuid));
+              // Draw the modified version
+              const element = visualState.element.get(uuid);
+              if (element) {
+                  const newUuid = shared.generateUuid();
+                  newUuids.push(newUuid);
+                  actions.push({
+                      type: shared.MOD_ACTIONS.DRAW.TYPE,
+                      [shared.MOD_ACTIONS.UUID]: newUuid,
+                      [shared.MOD_ACTIONS.DRAW.STROKE]: JSON.parse(JSON.stringify(element))
+                  });
+              }
+          }
+
+          if (actions.length === 0) {
+              selectionPendingMods = false;
+              selectionOriginalUuids = [];
+              selectionPendingOverrides = {};
+              return;
+          }
+
+          // Single flat GROUP — no nesting.
+          const groupUuid = shared.generateUuid();
+          const groupAction = {
+              type: shared.MOD_ACTIONS.GROUP.TYPE,
+              [shared.MOD_ACTIONS.UUID]: groupUuid,
+              [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
+          };
+
+          if (present < history.length) {
+              history = history.slice(0, present);
+              hashes = hashes.slice(0, present + 1);
+          }
+
+          history.push(groupAction);
+          present++;
+          const placeholderHash = shared.generateUuid();
+          hashes.push(placeholderHash);
+
+          const proposal = {
+              type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
+          };
+
+          // Clear pending state BEFORE updateVisualState to prevent re-entrancy.
+          selectionPendingMods = false;
+          selectionOriginalUuids = [];
+          selectionPendingOverrides = {};
+
+          updateVisualState();
+          selectedElements = newUuids;
+          updateUndoRedoButtons();
+          updateSyncStatus();
+
+          pending_register_action(groupUuid);
+          sendMessage(proposal);
+          requestRedraw();
+      }
+
+      // Modify selected elements — LEGACY: kept for moveToLayer etc. that still needs immediate commit.
       function modifySelectedElements(overrides) {
           if (selectedElements.length === 0) return;
 
@@ -5176,7 +5299,7 @@
                                             draw_settings.tool === 'selection-lasso' ||
                                             draw_settings.tool === 'selection-stroke');
                   if (isSelectionTool && selectedElements.length > 0) {
-                      modifySelectedElements({ color: this.dataset.color });
+                      applySelectionProperty({ color: this.dataset.color });
                       return;
                   }
                   document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
@@ -5527,6 +5650,9 @@
               clearSelection();
               isDeselectMode = false;
               deselectToggleBtn.classList.remove('active');
+          } else {
+              // Switching between selection tools: commit pending mods, keep selection
+              commitSelectionModifications();
           }
 
           // Update cursor
