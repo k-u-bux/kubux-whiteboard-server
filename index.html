@@ -3836,7 +3836,7 @@
       
       // Move selected elements - cut + immediate paste mode
       function moveSelectedElements() {
-          commitSelectionModifications();
+          clearPendingSelection();
           if (selectedElements.length === 0) return;
           cutSelectedElements();
           enterPasteMode();
@@ -4441,6 +4441,16 @@
           });
       }
 
+      // Discard pending property edits without committing to history.
+      // The operation that follows (drag/cut/delete/layer-change) reads
+      // the already-mutated elements from visualState, so its ERASE/DRAW
+      // naturally includes the property changes in one undo entry.
+      function clearPendingSelection() {
+          selectionPendingMods = false;
+          selectionOriginalUuids = [];
+          selectionPendingOverrides = {};
+      }
+
       // Selection Functions
       function clearSelection() {
           commitSelectionModifications();
@@ -4536,6 +4546,7 @@
       }
 
       function dragMoveSelectedElements(dx, dy) {
+          clearPendingSelection();
           const actions = selectedElements.map(uuid => {
               const element = visualState.element.get(uuid);
               if (!element) return null;
@@ -4635,7 +4646,7 @@
       }
 
       function cutSelectedElements() {
-          commitSelectionModifications();
+          clearPendingSelection();
           if (selectedElements.length === 0) return;
           copySelectedElements();
           deleteSelectedElements();
@@ -4643,7 +4654,7 @@
       }
 
       function deleteSelectedElements() {
-          commitSelectionModifications();
+          clearPendingSelection();
           if (selectedElements.length === 0) return;
           
           // Create group of erase actions
@@ -4930,6 +4941,8 @@
 
       function moveSelectedElementsToLayer(targetLayer) {
           if (selectedElements.length === 0) return;
+          
+          clearPendingSelection();
           
           const actions = selectedElements.map(uuid => {
               const element = visualState.element.get(uuid);
