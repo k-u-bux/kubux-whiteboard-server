@@ -1948,24 +1948,9 @@
               break;
           case 'selection-rectangle':
           case 'selection-lasso':
-              colorSelectionDiv.style.display = 'none';
-              widthSelectionDiv.style.display = 'none';
-              opacitySelectionDiv.style.display = 'none';
-              sensitivitySelectionDiv.style.display = 'none';
-              timerToggleDiv.style.display = 'none';
-              pathModeSelectionDiv.style.display = 'none';
-              shapeSelectionDiv.style.display = 'none';
-              capStyleSelectionDiv.style.display = 'none';
-              joinStyleSelectionDiv.style.display = 'none';
-              dashPatternSelectionDiv.style.display = 'none';
-              pasteModeSelectionDiv.style.display = 'none';
-              pasteCopiesSelectionDiv.style.display = 'none';
-              pasteCopiesXSelectionDiv.style.display = 'none';
-              pasteCopiesYSelectionDiv.style.display = 'none';
-              break;
           case 'selection-stroke':
-              colorSelectionDiv.style.display = 'none';
-              widthSelectionDiv.style.display = 'flex'; // For stroke width
+              colorSelectionDiv.style.display = 'flex';
+              widthSelectionDiv.style.display = 'flex';
               opacitySelectionDiv.style.display = 'none';
               sensitivitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
@@ -1973,7 +1958,7 @@
               shapeSelectionDiv.style.display = 'none';
               capStyleSelectionDiv.style.display = 'none';
               joinStyleSelectionDiv.style.display = 'none';
-              dashPatternSelectionDiv.style.display = 'none';
+              dashPatternSelectionDiv.style.display = 'flex';
               pasteModeSelectionDiv.style.display = 'none';
               pasteCopiesSelectionDiv.style.display = 'none';
               pasteCopiesXSelectionDiv.style.display = 'none';
@@ -3709,6 +3694,13 @@
       // Width selection
       function selectWidth () {
           const penRadius = widthSelector.value;
+          const isSelectionTool = (draw_settings.tool === 'selection-rectangle' ||
+                                    draw_settings.tool === 'selection-lasso' ||
+                                    draw_settings.tool === 'selection-stroke');
+          if (isSelectionTool && selectedElements.length > 0) {
+              modifySelectedElements({ width: parseFloat(penRadius) });
+              return;
+          }
           draw_settings.width = parseFloat(penRadius);
           widthSelector.style.setProperty('--thumb-size', draw_settings.width);
           saveSettings();
@@ -4164,7 +4156,13 @@
               option.addEventListener('click', function(e) {
                   e.stopPropagation();
                   const patternName = this.getAttribute('data-dash-pattern');
-                  
+                  const isSelectionTool = (draw_settings.tool === 'selection-rectangle' ||
+                                            draw_settings.tool === 'selection-lasso' ||
+                                            draw_settings.tool === 'selection-stroke');
+                  if (isSelectionTool && selectedElements.length > 0) {
+                      modifySelectedElements({ dash_pattern: DASH_PATTERNS[patternName] });
+                      return;
+                  }
                   draw_settings.dash_pattern = DASH_PATTERNS[patternName];
                   mainBtn.textContent = dashPatternIcons[patternName];
                   popup.style.display = 'none';
@@ -4992,6 +4990,78 @@
           sendMessage(proposal);
       }
 
+      // Modify selected elements — changes color/width/dash etc. using ERASE+DRAW+GROUP
+      function modifySelectedElements(overrides) {
+          if (selectedElements.length === 0) return;
+
+          const newUuids = [];
+          const actions = selectedElements.map(uuid => {
+              const element = visualState.element.get(uuid);
+              if (!element) return null;
+
+              // Deep-clone and apply overrides
+              const newElement = JSON.parse(JSON.stringify(element));
+              if (overrides.color !== undefined) newElement[shared.ELEMENT.COLOR] = overrides.color;
+              if (overrides.width !== undefined) newElement[shared.ELEMENT.WIDTH] = overrides.width;
+              if (overrides.dash_pattern !== undefined) newElement[shared.ELEMENT.DASH_PATTERN] = overrides.dash_pattern;
+              if (overrides.opacity !== undefined) newElement[shared.ELEMENT.OPACITY] = overrides.opacity;
+
+              const eraseAction = createEraseAction(uuid);
+              const drawUuid = shared.generateUuid();
+              newUuids.push(drawUuid);
+              const drawAction = {
+                  type: shared.MOD_ACTIONS.DRAW.TYPE,
+                  [shared.MOD_ACTIONS.UUID]: drawUuid,
+                  [shared.MOD_ACTIONS.DRAW.STROKE]: newElement
+              };
+
+              const modifyUuid = shared.generateUuid();
+              return {
+                  type: shared.MOD_ACTIONS.GROUP.TYPE,
+                  [shared.MOD_ACTIONS.UUID]: modifyUuid,
+                  [shared.MOD_ACTIONS.GROUP.ACTIONS]: [eraseAction, drawAction]
+              };
+          }).filter(action => action !== null);
+
+          if (actions.length === 0) return;
+
+          const groupUuid = shared.generateUuid();
+          const groupAction = {
+              type: shared.MOD_ACTIONS.GROUP.TYPE,
+              [shared.MOD_ACTIONS.UUID]: groupUuid,
+              [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
+          };
+
+          if (present < history.length) {
+              history = history.slice(0, present);
+              hashes = hashes.slice(0, present + 1);
+          }
+
+          history.push(groupAction);
+          present++;
+          const placeholderHash = shared.generateUuid();
+          hashes.push(placeholderHash);
+
+          const proposal = {
+              type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
+              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
+          };
+
+          // updateVisualState clears selection, so we re-set after
+          updateVisualState();
+          selectedElements = newUuids;
+          updateUndoRedoButtons();
+          updateSyncStatus();
+
+          pending_register_action( groupUuid );
+          sendMessage(proposal);
+          requestRedraw();
+      }
+
       // Setup paste mode inline button handlers
       function setupPasteModeButtons() {
           const buttons = document.querySelectorAll('.paste-mode-btn');
@@ -5094,6 +5164,13 @@
           colorSwatches.forEach(swatch => {
               // For normal click - select color
               swatch.addEventListener('click', function() {
+                  const isSelectionTool = (draw_settings.tool === 'selection-rectangle' ||
+                                            draw_settings.tool === 'selection-lasso' ||
+                                            draw_settings.tool === 'selection-stroke');
+                  if (isSelectionTool && selectedElements.length > 0) {
+                      modifySelectedElements({ color: this.dataset.color });
+                      return;
+                  }
                   document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
                   this.classList.add('active');
                   draw_settings.color = this.dataset.color;
