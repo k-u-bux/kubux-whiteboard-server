@@ -1112,6 +1112,24 @@
           <button class="shape-btn shape-option" data-shape="vertical" title="Vertical line">│</button>
           <button class="shape-btn shape-option" data-shape="line" title="Straight line">／</button>
         </div>
+
+        <!-- Selection action buttons (shown when selection tool is active) -->
+        <div class="tool-section sidebar-section" id="selection-actions-sidebar" style="display: none;">
+          <button class="shape-btn" id="cut-btn" title="Cut">✂️</button>
+        </div>
+        <div class="tool-section sidebar-section" id="selection-copy-sidebar" style="display: none;">
+          <button class="shape-btn" id="copy-btn" title="Copy">📋</button>
+        </div>
+        <div class="tool-section sidebar-section" id="selection-move-sidebar" style="display: none;">
+          <button class="shape-btn" id="move-btn" title="Move">🔄</button>
+        </div>
+        <div class="tool-section sidebar-section" id="selection-layer-sidebar" style="display: none;">
+          <button class="shape-btn" id="move-layer-btn" title="Move to Layer">⇅</button>
+        </div>
+        <div class="tool-section sidebar-section" id="selection-deselect-sidebar" style="display: none;">
+          <button class="shape-btn" id="deselect-toggle-btn" title="Deselect Mode">➖</button>
+        </div>
+        
         <!-- Color pickers -->
         <div class="tool-section sidebar-section" id="color-selection">
           <div class="color-swatch" title="Press and hold to open color picker" style="background-color: black;" data-color="black"></div>
@@ -1229,23 +1247,6 @@
           <button class="shape-btn dash-pattern-option" data-dash-pattern="dashdot" title="Dash-dot">━╌</button>
         </div>
 
-        <!-- Selection action buttons (shown when selection tool is active) -->
-        <div class="tool-section sidebar-section" id="selection-actions-sidebar" style="display: none;">
-          <button class="shape-btn" id="cut-btn" title="Cut">✂️</button>
-        </div>
-        <div class="tool-section sidebar-section" id="selection-copy-sidebar" style="display: none;">
-          <button class="shape-btn" id="copy-btn" title="Copy">📋</button>
-        </div>
-        <div class="tool-section sidebar-section" id="selection-move-sidebar" style="display: none;">
-          <button class="shape-btn" id="move-btn" title="Move">🔄</button>
-        </div>
-        <div class="tool-section sidebar-section" id="selection-layer-sidebar" style="display: none;">
-          <button class="shape-btn" id="move-layer-btn" title="Move to Layer">⇅</button>
-        </div>
-        <div class="tool-section sidebar-section" id="selection-deselect-sidebar" style="display: none;">
-          <button class="shape-btn" id="deselect-toggle-btn" title="Deselect Mode">➖</button>
-        </div>
-        
         <!-- Paste mode selection (shown when paste tool is active) — inline buttons -->
         <div class="tool-section sidebar-section" id="paste-mode-selection" style="display: none;">
           <button class="shape-btn paste-mode-btn" data-paste-mode="place" title="Place single copy">✚</button>
