@@ -1951,7 +1951,7 @@
           case 'selection-stroke':
               colorSelectionDiv.style.display = 'flex';
               widthSelectionDiv.style.display = 'flex';
-              opacitySelectionDiv.style.display = 'none';
+              opacitySelectionDiv.style.display = 'flex';
               sensitivitySelectionDiv.style.display = 'none';
               timerToggleDiv.style.display = 'none';
               pathModeSelectionDiv.style.display = 'none';
@@ -3708,7 +3708,15 @@
       
       // Opacity selection
       function selectOpacity () {
-          draw_settings.opacity = parseInt( opacitySelector.value ) / 128;
+          const opacity = parseInt( opacitySelector.value ) / 128;
+          const isSelectionTool = (draw_settings.tool === 'selection-rectangle' ||
+                                    draw_settings.tool === 'selection-lasso' ||
+                                    draw_settings.tool === 'selection-stroke');
+          if (isSelectionTool && selectedElements.length > 0) {
+              modifySelectedElements({ opacity: opacity });
+              return;
+          }
+          draw_settings.opacity = opacity;
           opacitySelector.style.setProperty('--thumb-opacity', draw_settings.opacity);
           saveSettings();
       }
