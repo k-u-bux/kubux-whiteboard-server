@@ -3701,6 +3701,7 @@
                                     draw_settings.tool === 'selection-lasso' ||
                                     draw_settings.tool === 'selection-stroke');
           if (isSelectionTool && selectedElements.length > 0) {
+              widthSelector.style.setProperty('--thumb-size', parseFloat(penRadius));
               applySelectionProperty({ width: parseFloat(penRadius) });
               return;
           }
@@ -3716,6 +3717,7 @@
                                     draw_settings.tool === 'selection-lasso' ||
                                     draw_settings.tool === 'selection-stroke');
           if (isSelectionTool && selectedElements.length > 0) {
+              opacitySelector.style.setProperty('--thumb-opacity', opacity);
               applySelectionProperty({ opacity: opacity });
               return;
           }
