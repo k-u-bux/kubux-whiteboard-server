@@ -3834,14 +3834,6 @@
           }
       }
       
-      // Move selected elements - cut + immediate paste mode
-      function moveSelectedElements() {
-          clearPendingSelection();
-          if (selectedElements.length === 0) return;
-          cutSelectedElements();
-          enterPasteMode();
-      }
-
       // Shape icons mapping (used by setupShapeSelector and updateShapeButton)
       const shapeIcons = {
           'curve': '∿',
@@ -4645,6 +4637,15 @@
           updatePasteButton();
       }
 
+      function moveSelectedElements() {
+          clearPendingSelection();
+          if (selectedElements.length === 0) return;
+          copySelectedElements();
+          const eraseAction = makeEraseAction( selectedElements );
+          clearSelection();
+          enterPasteModeWithErase( eraseAction );
+      }
+
       function cutSelectedElements() {
           clearPendingSelection();
           if (selectedElements.length === 0) return;
@@ -4653,35 +4654,48 @@
           // updatePasteButton() already called by copySelectedElements()
       }
 
-      function deleteSelectedElements() {
-          clearPendingSelection();
-          if (selectedElements.length === 0) return;
-          
-          // Create group of erase actions
+      function makeEraseAction ( selectedElements ) {
           const eraseActions = selectedElements.map(targetUuid => createEraseAction(targetUuid));
-          
           const groupUuid = shared.generateUuid();
           const groupAction = {
               type: shared.MOD_ACTIONS.GROUP.TYPE,
               [shared.MOD_ACTIONS.UUID]: groupUuid,
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: eraseActions
           };
-          
+          return groupAction;
+      }
+
+      function applyActionOptimistically ( action ) {
           // If we are in the middle of history (after undoing), truncate future actions
           if (present < history.length) {
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
           }
-          
           // Add to history and advance present
-          history.push(groupAction);
-          present++;
-          
+          history.push( action );
           // Calculate placeholder hash
-          const placeholderHash = shared.generateUuid();
-          hashes.push(placeholderHash);
+          const nextHash = shared.hashNext( hashes[ present ], action ); 
+          hashes.push( nextHash );
+          present++;
+       }
+
+      function deleteSelectedElements() {
+          clearPendingSelection();
+          if (selectedElements.length === 0) return;
           
-          // Create proposal
+          // Create group of erase actions
+          const groupAction = makeEraseAction( selectedElements );
+          applyActionOptimistically( groupAction );
+
+          // Clear selection
+          clearSelection();
+          
+          // Update visual state and UI
+          updateVisualState();
+          updateUndoRedoButtons();
+          updateSyncStatus();
+
+          // Create proposal and send to server
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
@@ -4690,17 +4704,7 @@
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
               [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
           };
-          
-          // Clear selection
-          clearSelection();
-          
-          // Update visual state and UI
-          updateVisualState();
-          updateUndoRedoButtons();
-          updateSyncStatus();
-          
-          // Send to server
-          pending_register_action( groupUuid );
+          pending_register_action( groupAction[shared.MOD_ACTIONS.UUID] );
           sendMessage(proposal);
       }
 
