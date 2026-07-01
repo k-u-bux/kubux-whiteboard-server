@@ -431,8 +431,12 @@ const JOIN_STYLE_STRINGS = ["round", "bevel", "miter"];
 // some validation routines
 // ========================
 
+// Maximum nesting depth for GROUP actions to prevent stack overflow
+const MAX_GROUP_DEPTH = 10;
+
 // Helper for validating action payloads
-function is_invalid_action_payload(action) {
+// depth is used internally to limit GROUP nesting
+function is_invalid_action_payload(action, depth = 0) {
     if (!action || typeof action !== 'object') return true;
     if (!action[MOD_ACTIONS.UUID] || typeof action[MOD_ACTIONS.UUID] !== 'string') return true;
     if (!action[MOD_ACTIONS.TYPE] || typeof action[MOD_ACTIONS.TYPE] !== 'string') return true;
@@ -459,6 +463,20 @@ function is_invalid_action_payload(action) {
             break;
         case MOD_ACTIONS.GROUP.TYPE:
             if (!Array.isArray(action[MOD_ACTIONS.GROUP.ACTIONS])) return true;
+            // Prevent excessive nesting which could cause stack overflow
+            if (depth >= MAX_GROUP_DEPTH) return true;
+            // Sub-actions must be edit ops only (DRAW, ERASE, GROUP) — these are
+            // the only types commitEdit handles. UNDO/REDO/NEW_PAGE/DELETE_PAGE
+            // are not valid inside a GROUP and would hit assert(false) in commitEdit.
+            const validSubTypes = [
+                MOD_ACTIONS.DRAW.TYPE,
+                MOD_ACTIONS.ERASE.TYPE,
+                MOD_ACTIONS.GROUP.TYPE
+            ];
+            for (const subAction of action[MOD_ACTIONS.GROUP.ACTIONS]) {
+                if (is_invalid_action_payload(subAction, depth + 1)) return true;
+                if (!validSubTypes.includes(subAction[MOD_ACTIONS.TYPE])) return true;
+            }
             break;
         case MOD_ACTIONS.UNDO.TYPE:
             if (!action[MOD_ACTIONS.UNDO.TARGET_ACTION] || typeof action[MOD_ACTIONS.UNDO.TARGET_ACTION] !== 'string') return true;
