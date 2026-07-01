@@ -17,9 +17,9 @@ A comprehensive security audit was conducted on `server.js` and `shared.js` cove
 - Denial of Service (DoS) attacks
 - Crash vectors via malformed input
 
-**Overall Assessment:** ⚠️ **No RCE or file access vulnerabilities. Several DoS/crash issues remain unfixed.**
+**Overall Assessment:** ⚠️ **No RCE or file access vulnerabilities. Several DoS issues remain unfixed.**
 
-The codebase demonstrates strong security practices for preventing RCE and arbitrary file access. However, several DoS and crash vectors exist that could allow an attacker to disrupt service or crash the server process.
+The codebase demonstrates strong security practices for preventing RCE and arbitrary file access. However, several DoS vectors exist that could allow an attacker to disrupt service availability.
 
 ---
 
@@ -104,7 +104,7 @@ The codebase demonstrates strong security practices for preventing RCE and arbit
 
 ---
 
-## Unfixed Findings (DoS / Crash Vectors)
+## Unfixed Findings (DoS Vectors)
 
 ### ⚠️ 1. CPU DoS via `create-board` endpoint [UNFIXED]
 
@@ -122,27 +122,7 @@ The codebase demonstrates strong security practices for preventing RCE and arbit
 
 ---
 
-### ⚠️ 2. Crash DoS via uncaught exceptions [UNFIXED]
-
-**Risk Level:** HIGH
-
-**Issue:** Multiple `assert()` calls and null-dereference points exist outside try-catch blocks. While most asserts are unreachable via malformed input (verified by tracing), several null-dereference crash points remain:
-
-**Crash points:**
-- `sendPageInfo` (line 737): `page.history` — if `usePage()` returns null (e.g., disk I/O failure), accessing `.history` throws
-- `ping_client_with_page` (line 786): `assert(page)` — if `usePage()` returns null
-- `FULL_PAGE_REQUEST` handler (line 1232): `assert(board)` — if `useBoard()` returns null
-- `REPLAY_REQUEST` handler (line 1533): `existingPage(pageUuid, board)` — if board is null, `board.pageOrder` throws
-
-**Attack vector:** These require specific runtime conditions (e.g., disk failure, race condition during eviction) rather than purely malformed input. However, a single triggered crash kills the entire Node.js process.
-
-**Recommended fix:**
-- Add a global `uncaughtException` / `unhandledRejection` handler that logs and continues
-- Add null checks before property access in the identified functions
-
----
-
-### ⚠️ 3. Memory DoS via unbounded resources [UNFIXED]
+### ⚠️ 2. Memory DoS via unbounded resources [UNFIXED]
 
 **Risk Level:** MEDIUM
 
@@ -162,7 +142,7 @@ The codebase demonstrates strong security practices for preventing RCE and arbit
 
 ---
 
-### ⚠️ 4. Docker runs as root [UNFIXED]
+### ⚠️ 3. Docker runs as root [UNFIXED]
 
 **Risk Level:** MEDIUM
 
@@ -183,7 +163,7 @@ CMD ["npm", "start"]
 
 ---
 
-### ⚠️ 5. Information disclosure via error messages [UNFIXED]
+### ⚠️ 4. Information disclosure via error messages [UNFIXED]
 
 **Risk Level:** LOW
 
@@ -201,7 +181,7 @@ const errorMessage = {
 
 ---
 
-### ⚠️ 6. `x-forwarded-proto` spoofing [UNFIXED]
+### ⚠️ 5. `x-forwarded-proto` spoofing [UNFIXED]
 
 **Risk Level:** LOW
 
@@ -216,6 +196,24 @@ const isSecure = forwardedProto === 'https' || req.connection.encrypted;
 **Impact:** An attacker could trick the server into sending HSTS headers over plain HTTP, or suppress HSTS over HTTPS. Low impact in practice since the server is designed to run behind nginx.
 
 **Recommended fix:** Only trust `x-forwarded-proto` when behind a configured proxy, or make it configurable via environment variable.
+
+---
+
+## Non-Security Observations
+
+### ℹ️ Crash via corrupted files on disk [NOT A SECURITY BUG]
+
+**Risk Level:** N/A (infrastructure failure, not exploitable via malformed input)
+
+**Issue:** `loadItem` (line 272-274) calls `fs.readFileSync` and `deserialize` (which calls `JSON.parse`) without a try-catch. If a file on disk is corrupted (e.g., truncated due to a crash during write), `deserialize` throws and the exception propagates uncaught, crashing the Node.js process.
+
+**Not reachable by malformed input:** All `assert()` calls and null-dereference points in the codebase were traced:
+- `sendPageInfo` (line 737): `pageId` comes from `existingPage` (always a valid UUID from `board.pageOrder`), and `usePage` is called with `create=true` (always creates). Not reachable.
+- `ping_client_with_page` (line 786): Same reasoning — `pageId` is always valid, `usePage` with `create=true`. Not reachable.
+- `FULL_PAGE_REQUEST` handler (line 1232): `boardId` is validated as UUID, `useBoard` with `create=true` always creates. Not reachable.
+- `REPLAY_REQUEST` handler (line 1533): Same — `board` is never null. Not reachable.
+
+**Conclusion:** Malformed client input cannot trigger any of these crash points. The only uncaught exception path is `loadItem` failing on corrupted server-side files, which is an infrastructure failure, not a security vulnerability.
 
 ---
 
@@ -357,7 +355,6 @@ Implement the following to protect against denial of service:
 - **WebSocket `maxPayload`** limit (memory DoS)
 - **Connection limit** (resource exhaustion)
 - **Page history size cap** (disk/memory DoS)
-- **Global `uncaughtException` handler** (crash resilience)
 
 ### 2. Docker Hardening
 
@@ -422,15 +419,16 @@ Consider adding:
 
 The kubux-whiteboard-server demonstrates strong security practices for preventing RCE and arbitrary file access vulnerabilities. The implemented validation layer, combined with UUID-based file access controls and safe deserialization, provides robust protection against these critical attack vectors.
 
-However, several DoS and crash vectors remain unfixed. These do not allow system compromise but could allow an attacker to disrupt service availability. The most critical unfixed issues are:
+Several DoS vectors remain unfixed. These do not allow system compromise but could allow an attacker to disrupt service availability. The most critical unfixed issues are:
 1. CPU DoS via unauthenticated `create-board` endpoint
-2. Crash DoS via uncaught exceptions (requires specific runtime conditions)
-3. Memory DoS via unbounded WebSocket messages and connections
+2. Memory DoS via unbounded WebSocket messages and connections
+
+Crash vectors via malformed input were investigated thoroughly: all `assert()` calls and null-dereference points are properly guarded by UUID validation and `create=true` semantics. Malformed input cannot crash the server. The only uncaught exception path is `loadItem` failing on corrupted server-side files (infrastructure failure, not a security bug).
 
 **Action required:** Implement DoS hardening measures listed in the Recommendations section.
 
 ---
 
-**Document Version:** 2.0  
-**Last Updated:** July 1, 2026  
+**Document Version:** 2.1  
+**Last Updated:** July 2, 2026  
 **Next Review:** Recommend review after DoS hardening is implemented
