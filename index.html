@@ -5045,22 +5045,26 @@
               }
               const element = visualState.element.get(uuid);
               if (!element) continue;
+              // Clone the element to avoid mutating the original that history references.
+              // This ensures updateVisualState() can reconstruct the correct state.
+              const clone = JSON.parse(JSON.stringify(element));
               if (overrides.color !== undefined) {
-                  element[shared.ELEMENT.COLOR] = overrides.color;
+                  clone[shared.ELEMENT.COLOR] = overrides.color;
                   selectionPendingOverrides[uuid].color = overrides.color;
               }
               if (overrides.width !== undefined) {
-                  element[shared.ELEMENT.WIDTH] = overrides.width;
+                  clone[shared.ELEMENT.WIDTH] = overrides.width;
                   selectionPendingOverrides[uuid].width = overrides.width;
               }
               if (overrides.dash_pattern !== undefined) {
-                  element[shared.ELEMENT.DASH_PATTERN] = overrides.dash_pattern;
+                  clone[shared.ELEMENT.DASH_PATTERN] = overrides.dash_pattern;
                   selectionPendingOverrides[uuid].dash_pattern = overrides.dash_pattern;
               }
               if (overrides.opacity !== undefined) {
-                  element[shared.ELEMENT.OPACITY] = overrides.opacity;
+                  clone[shared.ELEMENT.OPACITY] = overrides.opacity;
                   selectionPendingOverrides[uuid].opacity = overrides.opacity;
               }
+              visualState.element.set(uuid, clone);
           }
 
           backgroundValid = false;
