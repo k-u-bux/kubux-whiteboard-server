@@ -5605,7 +5605,7 @@
       
       // Hand tool pointer handler for panning
       const hand_pointer_handler = {
-          down: () => {
+          down: (event) => {
               if (force_stylus && event.pointerType === "touch") return;
               
               const rect = canvas.getBoundingClientRect();
@@ -5615,7 +5615,7 @@
               isDraggingPaste = true; // Reuse flag
               dragStartPoint = { x, y, panX, panY };
           },
-          move: () => {
+          move: (event) => {
               if (force_stylus && event.pointerType === "touch") return;
               if (!isDraggingPaste || !dragStartPoint) return;
               
@@ -5629,7 +5629,7 @@
               applyZoom();
               requestRedraw();
           },
-          up: () => {
+          up: (event) => {
               startResetTool();
               if (force_stylus && event.pointerType === "touch") return;
               
@@ -5788,7 +5788,7 @@
       }
       
       const draw_path_pointer_handler = {
-          down: () => {
+          down: (event) => {
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               const rect = canvas.getBoundingClientRect();
               const x = (event.clientX - rect.left - panX) / zoomLevel;
@@ -5814,7 +5814,7 @@
               currentStroke[shared.ELEMENT.OPACITY] = draw_settings.opacity;
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
           },
-          move: () => {
+          move: (event) => {
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               if (!isDrawing) return;
               const rect = canvas.getBoundingClientRect();
@@ -5826,7 +5826,7 @@
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
               requestRedraw();
           },
-          up: () => {
+          up: (event) => {
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               if (isDrawing) {
                   isDrawing = false;
@@ -5843,7 +5843,7 @@
       };
 
       const erase_path_pointer_handler = {
-          down: () => {
+          down: (event) => {
               startResetTool();
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               const rect = canvas.getBoundingClientRect();
@@ -5861,7 +5861,7 @@
               currentStroke[shared.ELEMENT.LAYER] = activeLayer;
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
           },
-          move: () => {
+          move: (event) => {
               startResetTool();
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               if (!isErasing) return;
@@ -5874,7 +5874,7 @@
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
               requestRedraw();
           },
-          up: () => {
+          up: (event) => {
               startResetTool();
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               if (isErasing) {
@@ -5894,7 +5894,7 @@
       };
 
       const selection_pointer_handler = {
-          down: () => {
+          down: (event) => {
               if (force_stylus && event.pointerType === "touch") return;
               
               const rect = canvas.getBoundingClientRect();
@@ -5946,7 +5946,7 @@
               requestRedraw();
           },
           
-          move: () => {
+          move: (event) => {
               if (force_stylus && event.pointerType === "touch") return;
               
               // Handle dragging of selected elements
@@ -6004,7 +6004,7 @@
               requestRedraw();
           },
           
-          up: () => {
+          up: (event) => {
               if (force_stylus && event.pointerType === "touch") return;
               
               // Finish dragging if we were dragging
@@ -6107,7 +6107,7 @@
 
       function draw_shape_pointer_handler ( make_path ) {
           const result = {
-              down: () => {
+              down: (event) => {
                   if ( force_stylus && event.pointerType === "touch" ) { return; }
                   const rect = canvas.getBoundingClientRect();
                   const x = (event.clientX - rect.left - panX) / zoomLevel;
@@ -6130,7 +6130,7 @@
                   currentStroke[shared.ELEMENT.POINTS] = [ point, point, point, point ];
                   A = point;
               },
-              move: () => {
+              move: (event) => {
                   if ( force_stylus && event.pointerType === "touch" ) { return; }
                   if (!isDrawing) return;
                   const rect = canvas.getBoundingClientRect();
@@ -6143,7 +6143,7 @@
                   currentStroke[shared.ELEMENT.POINTS] = currentPath;
                   requestRedraw();
               },
-              up: () => {
+              up: (event) => {
                   if ( force_stylus && event.pointerType === "touch" ) { return; }
                   if (isDrawing) {
                       isDrawing = false;
@@ -6169,7 +6169,7 @@
 
       // Paste mode pointer handler with affine controls
       const paste_pointer_handler = {
-          down: () => {
+          down: (event) => {
               stopResetTool();
               if (force_stylus && event.pointerType === "touch") return;
               
@@ -6211,7 +6211,7 @@
               }
           },
           
-          move: () => {
+          move: (event) => {
               stopResetTool();
               if (force_stylus && event.pointerType === "touch") return;
               
@@ -6289,7 +6289,7 @@
               requestRedraw();
           },
           
-          up: () => {
+          up: (event) => {
               startResetTool();
               if (force_stylus && event.pointerType === "touch") return;
               
@@ -6385,7 +6385,7 @@
           // For freehand modes (open-path), keep all raw accumulated points
           let rawPoints = [];
           return {
-              down: () => {
+              down: (event) => {
                   if (force_stylus && event.pointerType === "touch") return;
                   const rect = canvas.getBoundingClientRect();
                   const x = (event.clientX - rect.left - panX) / zoomLevel;
@@ -6406,7 +6406,7 @@
                   currentStroke[shared.ELEMENT.POINTS] = [point, point, point, point];
                   A = point;
               },
-              move: () => {
+              move: (event) => {
                   if (force_stylus && event.pointerType === "touch") return;
                   if (!isDrawing) return;
                   const rect = canvas.getBoundingClientRect();
@@ -6475,7 +6475,7 @@
                   
                   requestRedraw();
               },
-              up: () => {
+              up: (event) => {
                   if (force_stylus && event.pointerType === "touch") return;
                   if (isDrawing) {
                       isDrawing = false;
@@ -6640,7 +6640,7 @@
           
           // Create a handler that adapts to the current paste mode
           const handler = {
-              down: () => {
+              down: (event) => {
                   if (force_stylus && event.pointerType === "touch") return;
                   
                   const mode = paste_settings.pasteMode;
@@ -6658,20 +6658,20 @@
                   const makePath = getMakePathForMode(mode);
                   const isFreehand = (mode === 'open-path');
                   const ph = paste_shape_pointer_handler_factory(makePath, isFreehand);
-                  ph.down();
+                  ph.down(event);
                   // Store the handler for move/up
                   handler._activeHandler = ph;
               },
-              move: () => {
+              move: (event) => {
                   if (force_stylus && event.pointerType === "touch") return;
                   if (handler._activeHandler) {
-                      handler._activeHandler.move();
+                      handler._activeHandler.move(event);
                   }
               },
-              up: () => {
+              up: (event) => {
                   if (force_stylus && event.pointerType === "touch") return;
                   if (handler._activeHandler) {
-                      handler._activeHandler.up();
+                      handler._activeHandler.up(event);
                       handler._activeHandler = null;
                   }
               }
@@ -6689,27 +6689,27 @@
       function handlePointerDown(event) {
           // Override with paste handler if in paste mode
           if (pasteMode) {
-              paste_pointer_handler.down();
+              paste_pointer_handler.down(event);
           } else {
-              pointer_handler.down();
+              pointer_handler.down(event);
           }
       }
       
       function handlePointerMove(event) {
           // Override with paste handler if in paste mode
           if (pasteMode) {
-              paste_pointer_handler.move();
+              paste_pointer_handler.move(event);
           } else {
-              pointer_handler.move();
+              pointer_handler.move(event);
           }
       }
 
-      function handlePointerUp() {
+      function handlePointerUp(event) {
           // Override with paste handler if in paste mode
           if (pasteMode) {
-              paste_pointer_handler.up();
+              paste_pointer_handler.up(event);
           } else {
-              pointer_handler.up();
+              pointer_handler.up(event);
           }
       }
 
