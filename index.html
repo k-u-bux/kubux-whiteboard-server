@@ -12,9 +12,8 @@
           padding: 0;
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           overflow: hidden;
-          display: flex; /* Make body a flex container */
-          flex-direction: column; /* Stack children vertically */
-          height: 100vh;
+          display: flex;
+          flex-direction: column;
       }
       
       .toolbar {
@@ -2349,6 +2348,12 @@
       const force_stylus = true;
 
       // Initialize 
+      function setBodyHeight() {
+          document.body.style.height = window.innerHeight + 'px';
+      }
+      window.addEventListener('resize', setBodyHeight);
+      setBodyHeight();
+
       function init() {
           // Initialize IndexedDB cache first
           
