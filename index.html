@@ -2559,11 +2559,11 @@
               debugLog('Using direct WebSocket URL:', wsUrl);
           } else {
               // Auto-detect mode (proxy mode)
-              const hostname = window.location.hostname;
+              // location.host includes the port when non-default (hostname would drop it)
+              const host = window.location.host;
               const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
               
-              // For production with nginx-proxy (no port in URL)
-              wsUrl = `${protocol}//${hostname}/ws`;
+              wsUrl = `${protocol}//${host}/ws`;
               debugLog('Using auto-detected WebSocket URL:', wsUrl);
           }
           
@@ -2909,7 +2909,7 @@
           loadSettings();
           updateKnobs();
           saveMostRecentBoard();
-          joinPage( firstPageId, numPages, numPages );
+          joinPage( firstPageId, 1, numPages );
           // The server will send a full page message next, so we do not need
           // to request one explicitly
       }
@@ -7616,7 +7616,7 @@
                   pageSnapshots.push( pageInfo['hash'] );
                   touchPageInCache( pageUuid );
                   let initialPageData = loadPageFromCache( pageUuid );
-                  pageHashes = [ shared.hashAny( pageUuid ) ];
+                  let pageHashes = [ shared.hashAny( pageUuid ) ];
                   for ( let i = 0; i < initialPageData['history'].length; ++ i ) {
                       pageHashes.push( shared.hashNext( pageHashes[ i ], initialPageData['history'][ i ] ) );
                   }

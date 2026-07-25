@@ -881,7 +881,7 @@ function createNewBoard(ws, clientId, requestId) {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD]: boardId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD]: board.passwd,
-            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE_ID]: ws.pageId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE]: ws.pageId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
         };
         ws.send(serialize(response));
