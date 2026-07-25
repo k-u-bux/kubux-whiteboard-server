@@ -201,11 +201,13 @@ const isSecure = forwardedProto === 'https' || req.connection.encrypted;
 
 ## Non-Security Observations
 
-### ℹ️ Crash via corrupted files on disk [NOT A SECURITY BUG]
+### ✅ Crash via corrupted files on disk [FIXED]
 
 **Risk Level:** N/A (infrastructure failure, not exploitable via malformed input)
 
-**Issue:** `loadItem` (line 272-274) calls `fs.readFileSync` and `deserialize` (which calls `JSON.parse`) without a try-catch. If a file on disk is corrupted (e.g., truncated due to a crash during write), `deserialize` throws and the exception propagates uncaught, crashing the Node.js process.
+**Issue (historical):** `loadItem` (line 272-274) called `fs.readFileSync` and `deserialize` (which calls `JSON.parse`) without a try-catch. If a file on disk was corrupted (e.g., truncated due to a crash during write), `deserialize` threw and the exception propagated uncaught, crashing the Node.js process.
+
+**Fix (July 2026):** `loadItem` now wraps the read/deserialize in a try-catch and returns `null` on failure, so a corrupted data file degrades to a cache miss instead of crashing the server.
 
 **Not reachable by malformed input:** All `assert()` calls and null-dereference points in the codebase were traced:
 - `sendPageInfo` (line 737): `pageId` comes from `existingPage` (always a valid UUID from `board.pageOrder`), and `usePage` is called with `create=true` (always creates). Not reachable.
@@ -213,7 +215,7 @@ const isSecure = forwardedProto === 'https' || req.connection.encrypted;
 - `FULL_PAGE_REQUEST` handler (line 1232): `boardId` is validated as UUID, `useBoard` with `create=true` always creates. Not reachable.
 - `REPLAY_REQUEST` handler (line 1533): Same — `board` is never null. Not reachable.
 
-**Conclusion:** Malformed client input cannot trigger any of these crash points. The only uncaught exception path is `loadItem` failing on corrupted server-side files, which is an infrastructure failure, not a security vulnerability.
+**Conclusion:** Malformed client input cannot trigger any of these crash points. The previously identified uncaught exception path (`loadItem` failing on corrupted server-side files) has been fixed; it now returns `null` instead of crashing.
 
 ---
 
@@ -423,12 +425,14 @@ Several DoS vectors remain unfixed. These do not allow system compromise but cou
 1. CPU DoS via unauthenticated `create-board` endpoint
 2. Memory DoS via unbounded WebSocket messages and connections
 
-Crash vectors via malformed input were investigated thoroughly: all `assert()` calls and null-dereference points are properly guarded by UUID validation and `create=true` semantics. Malformed input cannot crash the server. The only uncaught exception path is `loadItem` failing on corrupted server-side files (infrastructure failure, not a security bug).
+Crash vectors via malformed input were investigated thoroughly: all `assert()` calls and null-dereference points are properly guarded by UUID validation and `create=true` semantics. Malformed input cannot crash the server. The formerly uncaught exception path in `loadItem` (corrupted server-side files) is now guarded by a try-catch that degrades to a cache miss.
 
 **Action required:** Implement DoS hardening measures listed in the Recommendations section.
 
 ---
 
-**Document Version:** 2.1  
-**Last Updated:** July 2, 2026  
+**Document Version:** 2.2  
+**Last Updated:** July 25, 2026  
 **Next Review:** Recommend review after DoS hardening is implemented
+
+**Changelog 2.2:** Marked the `loadItem` corrupted-file crash as fixed (try-catch → null return). DoS findings remain open.

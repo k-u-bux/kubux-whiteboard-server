@@ -18,6 +18,9 @@
 - Path modes: open paths, closed paths, and filled shapes.
 - Selection tools: rectangle, lasso, and stroke-based selection.
 - Clipboard operations: cut, copy, paste, and move selected elements.
+- Interactive paste with affine transform controls (move, rotate, scale, shear).
+- Multi-paste modes: place copies evenly along a path, line, circle, or in a grid.
+- Canvas format presets (A4, Letter, Legal, 16:9, 16:10, 4:3, 3:2, 2:1, custom) with fit-width/fit-height zoom.
 - Transform operations: scaling, rotation, and translation of selections.
 - Eraser tool for removing drawn elements.
 - Timer for timed drawing sessions.
@@ -32,6 +35,8 @@
 - Each board can have multiple pages in an ordered list.
 - Navigate pages via first/prev/next/last controls or jump-to-page menu.
 - Add and delete pages (deleted pages redirect to a replacement).
+- Page overview mode: thumbnail grid with drag-and-drop reordering, batch delete, and multi-page PDF export.
+- Page reordering via shuffle proposals (validated against server state).
 - Full page deletion mapping with redirect chains.
 
 ## Import/Export Features

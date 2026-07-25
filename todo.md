@@ -37,11 +37,12 @@ This document contains actionable items for improving code quality, security, pe
   - Show connection status to user
   - Location: `index.html:~2150` (ws.onclose)
 
-- [ ] **Add comprehensive error handling for file operations** (server.js)
+- [~] **Add comprehensive error handling for file operations** (server.js)
   - Wrap all file operations in try-catch blocks
   - Handle corrupted JSON gracefully
   - Log errors with context for debugging
   - Locations: `loadItem()`, `saveItem()`, all fs operations
+  - **Status (2026-07-25):** `loadItem()` now catches read/deserialize failures and returns null (corrupt file degrades to cache miss). `saveItem()` still unguarded.
 
 - [ ] **Profile file I/O performance before considering async conversion** (server.js)
   - **WARNING**: Converting to async is NOT a simple refactoring
@@ -147,11 +148,12 @@ This document contains actionable items for improving code quality, security, pe
   - Add usage examples for main functions
   - Priority: `shared.js` public API
 
-- [ ] **Document protocol message formats** (shared.js, separate doc)
+- [x] **Document protocol message formats** (shared.js, separate doc)
   - Create protocol documentation from MESSAGES constants
   - Include message flow diagrams
   - Document state machine transitions
   - Explain hash chain synchronization algorithm
+  - **Done:** see `protocol.md` (message flow diagrams still a nice-to-have)
 
 - [ ] **Add code comments for complex logic** (index.html, server.js)
   - Explain why, not what
@@ -300,12 +302,12 @@ Current performance is acceptable for typical use cases but degrades with:
 
 These items provide maximum impact with minimal effort:
 
-1. Add message validation (stability, 2 hours)
+1. ~~Add message validation~~ (done)
 2. Document magic numbers (maintainability, 1 hour)
-3. Add UUID validation (security, 30 min)
-4. Implement exponential backoff for reconnection (stability, 1 hour)
+3. ~~Add UUID validation~~ (done)
+4. ~~Implement exponential backoff for reconnection~~ (done)
 5. Cache hit/miss logging (observability, 30 min)
 
 ---
 
-Last Updated: 2025-01-03
+Last Updated: 2026-07-25

@@ -16,6 +16,8 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Pressure sensitivity** - Adjustable sensitivity levels (0-9) for variable-width strokes
 - **Path modes** - Open paths, closed paths, and filled shapes
 - **Selection tools** - Rectangle, lasso, and stroke-based selection with cut/copy/paste
+- **Interactive paste** - Paste with affine transform controls (move, rotate, scale, shear), plus multi-paste modes that place copies evenly along a path, line, circle, or in a grid
+- **Canvas formats** - Optional page format presets (A4, Letter, Legal, 16:9, 16:10, 4:3, 3:2, 2:1, custom) with fit-width/fit-height zoom
 - **Layer system** - Organize content across 8 separate layers with visibility control
 - **PDF export** - Export single pages, selected pages, or entire whiteboards as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
@@ -99,7 +101,7 @@ KUBUX_WHITEBOARD_URL=http://localhost:3000 npm start
 
 **Use case:** 
 - Local testing and development
-- If the specified port is exposed (not blocked by a firewall) and your computer is accessible from the ouside, you can use this mode to create an ad-hoc whiteboard sessions without a dedicated server
+- If the specified port is exposed (not blocked by a firewall) and your computer is accessible from the outside, you can use this mode to create an ad-hoc whiteboard session without a dedicated server
 
 
 **Access:** Open your browser to the URL specified in `KUBUX_WHITEBOARD_URL` (e.g., http://localhost:8080)
@@ -212,6 +214,7 @@ A new board will be created and the URL will change to point towards that board.
 - **Opacity** - Control transparency with the opacity slider
 - **Shape Mode** - Toggle between freeform drawing and shape modes (curve, rectangle, circle, horizontal/vertical/diagonal lines)
 - **Pressure Sensitivity** - Adjust sensitivity (0-9) for variable-width strokes based on input pressure
+- **Canvas Format** - Use the format menu (leftmost toolbar button) to constrain the page to a paper/screen format (A4, Letter, Legal, 16:9, etc.); content outside the format is shaded and excluded from PDF export
 
 ### Advanced Drawing Controls
 
@@ -262,7 +265,7 @@ Overview mode displays all pages as thumbnails in a grid, enabling batch operati
 
 ### Timer
 
-- Toggle the timer (🕐) in the sidebar to auto-undo drawing within a few seconds: think of temporarilry highlighting an element during a presentation).
+- Toggle the timer (🕐) in the sidebar to auto-undo drawing within a few seconds: think of temporarily highlighting an element during a presentation.
 
 
 ## Technical Overview

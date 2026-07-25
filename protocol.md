@@ -208,9 +208,12 @@ Sent in response to a successful board creation.
   "type": "board-created",
   "board": "<new-board-uuid>",
   "password": "<new-board-password>",
+  "first-page": "<page-uuid>",
   "requestId": "<request-uuid>"
 }
 ```
+
+- `first-page`: UUID of the board's initial (empty) page. The client joins this page immediately after creation.
 
 ---
 
@@ -532,6 +535,8 @@ The protocol uses a hash chain to ensure state consistency between clients and s
 2. **Subsequent hashes**: `hashNext(previousHash, action)` — combines the previous hash with the new action
 3. **Verification**: Clients and server independently compute hashes. Mismatches trigger replay requests.
 
+**Note:** Client and server use the exact same anchor and chain function (both from `shared.js`). The server's page state starts with `hashes: [hashAny(pageId)]` and extends via `hashNext`, matching the client's `hashes[0] = hashAny(pageUuid)`, `hashes[i+1] = hashNext(hashes[i], history[i])`. Any deviation on either side breaks all hash comparisons and causes replay/full-page loops.
+
 ### Snapshots
 
 The server maintains spaced snapshots of the hash chain (every few actions). These are sent in `page-info` and `ping` messages, allowing clients to find a matching hash point without needing the full history.
@@ -702,6 +707,10 @@ Server may return DECLINE with reasons:
 ---
 
 ## Changelog
+
+### Version 3.1 (July 2026)
+- Added `first-page` field to `board-created` message (was sent under a wrong key before; now matches `board-registered`)
+- Documented that client and server share the identical hash-chain anchor (`hashAny(pageUuid)`)
 
 ### Version 3.0 (May 2026)
 - Added `board-info-request` / `board-info` messages for page order synchronization

@@ -2,6 +2,8 @@
 
 This document catalogs defensive programming patterns that may be masking underlying bugs rather than properly handling edge cases.
 
+> **Review note (2026-07-25):** The `loadItem` corrupted-file crash flagged in server-security.md is fixed (try-catch → null). The assert list in section 3 is unchanged, but the security audit confirmed all listed asserts are unreachable by malformed client input. Instance counts below are approximate after recent edits.
+
 ## 1. Silent Early Returns in index.html
 
 **Pattern**: `if (!condition) return;`
