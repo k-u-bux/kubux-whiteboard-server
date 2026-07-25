@@ -1228,8 +1228,12 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, r
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD];
     if ( ! boardId ) { return; }
     if ( ! isUuid( boardId ) ) { return; }
-    const board = useBoard( boardId );
-    assert(board);
+    const board = useBoard( boardId, false );
+    if ( ! board ) {
+        debug.log(`[SERVER] full page request for unknown board ${boardId}, dropped`);
+        releaseBoard( boardId );
+        return;
+    }
     const pageId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE];
     const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA];
     debug.log( "[SERVER] handling full page request", `pageId = ${pageId}, delta = ${delta}`)
@@ -1353,7 +1357,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 
         debug.log(`[SERVER]: actionId = ${actionId}`);
 
-        const board = useBoard( boardId );
+        const board = useBoard( boardId, false );
         if (!board) {
             releaseBoard( boardId );
             debug.log(`[SERVER]: Cannot find board ${boardId}`);
@@ -1369,9 +1373,22 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             return;
         }
 
+        // The target page must actually belong to this board. Otherwise:
+        // - DRAW/ERASE/UNDO/REDO would create ghost pages via usePage(create=true)
+        // - DELETE_PAGE with indexOf === -1 would splice(-1, 1) and remove the LAST page
+        // - NEW_PAGE would insert at index 0 for a bogus anchor
+        if ( !board.pageOrder.includes( pageUuid ) ) {
+            const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, "page not on board");
+            ws.send(serialize(declineMessage));
+            logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
+            releaseBoard(boardId);
+            return;
+        }
+
         const page = usePage( pageUuid );
         if (!page) {
             releasePage( pageUuid );
+            releaseBoard( boardId );
             debug.log(`[SERVER]: Cannot find page ${pageUuid}`);
             return;
         }
@@ -1529,7 +1546,12 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
     const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
     const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
     
-    const board = useBoard(boardId);
+    const board = useBoard(boardId, false);
+    if ( ! board ) {
+        debug.log(`[SERVER] replay request for unknown board ${boardId}, dropped`);
+        releaseBoard( boardId );
+        return;
+    }
     const pageId = existingPage(pageUuid, board);
 
     if ( do_register ) {
