@@ -31,6 +31,8 @@
               pkgs.nodePackages.ts-node
               pkgs.typescript
               pkgs.jq
+              pkgs.librsvg
+              pkgs.imagemagick
             ];
 
             shellHook = ''
