@@ -291,9 +291,79 @@ function saveItem(itemId, item, ext, check) {
 
 
 const loadBoard = (boardId) => loadItem(boardId, 'board', isUuid);
-const loadPage = (pageId) => loadItem(pageId, 'page', isUuid);
 const saveBoard = (boardId, board) => saveItem(boardId, board, 'board', isUuid);
 const savePage = (pageId, page) => saveItem(pageId, page, 'page', isUuid);
+
+
+// Hash chain provenance
+// =====================
+// The hash chain is written to disk with the page, so the stored values are only
+// meaningful for the hash function that produced them. A page written by an older
+// hash function carries a chain no current client can reproduce (clients always
+// rebuild hashAny(pageId) + hashNext(...) from the history), which desynchronizes
+// every ping and traps the client in a replay / full-page loop.
+//
+// This is a version test of the hash function, NOT a validation of the chain: it
+// samples one entry per hash entry point — hashAny at the anchor, hashNext at the
+// first chain step — and trusts the rest. A page with an empty history stores only
+// the anchor, which the first comparison already covers. On a mismatch the chain is
+// rebuilt from the history and written back once, so a load costs O(1) and the
+// rebuild path runs at most once per page per hash function change.
+
+// The chain must describe the history: one hash per action plus the anchor. A
+// violation is not a provenance question — the array simply cannot be indexed
+// (ping / accept / replay read page.hashes[present]) and it was already wrong
+// when the page was written, i.e. it is a bug in the writer (handleEditAction
+// asserts the invariant) or a damaged file. It is reported as an error, never
+// silently repaired.
+function hashesAreUnusable(page) {
+    return ! Array.isArray( page.hashes ) || page.hashes.length !== page.history.length + 1;
+}
+
+function hashesLookStale(pageId, page) {
+    // hashAny: the anchor. Feeds through serialize, so this also covers a change
+    // to the serialization the hash is computed over.
+    if ( page.hashes[0] !== hashAny( pageId ) ) {
+        return true;
+    }
+    // hashNext: the chaining itself, which can change independently of hashAny.
+    if ( page.history.length >= 1
+         && page.hashes[1] !== hashNext( page.hashes[0], page.history[0] ) ) {
+        return true;
+    }
+    return false;
+}
+
+function rebuildHashes(pageId, page) {
+    const hashes = [ hashAny( pageId ) ];
+    for ( let i = 0; i < page.history.length; ++i ) {
+        hashes.push( hashNext( hashes[i], page.history[i] ) );
+    }
+    return hashes;
+}
+
+function repairChain(pageId, page) {
+    page.hashes = rebuildHashes( pageId, page );
+    savePage( pageId, page );
+    return page;
+}
+
+function loadPage(pageId) {
+    const page = loadItem(pageId, 'page', isUuid);
+    if ( ! page ) {
+        return page;
+    }
+    if ( hashesAreUnusable(page) ) {
+        const stored = Array.isArray(page.hashes) ? page.hashes.length : typeof page.hashes;
+        debug.error(`[SERVER] page ${pageId} has an unusable hash chain on disk: ${stored} hashes for ${page.history.length} actions (present = ${page.present}), expected ${page.history.length + 1}. Rebuilding it, but this is a writer bug or a damaged file, not a hash function change.`);
+        return repairChain( pageId, page );
+    }
+    if ( hashesLookStale( pageId, page ) ) {
+        debug.log(`[SERVER] hash chain of page ${pageId} was not produced by the current hash function, rebuilding from history.`);
+        return repairChain( pageId, page );
+    }
+    return page;
+}
 
 
 function createBoard(boardId) {
@@ -1280,6 +1350,10 @@ function handleEditAction(page, action) {
         page.hashes.splice(page.present + 1, future_size);
         page.hashes.push(hashNext(page.hashes[page.present], action));
         page.present = page.history.length;
+        // The chain must keep describing the history: one hash per action plus the
+        // anchor. Asserted where the arrays are mutated, so a bug surfaces at its
+        // origin instead of reaching the disk and being repaired on the next load.
+        assert( page.hashes.length === page.history.length + 1 );
         flag_and_fix_inconsistent_state( page, "edit exit" );
         return true;
     }
