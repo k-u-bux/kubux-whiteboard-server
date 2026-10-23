@@ -92,17 +92,34 @@ const deserialize = (jsonString) => {
 
 
 // hash stringify-ables
+//
+// 128 bit from four 32-bit lanes (the cyrb128 construction). Each character
+// costs a few Math.imul on small integers, with no allocation, where BigInt
+// arithmetic allocated per character. Math.imul, ^ and >>> are exactly
+// specified, so browser and Node produce identical hashes. Not cryptographic:
+// the hashes only detect diverging copies of a page, the server is authoritative.
+//
+// Changing this function invalidates every stored hash chain; the server
+// detects that on load and rebuilds them (see "Hash chain provenance").
 function hashAny(data) {
-    const mask = 0xffffffffffffffffffffffffffffffn; // 120 bit
     const dataString = serialize( data );
-    let hash = 0n;
+    let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
     for (let i = 0; i < dataString.length; i++) {
-        const char = dataString.charCodeAt(i);
-        hash += BigInt( char );
-        hash = (hash << 25n) - hash;
-        hash &= mask;
+        const k = dataString.charCodeAt(i);
+        h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+        h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+        h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+        h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
     }
-    return hash.toString(32); // 120 / 5 = 24 characters
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+    h1 ^= (h2 ^ h3 ^ h4);
+    h2 ^= h1;
+    h3 ^= h1;
+    h4 ^= h1;
+    return [h1, h2, h3, h4].map(h => (h >>> 0).toString(16).padStart(8, '0')).join(''); // 32 hex digits
 }
 
 // chain hashing
