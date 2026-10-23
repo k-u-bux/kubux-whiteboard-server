@@ -261,12 +261,22 @@ let pingTimer;
 let boardTimer;
 
 function initializeGlobals() {
+    // The password file is edited by the admin and treated like input: if it is
+    // unreadable or not a list of strings, the error is logged and no credentials
+    // are loaded, so no new boards can be created until it is fixed.
     const filePath = getPasswdFilePath();
     if (fs.existsSync(filePath)) {
-        const itemText = fs.readFileSync(filePath, 'utf8');
-        const parsed = JSON.parse(itemText);
-        Object.assign(credentials, parsed);
-        debug.log(`[SERVER] Loaded ${credentials.length} passwords`);
+        try {
+            const itemText = fs.readFileSync(filePath, 'utf8');
+            const parsed = JSON.parse(itemText);
+            if (!Array.isArray(parsed) || !parsed.every(entry => typeof entry === 'string')) {
+                throw new Error('expected a list of "salt:hash" strings');
+            }
+            credentials.push(...parsed);
+            debug.log(`[SERVER] Loaded ${credentials.length} passwords`);
+        } catch (error) {
+            debug.error(`[SERVER] Invalid password file ${filePath}, board creation is disabled: ${error.message}`);
+        }
     }
     const removalLogPath = getRemovalLogPath();
     if (fs.existsSync(removalLogPath)) {
