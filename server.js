@@ -933,17 +933,25 @@ function sendBoardInfo() {
 const messageHandlers = {};
 
 
+// A socket that re-registers under a new client ID drops its old entry;
+// otherwise the stale entry would keep the socket alive after it closes.
+function trackClient(ws, clientId) {
+    if (ws.clientId && clients[ws.clientId] === ws) {
+        delete clients[ws.clientId];
+    }
+    ws.clientId = clientId; // Store client ID for tracking
+    if (clientId) {
+        clients[clientId] = ws;
+    }
+}
+
 function createNewBoard(ws, clientId, requestId) {
     const boardId = generateSecureUuid();
     const board = createBoard(boardId);
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
-        ws.clientId = clientId; // Store client ID for tracking
+        trackClient(ws, clientId);
         ws.pageId = board.pageOrder[0]; // Default to first page
-        
-        if (clientId) {
-            clients[clientId] = ws;
-        }
         
         debug.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
         
@@ -965,12 +973,8 @@ function registerBoard(ws, boardId, clientId, requestId) {
     const board = useBoard(boardId, false);
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
-        ws.clientId = clientId; // Store client ID for tracking
+        trackClient(ws, clientId);
         ws.pageId = board.pageOrder[0]; // Default to first page
-        
-        if (clientId) {
-            clients[clientId] = ws;
-        }
         
         debug.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
         
@@ -1041,10 +1045,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         const resolvedPageId = findPage( board, pageId, delta );
         ws.boardId = boardId; // Store boardId in WebSocket client
         ws.pageId = resolvedPageId;
-        ws.clientId = clientId; // Store client ID for tracking
-        if (clientId) {
-            clients[clientId] = ws;
-        }
+        trackClient(ws, clientId);
         
         debug.log(`[SERVER] Client ${clientId} registered with page: ${resolvedPageId} on board ${boardId}`);
         

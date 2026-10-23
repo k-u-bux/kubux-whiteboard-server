@@ -496,7 +496,7 @@ function is_invalid_REGISTER_BOARD_message(data) {
     if (!boardId || !isUuid(boardId)) return true;
     
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
-    if (clientId !== undefined && typeof clientId !== 'string') return true;
+    if (clientId !== undefined && (typeof clientId !== 'string' || !isUuid(clientId))) return true;
     
     return false;
 }
@@ -514,7 +514,7 @@ function is_invalid_REGISTER_PAGE_message(data) {
     if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
     
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID];
-    if (clientId !== undefined && typeof clientId !== 'string') return true;
+    if (clientId !== undefined && (typeof clientId !== 'string' || !isUuid(clientId))) return true;
     
     return false;
 }
@@ -547,7 +547,7 @@ function is_invalid_CREATE_BOARD_message(data) {
     if (!password || typeof password !== 'string') return true;
     
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
-    if (clientId !== undefined && typeof clientId !== 'string') return true;
+    if (clientId !== undefined && (typeof clientId !== 'string' || !isUuid(clientId))) return true;
     
     return false;
 }
