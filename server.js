@@ -123,34 +123,60 @@ function hashPassword(password) {
 /**
  * Verify a password against a stored hash
  * 
+ * scrypt runs asynchronously in Node's worker pool, so the ~50 ms it takes do
+ * not block the event loop. The password file is edited by the admin and is
+ * treated like input: a malformed entry is logged and simply does not match.
+ *
  * @param {string} password - The password to verify
  * @param {string} storedHash - The stored hash in format salt:hash
- * @returns {boolean} True if password matches
+ * @returns {Promise<boolean>} Resolves to true if password matches
  */
 function verifyPassword(password, storedHash) {
-  try {
-    const [saltHex, hashHex] = storedHash.split(':');
-    if (!saltHex || !hashHex) {
-      debug.error('[SERVER] Invalid hash format - expected salt:hash format');
-      return false;
+  return new Promise((resolve) => {
+    let salt;
+    let storedHashBuffer;
+    try {
+      const [saltHex, hashHex] = storedHash.split(':');
+      if (!saltHex || !hashHex) {
+        debug.error('[SERVER] Invalid hash format - expected salt:hash format');
+        resolve(false);
+        return;
+      }
+      salt = Buffer.from(saltHex, 'hex');
+      storedHashBuffer = Buffer.from(hashHex, 'hex');
+    } catch (error) {
+      debug.error('[SERVER] Error verifying password:', error.message);
+      resolve(false);
+      return;
     }
-    
-    const salt = Buffer.from(saltHex, 'hex');
-    const storedHashBuffer = Buffer.from(hashHex, 'hex');
-    
+
     // Compute hash with same parameters
-    const computedHash = crypto.scryptSync(password, salt, 64, {
-      N: 16384,
-      r: 8,
-      p: 1
+    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1 }, (error, computedHash) => {
+      if (error) {
+        debug.error('[SERVER] Error verifying password:', error.message);
+        resolve(false);
+        return;
+      }
+      // timingSafeEqual throws on a length mismatch, i.e. on a malformed stored hash
+      if (storedHashBuffer.length !== computedHash.length) {
+        debug.error('[SERVER] Invalid hash format - stored hash has the wrong length');
+        resolve(false);
+        return;
+      }
+      // Use timing-safe comparison to prevent timing attacks
+      resolve(crypto.timingSafeEqual(storedHashBuffer, computedHash));
     });
-    
-    // Use timing-safe comparison to prevent timing attacks
-    return crypto.timingSafeEqual(storedHashBuffer, computedHash);
-  } catch (error) {
-    debug.error('[SERVER] Error verifying password:', error.message);
-    return false;
+  });
+}
+
+// Checks the credentials one after the other and stops at the first match.
+async function isValidCredential(password) {
+  for (const storedHash of credentials) {
+    if (await verifyPassword(password, storedHash)) {
+      return true;
+    }
   }
+  return false;
 }
 
 // Dual-mode configuration: proxy vs direct
@@ -1338,25 +1364,29 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
     }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
-    
-    // Check credentials using scrypt
-    let isAuthorized = false;
-    
-    for (const storedHash of credentials) {
-        if (verifyPassword(password, storedHash)) {
-            isAuthorized = true;
-            debug.log(`[SERVER] Client ${clientId} authenticated successfully`);
-            break;
-        }
-    }
-    
-    if (!isAuthorized) {
-        debug.log(`[SERVER] Client ${clientId} failed authentication`);
+
+    // Each check costs ~50 ms of CPU and 16 MiB: one check per connection at a time.
+    if ( ws.credentialCheckPending ) {
+        rejectMessage(ws, 'a board creation request is already being checked');
         return;
     }
-    
-    debug.log(`[SERVER] Client ${clientId} is allowed to create boards`);
-    createNewBoard(ws, clientId, requestId);
+    ws.credentialCheckPending = true;
+
+    // Check credentials using scrypt. An exception in createNewBoard is a bug and,
+    // as an unhandled rejection, ends the process like any other handler bug.
+    isValidCredential(password).then((isAuthorized) => {
+        ws.credentialCheckPending = false;
+        if (!isAuthorized) {
+            debug.log(`[SERVER] Client ${clientId} failed authentication`);
+            return;
+        }
+        // the client may have left while the check ran: no board for nobody
+        if (ws.readyState !== WebSocket.OPEN) {
+            return;
+        }
+        debug.log(`[SERVER] Client ${clientId} is allowed to create boards`);
+        createNewBoard(ws, clientId, requestId);
+    });
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, requestId) => {
