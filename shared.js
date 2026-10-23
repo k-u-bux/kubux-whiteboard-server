@@ -434,6 +434,68 @@ const JOIN_STYLE_STRINGS = ["round", "bevel", "miter"];
 // Maximum nesting depth for GROUP actions to prevent stack overflow
 const MAX_GROUP_DEPTH = 10;
 
+// The client offers layers 0..7
+const LAYER_COUNT = 8;
+
+// Longest dash pattern accepted (the client's longest has 4 entries)
+const MAX_DASH_PATTERN_LENGTH = 16;
+
+function is_finite_number(value) {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+function is_finite_number_list(list) {
+    return Array.isArray(list) && list.every(is_finite_number);
+}
+
+// A stroke is the compact array indexed by ELEMENT. Every slot holds a number,
+// a short string, or a list of numbers (points: a list of such lists), so the
+// check walks a fixed depth, one pass over the points, and stops at the first
+// slot of the wrong shape: arbitrarily nested input is rejected right there.
+function is_invalid_stroke(stroke) {
+    if (!Array.isArray(stroke) || stroke.length !== Object.keys(ELEMENT).length) return true;
+
+    if (!Object.values(DRAWABLE.TYPE).includes(stroke[ELEMENT.TYPE])) return true;
+    if (!Object.values(DRAWABLE.PATH).includes(stroke[ELEMENT.PATH])) return true;
+
+    // points are [x, y, pressure] or [x, y, pressure, timestamp]; moving and
+    // pasting drop the timestamp
+    const points = stroke[ELEMENT.POINTS];
+    if (!Array.isArray(points) || points.length === 0) return true;
+    for (const point of points) {
+        if (!is_finite_number_list(point) || point.length < 3 || point.length > 4) return true;
+    }
+
+    // the client only offers named swatches and #RRGGBB cells
+    const color = stroke[ELEMENT.COLOR];
+    if (typeof color !== 'string' || !/^(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6}|[a-z]{1,20})$/.test(color)) return true;
+
+    const width = stroke[ELEMENT.WIDTH];
+    if (!is_finite_number(width) || width <= 0) return true;
+
+    const transform = stroke[ELEMENT.TRANSFORM];
+    if (!is_finite_number_list(transform) || transform.length !== 6) return true;
+
+    const opacity = stroke[ELEMENT.OPACITY];
+    if (!is_finite_number(opacity) || opacity < 0 || opacity > 1) return true;
+
+    if (!Object.values(CAP_STYLES).includes(stroke[ELEMENT.CAP_STYLE])) return true;
+    if (!Object.values(JOIN_STYLES).includes(stroke[ELEMENT.JOIN_STYLE])) return true;
+
+    const dashPattern = stroke[ELEMENT.DASH_PATTERN];
+    if (!is_finite_number_list(dashPattern) || dashPattern.length > MAX_DASH_PATTERN_LENGTH) return true;
+    if (dashPattern.some(length => length < 0)) return true;
+
+    if (!is_finite_number(stroke[ELEMENT.SENSITIVITY])) return true;
+
+    const layer = stroke[ELEMENT.LAYER];
+    if (!Number.isInteger(layer) || layer < 0 || layer >= LAYER_COUNT) return true;
+
+    if (!Object.values(PEN_TYPES).includes(stroke[ELEMENT.PEN_TYPE])) return true;
+
+    return false;
+}
+
 // Helper for validating action payloads
 // depth is used internally to limit GROUP nesting
 function is_invalid_action_payload(action, depth = 0) {
@@ -456,7 +518,7 @@ function is_invalid_action_payload(action, depth = 0) {
     // Type-specific validation
     switch (action[MOD_ACTIONS.TYPE]) {
         case MOD_ACTIONS.DRAW.TYPE:
-            if (!action[MOD_ACTIONS.DRAW.STROKE] || typeof action[MOD_ACTIONS.DRAW.STROKE] !== 'object') return true;
+            if (is_invalid_stroke(action[MOD_ACTIONS.DRAW.STROKE])) return true;
             break;
         case MOD_ACTIONS.ERASE.TYPE:
             if (!action[MOD_ACTIONS.ERASE.TARGET_ACTION] || typeof action[MOD_ACTIONS.ERASE.TARGET_ACTION] !== 'string') return true;
