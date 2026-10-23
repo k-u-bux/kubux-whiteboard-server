@@ -511,7 +511,7 @@ function is_invalid_REGISTER_PAGE_message(data) {
     if (!pageId || !isUuid(pageId)) return true;
     
     const delta = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.DELTA];
-    if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
+    if (delta !== undefined && (typeof delta !== 'number' || !Number.isInteger(delta))) return true;
     
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.CLIENT_ID];
     if (clientId !== undefined && (typeof clientId !== 'string' || !isUuid(clientId))) return true;
@@ -532,7 +532,7 @@ function is_invalid_PAGE_INFO_REQUEST_message(data) {
     if (!requestId || !isUuid(requestId)) return true;
     
     const delta = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA];
-    if (delta !== undefined && (typeof delta !== 'number' || !Number.isFinite(delta))) return true;
+    if (delta !== undefined && (typeof delta !== 'number' || !Number.isInteger(delta))) return true;
     
     const register = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER];
     if (register !== undefined && typeof register !== 'boolean') return true;
@@ -566,7 +566,7 @@ function is_invalid_FULL_PAGE_REQUEST_message(data) {
     if (!requestId || !isUuid(requestId)) return true;
     
     const delta = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA];
-    if (delta === undefined || typeof delta !== 'number' || !Number.isFinite(delta)) return true;
+    if (delta === undefined || typeof delta !== 'number' || !Number.isInteger(delta)) return true;
     
     const register = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER];
     if (register === undefined || typeof register !== 'boolean') return true;

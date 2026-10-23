@@ -378,6 +378,10 @@ function createBoard(boardId) {
         passwd: password,
         pageOrder: [pageId]
     };
+    // Every entry of pageOrder must have a page (see "Lookup invariants" below).
+    // The page is written before the board, so no board on disk ever lists a
+    // page that was not yet written.
+    createPage(pageId);
     saveBoard(boardId, board);
     return board;
 }
@@ -398,7 +402,7 @@ function createPage(pageId) {
     return (page);
 }
 
-function loadOrCreateBoard(boardId, create=true) {
+function loadOrCreateBoard(boardId, create=false) {
     let board = loadBoard(boardId);
     if (board) { return board; }
     if ( create ) {
@@ -408,7 +412,7 @@ function loadOrCreateBoard(boardId, create=true) {
     }
 }
 
-function loadOrCreatePage(pageId, create=true) {
+function loadOrCreatePage(pageId, create=false) {
     let page = loadPage(pageId);
     if (page) { return page; }
     if ( create ) {
@@ -419,12 +423,36 @@ function loadOrCreatePage(pageId, create=true) {
 }
 
 
+// Lookup invariants
+// =================
+// useBoard / usePage do not create by default: boards are created only by
+// createNewBoard, pages only by createBoard, new-page and delete-page. A lookup
+// therefore returns null for an unknown ID, and every caller whose ID comes
+// straight from a client message has to handle that. Callers whose ID comes
+// from server state may instead assert non-null, based on:
+//
+// I1: every entry of a board's pageOrder has a page. pageOrder is written by
+//     createBoard, new-page, delete-page (each creates the page first) and
+//     shuffle (a permutation of existing entries).
+// I2: pageOrder is never empty: createBoard starts it with one page, delete-page
+//     keeps at least one, shuffle preserves the length.
+// I3: ws.boardId is only set to a board that was just found; boards are never
+//     deleted.
+// existingPage always returns an entry of pageOrder (by I2); so does findPage,
+// given that message validation only admits integer deltas.
+//
+// All three rest on intact data files: a missing or damaged file shows up as a
+// failed assert, never as a silently recreated empty board or page.
+//
+// Cache bookkeeping: only cached entries are ever evictable, so eviction and
+// persistence never touch an ID that is not in the cache.
+
 // page cache
 const pageCache = new Map();
 const pageCacheMax = 24;
 const evictablePages = new Set();
 
-function usePage(pageId, create=true) {
+function usePage(pageId, create=false) {
     if (!pageCache.has(pageId)) {
         const page = loadOrCreatePage(pageId, create);
         if ( page ) {
@@ -438,7 +466,10 @@ function usePage(pageId, create=true) {
 }
 
 function persistPage(pageId) {
-    savePage(pageId, usePage(pageId));
+    const page = pageCache.get(pageId);
+    if (page) {
+        savePage(pageId, page);
+    }
 }
 
 function persistAllPages() {
@@ -448,6 +479,10 @@ function persistAllPages() {
 }
 
 function releasePage(pageId) {
+    // a failed lookup has nothing to release
+    if (!pageCache.has(pageId)) {
+        return;
+    }
     if (evictablePages.has(pageId)) {
         evictablePages.delete(pageId);
     }
@@ -467,7 +502,7 @@ const boardCache = new Map();
 const boardCacheMax = 10;
 const evictableBoards = new Set();
 
-function useBoard(boardId, create = true) {
+function useBoard(boardId, create = false) {
     if (evictableBoards.has(boardId)) {
         evictableBoards.delete(boardId);
     }
@@ -482,7 +517,10 @@ function useBoard(boardId, create = true) {
 }
 
 function persistBoard(boardId) {
-    saveBoard(boardId, useBoard(boardId));
+    const board = boardCache.get(boardId);
+    if (board) {
+        saveBoard(boardId, board);
+    }
 }
 
 function persistAllBoards() {
@@ -492,6 +530,10 @@ function persistAllBoards() {
 }
 
 function releaseBoard(boardId) {
+    // a failed lookup has nothing to release
+    if (!boardCache.has(boardId)) {
+        return;
+    }
     if (evictableBoards.has(boardId)) {
         evictableBoards.delete(boardId);
     }
@@ -759,7 +801,7 @@ function get_page_snapshots(page) {
 
 function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
     const board = useBoard(boardId);
-    if ( ! board ) { return; }
+    assert( board ); // every caller has just found or created this board
 
     const pageId = existingPage(requestedPageId, board);
     if ( pageId != requestedPageId ) {
@@ -768,6 +810,7 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
         return;
     }
     const page = usePage(pageId);
+    assert( page ); // I1: existingPage returns an entry of pageOrder
     if (page) {
 
         const pageHistory = page.history;
@@ -801,9 +844,10 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
 
 function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
     const board = useBoard(boardId);
-    if ( ! board ) { return; }
+    assert( board ); // every caller has just found this board
     const pageId = existingPage(requestedPageId, board);
     const page = usePage(pageId);
+    assert( page ); // I1: existingPage returns an entry of pageOrder
     const pageHistory = page.history;
     const pagePresent = page.present;
     const pageHash = page.hashes[pagePresent];
@@ -853,7 +897,7 @@ function ping_client_with_page ( client, pageId, board ) {
     assert(board);
     client.pageId = pageId;
     const page = usePage(pageId);
-    assert(page);
+    assert(page); // I1
     assert(board.pageOrder.includes(pageId));
     
     const pageNr = board.pageOrder.indexOf(pageId) + 1;
@@ -878,16 +922,27 @@ function ping_client_with_page ( client, pageId, board ) {
 
 function ping_client( client ) {
     const board = useBoard(client.boardId);
-    assert(board);
+    assert(board); // I3
     const pageId = existingPage(client.pageId, board);
     client.pageId = pageId;
     ping_client_with_page( client, pageId, board );
 }
 
+// A failed assert in ping_client means a damaged data file. It must neither
+// kill the process (sendPing runs from a timer) nor stop the other clients
+// from being pinged.
+function tryPingClient( client ) {
+    try {
+        ping_client( client );
+    } catch (error) {
+        debug.error(`[SERVER] Cannot ping client ${client.clientId} on board ${client.boardId}, page ${client.pageId}:`, error);
+    }
+}
+
 function sendPing() {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && client.boardId && client.pageId) {
-            ping_client( client );
+            tryPingClient( client );
         }
     });
 }
@@ -895,7 +950,7 @@ function sendPing() {
 function sendPingToBoard ( boardId ) {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && boardId === client.boardId && client.pageId) {
-            ping_client( client );
+            tryPingClient( client );
         }
     });
 }
@@ -991,7 +1046,10 @@ function registerBoard(ws, boardId, clientId, requestId) {
     }
 }
 
+// Returns an entry of board.pageOrder; relies on delta being an integer
+// (enforced by message validation) or undefined.
 function findPage ( board, pageId, delta ) {
+    if ( delta === undefined ) { delta = 0; }
     pageId = existingPage( pageId, board );
     const index = board.pageOrder.indexOf(pageId);
     if (index === -1) {
@@ -1013,6 +1071,7 @@ function describePage(ws, boardId, pageId, delta, do_switch, requestId) {
             debug.log(`[SERVER] Requested page ${pageId} was deleted, redirecting to replacement ${resolvedPageId}`);
         }
         const page = usePage(resolvedPageId);
+        assert( page ); // I1: findPage returns an entry of pageOrder
         const pageNr = board.pageOrder.indexOf(resolvedPageId) + 1;
         const totalPages = board.pageOrder.length;
         const pageHash = page.hashes[page.present];        
@@ -1050,6 +1109,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
         debug.log(`[SERVER] Client ${clientId} registered with page: ${resolvedPageId} on board ${boardId}`);
         
         const page = usePage(resolvedPageId, false);
+        assert( page ); // I1: findPage returns an entry of pageOrder
         if ( !page ) {
             debug.log(`[SERVER]: Cannot find page ${resolvedPageId}`);
         } else {
@@ -1461,12 +1521,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         }
 
         const page = usePage( pageUuid );
-        if (!page) {
-            releasePage( pageUuid );
-            releaseBoard( boardId );
-            debug.log(`[SERVER]: Cannot find page ${pageUuid}`);
-            return;
-        }
+        assert( page ); // I1: pageUuid is on this board (checked above)
 
         let accept;
         let reason;
@@ -1641,6 +1696,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
     }
     
     const page = usePage(pageId);
+    assert( page ); // I1: existingPage returns an entry of pageOrder
     if (page.hashes[present] !== presentHash) {
         debug.log(`[SERVER] Hash ${pageId} changed at time ${present}, sending page info`);
         sendPageInfo( ws, boardId, pageId, do_register, requestId );
