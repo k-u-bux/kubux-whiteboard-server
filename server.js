@@ -251,9 +251,29 @@ function initializeGlobals() {
     }
 }
 
+// Write via a temporary file and a rename, so that a crash or a full disk
+// leaves either the old or the new content on disk, never a truncated file.
+// Errors are passed on to the caller, as with fs.writeFileSync.
+function writeFileAtomic(filePath, text) {
+    const tmpPath = `${filePath}.tmp`;
+    try {
+        const fd = fs.openSync(tmpPath, 'w');
+        try {
+            fs.writeFileSync(fd, text, 'utf8');
+            fs.fsyncSync(fd);
+        } finally {
+            fs.closeSync(fd);
+        }
+        fs.renameSync(tmpPath, filePath);
+    } catch (error) {
+        try { fs.unlinkSync(tmpPath); } catch (ignored) {}
+        throw error;
+    }
+}
+
 function persistDeletionMap() {
     const removalLogPath = getRemovalLogPath();
-    fs.writeFileSync(removalLogPath, JSON.stringify(deletionMap, null, 2), 'utf8');
+    writeFileAtomic(removalLogPath, JSON.stringify(deletionMap, null, 2));
 }
 
 initializeGlobals();
@@ -286,7 +306,7 @@ function saveItem(itemId, item, ext, check) {
     }
     const filePath = getFilePath(itemId, ext);
     const fileText = serialize(item);
-    fs.writeFileSync(filePath, fileText, 'utf8');
+    writeFileAtomic(filePath, fileText);
 }
 
 
