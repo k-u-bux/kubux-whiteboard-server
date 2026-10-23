@@ -833,18 +833,21 @@ function logSentMessage(type, payload, requestId = 'N/A', clientId = 'unknown' )
     debug.log(`[SERVER > CLIENT] Sending message of type '${type}' to '${clientId}' in response to '${requestId}' with payload:`, payload);
 }
 
+// The text is the same for every recipient: serialize once, not once per client.
 function broadcastMessageToBoard( message, boardId, excludeWs = null ) {
+    const text = serialize( message );
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && client.boardId === boardId && client !== excludeWs) {
-            client.send( serialize( message ) );
+            client.send( text );
         }
     });
 }
 
 function broadcastMessageToPage( message, pageId, excludeWs = null ) {
+    const text = serialize( message );
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && client.pageId === pageId && client !== excludeWs) {
-            client.send( serialize( message ) );
+            client.send( text );
         }
     });
 }
