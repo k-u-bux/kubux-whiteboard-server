@@ -1217,7 +1217,8 @@
         <div class="board-nav-section">
           <h3>Current Board</h3>
           <div class="board-nav-form">
-            <button type="button" class="board-nav-btn" id="copy-link-btn">📋 Copy Board Link</button>
+            <button type="button" class="board-nav-btn" id="copy-view-link-btn">📋 Copy View Link</button>
+            <button type="button" class="board-nav-btn" id="copy-edit-link-btn">✏️ Copy Edit Link</button>
             <span id="copy-feedback" style="display: none; color: #4CAF50; margin-left: 10px;">✓ Copied!</span>
           </div>
         </div>
@@ -5216,7 +5217,8 @@
           // Board navigation button
           document.getElementById('board-nav-btn').addEventListener('click', openBoardNavigation);
           document.getElementById('board-nav-close').addEventListener('click', closeBoardNavigation);
-          document.getElementById('copy-link-btn').addEventListener('click', copyBoardLink);
+          document.getElementById('copy-view-link-btn').addEventListener('click', () => copyBoardLink(false));
+          document.getElementById('copy-edit-link-btn').addEventListener('click', () => copyBoardLink(true));
           
           // Board navigation forms
           document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
@@ -7563,15 +7565,16 @@
 
        
        // Copy current board link to clipboard
-       function copyBoardLink() {
+       // A view link opens the board without the edit password; an edit link includes it
+      function copyBoardLink(withPassword) {
           if (!boardId) {
               alert('No board is currently loaded');
               return;
           }
           
-          // Build the full URL with board ID and password
+          // Build the full URL with board ID and, for an edit link, password
           let boardUrl = `${window.location.origin}${window.location.pathname}?board=${boardId}`;
-          if (passwd) {
+          if (withPassword && passwd) {
               boardUrl += `&passwd=${passwd}`;
           }
           
@@ -7579,6 +7582,7 @@
           navigator.clipboard.writeText(boardUrl).then(() => {
               // Show feedback
               const feedback = document.getElementById('copy-feedback');
+              feedback.textContent = withPassword ? '✓ Edit link copied!' : '✓ View link copied!';
               feedback.style.display = 'inline';
               setTimeout(() => {
                   feedback.style.display = 'none';
@@ -7996,6 +8000,9 @@
       function openBoardNavigation() {
           const overlay = document.getElementById('board-nav-overlay');
           overlay.style.display = 'flex';
+          
+          // Only a client that has the edit password can hand it on
+          document.getElementById('copy-edit-link-btn').style.display = passwd ? '' : 'none';
           
           // Pre-fill credential field if stored
           const credentialInput = document.getElementById('new-board-credential-input');
