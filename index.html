@@ -3439,15 +3439,11 @@
           // Update present position
           pageData['present'] = serverPresent;
           
-          // Verify hash at server's present position matches
-          
+          // The replay continued our chain from beforeHash with the server's actions, so
+          // it must arrive at the server's hash; a mismatch is a bug (or client and server
+          // out of step), not something to paper over with a refetch
           if (pageData['hashes'][pageData['present']] !== currentHash) {
-              debugLog("Current hash mismatch after replay", {
-                  ourHash: pageData['hashes'][pageData['present']],
-                  serverHash: currentHash
-              });
-              requestFullPage(pageUuid, do_switch);
-              return null;
+              throw new Error(`hash mismatch after replay on page ${pageUuid}: ours ${pageData['hashes'][pageData['present']]}, server's ${currentHash}`);
           }
           
           // Update cache with new state
