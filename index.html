@@ -3191,7 +3191,7 @@
           pending_actions.delete( acceptedActionUuid );
           
                                                     
-          if ( afterHash === hashes[ verifiedIndex ] ) {
+          if ( afterHash === hashes[ verifiedIndex + 1 ] ) {
               ++ verifiedIndex;
               updateSyncStatus();
               updateUndoRedoButtons();
