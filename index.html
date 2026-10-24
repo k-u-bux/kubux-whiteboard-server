@@ -2578,6 +2578,16 @@
               // do not offer the rejected credential again in the new-board form
               storedCredential = null;
               localStorage.removeItem('whiteboard_credential');
+              // nor retry it on a reload or reconnect (the server serves the app only
+              // with a credential, board or passwd parameter, so one is kept)
+              const params = new URLSearchParams(window.location.search);
+              params.set('credential', 'YOU_NEED_A_VALID_PASSWORD');
+              window.history.replaceState(null, null, `${window.location.pathname}?${params.toString()}`);
+              // the way forward: the new-board form, ready for another credential
+              openBoardNavigation();
+              const credentialInput = document.getElementById('new-board-credential-input');
+              credentialInput.value = '';
+              credentialInput.focus();
           }
       }
       
