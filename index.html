@@ -4846,45 +4846,35 @@
           
           clearPendingSelection();
           
-          const actions = selectedElements.map(uuid => {
+          // One flat group like Move: erase the originals, then draw the copies on the new layer
+          const erases = [];
+          const draws = [];
+          for (const uuid of selectedElements) {
               const element = visualState.element.get(uuid);
-              if (!element) return null;
+              if (!element) continue;
               
               // If already on target layer, skip
-              if (element[shared.ELEMENT.LAYER] === targetLayer) return null;
+              if (element[shared.ELEMENT.LAYER] === targetLayer) continue;
               
               // Create a new element with modified layer
               const newElement = JSON.parse(JSON.stringify(element));
               newElement[shared.ELEMENT.LAYER] = Number(targetLayer);
               
-              // Create erase action for the original
-              const eraseAction = createEraseAction(uuid);
-              
-              // Create draw action for the modified version
-              const drawUuid = shared.generateUuid();
-              const drawAction = {
+              erases.push(createEraseAction(uuid));
+              draws.push({
                   type: shared.MOD_ACTIONS.DRAW.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: drawUuid,
+                  [shared.MOD_ACTIONS.UUID]: shared.generateUuid(),
                   [shared.MOD_ACTIONS.DRAW.STROKE]: newElement
-              };
-              
-              // Return group of erase + draw
-              const modifyUuid = shared.generateUuid();
-              return {
-                  type: shared.MOD_ACTIONS.GROUP.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: modifyUuid,
-                  [shared.MOD_ACTIONS.GROUP.ACTIONS]: [eraseAction, drawAction]
-              };
-          }).filter(action => action !== null);
+              });
+          }
           
-          if (actions.length === 0) return;
+          if (erases.length === 0) return;
           
-          // Group all modifications
           const groupUuid = shared.generateUuid();
           const groupAction = {
               type: shared.MOD_ACTIONS.GROUP.TYPE,
               [shared.MOD_ACTIONS.UUID]: groupUuid,
-              [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
+              [shared.MOD_ACTIONS.GROUP.ACTIONS]: [...erases, ...draws]
           };
           
           applyActionOptimistically(groupAction);
