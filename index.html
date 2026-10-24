@@ -2769,8 +2769,9 @@
           
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID];
           
-          // On a reconnect: the edits the server has not confirmed, before the reset drops them
-          const unconfirmedPage = currentPageUuid;
+          // On a reconnect: the page we were on, and the edits the server has not
+          // confirmed, before the reset drops them (on the first load there is no page)
+          const previousPage = currentPageUuid;
           const unconfirmedEdits = history.slice(Math.min(verifiedIndex, present), present);
           
           // Reset local state
@@ -2799,11 +2800,17 @@
           loadSettings();
           updateKnobs();
           saveMostRecentBoard();
-          joinPage( firstPageId, 1, numPages );
-          // The server will send a full page message next, so we do not need
-          // to request one explicitly
+          if (previousPage) {
+              // Return to that page. The server resolves a page deleted meanwhile to
+              // its replacement (or the first page) and answers with page-registered.
+              registerPage( previousPage, 0 );
+          } else {
+              joinPage( firstPageId, 1, numPages );
+              // The server will send a full page message next, so we do not need
+              // to request one explicitly
+          }
           if (unconfirmedEdits.length > 0) {
-              resendUnconfirmedEdits(unconfirmedPage, unconfirmedEdits);
+              resendUnconfirmedEdits(previousPage, unconfirmedEdits);
           }
       }
 
