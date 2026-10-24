@@ -2338,7 +2338,7 @@
                   reject(new Error(`Request ${requestId} timed out`));
               }, timeout);
               pendingRequests.set(requestId, { resolve, reject, timer });
-              ws.send(shared.serialize(request));
+              ws.send(JSON.stringify(request));
           });
       }
 
@@ -2500,7 +2500,7 @@
           ws.onmessage = (event) => {
               try {
                   // debugLog('Received event: ', event); 
-                  const data = shared.deserialize(event.data);
+                  const data = JSON.parse(event.data); // wire messages are plain JSON
                   if ( data ) {
                       // Check if this message matches a pending request
                       const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.PAGE_INFO.REQUEST_ID]
@@ -2683,7 +2683,7 @@
           };
           
           debugLog('Sending board creation request:', createMessage);
-          ws.send(shared.serialize(createMessage));
+          ws.send(JSON.stringify(createMessage));
       }
       
       // Handle board creation response
@@ -2765,7 +2765,7 @@
           };
           
           debugLog('Sending board registration:', registerMessage);
-          ws.send(shared.serialize(registerMessage));
+          ws.send(JSON.stringify(registerMessage));
       }
       
       // Handle board registration response
@@ -2883,7 +2883,7 @@
           };
           
           debugLog('Sending page registration:', registerMessage);
-          ws.send(shared.serialize(registerMessage));
+          ws.send(JSON.stringify(registerMessage));
       }
 
             
@@ -3581,7 +3581,7 @@
           }
           
           debugLog('Sending message', message);
-          ws.send(shared.serialize(message));
+          ws.send(JSON.stringify(message));
           return true;
       }
 
@@ -4518,17 +4518,9 @@
               const element = visualState.element.get(uuid);
               if (!element) return null;
               
-              // Create a new element with transformed points
+              // Create a new element, moved by its transform
               const newElement = JSON.parse(JSON.stringify(element));
-              
-              // Apply movement to points
-              newElement[shared.ELEMENT.POINTS] = element[shared.ELEMENT.POINTS].map(point => {
-                  return [
-                      point[0] + dx,
-                      point[1] + dy,
-                      point[2]
-                  ];
-              });
+              newElement[shared.ELEMENT.TRANSFORM] = translatedTransform(element[shared.ELEMENT.TRANSFORM], dx, dy);
               
               // Create erase action for the original
               const eraseAction = createEraseAction(uuid);
@@ -6352,14 +6344,8 @@
                   const newElement = JSON.parse(JSON.stringify(element));
                   const newUuid = shared.generateUuid();
                   
-                  // Apply offset to points
-                  newElement[shared.ELEMENT.POINTS] = element[shared.ELEMENT.POINTS].map(point => {
-                      return [
-                          point[0] + offsetX,
-                          point[1] + offsetY,
-                          point[2]
-                      ];
-                  });
+                  // Move the copy by its transform
+                  newElement[shared.ELEMENT.TRANSFORM] = translatedTransform(element[shared.ELEMENT.TRANSFORM], offsetX, offsetY);
                   
                   // Set layer to current active layer
                   newElement[shared.ELEMENT.LAYER] = Number(activeLayer);
@@ -6545,9 +6531,47 @@
           return result;
       }
       
+      // A stroke's transform followed by a translation by (dx, dy): moves the stroke
+      // without touching its points
+      function translatedTransform(transform, dx, dy) {
+          const result = [...transform];
+          result[shared.TRANSFORM.E] += dx;
+          result[shared.TRANSFORM.F] += dy;
+          return result;
+      }
+
+      // A new stroke keeps its points relative to its first point, which moves into the
+      // stroke's transform (rendering, hit tests and bounding boxes all apply it). Small
+      // strokes then have small coordinates, so rounding them to a few significant digits
+      // keeps detail in proportion to the stroke's size. The transform keeps full
+      // precision; pressure is rounded to 2 decimals; timestamps stay as they are.
+      const POINT_DIGITS = 5;
+      function compactStroke(stroke) {
+          const points = stroke[shared.ELEMENT.POINTS];
+          const ox = points[0][shared.POINT.X];
+          const oy = points[0][shared.POINT.Y];
+          const round = (v) => Number(v.toPrecision(POINT_DIGITS));
+          const result = [...stroke];
+          result[shared.ELEMENT.POINTS] = points.map(point => {
+              const p = [...point];
+              p[shared.POINT.X] = round(point[shared.POINT.X] - ox);
+              p[shared.POINT.Y] = round(point[shared.POINT.Y] - oy);
+              p[shared.POINT.PRESSURE] = Math.round(point[shared.POINT.PRESSURE] * 100) / 100;
+              return p;
+          });
+          // new transform = old transform after the translation back to the first point
+          const t = stroke[shared.ELEMENT.TRANSFORM];
+          const transform = [...t];
+          transform[shared.TRANSFORM.E] = t[shared.TRANSFORM.A] * ox + t[shared.TRANSFORM.C] * oy + t[shared.TRANSFORM.E];
+          transform[shared.TRANSFORM.F] = t[shared.TRANSFORM.B] * ox + t[shared.TRANSFORM.D] * oy + t[shared.TRANSFORM.F];
+          result[shared.ELEMENT.TRANSFORM] = transform;
+          return result;
+      }
+
       // Send a draw action to the server
-      function sendDrawAction(stroke) {
+      function sendDrawAction(rawStroke) {
           const actionUuid = shared.generateUuid();
+          const stroke = compactStroke(rawStroke);
           
           const drawAction = {
               type: shared.MOD_ACTIONS.DRAW.TYPE,
