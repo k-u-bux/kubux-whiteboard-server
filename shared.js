@@ -384,6 +384,9 @@ const MESSAGES = {
     }
 };
 
+// Reason in the server's 'error' message when a create-board credential fails the check
+const CREDENTIAL_NOT_ACCEPTED = 'credential not accepted';
+
 const DRAWABLE = {
     TYPE: {
         STROKE: 'stroke',
@@ -1731,6 +1734,7 @@ if (typeof module !== 'undefined' && module.exports) {
         // schemas and constants
         MOD_ACTIONS,
         MESSAGES,
+        CREDENTIAL_NOT_ACCEPTED,
         DRAWABLE,
         POINT,
         ELEMENT,
@@ -1812,6 +1816,7 @@ else if (typeof window !== 'undefined') {
         // schemas and constants
         MOD_ACTIONS,
         MESSAGES,
+        CREDENTIAL_NOT_ACCEPTED,
         DRAWABLE,
         POINT,
         ELEMENT,

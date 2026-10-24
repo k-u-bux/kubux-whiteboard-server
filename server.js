@@ -220,6 +220,7 @@ const {
     revertEdit,
     commitGroup, 
     MESSAGES, 
+    CREDENTIAL_NOT_ACCEPTED,
     MOD_ACTIONS, 
     NULL_UUID,
     ELEMENT, 
@@ -1391,6 +1392,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
         ws.credentialCheckPending = false;
         if (!isAuthorized) {
             debug.log(`[SERVER] Client ${clientId} failed authentication`);
+            rejectMessage(ws, CREDENTIAL_NOT_ACCEPTED);
             return;
         }
         // the client may have left while the check ran: no board for nobody

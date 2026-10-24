@@ -2573,6 +2573,11 @@
       function handleErrorMessage(data) {
           console.error(`[SERVER ERROR] ${data.message}`, data.stack);
           showError(`Server error: ${data.message}`);
+          if (data.message === shared.CREDENTIAL_NOT_ACCEPTED) {
+              // do not offer the rejected credential again in the new-board form
+              storedCredential = null;
+              localStorage.removeItem('whiteboard_credential');
+          }
       }
       
       // Handle board info response (page order for shuffle)
