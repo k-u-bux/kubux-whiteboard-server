@@ -5251,9 +5251,6 @@
           canvas.addEventListener('touchstart', e => e.preventDefault());
           canvas.addEventListener('touchmove', e => e.preventDefault());
           canvas.addEventListener('touchend', e => e.preventDefault());
-          
-          // Keyboard shortcuts
-          document.addEventListener('keydown', handleKeyDown);
       }
 
       function setupLayerControls() {
@@ -5313,24 +5310,6 @@
           console.log('Visual State:', visualState);
           
           alert(`Debug info in console.\nHistory: ${history.length} actions\nPresent: ${present}\nVerified: ${verifiedIndex}`);
-      }
-      
-      // Handle keyboard shortcuts
-      function handleKeyDown(e) {
-          // Undo: Ctrl+Z
-          if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-              e.preventDefault();
-              if (!undoBtn.disabled) {
-                  handleUndo();
-              }
-          }
-          // Redo: Ctrl+Y or Ctrl+Shift+Z
-          else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-              e.preventDefault();
-              if (!redoBtn.disabled) {
-                  handleRedo();
-              }
-          }
       }
       
       // Offline, undo and redo stay within the edits the server has not confirmed:
