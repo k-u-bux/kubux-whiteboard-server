@@ -8191,20 +8191,66 @@
           });
       }
        
+      // Thumbnail pages are fetched one at a time, each missing page once: the
+      // overview refreshes on every incoming message, and requesting all missing
+      // pages on each refresh used to send the same large pages again and again.
+      // One request at a time also keeps at most one large reply ahead of other
+      // traffic, such as an export's page-info requests.
+      const thumbnailQueue = [];       // pages waiting to be fetched
+      let thumbnailInFlight = null;    // page currently being fetched
+
       function requestThumbnailData() {
           // For pages not in cache, request data
           const grid = document.getElementById('overview-grid');
           const thumbs = grid.querySelectorAll('.overview-thumb');
           thumbs.forEach( ( thumb, idx ) => {
               const pageUuid = thumb.dataset.pageUuid;
-              if ( ! pageUuid ) { 
+              if ( ! pageUuid ) {
                   console.error( "thumbnail should know its uuid" );
-                  return; 
+                  return;
               }
               const pageData = loadPageFromCache( pageUuid, false );
               if ( pageData ) { return; }
-              requestFullPage( pageUuid, false );
+              if ( pageUuid !== thumbnailInFlight && ! thumbnailQueue.includes( pageUuid ) ) {
+                  thumbnailQueue.push( pageUuid );
+              }
           });
+          fetchThumbnailPages();
+      }
+
+      async function fetchThumbnailPages() {
+          if ( thumbnailInFlight ) { return; } // the running loop picks up new entries
+          while ( thumbnailQueue.length > 0 ) {
+              // leaving the overview or losing the connection drops the queue;
+              // reopening or reconnecting refreshes the grid, which refills it
+              if ( ! isOverviewActive() || ws.readyState !== WebSocket.OPEN ) {
+                  thumbnailQueue.length = 0;
+                  break;
+              }
+              const pageUuid = thumbnailQueue.shift();
+              if ( loadPageFromCache( pageUuid, false ) ) { continue; }
+              thumbnailInFlight = pageUuid;
+              try {
+                  const reply = await sendWithCallback({
+                      type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE,
+                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD]: boardId,
+                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE]: pageUuid,
+                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA]: 0,
+                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER]: false,
+                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID]: createRequestId()
+                  }, FULL_PAGE_TIMEOUT);
+                  if ( reply.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE ) {
+                      handleFullPageMessage( reply ); // caches the page and redraws the grid
+                  } else {
+                      // page-lost: the page was deleted; the next board-info removes its thumbnail
+                      debugLog( `Thumbnail page ${pageUuid} not fetched: ${reply.type}` );
+                  }
+              } catch ( err ) {
+                  console.warn( `Thumbnail page ${pageUuid} not fetched: ${err.message}` );
+              } finally {
+                  thumbnailInFlight = null;
+              }
+          }
       }
       
       function overviewAddPage() {
