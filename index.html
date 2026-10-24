@@ -2353,6 +2353,7 @@
       
       // Show synchronization status
       function updateSyncStatus() {
+          saveUnconfirmedEdits();
       //     if (present > verifiedIndex) {
       //         // Some actions not yet confirmed by server
       //         syncStatus.textContent = "⟳";
@@ -2801,6 +2802,8 @@
           
           // Update board ID and URL if necessary
           boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.BOARD];
+          // First load: edits this tab had not got confirmed before a reload
+          const savedEdits = previousPage ? null : takeSavedEdits();
           const firstPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE];
           const lastPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.LAST_PAGE];
           const numPages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES];
@@ -2833,6 +2836,42 @@
           if (unconfirmedEdits.length > 0) {
               resendUnconfirmedEdits(previousPage, unconfirmedEdits);
           }
+          if (savedEdits) {
+              resendUnconfirmedEdits(savedEdits.page, savedEdits.edits);
+          }
+      }
+
+      // Unconfirmed edits survive a reload of the tab: they are kept in sessionStorage,
+      // which belongs to the tab and goes with it, and sent again on the next load.
+      // Storage that is full or blocked only means the edits stay in memory.
+      const SAVED_EDITS_KEY = 'whiteboard_unconfirmed_edits';
+
+      function saveUnconfirmedEdits() {
+          if (!boardId || !currentPageUuid) return;
+          const edits = history.slice(Math.min(verifiedIndex, present), present);
+          try {
+              if (edits.length > 0) {
+                  sessionStorage.setItem(SAVED_EDITS_KEY, JSON.stringify({ board: boardId, page: currentPageUuid, edits }));
+              } else {
+                  sessionStorage.removeItem(SAVED_EDITS_KEY);
+              }
+          } catch (err) {
+              // storage full or blocked
+          }
+      }
+
+      // The edits saved for this board before a reload (removed from storage)
+      function takeSavedEdits() {
+          try {
+              const entry = JSON.parse(sessionStorage.getItem(SAVED_EDITS_KEY));
+              sessionStorage.removeItem(SAVED_EDITS_KEY);
+              if (entry && entry.board === boardId && Array.isArray(entry.edits) && entry.edits.length > 0) {
+                  return entry;
+              }
+          } catch (err) {
+              // storage blocked or entry unreadable
+          }
+          return null;
       }
 
       // Edits made while offline (or sent just before the connection dropped) are
@@ -3179,9 +3218,9 @@
           }
           
           if ( actionIndex === acceptedActionIndex ) {
+              verifiedIndex = actionIndex + 1;
               updateSyncStatus();
               updateUndoRedoButtons();
-              verifiedIndex = actionIndex + 1;
               return;
           }
 
