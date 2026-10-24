@@ -2,7 +2,7 @@
   "name": "kubux-whiteboard-server",
   "version": "1.0.0",
   "dependencies": {
-    "ws": "^8.0.0"
+    "ws": "^8.22.0"
   },
   "scripts": {
     "start": "node server.js"
