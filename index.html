@@ -4525,40 +4525,30 @@
 
       function dragMoveSelectedElements(dx, dy) {
           clearPendingSelection();
-          const actions = selectedElements.map(uuid => {
+          // One flat group like Move: erase the originals, then draw the moved copies
+          const erases = [];
+          const draws = [];
+          for (const uuid of selectedElements) {
               const element = visualState.element.get(uuid);
-              if (!element) return null;
+              if (!element) continue;
               
               // Create a new element, moved by its transform
               const newElement = JSON.parse(JSON.stringify(element));
               newElement[shared.ELEMENT.TRANSFORM] = translatedTransform(element[shared.ELEMENT.TRANSFORM], dx, dy);
               
-              // Create erase action for the original
-              const eraseAction = createEraseAction(uuid);
-              
-              // Create draw action for the modified version
-              const drawUuid = shared.generateUuid();
-              const drawAction = {
+              erases.push(createEraseAction(uuid));
+              draws.push({
                   type: shared.MOD_ACTIONS.DRAW.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: drawUuid,
+                  [shared.MOD_ACTIONS.UUID]: shared.generateUuid(),
                   [shared.MOD_ACTIONS.DRAW.STROKE]: newElement
-              };
-              
-              // Return group of erase + draw
-              const modifyUuid = shared.generateUuid();
-              return {
-                  type: shared.MOD_ACTIONS.GROUP.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: modifyUuid,
-                  [shared.MOD_ACTIONS.GROUP.ACTIONS]: [eraseAction, drawAction]
-              };
-          }).filter(action => action !== null);
+              });
+          }
           
-          // Group all modifications
           const groupUuid = shared.generateUuid();
           const groupAction = {
               type: shared.MOD_ACTIONS.GROUP.TYPE,
               [shared.MOD_ACTIONS.UUID]: groupUuid,
-              [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
+              [shared.MOD_ACTIONS.GROUP.ACTIONS]: [...erases, ...draws]
           };
           
           // Add to history with the real hash, so client and server agree at once
