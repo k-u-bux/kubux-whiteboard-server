@@ -1031,6 +1031,7 @@
           <span class="tooltiptext">Redo (Ctrl+Y)</span>
         </button>
         <button class="tool-btn" id="paste-btn" title="Paste">📌</button>
+        <button class="tool-btn" id="cancel-paste-btn" title="Cancel Paste" style="display: none;">✕</button>
       </div>
       
       <div class="tool-section">
@@ -2079,6 +2080,7 @@
       let pasteMode = false;
       let pastePreviewPositions = [];
       let pastedElements = []; // Array of {uuid, originalElement, transform}
+      let pasteReplaces = []; // uuids a Move replaces: hidden during the preview, erased on commit
       let pasteBounds = null;
       let pasteTransform = null; // Current transform being applied to paste group
       let isDraggingPaste = false;
@@ -4425,6 +4427,7 @@
           copyBtn.addEventListener('click',  () => { copySelectedElements(); startResetTool(); } );
           moveBtn.addEventListener('click',  () => { moveSelectedElements(); startResetTool(); } );
           pasteBtn.addEventListener('click', () => { setTool('paste'); });
+          document.getElementById('cancel-paste-btn').addEventListener('click', cancelPaste);
           moveLayerBtn.addEventListener('click', showMoveToLayerDialog);
           
           // Deselect toggle button
@@ -4588,19 +4591,8 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
           
-          // If we are in the middle of history (after undoing), truncate future actions
-          if (present < history.length) {
-              history = history.slice(0, present);
-              hashes = hashes.slice(0, present + 1);
-          }
-          
-          // Add to history and advance present
-          history.push(groupAction);
-          present++;
-          
-          // Calculate placeholder hash
-          const placeholderHash = shared.generateUuid();
-          hashes.push(placeholderHash);
+          // Add to history with the real hash, so client and server agree at once
+          applyActionOptimistically(groupAction);
           
           // Create proposal
           const proposal = {
@@ -4642,13 +4634,22 @@
           updatePasteButton();
       }
 
+      // Move: the selection itself goes into paste mode (the clipboard is left
+      // alone). Committing erases the originals and draws the transformed copies
+      // as one group, i.e. one undo step; cancelling leaves the page as it was.
       function moveSelectedElements() {
           clearPendingSelection();
           if (selectedElements.length === 0) return;
-          copySelectedElements();
-          const eraseAction = makeEraseAction( selectedElements );
+          const replaces = [...selectedElements];
+          const elements = replaces.map(uuid => visualState.element.get(uuid)).filter(element => element);
           clearSelection();
-          enterPasteModeWithErase( eraseAction );
+          enterPasteMode(elements, replaces);
+      }
+
+      // Cancel button: leave paste mode without committing
+      function cancelPaste() {
+          if (!pasteMode) return;
+          exitPasteMode();
       }
 
       function cutSelectedElements() {
@@ -4732,17 +4733,22 @@
           startResetTool();
       }
       
-      // Enter interactive paste mode
-      function enterPasteMode() {
+      // Enter interactive paste mode, by default with the clipboard. A Move passes
+      // the selected elements and their uuids: those are hidden while the preview
+      // is shown and erased in the same group that draws the copies.
+      function enterPasteMode(elements = clipboard.elements, replaces = []) {
           // Create preview elements at original coordinates
           pasteMode = true;
           pastedElements = [];
-          
+          pasteReplaces = replaces;
+          document.getElementById('cancel-paste-btn').style.display = '';
+          backgroundValid = false; // hide the elements a Move replaces
+
           // Create identity transform initially (elements at original position)
           pasteTransform = shared.createIdentityTransform();
-          
+
           // Store elements with their UUIDs
-          clipboard.elements.forEach(element => {
+          elements.forEach(element => {
               const uuid = shared.generateUuid();
               pastedElements.push({
                   uuid: uuid,
@@ -4796,10 +4802,12 @@
               
               // Compose the paste transform with original transform
               newElement[shared.ELEMENT.TRANSFORM] = shared.compose(pasteTransform, originalElement[shared.ELEMENT.TRANSFORM]);
-              
-              // Set layer to current active layer
-              newElement[shared.ELEMENT.LAYER] = Number(activeLayer);
-              
+
+              // A paste goes to the active layer; a Move keeps each element's layer
+              if (pasteReplaces.length === 0) {
+                  newElement[shared.ELEMENT.LAYER] = Number(activeLayer);
+              }
+
               // Create a draw action
               return {
                   type: shared.MOD_ACTIONS.DRAW.TYPE,
@@ -4807,7 +4815,10 @@
                   [shared.MOD_ACTIONS.DRAW.STROKE]: newElement
               };
           });
-          
+
+          // A Move erases the originals in the same group, so it is one undo step
+          actions.unshift(...pasteReplaces.map(uuid => createEraseAction(uuid)));
+
           // Group all paste actions
           const groupUuid = shared.generateUuid();
           const groupAction = {
@@ -4816,19 +4827,8 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
           
-          // If we are in the middle of history (after undoing), truncate future actions
-          if (present < history.length) {
-              history = history.slice(0, present);
-              hashes = hashes.slice(0, present + 1);
-          }
-          
-          // Add to history and advance present
-          history.push(groupAction);
-          present++;
-          
-          // Calculate placeholder hash
-          const placeholderHash = shared.generateUuid();
-          hashes.push(placeholderHash);
+          // Add to history with the real hash, so client and server agree at once
+          applyActionOptimistically(groupAction);
           
           // Create proposal
           const proposal = {
@@ -4857,6 +4857,9 @@
       function exitPasteMode() {
           pasteMode = false;
           pastedElements = [];
+          pasteReplaces = [];
+          document.getElementById('cancel-paste-btn').style.display = 'none';
+          backgroundValid = false; // show the elements of a cancelled Move again
           pasteBounds = null;
           pasteTransform = null;
           isDraggingPaste = false;
@@ -6597,19 +6600,8 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
           
-          // If we are in the middle of history (after undoing), truncate future actions
-          if (present < history.length) {
-              history = history.slice(0, present);
-              hashes = hashes.slice(0, present + 1);
-          }
-          
-          // Add to history and advance present
-          history.push(groupAction);
-          present++;
-          
-          // Calculate placeholder hash
-          const placeholderHash = shared.generateUuid();
-          hashes.push(placeholderHash);
+          // Add to history with the real hash, so client and server agree at once
+          applyActionOptimistically(groupAction);
           
           // Create proposal
           const proposal = {
@@ -7370,12 +7362,12 @@
               backgroundCtx.fillRect(0, 0, canvasFormat.w, canvasFormat.h);
           }
           
-          // Render all visible elements to background
-          shared.render_all_visible_elements(visualState, (element) => {
-              if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
+          // Render all visible elements to background, except those a Move is replacing
+          for (const [uuid, element] of visualState.element) {
+              if (visualState.visible.has(uuid) && !pasteReplaces.includes(uuid) && visibleLayers.has(element[shared.ELEMENT.LAYER])) {
                   renderElement(backgroundCtx, element);
               }
-          });
+          }
           
           // Render selection highlights to background
           if (selectedElements.length > 0) {
