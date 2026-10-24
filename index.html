@@ -8191,13 +8191,14 @@
           });
       }
        
-      // Thumbnail pages are fetched one at a time, each missing page once: the
+      // Thumbnail pages are requested in parallel, but a page is not requested
+      // again while its latest request is younger than THUMBNAIL_RETRY_AFTER: the
       // overview refreshes on every incoming message, and requesting all missing
       // pages on each refresh used to send the same large pages again and again.
-      // One request at a time also keeps at most one large reply ahead of other
-      // traffic, such as an export's page-info requests.
-      const thumbnailQueue = [];       // pages waiting to be fetched
-      let thumbnailInFlight = null;    // page currently being fetched
+      // Replies are matched to their request by requestId; when two requests for
+      // a page are answered, the reply to the more recent one wins.
+      const THUMBNAIL_RETRY_AFTER = 10000;
+      const thumbnailRequests = new Map(); // pageUuid -> { requestId, sentAt } of the latest request
 
       function requestThumbnailData() {
           // For pages not in cache, request data
@@ -8211,45 +8212,42 @@
               }
               const pageData = loadPageFromCache( pageUuid, false );
               if ( pageData ) { return; }
-              if ( pageUuid !== thumbnailInFlight && ! thumbnailQueue.includes( pageUuid ) ) {
-                  thumbnailQueue.push( pageUuid );
-              }
+              const latest = thumbnailRequests.get( pageUuid );
+              if ( latest && Date.now() - latest.sentAt < THUMBNAIL_RETRY_AFTER ) { return; }
+              requestThumbnailPage( pageUuid );
           });
-          fetchThumbnailPages();
       }
 
-      async function fetchThumbnailPages() {
-          if ( thumbnailInFlight ) { return; } // the running loop picks up new entries
-          while ( thumbnailQueue.length > 0 ) {
-              // leaving the overview or losing the connection drops the queue;
-              // reopening or reconnecting refreshes the grid, which refills it
-              if ( ! isOverviewActive() || ws.readyState !== WebSocket.OPEN ) {
-                  thumbnailQueue.length = 0;
-                  break;
+      async function requestThumbnailPage( pageUuid ) {
+          const requestId = createRequestId();
+          thumbnailRequests.set( pageUuid, { requestId, sentAt: Date.now() } );
+          const isLatest = () => thumbnailRequests.get( pageUuid )?.requestId === requestId;
+          try {
+              const reply = await sendWithCallback({
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD]: boardId,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE]: pageUuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA]: 0,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER]: false,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID]: requestId
+              }, FULL_PAGE_TIMEOUT);
+              if ( reply.type !== shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE ) {
+                  // page-lost: the page was deleted; the next board-info removes its thumbnail
+                  debugLog( `Thumbnail page ${pageUuid} not fetched: ${reply.type}` );
+                  if ( isLatest() ) { thumbnailRequests.delete( pageUuid ); }
+                  return;
               }
-              const pageUuid = thumbnailQueue.shift();
-              if ( loadPageFromCache( pageUuid, false ) ) { continue; }
-              thumbnailInFlight = pageUuid;
-              try {
-                  const reply = await sendWithCallback({
-                      type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE,
-                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD]: boardId,
-                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE]: pageUuid,
-                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA]: 0,
-                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER]: false,
-                      [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID]: createRequestId()
-                  }, FULL_PAGE_TIMEOUT);
-                  if ( reply.type === shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE ) {
-                      handleFullPageMessage( reply ); // caches the page and redraws the grid
-                  } else {
-                      // page-lost: the page was deleted; the next board-info removes its thumbnail
-                      debugLog( `Thumbnail page ${pageUuid} not fetched: ${reply.type}` );
-                  }
-              } catch ( err ) {
-                  console.warn( `Thumbnail page ${pageUuid} not fetched: ${err.message}` );
-              } finally {
-                  thumbnailInFlight = null;
+              if ( isLatest() ) {
+                  thumbnailRequests.delete( pageUuid );
+                  handleFullPageMessage( reply ); // caches the page and redraws the grid
+              } else if ( ! loadPageFromCache( pageUuid, false ) ) {
+                  // superseded, but better than nothing until the newer reply arrives
+                  handleFullPageMessage( reply );
               }
+          } catch ( err ) {
+              // timeout or disconnect: the next refresh may ask again
+              console.warn( `Thumbnail page ${pageUuid} not fetched: ${err.message}` );
+              if ( isLatest() ) { thumbnailRequests.delete( pageUuid ); }
           }
       }
       
