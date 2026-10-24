@@ -867,32 +867,6 @@
       body.overview-active .app-container {
           display: none;
       }
-
-      /* Opened without the edit password: no editing controls (see applyViewMode) */
-      body.view-only .sidebar,
-      body.view-only #add-page,
-      body.view-only #delete-page,
-      body.view-only .tool-section:has(#undo-btn),
-      body.view-only .tool-section:has(#pen-slot-0),
-      body.view-only .tool-section:has(#selection-rectangle-tool),
-      body.view-only #layer-controls .active-row,
-      body.view-only #overview-delete,
-      body.view-only #overview-add-page,
-      body.view-only #overview-move-front,
-      body.view-only #overview-move-back,
-      body.view-only #overview-confirm {
-          display: none;
-      }
-      #view-only-badge {
-          display: none;
-          align-self: center;
-          padding: 0 6px;
-          font-size: 0.85em;
-          color: #666;
-      }
-      body.view-only #view-only-badge {
-          display: inline;
-      }
     </style>
   </head>
   <body>
@@ -1027,7 +1001,6 @@
 
       <div class="tool-section" id="debug-tools">
         <button class="tool-btn" id="board-nav-btn" title="Board Navigation">🗂️</button>
-        <span id="view-only-badge" title="Opened without the edit password">👁 View only</span>
         <!-- <span id="sync-status">✓</span> -->
       </div>
     </div>
@@ -1244,8 +1217,7 @@
         <div class="board-nav-section">
           <h3>Current Board</h3>
           <div class="board-nav-form">
-            <button type="button" class="board-nav-btn" id="copy-view-link-btn">📋 Copy View Link</button>
-            <button type="button" class="board-nav-btn" id="copy-edit-link-btn">✏️ Copy Edit Link</button>
+            <button type="button" class="board-nav-btn" id="copy-link-btn">📋 Copy Board Link</button>
             <span id="copy-feedback" style="display: none; color: #4CAF50; margin-left: 10px;">✓ Copied!</span>
           </div>
         </div>
@@ -2442,21 +2414,6 @@
           hideError();
       }
       
-      // Without the edit password the server declines every edit, so such a client
-      // shows no editing controls (body.view-only in the CSS) and uses the hand tool.
-      // A board being created gets its password with board-created.
-      function applyViewMode() {
-          const viewOnly = !passwd && !new URLSearchParams(window.location.search).get('credential');
-          document.body.classList.toggle('view-only', viewOnly);
-          if (viewOnly) {
-              currentDefaultTool = 'hand'; // the tool resetTool returns to
-              if (currentTool !== 'hand') {
-                  setTool('hand');
-              }
-          }
-          resizeCanvas(); // the sidebar may have come or gone
-      }
-
       function setupWebSocket() {
           const urlParams = new URLSearchParams(window.location.search);
           const credential = urlParams.get('credential');
@@ -2473,8 +2430,6 @@
           } else {
               debugLog( 'not loading most recent board. current board:', boardId );
           }
-
-          applyViewMode();
 
           // Determine if we are creating or registering
           const isCreating = !!credential;
@@ -2768,7 +2723,6 @@
           // Load settings now that we have a boardId
           loadSettings();
           updateKnobs();
-          applyViewMode();
       }
       
           
@@ -2852,7 +2806,6 @@
           // Load settings now that we have a boardId
           loadSettings();
           updateKnobs();
-          applyViewMode();
           saveMostRecentBoard();
           if (previousPage) {
               // Return to that page. The server resolves a page deleted meanwhile to
@@ -5263,8 +5216,7 @@
           // Board navigation button
           document.getElementById('board-nav-btn').addEventListener('click', openBoardNavigation);
           document.getElementById('board-nav-close').addEventListener('click', closeBoardNavigation);
-          document.getElementById('copy-view-link-btn').addEventListener('click', () => copyBoardLink(false));
-          document.getElementById('copy-edit-link-btn').addEventListener('click', () => copyBoardLink(true));
+          document.getElementById('copy-link-btn').addEventListener('click', copyBoardLink);
           
           // Board navigation forms
           document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
@@ -7611,16 +7563,15 @@
 
        
        // Copy current board link to clipboard
-       // A view link opens the board without the edit password; an edit link includes it
-      function copyBoardLink(withPassword) {
+       function copyBoardLink() {
           if (!boardId) {
               alert('No board is currently loaded');
               return;
           }
           
-          // Build the full URL with board ID and, for an edit link, password
+          // Build the full URL with board ID and password
           let boardUrl = `${window.location.origin}${window.location.pathname}?board=${boardId}`;
-          if (withPassword && passwd) {
+          if (passwd) {
               boardUrl += `&passwd=${passwd}`;
           }
           
@@ -7628,7 +7579,6 @@
           navigator.clipboard.writeText(boardUrl).then(() => {
               // Show feedback
               const feedback = document.getElementById('copy-feedback');
-              feedback.textContent = withPassword ? '✓ Edit link copied!' : '✓ View link copied!';
               feedback.style.display = 'inline';
               setTimeout(() => {
                   feedback.style.display = 'none';
@@ -8046,9 +7996,6 @@
       function openBoardNavigation() {
           const overlay = document.getElementById('board-nav-overlay');
           overlay.style.display = 'flex';
-          
-          // Only a client that has the edit password can hand it on
-          document.getElementById('copy-edit-link-btn').style.display = passwd ? '' : 'none';
           
           // Pre-fill credential field if stored
           const credentialInput = document.getElementById('new-board-credential-input');
