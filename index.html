@@ -3400,6 +3400,14 @@
           
 
           if (startIndex === -1) {
+              if (pageUuid === currentPageUuid && !cache_only) {
+                  // The page on screen: ask for what is missing since our last confirmed
+                  // state (the server falls back to page-info with snapshots if it does
+                  // not know that state); the answer switches, so the view catches up now
+                  debugLog("Replay hash not found in our chain, requesting a replay", { beforeHash });
+                  requestReplay(currentPageUuid, true);
+                  return null;
+              }
               // Cannot find matching hash - need full page refresh
               debugLog("Replay hash not found in our chain, requesting full page", {
                   beforeHash,
