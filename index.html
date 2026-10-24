@@ -466,99 +466,6 @@
           cursor: pointer;
       }
       
-      /* Page Selection Menu */
-      #page-menu-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background-color: transparent;
-          display: none;
-          z-index: 2000;
-          pointer-events: all;
-      }
-      
-      #page-menu-window {
-          position: absolute;
-          background: white;
-          border-radius: 8px;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-          width: max-content;
-          min-width: 200px;
-          max-height: 400px;
-          display: flex;
-          flex-direction: column;
-      }
-      
-      #page-menu-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 12px;
-          border-bottom: 1px solid #ddd;
-          gap: 8px;
-      }
-      
-      #page-menu-toolbar {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          flex: 1;
-      }
-      
-      #page-menu-current-label {
-          font-size: 14px;
-          font-weight: bold;
-          margin: 0 6px;
-          min-width: 60px;
-      }
-      
-      #page-menu-title {
-          font-size: 18px;
-          font-weight: bold;
-          margin: 0;
-      }
-      
-      #page-menu-close {
-          background: none;
-          border: none;
-          font-size: 24px;
-          cursor: pointer;
-          color: #666;
-          padding: 0;
-          width: 30px;
-          height: 30px;
-          line-height: 1;
-      }
-      
-      #page-menu-close:hover {
-          color: #000;
-      }
-      
-      #page-menu-list {
-          overflow-y: auto;
-          padding: 10px;
-      }
-      
-      .page-menu-item {
-          padding: 12px 20px;
-          cursor: pointer;
-          border-radius: 4px;
-          margin-bottom: 5px;
-          transition: background-color 0.2s;
-      }
-      
-      .page-menu-item:hover {
-          background-color: #f0f0f0;
-      }
-      
-      .page-menu-item.current {
-          background-color: #0078d7;
-          color: white;
-          font-weight: bold;
-      }
-      
       /* Board Navigation Overlay */
       #board-nav-overlay {
           position: fixed;
@@ -1278,25 +1185,6 @@
       </div>
     </div>
 
-
-    <!-- Page Selection Menu -->
-    <div id="page-menu-overlay">
-      <div id="page-menu-window">
-        <div id="page-menu-header">
-          <div id="page-menu-toolbar">
-            <button id="page-menu-move-up" class="tool-btn" title="Move current page up">▲</button>
-            <button id="page-menu-move-down" class="tool-btn" title="Move current page down">▼</button>
-            <span id="page-menu-current-label">Page 1</span>
-            <input type="number" id="page-menu-move-to" min="1" value="1" style="width:50px;padding:2px 4px;">
-            <button id="page-menu-move-btn" class="tool-btn" title="Move current page to position">Move</button>
-          </div>
-          <button id="page-menu-close">×</button>
-        </div>
-        <div id="page-menu-list">
-          <!-- Page list items will be dynamically generated -->
-        </div>
-      </div>
-    </div>
 
     <!-- Page Overview Mode -->
     <div id="page-overview">
@@ -2714,11 +2602,6 @@
               serverPageOrder = pages;
               totalPages = pages.length;
               pageNr = newPageNr + 1;
-          }
-          // Refresh the page menu if open
-          const menuOverlay = document.getElementById('page-menu-overlay');
-          if ( menuOverlay.style.display === 'block' ) {
-              rebuildPageMenu();
           }
           // If overview is active, refresh the grid
           refreshOverviewIfActive();
@@ -5407,14 +5290,6 @@
           document.getElementById('add-page').addEventListener('click', addNewPage);
           document.getElementById('delete-page').addEventListener('click', deletePage);
           
-          // Page menu controls
-          document.getElementById('page-menu-close').addEventListener('click', closePageMenu);
-          document.getElementById('page-menu-overlay').addEventListener('click', function(e) {
-              if (e.target === this) {
-                  closePageMenu();
-              }
-          });
-          
           // Zoom controls
           document.getElementById('zoom-in').addEventListener('click', () => adjustZoom(0.05));
           document.getElementById('zoom-out').addEventListener('click', () => adjustZoom(-0.05));
@@ -7851,88 +7726,6 @@
           }
       }
       
-      // Page Menu Functions
-      function openPageMenu() {
-          const overlay = document.getElementById('page-menu-overlay');
-          const menuWindow = document.getElementById('page-menu-window');
-          
-          // Get button position
-          const buttonRect = pageInfo.getBoundingClientRect();
-          
-          // Position menu below button
-          menuWindow.style.left = buttonRect.left + 'px';
-          menuWindow.style.top = (buttonRect.bottom + 5) + 'px';
-          
-          // Request latest board info before showing menu
-          requestBoardInfo();
-          
-          // Build the menu
-          rebuildPageMenu();
-          
-          overlay.style.display = 'block';
-      }
-      
-      function rebuildPageMenu() {
-          const menuList = document.getElementById('page-menu-list');
-          const moveUpBtn = document.getElementById('page-menu-move-up');
-          const moveDownBtn = document.getElementById('page-menu-move-down');
-          const currentLabel = document.getElementById('page-menu-current-label');
-          const moveToInput = document.getElementById('page-menu-move-to');
-          const moveBtn = document.getElementById('page-menu-move-btn');
-          
-          // Update toolbar
-          currentLabel.textContent = `Page ${pageNr}`;
-          moveToInput.value = pageNr;
-          moveToInput.max = totalPages;
-          
-          // Enable/disable move buttons based on position
-          moveUpBtn.disabled = pageNr <= 1;
-          moveDownBtn.disabled = pageNr >= totalPages;
-          
-          // Clear existing items
-          menuList.innerHTML = '';
-          
-          // Add overview item
-          const overviewItem = document.createElement('div');
-          overviewItem.className = 'page-menu-item';
-          overviewItem.textContent = '☐☐ Overview';
-          overviewItem.addEventListener('click', function() {
-              closePageMenu();
-              enterOverviewMode();
-          });
-          menuList.appendChild(overviewItem);
-          
-          // Separator
-          const sep = document.createElement('div');
-          sep.className = 'popup-separator';
-          menuList.appendChild(sep);
-          
-          // Generate page items
-          for (let i = 1; i <= totalPages; i++) {
-              const item = document.createElement('div');
-              item.className = 'page-menu-item';
-              if (i === pageNr) {
-                  item.classList.add('current');
-              }
-              item.textContent = `Go to page ${i}`;
-              item.dataset.page = i;
-              
-              item.addEventListener('click', function() {
-                  const targetPage = parseInt(this.dataset.page);
-                  const delta = targetPage - pageNr;
-                  navigatePage(delta);
-                  closePageMenu();
-              });
-              
-              menuList.appendChild(item);
-          }
-      }
-      
-      function closePageMenu() {
-          const overlay = document.getElementById('page-menu-overlay');
-          overlay.style.display = 'none';
-      }
-      
       // Module-scoped overview state
       let overviewThumbState = { w: 200, h: 150, viewportW: 0, viewportH: 0 };
 
@@ -8294,7 +8087,7 @@
           reindexThumbnails();
       }
       
-      // Wire up page menu toolbar events
+      // Wire up page overview toolbar events
       document.addEventListener('DOMContentLoaded', function() {
           // Wire up overview buttons
           document.getElementById('overview-confirm').addEventListener('click', () => exitOverviewMode(true));
@@ -8305,34 +8098,6 @@
           document.getElementById('overview-export-all').addEventListener('click', overviewExportAll);
           document.getElementById('overview-move-front').addEventListener('click', () => overviewMoveSelected(true));
           document.getElementById('overview-move-back').addEventListener('click', () => overviewMoveSelected(false));
-          
-          document.getElementById('page-menu-move-up').addEventListener('click', function() {
-              if (pageNr <= 1) return;
-              const idx = serverPageOrder.indexOf(currentPageUuid);
-              if (idx < 0) return;
-              const newOrder = [...serverPageOrder];
-              [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
-              sendShuffleProposal(newOrder);
-          });
-          
-          document.getElementById('page-menu-move-down').addEventListener('click', function() {
-              if (pageNr >= totalPages) return;
-              const idx = serverPageOrder.indexOf(currentPageUuid);
-              if (idx < 0) return;
-              const newOrder = [...serverPageOrder];
-              [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
-              sendShuffleProposal(newOrder);
-          });
-          
-          document.getElementById('page-menu-move-btn').addEventListener('click', function() {
-              const targetPos = parseInt(document.getElementById('page-menu-move-to').value);
-              if (isNaN(targetPos) || targetPos < 1 || targetPos > totalPages) return;
-              const idx = serverPageOrder.indexOf(currentPageUuid);
-              if (idx < 0) return;
-              const newOrder = serverPageOrder.filter(id => id !== currentPageUuid);
-              newOrder.splice(targetPos - 1, 0, currentPageUuid);
-              sendShuffleProposal(newOrder);
-          });
       });
       
       // Board Navigation Functions
