@@ -1681,8 +1681,11 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         ws.send(JSON.stringify(acceptMessage));
         logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
         
+        // Start just before the latest change: a new or redone action is the first of
+        // the sequence, an undone one stays in it as part of the redo tail. Starting
+        // earlier would send every new stroke a second time with the next one.
         const replayActions = [];
-        const past = Math.max( 0, pagePresent - 2 );
+        const past = Math.max( 0, pagePresent - 1 );
         for (let time = past; time < page.history.length; ++time) {
             replayActions.push(page.history[time]);
         }
