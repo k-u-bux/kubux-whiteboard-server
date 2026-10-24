@@ -2809,6 +2809,9 @@
               // Return to that page. The server resolves a page deleted meanwhile to
               // its replacement (or the first page) and answers with page-registered.
               registerPage( previousPage, 0 );
+          } else if (window.savedPagePosition) {
+              // First load: reopen the board at the page this browser showed last
+              registerPage( window.savedPagePosition.uuid, 0 );
           } else {
               joinPage( firstPageId, 1, numPages );
               // The server will send a full page message next, so we do not need
@@ -2888,6 +2891,7 @@
           totalPages = total;
           pagesMetaData[ currentPageUuid ] = [ pageNr, totalPages ];
           updatePageInfo();
+          saveSettings(); // remembers the page for the next load
 
           // Check if we have this page cached (but only if not already in verification cycle)
           // const cachedPage = !cacheVerificationInProgress ? loadPageFromCache(pageUuid) : null;
@@ -3422,7 +3426,6 @@
       
       // Track if we are in a cache verification cycle to avoid infinite loops
       // let cacheVerificationInProgress = false;
-      let hasRestoredSavedPosition = false; // Track if we have restored saved page position
       
       // Handle full page message from server
       function handleFullPageMessage(data) {
@@ -3462,17 +3465,6 @@
                    updatePageInfo();
                    updateSyncStatus();
                    updateUndoRedoButtons();
-                  
-                  // After loading initial page, check if we should restore saved position
-                  if (!hasRestoredSavedPosition && window.savedPagePosition) {
-                      hasRestoredSavedPosition = true;
-                      
-                      // If the saved page is different from current, navigate to it
-                      if (window.savedPagePosition.uuid !== currentPageUuid) {
-                          debugLog('Restoring saved page position', window.savedPagePosition);
-                          requestFullPage(window.savedPagePosition.uuid, true);
-                      }
-                  }
                   
                   // Save current page position to settings
                   saveSettings();
