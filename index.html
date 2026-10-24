@@ -2435,8 +2435,9 @@
       // Pending request dispatch system -- replaces fragile ws.onmessage hijacking
       const pendingRequests = new Map();
       const REQUEST_TIMEOUT = 5000;
+      const FULL_PAGE_TIMEOUT = 60000; // a whole large page can take far longer than a replay
 
-      function sendWithCallback(request) {
+      function sendWithCallback(request, timeout = REQUEST_TIMEOUT) {
           const requestId = request[shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REQUEST_ID]
                         || request[shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REQUEST_ID]
                         || request[shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID]
@@ -2445,7 +2446,7 @@
               const timer = setTimeout(() => {
                   pendingRequests.delete(requestId);
                   reject(new Error(`Request ${requestId} timed out`));
-              }, REQUEST_TIMEOUT);
+              }, timeout);
               pendingRequests.set(requestId, { resolve, reject, timer });
               ws.send(shared.serialize(request));
           });
@@ -7573,9 +7574,54 @@
           }
       }
 
+      // Fetch a page's complete history, for when its cached copy cannot be
+      // brought up to date by a replay. Throws with a readable reason on failure.
+      async function fetchFullPageForExport(pageUuid) {
+          const reply = await sendWithCallback({
+              type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE,
+              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE]: pageUuid,
+              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA]: 0,
+              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER]: false,
+              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REQUEST_ID]: createRequestId()
+          }, FULL_PAGE_TIMEOUT);
+          if (reply.type === shared.MESSAGES.SERVER_TO_CLIENT.PAGE_LOST.TYPE) {
+              throw new Error('the page was deleted');
+          }
+          if (reply.type !== shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.TYPE) {
+              throw new Error(`unexpected reply '${reply.type}'`);
+          }
+          const pageData = {
+              history: reply[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY],
+              present: reply[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.PRESENT],
+              hash: reply[shared.MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HASH]
+          };
+          savePageToCache(pageUuid, pageData);
+          return pageData;
+      }
+
+      // Stand-in for a page that could not be loaded: it keeps the PDF's page
+      // numbering in step with the export and says what is missing and why.
+      function addMissingPagePlaceholder(builder, position, total, reason) {
+          const pageW = canvasFormat ? canvasFormat.w : canvas.width;
+          const pageH = canvasFormat ? canvasFormat.h : canvas.height;
+          const ctx = builder.new_page(pageW, pageH);
+          const margin = Math.min(pageW, pageH) / 20;
+          const size = Math.max(12, Math.min(pageW, pageH) / 30);
+          ctx.strokeStyle = 'rgb(160, 160, 160)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([12, 8]);
+          ctx.strokeRect(margin, margin, pageW - 2 * margin, pageH - 2 * margin);
+          ctx.fillStyle = 'rgb(160, 0, 0)';
+          ctx.fillText(`Page ${position} of ${total} could not be loaded.`, 2 * margin, 2 * margin + size, size);
+          ctx.fillStyle = 'rgb(80, 80, 80)';
+          ctx.fillText(`Reason: ${reason}`, 2 * margin, 2 * margin + 2.5 * size, 0.7 * size);
+      }
+
       async function exportPagesToPDF(pageUuids, filename) {
           try {
               const builder = shared.PDFBuilder();
+              const skipped = []; // "position (reason)" of each page left out
               const startPageNr = pageNr;
 
               for (let idx = 0; idx < pageUuids.length; idx++) {
@@ -7603,9 +7649,11 @@
                       debugLog('Got page info: ', pageInfo);
                   } catch (err) {
                       console.warn(`Skipping page ${pageUuid}: ${err.message}`);
+                      skipped.push(`${idx + 1} (${err.message})`);
+                      addMissingPagePlaceholder(builder, idx + 1, pageUuids.length, err.message);
                       continue;
                   }
-                  
+
                   if (!pageInfo) continue;
                  
                   const actualPageUuid = pageInfo['pageId'];
@@ -7662,14 +7710,22 @@
                           });
                           pageData = handleReplayMessage( pageData, true );
                       } catch (err) {
-                          console.warn(`Skipping replay for page ${pageUuid}: ${err.message}`);
-                          continue;
+                          console.warn(`Replay for page ${pageUuid} failed: ${err.message}`);
+                          pageData = null;
                       }
                   }
-                  
+
+                  // The cached copy could not be brought up to date: fetch the whole page instead
                   if ( !pageData ) {
-                      console.warn(`Skipping page ${pageUuid}: replay returned no data (hash chain mismatch)`);
-                      continue;
+                      debugLog(`Replay for page ${pageUuid} gave no data, fetching the full page`);
+                      try {
+                          pageData = await fetchFullPageForExport( pageUuid );
+                      } catch (err) {
+                          console.warn(`Skipping page ${pageUuid}: ${err.message}`);
+                          skipped.push(`${idx + 1} (${err.message})`);
+                          addMissingPagePlaceholder(builder, idx + 1, pageUuids.length, err.message);
+                          continue;
+                      }
                   }
                   
                   // Use format dimensions if set, else canvas size
@@ -7705,9 +7761,16 @@
                   }
               }
 
+               if (skipped.length === pageUuids.length) {
+                   showError(`PDF export failed, no page could be loaded: ${skipped.join(', ')}`);
+                   return;
+               }
                builder.download_in_browser(filename);
                hideError();
-               
+               if (skipped.length > 0) {
+                   showError(`PDF exported without page(s) ${skipped.join(', ')}`);
+               }
+
            } catch (err) {
                hideError();
                showError(`PDF export failed: ${err.message}`);

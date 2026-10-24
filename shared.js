@@ -1320,6 +1320,19 @@ function PDFContext2D(pageContent, pageHeight, builder) {
             }
         },
 
+        // --- Text ---
+        // One line in Helvetica (font /F1 of PDFBuilder), filled with fillStyle;
+        // (x, y) is the left end of the baseline. Unlike canvas, the size is an
+        // argument, as there is no font property. Helvetica is one of the standard
+        // fonts every PDF viewer has, so nothing is embedded. It covers WinAnsi
+        // only: other characters become '?'.
+        fillText(text, x, y, size = 12) {
+            const escaped = String(text)
+                .replace(/[^\x20-\x7e\xa0-\xff]/g, '?')
+                .replace(/[\\()]/g, (c) => '\\' + c);
+            addCommand(`BT /F1 ${num(size)} Tf ${num(x)} ${num(invertY(y))} Td (${escaped}) Tj ET`);
+        },
+
         // --- Path Construction / clipping ---
         rect(x, y, w, h) {
             addCommand(`${num(x)} ${num(invertY(y + h))} ${num(w)} ${num(h)} re`);
@@ -1552,7 +1565,13 @@ function PDFBuilder() {
         // --- 1. Content Streams (compressed) ---
         for (const page of pages) {
             const contentStream = page.commands.join('\n');
-            const bytes = zlibDeflate(new TextEncoder().encode(contentStream));
+            // Content streams are bytes. Every character in them is below 256 (fillText
+            // maps all others to '?') and stands for one byte, as the WinAnsi font expects.
+            const raw = new Uint8Array(contentStream.length);
+            for (let i = 0; i < contentStream.length; i++) {
+                raw[i] = contentStream.charCodeAt(i);
+            }
+            const bytes = zlibDeflate(raw);
 
             // Convert binary data to Latin-1 string for PDF
             let binaryString = '';
@@ -1578,7 +1597,9 @@ function PDFBuilder() {
         extGStateObjects.forEach(res => {
             extGStateDict += `  ${res.resourceID} ${res.objID} 0 R\n`;
         });
-        const resourcesDict = `<< /ExtGState <<\n${extGStateDict}>>\n>>`;
+        // fillText's font, as its own object: some tools mishandle inline font dictionaries
+        const fontObjID = addObject(`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`);
+        const resourcesDict = `<< /ExtGState <<\n${extGStateDict}>>\n/Font << /F1 ${fontObjID} 0 R >>\n>>`;
         const resourceObjID = addObject(resourcesDict);
 
         // --- 4. Page Dictionaries ---
