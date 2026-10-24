@@ -4843,80 +4843,6 @@
           requestRedraw();
       }
 
-      function pasteElements(x, y) {
-          if (!clipboard.elements.length) return;
-          
-          // Calculate offset to paste at cursor position
-          const offsetX = x - (clipboard.bounds.x + clipboard.bounds.width/2);
-          const offsetY = y - (clipboard.bounds.y + clipboard.bounds.height/2);
-          
-          const actions = clipboard.elements.map(element => {
-              const newElement = JSON.parse(JSON.stringify(element));
-              const newUuid = shared.generateUuid();
-              
-              // Apply offset to points
-              newElement[shared.ELEMENT.POINTS] = element[shared.ELEMENT.POINTS].map(point => {
-                  return [
-                      point[0] + offsetX,
-                      point[1] + offsetY,
-                      point[2]
-                  ];
-              });
-              
-              // Set layer to current active layer
-              newElement[shared.ELEMENT.LAYER] = Number(activeLayer);
-              
-              // Create a draw action
-              return {
-                  type: shared.MOD_ACTIONS.DRAW.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: newUuid,
-                  [shared.MOD_ACTIONS.DRAW.STROKE]: newElement
-              };
-          });
-          
-          // Group all paste actions
-          const groupUuid = shared.generateUuid();
-          const groupAction = {
-              type: shared.MOD_ACTIONS.GROUP.TYPE,
-              [shared.MOD_ACTIONS.UUID]: groupUuid,
-              [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
-          };
-          
-          // If we are in the middle of history (after undoing), truncate future actions
-          if (present < history.length) {
-              history = history.slice(0, present);
-              hashes = hashes.slice(0, present + 1);
-          }
-          
-          // Add to history and advance present
-          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
-          history.push(groupAction);
-          present++;
-          
-          // Calculate placeholder hash
-          const placeholderHash = shared.generateUuid();
-          hashes.push(placeholderHash);
-          
-          // Create proposal
-          const proposal = {
-              type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
-          };
-          
-          // Update visual state and UI
-          updateVisualState();
-          updateUndoRedoButtons();
-          updateSyncStatus();
-          
-          // Send to server
-          pending_register_action( groupUuid );
-          sendMessage(proposal);
-      }
-
       function showMoveToLayerDialog() {
           // Simple implementation - directly move to active layer
           moveSelectedElementsToLayer(activeLayer);
@@ -4968,20 +4894,7 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
           
-          // If we are in the middle of history (after undoing), truncate future actions
-          if (present < history.length) {
-              history = history.slice(0, present);
-              hashes = hashes.slice(0, present + 1);
-          }
-          
-          // Add to history and advance present
-          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
-          history.push(groupAction);
-          present++;
-          
-          // Calculate placeholder hash
-          const placeholderHash = shared.generateUuid();
-          hashes.push(placeholderHash);
+          applyActionOptimistically(groupAction);
           
           // Create proposal
           const proposal = {
@@ -5095,16 +5008,7 @@
               [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
           };
 
-          if (present < history.length) {
-              history = history.slice(0, present);
-              hashes = hashes.slice(0, present + 1);
-          }
-
-          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
-          history.push(groupAction);
-          present++;
-          const placeholderHash = shared.generateUuid();
-          hashes.push(placeholderHash);
+          applyActionOptimistically(groupAction);
 
           const proposal = {
               type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
@@ -5126,79 +5030,6 @@
           updateSyncStatus();
 
           pending_register_action(groupUuid);
-          sendMessage(proposal);
-          requestRedraw();
-      }
-
-      // Modify selected elements — LEGACY: kept for moveToLayer etc. that still needs immediate commit.
-      function modifySelectedElements(overrides) {
-          if (selectedElements.length === 0) return;
-
-          const newUuids = [];
-          const actions = selectedElements.map(uuid => {
-              const element = visualState.element.get(uuid);
-              if (!element) return null;
-
-              // Deep-clone and apply overrides
-              const newElement = JSON.parse(JSON.stringify(element));
-              if (overrides.color !== undefined) newElement[shared.ELEMENT.COLOR] = overrides.color;
-              if (overrides.width !== undefined) newElement[shared.ELEMENT.WIDTH] = overrides.width;
-              if (overrides.dash_pattern !== undefined) newElement[shared.ELEMENT.DASH_PATTERN] = overrides.dash_pattern;
-              if (overrides.opacity !== undefined) newElement[shared.ELEMENT.OPACITY] = overrides.opacity;
-
-              const eraseAction = createEraseAction(uuid);
-              const drawUuid = shared.generateUuid();
-              newUuids.push(drawUuid);
-              const drawAction = {
-                  type: shared.MOD_ACTIONS.DRAW.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: drawUuid,
-                  [shared.MOD_ACTIONS.DRAW.STROKE]: newElement
-              };
-
-              const modifyUuid = shared.generateUuid();
-              return {
-                  type: shared.MOD_ACTIONS.GROUP.TYPE,
-                  [shared.MOD_ACTIONS.UUID]: modifyUuid,
-                  [shared.MOD_ACTIONS.GROUP.ACTIONS]: [eraseAction, drawAction]
-              };
-          }).filter(action => action !== null);
-
-          if (actions.length === 0) return;
-
-          const groupUuid = shared.generateUuid();
-          const groupAction = {
-              type: shared.MOD_ACTIONS.GROUP.TYPE,
-              [shared.MOD_ACTIONS.UUID]: groupUuid,
-              [shared.MOD_ACTIONS.GROUP.ACTIONS]: actions
-          };
-
-          if (present < history.length) {
-              history = history.slice(0, present);
-              hashes = hashes.slice(0, present + 1);
-          }
-
-          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
-          history.push(groupAction);
-          present++;
-          const placeholderHash = shared.generateUuid();
-          hashes.push(placeholderHash);
-
-          const proposal = {
-              type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: currentPageUuid,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: groupAction,
-              [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: hashes[present - 1]
-          };
-
-          // updateVisualState clears selection, so we re-set after
-          updateVisualState();
-          selectedElements = newUuids;
-          updateUndoRedoButtons();
-          updateSyncStatus();
-
-          pending_register_action( groupUuid );
           sendMessage(proposal);
           requestRedraw();
       }
