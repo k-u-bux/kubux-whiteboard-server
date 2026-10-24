@@ -2385,7 +2385,7 @@
           const seconds = (delay / 1000).toFixed(1);
           
           debugLog(`Scheduling reconnection attempt ${reconnectAttempts + 1} in ${seconds}s`);
-          showError(`Connection lost. Reconnecting in ${seconds}s... (Attempt ${reconnectAttempts + 1})`);
+          showError(`Connection lost. Reconnecting in ${seconds}s... (Attempt ${reconnectAttempts + 1})` + waitingEditsNote());
           
           reconnectTimer = setTimeout(() => {
               reconnectAttempts++;
@@ -2485,6 +2485,7 @@
               debugLog('Disconnected from server');
               connectionEstablished = false;
               cleanupPendingRequests();
+              updateUndoRedoButtons();
               
               // Schedule automatic reconnection with exponential backoff
               scheduleReconnect();
@@ -2768,6 +2769,10 @@
           
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID];
           
+          // On a reconnect: the edits the server has not confirmed, before the reset drops them
+          const unconfirmedPage = currentPageUuid;
+          const unconfirmedEdits = history.slice(Math.min(verifiedIndex, present), present);
+          
           // Reset local state
           history = [];
           present = 0;
@@ -2797,6 +2802,54 @@
           joinPage( firstPageId, 1, numPages );
           // The server will send a full page message next, so we do not need
           // to request one explicitly
+          if (unconfirmedEdits.length > 0) {
+              resendUnconfirmedEdits(unconfirmedPage, unconfirmedEdits);
+          }
+      }
+
+      // Edits made while offline (or sent just before the connection dropped) are
+      // the unconfirmed tail of the local history. Propose them again on top of
+      // the server's current page; the server applies draw/erase/group actions to
+      // whatever state it has, so they need no rebasing. Edits the server already
+      // has are skipped; one whose target is gone by now is declined as usual.
+      async function resendUnconfirmedEdits(pageUuid, edits) {
+          let serverPage;
+          try {
+              serverPage = await fetchFullPage(pageUuid);
+          } catch (err) {
+              showError(`${edits.length} offline edit(s) could not be sent: ${err.message}`);
+              return;
+          }
+          const known = new Set(serverPage.history.map(action => action[shared.MOD_ACTIONS.UUID]));
+          let beforeHash = serverPage.hash;
+          for (const action of edits) {
+              if (known.has(action[shared.MOD_ACTIONS.UUID])) continue;
+              const proposal = {
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PASSWORD]: passwd,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD]: boardId,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAGE]: pageUuid,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.PAYLOAD]: action,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BEFORE_HASH]: beforeHash
+              };
+              pending_register_action( action[shared.MOD_ACTIONS.UUID] );
+              sendMessage(proposal);
+              beforeHash = shared.hashNext(beforeHash, action);
+          }
+      }
+
+      // While offline: how many edits wait in the unconfirmed tail of the history
+      function waitingEditsNote() {
+          const waiting = present - Math.min(verifiedIndex, present);
+          return waiting > 0 ? ` ${waiting} edit${waiting === 1 ? '' : 's'} waiting to be sent.` : '';
+      }
+
+      // Page actions need the server, and leaving the page would strand its
+      // unconfirmed edits, so they are refused while offline.
+      function refusedWhileOffline() {
+          if (connectionEstablished) return false;
+          showError('Not connected to server: page actions are unavailable.' + waitingEditsNote());
+          return true;
       }
 
       
@@ -3492,7 +3545,7 @@
       // Send a message to the server
       function sendMessage(message) {
           if (!connectionEstablished) {
-              showError('Not connected to server');
+              showError('Not connected to server.' + waitingEditsNote());
               return false;
           }
           
@@ -4560,6 +4613,9 @@
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
           }
+          // The new action is unconfirmed: the confirmed prefix ends at present at most
+          // (an accepted redo can leave verifiedIndex past the history until the next ping)
+          verifiedIndex = Math.min(verifiedIndex, present);
           // Add to history and advance present
           history.push( action );
           // Calculate placeholder hash
@@ -4802,6 +4858,7 @@
           }
           
           // Add to history and advance present
+          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
           history.push(groupAction);
           present++;
           
@@ -4887,6 +4944,7 @@
           }
           
           // Add to history and advance present
+          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
           history.push(groupAction);
           present++;
           
@@ -5011,6 +5069,7 @@
               hashes = hashes.slice(0, present + 1);
           }
 
+          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
           history.push(groupAction);
           present++;
           const placeholderHash = shared.generateUuid();
@@ -5087,6 +5146,7 @@
               hashes = hashes.slice(0, present + 1);
           }
 
+          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
           history.push(groupAction);
           present++;
           const placeholderHash = shared.generateUuid();
@@ -5411,18 +5471,24 @@
           }
       }
       
+      // Offline, undo and redo stay within the edits the server has not confirmed:
+      // the server can only undo or redo at the top of its own history.
+      function undoFloor() {
+          return connectionEstablished ? 0 : verifiedIndex;
+      }
+      
       // Update undo/redo button states
       function updateUndoRedoButtons() {
           // Undo is available if we have actions in history before our present position
-          undoBtn.disabled = present === 0;
+          undoBtn.disabled = present <= undoFloor();
           
           // Redo is available if we have actions in history after our present position
-          redoBtn.disabled = present >= history.length;
+          redoBtn.disabled = present >= history.length || present < undoFloor();
       }
       
       // Handle undo action
       function handleUndo() {
-          if (present === 0) return;
+          if (present <= undoFloor()) return;
           
           const actionToUndo = history[present - 1];
           const undoUuid = shared.generateUuid();
@@ -5457,7 +5523,7 @@
       
       // Handle redo action
       function handleRedo() {
-          if (present >= history.length) return;
+          if (present >= history.length || present < undoFloor()) return;
           
           const actionToRedo = history[present];
           const redoUuid = shared.generateUuid();
@@ -6655,6 +6721,7 @@
           }
           
           // Add to history and advance present
+          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
           history.push(drawAction);
           present++;
           
@@ -6718,6 +6785,7 @@
           }
           
           // Add to history and advance present
+          verifiedIndex = Math.min(verifiedIndex, present); // see applyActionOptimistically
           history.push(groupAction);
           present++;
           
@@ -6764,6 +6832,7 @@
       }
 
       function addNewPage() {
+          if (refusedWhileOffline()) return;
           insertPageAfter(passwd, boardId, currentPageUuid);
       }
   
@@ -6788,6 +6857,7 @@
      
       // Delete current page
       function deletePage() {    
+          if (refusedWhileOffline()) return;
           const confirmation = window.confirm(
               'Are you sure you want to permanently delete the current page? This action cannot be undone.'
           );
@@ -6840,6 +6910,7 @@
 
       // Navigate to next/previous page
       function navigatePage(delta) {
+          if (refusedWhileOffline()) return;
           // Save current page to cache before navigating
           savePageToCache(currentPageUuid, {
               history: history,
@@ -6852,6 +6923,7 @@
       }
       
       function navigatePageUuid(pageId) {
+          if (refusedWhileOffline()) return;
           savePageToCache(currentPageUuid, {
               history: history,
               present: present,
@@ -7443,7 +7515,7 @@
 
       // Fetch a page's complete history, for when its cached copy cannot be
       // brought up to date by a replay. Throws with a readable reason on failure.
-      async function fetchFullPageForExport(pageUuid) {
+      async function fetchFullPage(pageUuid) {
           const reply = await sendWithCallback({
               type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE,
               [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD]: boardId,
@@ -7586,7 +7658,7 @@
                   if ( !pageData ) {
                       debugLog(`Replay for page ${pageUuid} gave no data, fetching the full page`);
                       try {
-                          pageData = await fetchFullPageForExport( pageUuid );
+                          pageData = await fetchFullPage( pageUuid );
                       } catch (err) {
                           console.warn(`Skipping page ${pageUuid}: ${err.message}`);
                           skipped.push(`${idx + 1} (${err.message})`);
@@ -7855,6 +7927,7 @@
 
       // Page Overview Mode
       function enterOverviewMode() {
+          if (refusedWhileOffline()) return;
           commitCurrentPage();
           const overview = document.getElementById('page-overview');
           const grid = document.getElementById('overview-grid');
