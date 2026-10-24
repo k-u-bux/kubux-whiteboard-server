@@ -1202,8 +1202,15 @@ function PDFContext2D(pageContent, pageHeight, builder) {
     const addPathCommand = (cmd) => internalState.path.push(cmd);
     const invertY = (y) => internalState.height - y;
 
+    // Coordinates and lengths are in points (1/72 inch): 0.01 pt is invisible and
+    // the short form roughly halves the content stream. Matrix factors scale
+    // everything after them, so they keep 6 decimals. Fixed decimals also avoid
+    // exponent notation (1e-7), which PDF does not understand.
+    const num = (v) => +(+v).toFixed(2);
+    const factor = (v) => +(+v).toFixed(6);
+
     // Initial commands to set defaults in the PDF content stream
-    addCommand(`${internalState._lineWidth} w`);
+    addCommand(`${num(internalState._lineWidth)} w`);
     addCommand(`[] 0 d`);
 
     const context = {
@@ -1222,7 +1229,7 @@ function PDFContext2D(pageContent, pageHeight, builder) {
 
         set lineWidth(value) {
             internalState._lineWidth = value;
-            addCommand(`${value} w`);
+            addCommand(`${num(value)} w`);
         },
         get lineWidth() { return internalState._lineWidth; },
         
@@ -1241,7 +1248,7 @@ function PDFContext2D(pageContent, pageHeight, builder) {
         },
         
         set miterLimit(value) {
-            addCommand(`${value} M`);
+            addCommand(`${num(value)} M`);
         },
         
         set globalAlpha(value) {
@@ -1277,20 +1284,20 @@ function PDFContext2D(pageContent, pageHeight, builder) {
                 // Re-emit commands for properties that might have been changed/restored
                 addCommand(toPDFColor(internalState._fillStyle, false));
                 addCommand(toPDFColor(internalState._strokeStyle, true));
-                addCommand(`${internalState._lineWidth} w`);
+                addCommand(`${num(internalState._lineWidth)} w`);
                 
                 const resourceID = builder.getAlphaResourceID(internalState._globalAlpha);
                 addCommand(`${resourceID} gs`);
 
-                const pattern = internalState.lineDash.join(' ');
+                const pattern = internalState.lineDash.map(num).join(' ');
                 addCommand(`[${pattern}] 0 d`);
             }
         },
 
         // --- Path Commands ---
         beginPath() { internalState.path = []; },
-        moveTo(x, y) { addPathCommand(`${x} ${invertY(y)} m`); },
-        lineTo(x, y) { addPathCommand(`${x} ${invertY(y)} l`); },
+        moveTo(x, y) { addPathCommand(`${num(x)} ${num(invertY(y))} m`); },
+        lineTo(x, y) { addPathCommand(`${num(x)} ${num(invertY(y))} l`); },
         closePath() { addPathCommand('h'); },
         arc(x, y, radius, startAngle, endAngle, counterclockwise = false) {
             // Fails hard if unimplemented
@@ -1315,7 +1322,7 @@ function PDFContext2D(pageContent, pageHeight, builder) {
 
         // --- Path Construction / clipping ---
         rect(x, y, w, h) {
-            addCommand(`${x} ${invertY(y + h)} ${w} ${h} re`);
+            addCommand(`${num(x)} ${num(invertY(y + h))} ${num(w)} ${num(h)} re`);
         },
         clip() {
             addCommand('W n');
@@ -1324,11 +1331,11 @@ function PDFContext2D(pageContent, pageHeight, builder) {
         // --- Shape Shortcuts ---
         fillRect(x, y, w, h) {
             // PDF's 're' operator uses bottom-left as origin
-            addCommand(`${x} ${invertY(y + h)} ${w} ${h} re`);
+            addCommand(`${num(x)} ${num(invertY(y + h))} ${num(w)} ${num(h)} re`);
             addCommand('f');
         },
         strokeRect(x, y, w, h) {
-            addCommand(`${x} ${invertY(y + h)} ${w} ${h} re`);
+            addCommand(`${num(x)} ${num(invertY(y + h))} ${num(w)} ${num(h)} re`);
             addCommand('S');
         },
         clearRect(x, y, w, h) {
@@ -1342,18 +1349,18 @@ function PDFContext2D(pageContent, pageHeight, builder) {
         // --- Transforms ---
         translate(x, y) {
             // The negative Y compensates for the initial CTM inversion
-            addCommand(`1 0 0 1 ${x} ${-y} cm`);
+            addCommand(`1 0 0 1 ${num(x)} ${num(-y)} cm`);
         },
         transform(a, b, c, d, e, f) {
             // Multiply current matrix by the transformation matrix
             // addCommand(`${a} ${-b} ${-c} ${d} ${e} ${-f} cm`);
-            addCommand(`${a} ${-b} ${-c} ${d} ${e + c*internalState.height} ${internalState.height*(1-d) - f} cm`);
+            addCommand(`${factor(a)} ${factor(-b)} ${factor(-c)} ${factor(d)} ${num(e + c*internalState.height)} ${num(internalState.height*(1-d) - f)} cm`);
         },
 
         // --- Line Style ---
         setLineDash(segments) {
             internalState.lineDash = segments;
-            const pattern = segments.join(' ');
+            const pattern = segments.map(num).join(' ');
             addCommand(`[${pattern}] 0 d`);
         }
     };
@@ -1367,20 +1374,129 @@ function PDFContext2D(pageContent, pageHeight, builder) {
 // --------------------------------------------------------
 
 // Node.js conditional imports
-let fs, zlib;
+let fs;
 if (typeof process !== 'undefined' && process.versions && process.versions.node) {
     try {
         fs = require('fs');
-        zlib = require('zlib');
     } catch (e) {
         // This is fine if the user runs the file in the browser (where 'require' is not defined)
         // or if running in a restrictive sandbox.
     }
 }
 
-// Check for pako library in browser (for compression)
-function hasPako() {
-    return typeof window !== 'undefined' && typeof window.pako !== 'undefined';
+// Minimal zlib encoder for FlateDecode streams
+// --------------------------------------------
+// A single final deflate block with the fixed Huffman code (RFC 1951, 3.2.6),
+// greedy LZ77 matching through hash chains over the 32 KiB window, framed as a
+// zlib stream (RFC 1950: 2-byte header, Adler-32 trailer). Only the encoder is
+// needed: decoding is the PDF viewer's job.
+
+const DEFLATE_LENGTH_BASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+const DEFLATE_LENGTH_EXTRA = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+const DEFLATE_DIST_BASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+const DEFLATE_DIST_EXTRA = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+
+/**
+ * @param {Uint8Array} data - The bytes to compress.
+ * @returns {Uint8Array} A zlib stream (what PDF's /FlateDecode expects).
+ */
+function zlibDeflate(data) {
+    const out = [0x78, 0x01]; // zlib header: deflate, 32 KiB window, no dictionary
+
+    // deflate fills each byte starting at its least significant bit
+    let bitBuffer = 0;
+    let bitCount = 0;
+    const putBits = (value, count) => {
+        bitBuffer |= value << bitCount;
+        bitCount += count;
+        while (bitCount >= 8) {
+            out.push(bitBuffer & 0xff);
+            bitBuffer >>>= 8;
+            bitCount -= 8;
+        }
+    };
+    // Huffman codes are sent most significant bit first
+    const putCode = (code, length) => {
+        let reversed = 0;
+        for (let i = 0; i < length; i++) {
+            reversed = (reversed << 1) | ((code >>> i) & 1);
+        }
+        putBits(reversed, length);
+    };
+    // the fixed literal/length code
+    const putSymbol = (symbol) => {
+        if (symbol < 144)      { putCode(0x30 + symbol, 8); }
+        else if (symbol < 256) { putCode(0x190 + symbol - 144, 9); }
+        else if (symbol < 280) { putCode(symbol - 256, 7); }
+        else                   { putCode(0xc0 + symbol - 280, 8); }
+    };
+    const putMatch = (length, distance) => {
+        let i = DEFLATE_LENGTH_BASE.length - 1;
+        while (DEFLATE_LENGTH_BASE[i] > length) { i--; }
+        putSymbol(257 + i);
+        putBits(length - DEFLATE_LENGTH_BASE[i], DEFLATE_LENGTH_EXTRA[i]);
+        let j = DEFLATE_DIST_BASE.length - 1;
+        while (DEFLATE_DIST_BASE[j] > distance) { j--; }
+        putCode(j, 5); // fixed distance codes are plain 5-bit numbers
+        putBits(distance - DEFLATE_DIST_BASE[j], DEFLATE_DIST_EXTRA[j]);
+    };
+
+    putBits(1, 1); // BFINAL: this is the only block
+    putBits(1, 2); // BTYPE 01: fixed Huffman code
+
+    // head[hash] is the latest position with that hash, prev[] chains to older ones
+    const WINDOW = 32768, MIN_MATCH = 3, MAX_MATCH = 258, MAX_CHAIN = 64, HASH_SIZE = 1 << 15;
+    const head = new Int32Array(HASH_SIZE).fill(-1);
+    const prev = new Int32Array(WINDOW).fill(-1);
+    const hashAt = (p) => ((data[p] << 10) ^ (data[p + 1] << 5) ^ data[p + 2]) & (HASH_SIZE - 1);
+    const insert = (p) => {
+        if (p + MIN_MATCH <= data.length) {
+            const h = hashAt(p);
+            prev[p & (WINDOW - 1)] = head[h];
+            head[h] = p;
+        }
+    };
+
+    let pos = 0;
+    while (pos < data.length) {
+        let bestLength = 0;
+        let bestDistance = 0;
+        if (pos + MIN_MATCH <= data.length) {
+            const limit = Math.min(MAX_MATCH, data.length - pos);
+            let candidate = head[hashAt(pos)];
+            // every candidate lies before pos; a recycled prev slot can only waste a step
+            for (let chain = MAX_CHAIN; candidate >= 0 && pos - candidate <= WINDOW && chain > 0; chain--) {
+                let length = 0;
+                while (length < limit && data[candidate + length] === data[pos + length]) { length++; }
+                if (length > bestLength) {
+                    bestLength = length;
+                    bestDistance = pos - candidate;
+                    if (length === limit) { break; }
+                }
+                candidate = prev[candidate & (WINDOW - 1)];
+            }
+        }
+        if (bestLength >= MIN_MATCH) {
+            putMatch(bestLength, bestDistance);
+            for (const end = pos + bestLength; pos < end; pos++) { insert(pos); }
+        } else {
+            putSymbol(data[pos]);
+            insert(pos);
+            pos++;
+        }
+    }
+    putSymbol(256); // end of block
+    if (bitCount > 0) { out.push(bitBuffer & 0xff); }
+
+    // Adler-32 of the uncompressed data, most significant byte first
+    let a = 1;
+    let b = 0;
+    for (let i = 0; i < data.length; i++) {
+        a = (a + data[i]) % 65521;
+        b = (b + a) % 65521;
+    }
+    out.push(b >>> 8, b & 0xff, a >>> 8, a & 0xff);
+    return Uint8Array.from(out);
 }
 
 function PDFBuilder() {
@@ -1433,50 +1549,18 @@ function PDFBuilder() {
         const contentStreamIDs = [];
         const pageObjIDs = [];
 
-        // --- 1. Content Streams (with optional compression) ---
+        // --- 1. Content Streams (compressed) ---
         for (const page of pages) {
             const contentStream = page.commands.join('\n');
-            
-            // Try to compress the content stream
-            let compressedData = null;
-            let useCompression = false;
-            
-            // Node.js environment (use zlib)
-            if (typeof zlib !== 'undefined') {
-                try {
-                    compressedData = zlib.deflateSync(Buffer.from(contentStream, 'utf8'));
-                    useCompression = true;
-                } catch (e) {
-                    console.warn('Compression failed (Node.js), using uncompressed stream:', e.message);
-                }
+            const bytes = zlibDeflate(new TextEncoder().encode(contentStream));
+
+            // Convert binary data to Latin-1 string for PDF
+            let binaryString = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binaryString += String.fromCharCode(bytes[i]);
             }
-            // Browser environment (use pako if available)
-            else if (hasPako()) {
-                try {
-                    const textEncoder = new TextEncoder();
-                    const uint8Array = textEncoder.encode(contentStream);
-                    compressedData = window.pako.deflate(uint8Array);
-                    useCompression = true;
-                } catch (e) {
-                    console.warn('Compression failed (browser), using uncompressed stream:', e.message);
-                }
-            }
-            
-            let streamContent;
-            if (useCompression && compressedData) {
-                // Convert binary data to Latin-1 string for PDF
-                let binaryString = '';
-                const bytes = new Uint8Array(compressedData);
-                for (let i = 0; i < bytes.length; i++) {
-                    binaryString += String.fromCharCode(bytes[i]);
-                }
-                
-                streamContent = `<< /Length ${binaryString.length} /Filter /FlateDecode >>\nstream\n${binaryString}\nendstream`;
-            } else {
-                // Uncompressed fallback
-                streamContent = `<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream`;
-            }
-            
+
+            const streamContent = `<< /Length ${binaryString.length} /Filter /FlateDecode >>\nstream\n${binaryString}\nendstream`;
             contentStreamIDs.push(addObject(streamContent));
         }
 
@@ -1682,7 +1766,8 @@ if (typeof module !== 'undefined' && module.exports) {
         pathsIntersect,
         findIntersectingElements,
         PDFContext2D,
-        PDFBuilder
+        PDFBuilder,
+        zlibDeflate
     };
 }
 // Export for browsers (client)
@@ -1753,6 +1838,7 @@ else if (typeof window !== 'undefined') {
         pathsIntersect,
         findIntersectingElements,
         PDFContext2D,
-        PDFBuilder
+        PDFBuilder,
+        zlibDeflate
     };
 }
