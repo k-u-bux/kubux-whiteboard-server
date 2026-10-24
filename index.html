@@ -7053,29 +7053,6 @@
               ctx.strokeStyle = '#0078d7';
               ctx.lineWidth = 2;
               ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-              
-              // Draw handles for resizing
-              const handleSize = 8 / zoomLevel;
-              ctx.fillStyle = 'white';
-              ctx.strokeStyle = '#0078d7';
-              ctx.lineWidth = 1;
-              
-              // Draw handles at corners and midpoints
-              const handles = [
-                  {x: bounds.x, y: bounds.y}, // top-left
-                  {x: bounds.x + bounds.width/2, y: bounds.y}, // top-middle
-                  {x: bounds.x + bounds.width, y: bounds.y}, // top-right
-                  {x: bounds.x + bounds.width, y: bounds.y + bounds.height/2}, // middle-right
-                  {x: bounds.x + bounds.width, y: bounds.y + bounds.height}, // bottom-right
-                  {x: bounds.x + bounds.width/2, y: bounds.y + bounds.height}, // bottom-middle
-                  {x: bounds.x, y: bounds.y + bounds.height}, // bottom-left
-                  {x: bounds.x, y: bounds.y + bounds.height/2} // middle-left
-              ];
-              
-              handles.forEach(handle => {
-                  ctx.fillRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
-                  ctx.strokeRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
-              });
           }
           
           ctx.restore();
@@ -7217,29 +7194,6 @@
               context.strokeStyle = '#0078d7';
               context.lineWidth = 2;
               context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-              
-              // Draw handles for resizing
-              const handleSize = 8 / zoomLevel;
-              context.fillStyle = 'white';
-              context.strokeStyle = '#0078d7';
-              context.lineWidth = 1;
-              
-              // Draw handles at corners and midpoints
-              const handles = [
-                  {x: bounds.x, y: bounds.y}, // top-left
-                  {x: bounds.x + bounds.width/2, y: bounds.y}, // top-middle
-                  {x: bounds.x + bounds.width, y: bounds.y}, // top-right
-                  {x: bounds.x + bounds.width, y: bounds.y + bounds.height/2}, // middle-right
-                  {x: bounds.x + bounds.width, y: bounds.y + bounds.height}, // bottom-right
-                  {x: bounds.x + bounds.width/2, y: bounds.y + bounds.height}, // bottom-middle
-                  {x: bounds.x, y: bounds.y + bounds.height}, // bottom-left
-                  {x: bounds.x, y: bounds.y + bounds.height/2} // middle-left
-              ];
-              
-              handles.forEach(handle => {
-                  context.fillRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
-                  context.strokeRect(handle.x - handleSize/2, handle.y - handleSize/2, handleSize, handleSize);
-              });
           }
           
           context.restore();
