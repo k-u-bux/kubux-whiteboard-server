@@ -1,25 +1,35 @@
 # Security Audit Report: kubux-whiteboard-server
 
-**Audit Date:** July 1, 2026  
-**Auditor:** Security Review  
-**Version:** Current (commit: f56d3d5)  
-**Focus Areas:** RCE, Arbitrary File Access, DoS, Crash Vectors
+**Audit Date:** October 25, 2026
+**Auditor:** Security Review (re-audit of v2.2)
+**Version:** Current (commit 79fc50a — HEAD; server.js, shared.js, index.html all changed after v2.2)
+**Focus Areas:** RCE, Arbitrary File Access, DoS, Crash Vectors, Client-Side XSS
 
 ---
 
 ## Executive Summary
 
-A comprehensive security audit was conducted on `server.js` and `shared.js` covering:
-- Remote code execution vulnerabilities
-- Arbitrary file read/write access
-- Path traversal attacks
-- Deserialization vulnerabilities
-- Denial of Service (DoS) attacks
-- Crash vectors via malformed input
+Re-audit of `server.js`, `shared.js` and `index.html` at HEAD. Unlike v2.2 (static only), the findings in this version were **verified against a live test instance** (`ws://localhost:8099`, isolated data/log dirs).
 
-**Overall Assessment:** ⚠️ **No RCE or file access vulnerabilities. Several DoS issues remain unfixed.**
+**Overall Assessment:** ⚠️ **No RCE, no file access, no XSS, no client-reachable crash. DoS surface reduced but still exploitable; two new findings.**
 
-The codebase demonstrates strong security practices for preventing RCE and arbitrary file access. However, several DoS vectors exist that could allow an attacker to disrupt service availability.
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 1 | `create-board` scrypt flood (no rate limit) | HIGH | Open; partially mitigated vs v2.2 |
+| 2 | Unbounded error-log growth → disk-full crash | MEDIUM | Open (**new** in v3.0) |
+| 3 | Plaintext board passwords in `logs/debug.log` | MEDIUM | Open (**new** in v3.0) |
+| 4 | Unbounded state: history, pages, deletionMap, files | MEDIUM | Open (unchanged) |
+| 5 | No Origin check on WebSocket handshake | LOW | Open (**new** in v3.0) |
+| 6 | `x-forwarded-proto` trusted unconditionally | LOW | Open (unchanged) |
+| 7 | Error details (`e.message`) sent to clients | LOW | Open (unchanged) |
+| 8 | Dockerfile: `node:20` cannot start the server; runs as root | INFRA | Open (**new** in v3.0) |
+
+Key changes vs v2.2:
+- **`create-board` CPU DoS recharacterized:** `scryptSync` was replaced by async `crypto.scrypt`. The event loop is *not* blocked anymore — measured fullPage latency of **3 ms during a sustained 60-connection flood** (v2.2 predicted "pins CPU at 100%, unresponsive host" — that impact is gone). The remaining impact is worker-pool starvation: legitimate board creation queues behind an attacker's jobs, and the queue is unbounded (memory). About **50 attempts/sec** were sustained from 60 connections, each attempt costing **one scrypt per stored credential** (~100 ms, 16 MiB each; currently 2 credentials).
+- **`maxPayload` enforced.** A 6 MiB message closed the connection (limit 5 MB, commit d6197cd). `ws` upgraded to 8.22.0 (CVE-2026-48779, commit c9694cb).
+- **GROUP validation verified live:** a depth-15 nested GROUP payload is silently dropped (`MAX_GROUP_DEPTH = 10`), closing the v2.2 assert-crash / stack-overflow finding.
+- **New log-growth finding:** every malformed message writes one `debug.error` line with no cap or rotation. Measured ~1000 lines/s ≈ 87 KB/s from a *single* connection. A full disk turns into a crash: `writeFileAtomic` throws inside the 10 s persist timer (unhandled), losing up to 10 s of edits.
+- **New data-exposure finding:** the existing `logs/debug.log` contains board passwords in cleartext (`passwd: 'e0k5ndiszdig'` ×N), written by a pre-current logging configuration. The current config sends `debug.log` to a NullStream, making the entire payload-logging layer dead code — the live leak is one commented-out line away (server.js:71–72).
 
 ---
 
@@ -32,407 +42,225 @@ The codebase demonstrates strong security practices for preventing RCE and arbit
 - Path construction logic
 - HTTP request handling
 - WebSocket message routing
-- Denial of Service (DoS) attacks
-- Crash vectors via malformed input
-- Resource exhaustion vectors
+- Denial of Service (DoS) / crash vectors via malformed input
+- Client-side (index.html) DOM injection / credential storage
 
 ### Methodology
-1. **Static code analysis** of all file operations
-2. **Input validation review** for all message handlers
-3. **Deserialization security analysis**
-4. **Path traversal vulnerability assessment**
-5. **Remote code execution vector analysis**
-6. **DoS and crash vector analysis**
-7. **Assert reachability analysis** (can malformed input trigger asserts?)
+1. **Static analysis** of all handlers and validation routines
+2. **Live testing** on an isolated instance:
+   - HTTP layer: `/.env` → 403, `/%2e%2e%2f…etc/passwd` → 403, `/server.js` → 404, whitelist (`/manifest.json`) → 200
+   - Unauthenticated `register-board` + `fullPage-requests` → full page history (view access, by design)
+   - `create-board` with wrong credential → rejected; sustained rate measured (~50 attempts/s from 60 connections; event loop latency 3 ms under flood)
+   - GROUP nesting depth 15 → dropped by validation
+   - MOD_ACTION with wrong password → `decline("unauthorized")`
+   - `maxPayload`: 6 MiB message → connection closed
+   - 500 000-deep JSON array → parsed, rejected as unknown type — **no crash** (V8 depth-safe)
+   - 3000 invalid messages → ~3000 `Rejected message` log lines in 3 s (87 KB/s log growth)
+3. **Assert reachability re-analysis** (all `assert()` calls traced; see Resolved)
+4. **Client-side XSS sweep** (DOM sinks, credential storage)
 
 ---
 
 ## Critical Findings
 
-### ✅ No RCE Vulnerabilities Found
+### ✅ No RCE Vulnerabilities
+Unchanged from v2.2: no `eval`/`Function()`/`vm`, no command execution, no user input on template-literal paths. Re-confirmed.
 
-**Assessment:** No remote code execution vectors identified.
+### ✅ No Arbitrary File Access Vulnerabilities
+Unchanged and re-verified live:
+- `isUuid()` gate on every file-ID path (`getFilePath` = `path.join(DATA_DIR, uuid.ext)`)
+- HTTP static serving is an exact-match whitelist (`serveableFiles`), traversal and hidden-file segments blocked before any read
+- Traversal probes returned 403/404, never a file body
 
-**Evidence:**
-- No use of `eval()`, `Function()`, or similar dangerous functions
-- No `vm` module usage with user input
-- No command execution (`exec`, `spawn`) with user-controlled data
-- Template literals only use validated or server-generated values
-- `WHITEBOARD_URL` environment variable properly sanitized (line 164-176)
+### ✅ No Deserialization Vulnerabilities
+Unchanged: `deserialize` reviver handles only `__type: BigInt|Set|Map`; no `__proto__`/`constructor` handling.
 
-### ✅ No Arbitrary File Access Vulnerabilities Found
-
-**Assessment:** File access is properly restricted and validated.
-
-**Evidence:**
-
-1. **UUID Validation Layer** (Lines 259-284)
-   ```javascript
-   function loadItem(itemId, ext, check) {
-       if ( ! check( itemId ) ) {  // UUID validation required
-           debug.log( `Invalid itemId: ${itemId}` );
-           return null; 
-       }
-       const filePath = getFilePath(itemId, ext);
-       // ... safe file operations
-   }
-   ```
-
-2. **Whitelist for HTTP Requests** (Lines 478-483)
-   ```javascript
-   const serveableFiles = {
-       '/manifest.json': { path: 'manifest.json', type: 'application/json' },
-       '/sw.js': { path: 'sw.js', type: 'application/javascript' },
-       // ... only these files can be served
-   };
-   ```
-
-3. **Safe Path Construction** (Line 221)
-   ```javascript
-   const getFilePath = (uuid,ext) => path.join(DATA_DIR, `${uuid}.${ext}`);
-   // UUID validated before reaching this function
-   ```
-
-4. **No User-Controlled Paths**
-   - All file paths constructed using validated UUIDs or hardcoded values
-   - No string concatenation with user input for file paths
-   - `fs.readFile()` only used with validated paths
-
-**Path Traversal Testing:**
-- Attempted payloads like `../../etc/passwd` would fail UUID validation
-- `isUuid()` regex requires proper UUID format: `/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`
+### ✅ No Client-Side XSS (new verification)
+- All DOM text assignment goes through `textContent` (incl. server error messages)
+- Strokes are rendered on `<canvas>`; stroke colors regex-restricted (`#RGB`/`#RRGGBB`/`[a-z]{1,20}`)
+- The only `innerHTML` assignments are static icon glyphs (cap/join style menus)
+- Storage audit: the server-level credential is persisted to `localStorage['whiteboard_credential']` (design decision; see Recommendation 8)
 
 ---
 
-## Unfixed Findings (DoS Vectors)
+## Findings
 
-### ⚠️ 1. CPU DoS via `create-board` endpoint [UNFIXED]
+### ⚠️ 1. `create-board` scrypt flood — no rate limiting [OPEN, recharacterized]
 
-**Risk Level:** HIGH
+**Risk Level:** HIGH (availability of board creation; memory via unbounded queue)
 
-**Issue:** Every `create-board` request runs `scryptSync` (N=16384, intentionally slow ~50-100ms) for *each* stored credential. There is no rate limiting on this endpoint.
+**Old impact (v2.2):** "pins the server CPU at 100%" — **no longer true.** `verifyPassword` now uses async `crypto.scrypt` (worker pool), verified: fullPage latency stayed at **3 ms** while 60 connections hammered `create-board` for 2 s (~60 attempts served).
 
-**Attack vector:** An attacker can flood the `create-board` WebSocket message endpoint with requests. Each request triggers expensive scrypt computation across all stored credentials. This pins the server CPU at 100%, making the server (and potentially the host machine) unresponsive.
+**Current impact (measured):**
+- ~50 attempts/sec sustained from 60 connections; each attempt = **one scrypt per stored credential** (currently 2 × ~100 ms, 16 MiB memory each).
+- Node's worker pool saturates: legitimate `create-board` requests (and any other pool work) starve behind attacker jobs.
+- Pending scrypt jobs queue without bound → memory exhaustion with enough connections.
+- `ws.credentialCheckPending` serializes checks *per connection* only; connections are unlimited.
 
-**Location:** `server.js` lines 1205-1211 (the `for` loop over `credentials` calling `verifyPassword`).
+**Location:** `server.js` `CREATE_BOARD` handler (1411–1442), `isValidCredential` (180–187), `verifyPassword` (141–177).
 
 **Recommended fix:**
-- Add rate limiting for `create-board` requests (e.g., max 5 per minute per IP)
-- Consider asynchronous scrypt (`crypto.scrypt` instead of `crypto.scryptSync`) to avoid blocking the event loop
+- Token-bucket rate limit per IP on `create-board` (e.g., 5/min)
+- Cap concurrent WebSocket connections per IP and globally
+- Cap the number of stored credentials (flood cost is linear in it)
 
 ---
 
-### ⚠️ 2. Memory DoS via unbounded resources [UNFIXED]
+### ⚠️ 2. Unbounded error-log growth → disk-full crash chain [OPEN — NEW]
 
-**Risk Level:** MEDIUM
+**Risk Level:** MEDIUM (unauthenticated; slow disk fill, then process crash + data loss)
 
-**Issue:** Several resources are unbounded:
+Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` → `debug.error(...)`, one line per message, appended to `logs/debug.log` with **no cap and no rotation**. Measured: a single connection sustained **~3000 lines / 3 s ≈ 87 KB/s**. Multiple connections scale linearly.
 
-1. **WebSocket message size:** No `maxPayload` limit configured. The `ws` library default is 100MB per message. An attacker can send large messages to exhaust memory.
-2. **Connection limit:** No limit on concurrent WebSocket connections. An attacker can open thousands of connections.
-3. **Page history growth:** Each draw/erase action appends to `page.history` with no cap. A client with board password can grow history indefinitely, exhausting disk and memory.
-4. **Number of boards/pages:** No limit on total boards or pages.
+**Crash chain:** when the disk fills, `writeFileAtomic` throws (ENOSPC) inside `periodicallyPersist` (10 s timer) — unhandled → process crash, losing up to 10 s of edits.
 
-**Location:** `server.js` line 640 (WebSocket server creation — no `maxPayload`), `shared.js` `handleEditAction` (no history cap).
+**Location:** `server.js` `rejectMessage` (1803), `periodicallyPersist` (1875), `writeFileAtomic` (301).
 
-**Recommended fix:**
-- Set `maxPayload` on the WebSocket server (e.g., 1MB)
-- Add a connection limit (e.g., max 100 concurrent clients)
-- Add a page history size cap (e.g., max 10000 edits per page)
+**Recommended fix:** log rotation + size cap; rate-limit malformed-input logging (dedupe per second); catch/tolerate persist failures (log + retry) instead of crashing.
 
 ---
 
-### ⚠️ 3. Docker runs as root [UNFIXED]
+### ⚠️ 3. Plaintext board passwords in `logs/debug.log` [OPEN — NEW]
 
-**Risk Level:** MEDIUM
+**Risk Level:** MEDIUM (historical credential exposure + fragile config)
 
-**Issue:** The `Dockerfile` does not create or switch to a non-root user. The Node.js process runs as root inside the container.
+The existing production `logs/debug.log` (~792 KB) contains board passwords in cleartext: `passwd: 'e0k5ndiszdig'` (and others) in the `BOARD_CREATED` payload dumps and incoming `shuffle-proposal`/`mod-action-proposals` messages.
 
-**Location:** `Dockerfile` (3 lines, no `USER` directive).
+**Why:** an earlier run used `new Console({ stdout: debugTee, stderr: debugTee })` (server.js:72, now commented out), logging every sent/received message with full payload. The **current** config (`stdout: debugNull`) sends `debug.log` to a NullStream — the entire payload-logging layer (`routeMessage`, `logSentMessage`) is dead code. The live leak is one commented-out line away from being re-enabled.
 
-**Impact:** If any other vulnerability is discovered (e.g., a file write outside `data/`), the attacker has root privileges inside the container, increasing the blast radius.
+**Additional notes:** the file is never rotated/truncated; board passwords persist in it indefinitely.
 
-**Recommended fix:**
-```dockerfile
-FROM node:20 AS builder
-WORKDIR /app
-RUN useradd -r -u 1001 -g root appuser
-USER appuser
-CMD ["npm", "start"]
-```
+**Recommended fix:** rotate/truncate the existing log file; delete the commented-out `debugTee` stdout configs; never log `passwd` fields; if payload logging is ever re-enabled, redact secrets.
 
 ---
 
-### ⚠️ 4. Information disclosure via error messages [UNFIXED]
+### ⚠️ 4. Unbounded state for authorized users [OPEN, unchanged]
+
+**Risk Level:** MEDIUM (disk + memory + CPU exhaustion; requires board password — shared with collaborators by design in readme.md)
+
+- Page **history grows without bound** (no cap on `handleEditAction`); each action is stored + hashed + persisted every 10 s.
+- **Page count** and **`deletionMap`** grow without bound; a deleted page's **file is never removed from disk**; `to_be_removed.json` grows without bound.
+- `existingPage` walks deletion chains — length unbounded (assert-guarded against cycles, so no hang, but O(chain) per lookup).
+- Each top-level GROUP action deep-clones the whole visual state (`structuredClone` in `commitGroup`) — an O(page-size) cost per GROUP a member can send at will.
+
+**Recommended fix:** history cap (e.g., 100 000 actions/page), page/board caps, delete page files on `delete page`, cap `deletionMap`, avoid the full-state clone per GROUP.
+
+---
+
+### ⚠️ 5. No Origin check on WebSocket handshake [OPEN — NEW]
 
 **Risk Level:** LOW
 
-**Issue:** Line 1603 of `server.js` sends `e.message` to clients in the error response. While stack traces were removed (previous fix), the error message itself can leak internal paths, function names, and logic structure.
+`wss.on('connection', ...)` (server.js:1839) never inspects `req.headers.origin`. Any webpage can open a WebSocket to the server and act as an unauthenticated client (read boards whose ID is known — view access is open by design; participate in the DoS vectors above). Impact is bounded because every privileged action requires the board password or admin credential, which live in the URL / `localStorage` — a cookie-based session this is not. Still, with any future credential-bearing cookie or same-origin-gapless auth change, missing Origin verification becomes CSWSH.
 
-**Location:** `server.js` line 1603:
-```javascript
-const errorMessage = {
-    type: "error",
-    message: e.message,  // ← can leak internals
-};
-```
-
-**Recommended fix:** Send a generic error message to clients; log the full error server-side only.
+**Recommended fix:** verify `Origin` against the configured host, or deny cross-origin handshakes.
 
 ---
 
-### ⚠️ 5. `x-forwarded-proto` spoofing [UNFIXED]
+### ⚠️ 6. `x-forwarded-proto` spoofing [OPEN, unchanged]
 
-**Risk Level:** LOW
+**Risk Level:** LOW — HSTS is emitted when the header says `https`, even on plain HTTP (server.js:715–722). Only trustworthy when the server sits behind the documented nginx proxy. Make proxy trust configurable.
 
-**Issue:** The server trusts the `x-forwarded-proto` header unconditionally (line 539) to determine if the connection is secure (for HSTS). If the server is accessed directly (not behind a trusted reverse proxy), an attacker can spoof this header.
+### ⚠️ 7. Error details sent to clients [OPEN, unchanged]
 
-**Location:** `server.js` line 539-540:
-```javascript
-const forwardedProto = req.headers['x-forwarded-proto'];
-const isSecure = forwardedProto === 'https' || req.connection.encrypted;
-```
-
-**Impact:** An attacker could trick the server into sending HSTS headers over plain HTTP, or suppress HSTS over HTTPS. Low impact in practice since the server is designed to run behind nginx.
-
-**Recommended fix:** Only trust `x-forwarded-proto` when behind a configured proxy, or make it configurable via environment variable.
+**Risk Level:** LOW — `routeMessage` sends `JSON.parse` failure messages back to clients (`rejectMessage(ws, e.message)`). Not a stack trace, but leaks parser internals; log full detail server-side, send a generic message.
 
 ---
 
-## Non-Security Observations
+## Deployment Findings
 
-### ✅ Crash via corrupted files on disk [FIXED]
+### ⚠️ 8. Dockerfile cannot start the server [NEW]
 
-**Risk Level:** N/A (infrastructure failure, not exploitable via malformed input)
+`FROM node:20` — but `server.js` requires `module 'console'` (line 14) and uses `fs.createWriteStream` (line 19), both of which need **Node ≥ 23**. A standalone `docker build` produces a container that exits at startup (`MODULE_NOT_FOUND`). It also runs as root (no `USER`).
 
-**Issue (historical):** `loadItem` (line 272-274) called `fs.readFileSync` and `deserialize` (which calls `JSON.parse`) without a try-catch. If a file on disk was corrupted (e.g., truncated due to a crash during write), `deserialize` threw and the exception propagated uncaught, crashing the Node.js process.
+**Note:** the documented `docker-compose.yml` path is fine — `user: "1000:1000"`, app mounted `:ro`, only `data/` + `logs/` writable. Fix the Dockerfile base image (e.g. `node:24`) and add `USER`.
 
-**Fix (July 2026):** `loadItem` now wraps the read/deserialize in a try-catch and returns `null` on failure, so a corrupted data file degrades to a cache miss instead of crashing the server.
+### ℹ️ `passwd_hash` shell-injection footgun
 
-**Not reachable by malformed input:** All `assert()` calls and null-dereference points in the codebase were traced:
-- `sendPageInfo` (line 737): `pageId` comes from `existingPage` (always a valid UUID from `board.pageOrder`), and `usePage` is called with `create=true` (always creates). Not reachable.
-- `ping_client_with_page` (line 786): Same reasoning — `pageId` is always valid, `usePage` with `create=true`. Not reachable.
-- `FULL_PAGE_REQUEST` handler (line 1232): `boardId` is validated as UUID, `useBoard` with `create=true` always creates. Not reachable.
-- `REPLAY_REQUEST` handler (line 1533): Same — `board` is never null. Not reachable.
+`node -e "…hashPassword('$passwd')…"` interpolates the password into a JS string literal inside shell double quotes. Embedded `'` runs arbitrary JS as the admin who invoked the tool. **Not remotely exploitable** (local admin tool, self-inflicted), but the utility should quote/clean its input.
 
-**Conclusion:** Malformed client input cannot trigger any of these crash points. The previously identified uncaught exception path (`loadItem` failing on corrupted server-side files) has been fixed; it now returns `null` instead of crashing.
+### ℹ️ `generatePasswd` modulo bias
+
+`b % 36` with `b ∈ [0,255]` makes digits 0–3 slightly more likely (8/256 vs 7/256). Negligible — the 12-char base36 keyspace (~62 bits) dominates; constant-time compare (79fc50a) prevents timing attacks.
 
 ---
 
-## Resolved Issues
+## Resolved Since v2.2 (verified)
 
-### ✅ GROUP sub-action validation (assert crash + stack overflow) [FIXED]
+### ✅ GROUP sub-action validation (assert crash + stack overflow) [FIXED, verified live]
+`is_invalid_action_payload` recursively validates GROUP sub-actions (DRAW/ERASE/GROUP only) and enforces `MAX_GROUP_DEPTH = 10`. A depth-15 payload was dropped by validation on the live instance. `assert(false)` in `commitEdit` is no longer input-reachable.
 
-**Issue:** `is_invalid_action_payload` validated the top-level action type but did not recursively validate GROUP sub-actions. A client could send a GROUP containing sub-actions with types like `undo`, `redo`, `new page`, or `delete page` — types that `commitEdit` doesn't handle, hitting `assert(false)` and crashing the server. The same gap allowed unbounded nesting depth, risking stack overflow.
+### ✅ WebSocket message size limit [FIXED, verified live]
+`maxPayload: 5 * 1024 * 1024`; a 6 MiB message closed the connection. (v2.2 flagged the 100 MiB default.)
 
-**Fix:** In `shared.js`, the GROUP case of `is_invalid_action_payload` now:
-1. Recursively validates each sub-action
-2. Restricts sub-action types to `DRAW`, `ERASE`, `GROUP` only
-3. Enforces a max nesting depth of 10 (`MAX_GROUP_DEPTH`)
+### ✅ ws library CVE [FIXED]
+`ws` 8.22.0 (CVE-2026-48779, commit c9694cb).
 
-**Status:** ✅ Resolved
+### ✅ CPU-blocking scrypt [PARTIALLY FIXED]
+`scryptSync` → async `crypto.scrypt` (worker pool): event loop stays responsive under flood (measured 3 ms). Residual issue: worker-pool starvation + unbounded queue (Finding 1).
 
-### ✅ Information Disclosure via Stack Traces [FIXED]
+### ✅ Constant-time board-password comparison [FIXED]
+SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no length leak, no timing leak.
 
-**Issue:** Error handling exposed stack traces to clients (Line 1333)
+### ✅ Corrupted-file crash [FIXED, confirmed in code]
+`loadItem` wraps read/deserialize in try-catch → `null` (cache miss) instead of crashing.
 
-**Before:**
-```javascript
-const errorMessage = {
-    type: "error",
-    message: e.message,
-    stack: e.stack  // ← Leaked server internals
-};
-```
-
-**After:**
-```javascript
-const errorMessage = {
-    type: "error",
-    message: e.message
-    // stack removed
-};
-```
-
-**Status:** ✅ Resolved
+### ✅ Crash via deep JSON nesting [NOT A FINDING, verified live]
+500 000-deep array parsed without crash (V8 is depth-safe here).
 
 ---
 
-## Security Controls Implemented
+## Security Controls Implemented (verified)
 
-### 1. Message Validation Layer ✅
-
-Comprehensive validation functions prevent malformed messages:
-
-- `is_invalid_REGISTER_BOARD_message()`
-- `is_invalid_REGISTER_PAGE_message()`
-- `is_invalid_PAGE_INFO_REQUEST_message()`
-- `is_invalid_CREATE_BOARD_message()`
-- `is_invalid_FULL_PAGE_REQUESTS_message()`
-- `is_invalid_MOD_ACTION_PROPOSALS_message()`
-- `is_invalid_REPLAY_REQUESTS_message()`
-
-**Protection against:**
-- Type confusion attacks
-- Missing required fields
-- Invalid UUID formats
-- Non-numeric delta values
-- Malformed action payloads
-- Invalid GROUP sub-action types (recursive validation)
-
-### 2. UUID-Based Access Control ✅
-
-All file operations require valid UUIDs:
-
-```javascript
-function isUuid(str) {
-  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return regex.test(str);
-}
-```
-
-**Ensures:**
-- No path traversal (`../`, `..\\`)
-- No absolute paths (`/etc/passwd`)
-- No null bytes or special characters
-- Cryptographically random identifiers via `crypto.randomBytes(16)`
-
-### 3. Safe Deserialization ✅
-
-The `deserialize()` function (shared.js:71-87) safely handles custom types:
-
-```javascript
-const deserialize = (jsonString) => {
-    const reviver = (key, value) => {
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-            if (value.__type === 'BigInt') {
-                return BigInt(value.value);
-            }
-            if (value.__type === 'Set') {
-                return new Set(value.value);
-            }
-            if (value.__type === 'Map') {
-                return new Map(value.value);
-            }
-        }
-        return value;
-    };
-    return JSON.parse(jsonString, reviver);
-};
-```
-
-**Protection against:**
-- Prototype pollution (no `__proto__` or `constructor` handling)
-- Arbitrary code execution through deserialization
-- Only handles safe types: BigInt, Set, Map
-
-### 4. Password Authentication ✅
-
-Secure password verification using scrypt (Lines 104-153):
-
-- **Key derivation:** scrypt with N=16384, r=8, p=1
-- **Salt:** 32 bytes (256 bits) of random data
-- **Timing-safe comparison:** `crypto.timingSafeEqual()`
-- **Memory-hard:** Resistant to GPU/ASIC attacks
-
-### 5. HTTP Security Headers ✅
-
-HSTS header for HTTPS connections (Line 497):
-```javascript
-res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-```
-
-### 6. Assert Safety ✅
-
-All `assert()` calls in the codebase were traced to verify they cannot be triggered by malformed input. The one assert that was reachable (`assert(false)` in `commitEdit` via GROUP sub-actions) has been fixed. Remaining asserts are only reachable on programmer error or runtime failure (disk I/O), not malformed client input.
+1. **Message validation layer** — every handler validates before use; GROUP sub-actions recursively.
+2. **UUID-based access control** — `isUuid` gates all file IDs and message IDs; no traversal.
+3. **Safe deserialization** — BigInt/Set/Map only; no prototype pollution.
+4. **scrypt password auth** — N=16384/r=8/p=1, 32-byte salt, timing-safe compare.
+5. **HTTP hardening** — whitelist serving, hidden-file block, HSTS (behind proxy).
+6. **Assert safety** — all remaining asserts reachable only via disk damage/programmer error, not malformed input.
 
 ---
 
-## Recommendations
+## Recommendations (prioritized)
 
-### 1. DoS Hardening (Priority)
-
-Implement the following to protect against denial of service:
-- **Rate limiting** for `create-board` requests (CPU DoS)
-- **WebSocket `maxPayload`** limit (memory DoS)
-- **Connection limit** (resource exhaustion)
-- **Page history size cap** (disk/memory DoS)
-
-### 2. Docker Hardening
-
-- Run the container as a non-root user
-- Consider read-only filesystem for the app directory (only `data/` writable)
-
-### 3. Monitoring & Logging
-Consider implementing:
-- Rate limiting for failed authentication attempts
-- Alerting for unusual file access patterns
-- Monitoring for validation failures (potential attack attempts)
-
-### 4. Regular Security Reviews
-- Periodic code audits when adding new message handlers
-- Review any new file operations for UUID validation
-- Test deserialization with malicious payloads
-- Trace assert reachability for any new assert() calls
-
-### 5. Future Enhancements
-Consider adding:
-- Content Security Policy (CSP) headers
-- Rate limiting on WebSocket connections
-- Failed authentication lockout mechanism
-- Configurable trust for `x-forwarded-proto` header
+1. **Rate-limit `create-board`** (per IP/per connection) and **cap WebSocket connections** (Finding 1).
+2. **Log rotation + size cap + malformed-input logging rate limit**; make persist failures non-fatal (Finding 2).
+3. **Rotate/truncate existing `debug.log`; remove secret-logging configs** (Finding 3).
+4. **State caps + GC:** history per page, page count, `deletionMap`, delete page files (Finding 4).
+5. **Verify `Origin` on the WS handshake** (Finding 5).
+6. **Fix Dockerfile:** `node:24` base, non-root user (Finding 8).
+7. **Configurable proxy trust** for `x-forwarded-proto` (Finding 6); generic client error messages (Finding 7).
+8. **Storage note:** the admin credential persists in `localStorage['whiteboard_credential']` — acceptable only while there is no XSS and the machine is single-user; add CSP as defense-in-depth.
 
 ---
 
-## Test Cases (Theoretical)
+## Test Cases (live, Oct 25, 2026)
 
-### Path Traversal Attempts (All Blocked ✅)
-```
-../../../etc/passwd          → Fails UUID validation
-..\\..\\..\\windows\\system32 → Fails UUID validation
-%2e%2e%2f%2e%2e%2f%2e%2e%2f   → Fails UUID validation
-/etc/passwd                    → Fails UUID validation
-```
-
-### RCE Attempts (All Blocked ✅)
-- No `eval()` to exploit
-- No `Function()` constructor accessible
-- No command injection vectors
-- Template literals use only validated data
-
-### Deserialization Attacks (All Blocked ✅)
-```json
-{"__proto__": {"polluted": true}}        → Not processed
-{"constructor": {"prototype": {}}}       → Not processed
-{"__type": "Function", "value": "..."}  → Only BigInt/Set/Map allowed
-```
-
-### GROUP Sub-action Attacks (All Blocked ✅ after fix)
-```json
-{"type": "group", "actions": [{"type": "undo", ...}]}        → Rejected (invalid sub-type)
-{"type": "group", "actions": [{"type": "delete page", ...}]} → Rejected (invalid sub-type)
-{"type": "group", "actions": [{"type": "group", "actions": [...deeply nested...] }]} → Rejected (depth > 10)
-{"type": "group", "actions": ["not-an-object"]}              → Rejected (invalid sub-action)
-```
+| Test | Result |
+|------|--------|
+| `GET /.env` | 403 Access Denied |
+| `GET /..%2f..%2fetc%2fpasswd`, `GET /server.js` | 403 / 404 |
+| `GET /manifest.json` (whitelist) | 200 |
+| unauthenticated `register-board` + `fullPage-requests` | full history returned (view access by design) |
+| `create-board` wrong credential ×2 | `error: credential not accepted`; flood: ~50 attempts/s from 60 conns; 3 ms fullPage latency under flood |
+| GROUP nesting depth 15 | dropped (validation) |
+| MOD_ACTION wrong password | `decline(unauthorized)` |
+| 6 MiB WebSocket message | connection closed (maxPayload) |
+| 500 000-deep JSON array | rejected, no crash |
+| 3000 invalid messages | ~3000 log lines ≈ 87 KB/s log growth |
 
 ---
 
 ## Conclusion
 
-The kubux-whiteboard-server demonstrates strong security practices for preventing RCE and arbitrary file access vulnerabilities. The implemented validation layer, combined with UUID-based file access controls and safe deserialization, provides robust protection against these critical attack vectors.
+The kubux-whiteboard-server remains solid against RCE, file access, deserialization and XSS, and the crash-on-malformed-input class is closed. The DoS surface is smaller than v2.2 suggested (event loop survives the scrypt flood; message sizes are capped), but three availability issues remain exploitable: **unauthenticated scrypt flooding** (HIGH), **log-growth disk fill** (MEDIUM) and **unbounded state growth by board members** (MEDIUM) — plus a historical credential exposure in the unrotated log file. One deployment bug stands out: the provided Dockerfile cannot run the server on its declared base image.
 
-Several DoS vectors remain unfixed. These do not allow system compromise but could allow an attacker to disrupt service availability. The most critical unfixed issues are:
-1. CPU DoS via unauthenticated `create-board` endpoint
-2. Memory DoS via unbounded WebSocket messages and connections
-
-Crash vectors via malformed input were investigated thoroughly: all `assert()` calls and null-dereference points are properly guarded by UUID validation and `create=true` semantics. Malformed input cannot crash the server. The formerly uncaught exception path in `loadItem` (corrupted server-side files) is now guarded by a try-catch that degrades to a cache miss.
-
-**Action required:** Implement DoS hardening measures listed in the Recommendations section.
+**Action required:** Findings 1–4 (rate limits, log management, state caps) before Findings 5–8.
 
 ---
 
-**Document Version:** 2.2  
-**Last Updated:** July 25, 2026  
-**Next Review:** Recommend review after DoS hardening is implemented
+**Document Version:** 3.0
+**Last Updated:** October 25, 2026
+**Next Review:** after Findings 1–4 are addressed
 
-**Changelog 2.2:** Marked the `loadItem` corrupted-file crash as fixed (try-catch → null return). DoS findings remain open.
+**Changelog 3.0 (Oct 25, 2026):** Full re-audit at HEAD 79fc50a with live verification. Recharacterized Finding 1 (async scrypt: event loop no longer blocked; impact is worker-pool starvation + unbounded queue — with measurements). Added Findings 2 (error-log disk fill → crash), 3 (plaintext passwords in existing debug.log, dead logging config), 5 (missing Origin check), 8 (Dockerfile node:20 broken). Marked GROUP fix, maxPayload, ws 8.22.0, constant-time compare, corrupt-file guard as verified. Added client-side XSS verification and live test-case table. v2.2 Finding 2 (memory DoS) superseded in part: maxPayload fixed, connection/history caps still open (Finding 4).
