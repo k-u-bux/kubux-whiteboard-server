@@ -1,0 +1,7 @@
+# runtime state: server credentials, board and page files, logs
+conf/
+data/
+logs/
+
+# installed by npm ci
+node_modules/
