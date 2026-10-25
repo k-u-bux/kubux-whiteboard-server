@@ -18,31 +18,30 @@ This document contains actionable items for improving code quality, security, pe
   - Location: `docker-compose.yml`, `README.md "Mode 2: Docker with Reverse Proxy"`
 
 - [x] **Add salt/pepper to password hashing** (server.js)
-  - Implement per-user salt for password hashes
-  - Consider using bcrypt or argon2 instead of plain SHA-256
-  - Update credential storage format
-  - Location: `server.js:~340, ~475`
+  - Done: the server-level credentials in `conf/passwd.json` are scrypt hashes (N=16384, r=8, p=1) with a random 32-byte salt each, stored as `salt:hash`
+  - Board edit passwords are random 12-character strings stored with the board and compared in constant time
+  - Location: `server.js:96-187`, `passwd_hash`
 
 - [X] **Validate UUIDs before file operations** (server.js)
-  - Add UUID format validation in `getFilePath()`
+  - Done: `loadItem()` and `saveItem()` check the ID with `isUuid()` before building a path (`getFilePath()` itself does not check)
   - Prevent potential file system exploits from malformed UUIDs
-  - Use regex: `/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`
-  - Location: `server.js:~40`
+  - Regex (`isUuid` in shared.js): `/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`
+  - Location: `server.js:329-354`, `shared.js:53-56`
 
 ### Error Handling
 
 - [x] **Implement exponential backoff for WebSocket reconnection** (index.html)
-  - Add automatic reconnection logic with increasing delays
-  - Implement max retry limit
-  - Show connection status to user
-  - Location: `index.html:~2150` (ws.onclose)
+  - Done: automatic reconnection with delays from 1 s doubling to at most 30 s; a Reconnect button retries at once
+  - Not done: there is no maximum number of retries (the client keeps trying)
+  - Connection status is shown in the error banner (countdown, number of edits waiting to be sent)
+  - Location: `index.html:~2368-2420` (`getReconnectDelay`, `scheduleReconnect`, `reconnectWebSocket`), `ws.onclose` at `~2486`
 
 - [~] **Add comprehensive error handling for file operations** (server.js)
   - Wrap all file operations in try-catch blocks
   - Handle corrupted JSON gracefully
   - Log errors with context for debugging
   - Locations: `loadItem()`, `saveItem()`, all fs operations
-  - **Status (2026-07-25):** `loadItem()` now catches read/deserialize failures and returns null (corrupt file degrades to cache miss). `saveItem()` still unguarded.
+  - **Status (2026-10-25):** `loadItem()` has **no** try-catch: a data file that is not valid JSON throws, and the exception ends the process. This is deliberate fail-fast behaviour (see the "Lookup invariants" comment in server.js). `saveItem()` writes through `writeFileAtomic()` (temporary file, fsync, rename; the temporary file is removed and the error re-thrown on failure), so a crash or full disk cannot leave a truncated file, but a failed write in the periodic save still ends the process (see server-security.md, Finding 2).
 
 - [ ] **Profile file I/O performance before considering async conversion** (server.js)
   - **WARNING**: Converting to async is NOT a simple refactoring
@@ -59,9 +58,9 @@ This document contains actionable items for improving code quality, security, pe
 - [X] **Add message schema validation** (server.js)
   - Validate incoming messages before processing
   - Check required fields exist and have correct types
-  - Consider using a schema library (Zod, Joi, etc.)
+  - Done with hand-written validators (`is_invalid_*` in shared.js), no schema library
   - Prevents server crashes from malformed client messages
-  - Location: `routeMessage()` and all message handlers
+  - Location: every message handler in server.js calls its validator first
 
 ---
 
@@ -84,7 +83,7 @@ This document contains actionable items for improving code quality, security, pe
 - [x] **Add bounding box pre-filtering for intersections** (index.html, shared.js)
   - Performs layer check, then bbox intersection, then pixel comparison
   - Early returns if bboxes don't overlap, avoiding expensive pixel checks
-  - Location: `index.html:~2565` (do_intersect function)
+  - Location: `index.html:~6879` (do_intersect function)
 
 ### Memory Management
 
@@ -114,10 +113,9 @@ This document contains actionable items for improving code quality, security, pe
 - [ ] **Replace magic numbers with named constants** (all files)
   ```javascript
   // Examples to fix:
-  const PING_INTERVAL_MS = 5000;
-  const DRAG_THRESHOLD_PX = 5;
-  const HASH_BIT_MASK = 0xffffffffffffffffffffffffffffffn; // 120 bits for collision resistance
-  const PERSIST_INTERVAL_MS = 10000;
+  const PERSIST_INTERVAL_MS = 10000;   // server.js: setInterval( periodicallyPersist, 10000 )
+  const AUTO_ERASE_DELAY_MS = 3000;    // index.html: timer pens
+  const RESPONSE_TIMEOUT_MS = 100;     // index.html: pings ignored while a proposal is pending
   ```
   - Add comments explaining why these values were chosen
   - Locations: Throughout codebase
@@ -128,17 +126,15 @@ This document contains actionable items for improving code quality, security, pe
   - Update message protocol constants
   - Consider: camelCase for JS, snake_case for protocol messages
 
-- [ ] **Remove or complete canvas caching optimization** (index.html)
-  - Commented-out canvas caching code exists
-  - Either implement fully or remove
-  - If implementing, add documentation
-  - Location: `index.html:~2740-2760` (commented canvasCache code)
+- [x] **Remove or complete canvas caching optimization** (index.html)
+  - Done: the commented-out `canvasCache` code is gone
+  - (The client's page cache is an in-memory LRU of 24 pages; the old sessionStorage version of it is still present as a commented-out block at `index.html:~1355-1414`)
 
 - [ ] **Replace assertions with proper error handling** (server.js)
-  - Assertions may be disabled in production
-  - Use explicit error throwing for runtime validation
+  - Node's `assert` is never disabled; a failed assert throws, and since handler exceptions are not caught, it ends the process
+  - The asserts guard server-side invariants (see "Lookup invariants" in server.js), not client input
   - Add meaningful error messages
-  - Locations: All `assert()` calls
+  - Locations: All `assert()` calls (20)
 
 ### Documentation
 
@@ -213,10 +209,9 @@ This document contains actionable items for improving code quality, security, pe
   - Alternative: Use JSDoc type annotations for incremental improvement
   - Start with shared.js if migrating
 
-- [ ] **Add runtime type validation for critical paths** (server.js, index.html)
-  - Validate message formats at runtime
-  - Validate action payloads
-  - Use schemas or type guards
+- [~] **Add runtime type validation for critical paths** (server.js, index.html)
+  - Done on the server: message formats and action payloads (including stroke structure and group nesting) are validated (`is_invalid_*` in shared.js)
+  - Not done: the client does not validate server messages
   - Prevents type-related bugs
 
 ### Monitoring & Observability
@@ -235,7 +230,7 @@ This document contains actionable items for improving code quality, security, pe
 
 - [ ] **Implement health check endpoint** (server.js)
   - HTTP endpoint for monitoring
-  - Check database connectivity
+  - Check that the data directory is writable (there is no database)
   - Report cache status
   - Use for load balancer health checks
 
@@ -249,14 +244,13 @@ This document contains actionable items for improving code quality, security, pe
 
 - [ ] **Add connection quality indicators** (index.html)
   - Show latency to user
-  - Indicate when actions are pending server confirmation
+  - Indicate when actions are pending server confirmation (while offline, the error banner already shows how many edits wait; a sync indicator exists only as commented-out code)
   - Warn about poor connection quality
 
-- [ ] **Implement offline mode with sync** (index.html)
-  - Cache actions when disconnected
-  - Queue for upload when reconnected
-  - Show offline indicator
-  - Handle conflicts on reconnection
+- [~] **Implement offline mode with sync** (index.html)
+  - Done: edits made while disconnected stay in the local history as unconfirmed edits, are kept in sessionStorage across a reload of the tab, and are proposed again after reconnecting (`resendUnconfirmedEdits`)
+  - Done: the error banner shows the offline state and the number of waiting edits; page actions are refused while offline
+  - Conflicts: resent edits are applied to the server's current page; an edit whose target is gone is declined, with no further resolution
 
 ---
 
@@ -290,7 +284,7 @@ The single-file approach is **intentional** for security:
 - Embedding shared.js prevents external dependency attacks
 
 ### Performance Context
-Current performance is acceptable for typical use cases but degrades with:
+No measurements exist yet (see `performance/README.md`, a plan that has not been run). The expectation is that performance is acceptable for typical use cases but degrades with:
 - Many strokes (>1000) on canvas
 - Complex selections/erases
 - Long sessions without refresh
@@ -310,4 +304,4 @@ These items provide maximum impact with minimal effort:
 
 ---
 
-Last Updated: 2026-07-25
+Last Updated: 2026-10-25

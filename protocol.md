@@ -4,49 +4,64 @@
 
 This document describes the WebSocket-based communication protocol used by the Kubux Whiteboard Server. The protocol enables real-time collaborative drawing with support for multiple pages, undo/redo, and state synchronization.
 
-## Message Format
+The authoritative definitions are the `MESSAGES` and `MOD_ACTIONS` constants and the `is_invalid_*` validators in `shared.js`; the behaviour described here is that of the handlers in `server.js`. Field names below are the literal keys on the wire.
 
-All messages are JSON-encoded with a `type` field identifying the message type. Messages use a `requestId` field for correlating requests and responses.
+## Transport and Message Format
 
-### Serialization
+- The WebSocket endpoint is `/ws` (in direct mode the client is told the full `ws://…/ws` URL; behind the proxy it derives `wss://<host>/ws`).
+- Every message is a plain JSON object with a `type` field. Wire messages are parsed with `JSON.parse` and written with `JSON.stringify` on both sides; Map, Set and BigInt never appear on the wire.
+- The custom `serialize` / `deserialize` pair in `shared.js` (which encodes Set, Map and BigInt as `{"__type": …}` objects and indents by 2) is used only for the files on disk and as the input of the hash function.
+- Most requests carry a `requestId` (a UUID). Responses that answer a request echo it under the same key, so the client can match them.
+- The server closes connections that send a message larger than 5 MiB (`maxPayload`). Per-message deflate compression is enabled.
 
-Messages support complex data types (Map, Set, BigInt) through a custom serialization layer in `shared.js`.
+### How the server tracks a client
+
+Each connection has a current board (`ws.boardId`) and a current page (`ws.pageId`). They decide which broadcasts and pings the connection receives. They are set by `register-board`, `register-page`, `board-info-request` with `register: true`, `page-info-request` / `full-page` request / `replay-requests` with `register: true`, `create-board`, and by the server itself when it redirects a client away from a deleted page (see `ping`).
+
+### Validation and rejection
+
+- A message whose JSON cannot be parsed, or whose `type` has no handler, is answered with an `error` message.
+- A message that fails its validator (`is_invalid_*` in `shared.js`) is dropped without a reply.
+- A request that names an unknown board is dropped without a reply.
 
 ## Client → Server Messages
 
 ### `register-board`
 
-Register a client with a board.
+Register the connection with a board. The connection's current page becomes the board's first page.
 
 ```json
 {
   "type": "register-board",
-  "board": "<board-uuid>",
-  "client-id": "<client-uuid>",
+  "board-uuid": "<board-uuid>",
+  "clientId": "<client-uuid>",
   "requestId": "<request-uuid>"
 }
 ```
 
-**Response:** `board-registered`
+- `board-uuid`: required, UUID.
+- `clientId`: optional, UUID.
+
+**Response:** `board-registered`. No response if the board does not exist.
 
 ---
 
 ### `register-page`
 
-Register a client with a specific page on a board.
+Register the connection with a page of a board.
 
 ```json
 {
   "type": "register-page",
-  "board": "<board-uuid>",
-  "page": "<page-uuid>",
+  "board-uuid": "<board-uuid>",
+  "page-uuid": "<page-uuid>",
   "delta": <integer>,
-  "client-id": "<client-uuid>",
+  "clientId": "<client-uuid>",
   "requestId": "<request-uuid>"
 }
 ```
 
-The `delta` parameter specifies page navigation offset (e.g., +1 for next page, -1 for previous page). The server resolves the target page relative to the current page.
+The server first maps a deleted `page-uuid` to its replacement (see *Deletion Map*), then moves `delta` positions in the page order (+1 = next page, -1 = previous page), clamped to the first and last page. `delta` and `clientId` are optional.
 
 **Response:** `page-registered`
 
@@ -54,54 +69,58 @@ The `delta` parameter specifies page navigation offset (e.g., +1 for next page, 
 
 ### `page-info-request`
 
-Request metadata about a page (snapshots for hash-chain verification).
+Request the hash and snapshots of a page (resolved like `register-page`).
 
 ```json
 {
   "type": "page-info-request",
-  "board": "<board-uuid>",
-  "page": "<page-uuid>",
+  "board-uuid": "<board-uuid>",
+  "page-uuid": "<page-uuid>",
   "delta": <integer>,
   "register": <boolean>,
   "requestId": "<request-uuid>"
 }
 ```
 
-- `register`: If true, the client will be registered to the resolved page (switches the client's active page).
-- `delta`: Page navigation offset (0 for current page).
+- `requestId`: required, UUID.
+- `delta`, `register`: optional. If `register` is true, the connection's current page becomes the resolved page.
 
-**Response:** `page-info`
+**Response:** `page-info` (for the resolved page; a deleted page is silently replaced, no `page-lost`).
 
 ---
 
-### `full-page-request`
+### `fullPage-requests`
 
-Request the complete state of a page (history + present position).
+Request the complete state of a page (history + present position). The constant is `FULL_PAGE_REQUEST`; note the type string.
 
 ```json
 {
-  "type": "full-page-request",
-  "board": "<board-uuid>",
-  "page": "<page-uuid>",
+  "type": "fullPage-requests",
+  "board-uuid": "<board-uuid>",
+  "page-uuid": "<page-uuid>",
   "delta": <integer>,
   "register": <boolean>,
   "requestId": "<request-uuid>"
 }
 ```
 
-**Response:** `full-page`
+All fields are required. The page is resolved like `register-page`.
+
+**Response:**
+- `page-lost` if `delta` is 0 and the requested page has been deleted;
+- otherwise `fullPage` for the resolved page.
 
 ---
 
-### `replay-request`
+### `replay-requests`
 
-Request replay of actions from a known hash position.
+Request the actions from a known position of the page's hash chain onward. The constant is `REPLAY_REQUEST`; note the type string.
 
 ```json
 {
-  "type": "replay-request",
-  "board": "<board-uuid>",
-  "page": "<page-uuid>",
+  "type": "replay-requests",
+  "board-uuid": "<board-uuid>",
+  "page-uuid": "<page-uuid>",
   "present": <integer>,
   "present-hash": "<hash-string>",
   "register": <boolean>,
@@ -109,31 +128,39 @@ Request replay of actions from a known hash position.
 }
 ```
 
-The client provides its current position and hash. The server responds with all actions from that point forward, allowing the client to catch up.
+All fields are required; `present` is a non-negative integer. The client states a position `present` in the history and the hash it has there.
 
-**Response:** `replay`
+**Response:**
+- `page-lost` if the page has been deleted;
+- `page-info` if the server's hash at position `present` differs from `present-hash` (the client has to find another common position);
+- otherwise `replay` with all history entries from `present` to the end of the history (including an undone tail) and the server's current `present`.
 
 ---
 
 ### `mod-action-proposals`
 
-Propose a modification action (draw, erase, group, undo, redo, new-page, delete-page).
+Propose a modification (draw, erase, group, undo, redo, new page, delete page).
 
 ```json
 {
   "type": "mod-action-proposals",
-  "password": "<board-password>",
-  "board": "<board-uuid>",
-  "page": "<page-uuid>",
+  "passwd": "<board-password>",
+  "board-uuid": "<board-uuid>",
+  "page-uuid": "<page-uuid>",
   "payload": { <action-object> },
-  "before-hash": "<hash-string>",
-  "requestId": "<request-uuid>"
+  "before-hash": "<hash-string>"
 }
 ```
 
-The `before-hash` field contains the hash of the state *before* applying the action, enabling the server to verify the client's state is current.
+- `passwd`, `board-uuid`, `page-uuid`, `payload`: required. The payload is validated recursively (see *Action Types*).
+- `before-hash`: optional string. The client sends the hash of its state before the action (`NULL_UUID` for page actions). **The server does not check it**: draw, erase and group actions are applied to whatever state the server has, and are declined only if they cannot be applied there.
+- There is no `requestId` key; the server uses `requestId`, then `action-uuid`, if present (otherwise `"N/A"`), for logging and as the `requestId` of the responses to page actions.
 
-**Response:** `accept` or `decline`
+**Responses:**
+- `decline` with reason `unauthorized` if `passwd` does not match the board password;
+- `decline` with reason `page not on board` if `page-uuid` is not in the board's page order;
+- draw / erase / group / undo / redo: `accept` (or `decline`) to the proposer, and on acceptance a `replay` broadcast to every *other* connection registered with the board (see *Action Broadcast*);
+- new page / delete page: see *Page Management Protocol*. No `accept` is sent.
 
 ---
 
@@ -144,13 +171,14 @@ Request the current page order of a board.
 ```json
 {
   "type": "board-info-request",
-  "board": "<board-uuid>",
+  "board-uuid": "<board-uuid>",
   "register": <boolean>,
   "requestId": "<request-uuid>"
 }
 ```
 
-- `register`: If true, the client will be registered to the first page of the board.
+- `requestId`: required, UUID.
+- `register`: optional. If true, the connection is registered with the board and its current page becomes the board's first page.
 
 **Response:** `board-info`
 
@@ -158,42 +186,49 @@ Request the current page order of a board.
 
 ### `shuffle-proposal`
 
-Propose a reordering of pages on a board.
+Propose a reordering of the pages of a board.
 
 ```json
 {
   "type": "shuffle-proposal",
-  "board": "<board-uuid>",
-  "password": "<board-password>",
+  "board-uuid": "<board-uuid>",
+  "passwd": "<board-password>",
   "before": ["<page-uuid>", ...],
   "after": ["<page-uuid>", ...],
   "requestId": "<request-uuid>"
 }
 ```
 
-The server validates:
-1. Password matches the board password
-2. `before` matches the current server-side page order (sync check)
-3. `after` is a valid permutation of the same UUIDs
+The proposal is dropped unless the connection is registered with `board-uuid`. The server then checks:
+1. `passwd` matches the board password;
+2. `before` equals the current server-side page order (sync check);
+3. `after` has the same length and the same set of UUIDs as `before`.
 
-**Response:** `board-info` (broadcast to all subscribers on the board)
+**Response:**
+- on success, the new order is saved and a `board-info` is broadcast to all connections registered with the board (including the proposer);
+- on any failed check, a `board-info` with the unchanged order is sent to the proposer only.
 
 ---
 
 ### `create-board`
 
-Create a new board (requires server-level credential).
+Create a new board (requires a server-level credential from `conf/passwd.json`).
 
 ```json
 {
   "type": "create-board",
-  "password": "<credential>",
-  "client-id": "<client-uuid>",
+  "passwd": "<credential>",
+  "clientId": "<client-uuid>",
   "requestId": "<request-uuid>"
 }
 ```
 
-**Response:** `board-created`
+The credential is checked asynchronously with scrypt against each stored hash. A connection may have only one check in progress.
+
+**Response:**
+- on success: `board-created`, followed by a `fullPage` of the board's first (empty) page with `do-move: true`; the connection is registered with the new board;
+- wrong credential: `error` with message `credential not accepted`;
+- a check already running on this connection: `error` with message `a board creation request is already being checked`.
 
 ---
 
@@ -201,33 +236,30 @@ Create a new board (requires server-level credential).
 
 ### `board-created`
 
-Sent in response to a successful board creation.
-
 ```json
 {
   "type": "board-created",
-  "board": "<new-board-uuid>",
-  "password": "<new-board-password>",
-  "first-page": "<page-uuid>",
+  "board-uuid": "<new-board-uuid>",
+  "passwd": "<new-board-password>",
+  "first-page-uuid": "<page-uuid>",
   "requestId": "<request-uuid>"
 }
 ```
 
-- `first-page`: UUID of the board's initial (empty) page. The client joins this page immediately after creation.
+- `passwd`: the board's edit password (12 characters, `0-9a-z`).
+- `first-page-uuid`: the board's initial (empty) page.
 
 ---
 
 ### `board-registered`
 
-Sent in response to a successful board registration.
-
 ```json
 {
   "type": "board-registered",
-  "board": "<board-uuid>",
-  "first-page": "<page-uuid>",
-  "last-page": "<page-uuid>",
-  "total-pages": <integer>,
+  "board-uuid": "<board-uuid>",
+  "first-page-uuid": "<page-uuid>",
+  "last-page-uuid": "<page-uuid>",
+  "totalPages": <integer>,
   "requestId": "<request-uuid>"
 }
 ```
@@ -236,75 +268,80 @@ Sent in response to a successful board registration.
 
 ### `page-registered`
 
-Sent in response to a successful page registration.
-
 ```json
 {
   "type": "page-registered",
-  "page": "<page-uuid>",
-  "page-nr": <integer>,
-  "total-pages": <integer>,
+  "page-uuid": "<page-uuid>",
+  "hash": "<hash-string>",
+  "snapshots": ["<hash-string>", ...],
+  "pageNr": <integer>,
+  "totalPages": <integer>,
   "requestId": "<request-uuid>"
 }
 ```
+
+`page-uuid` is the resolved page, which differs from the requested one after a redirect or a non-zero `delta`.
 
 ---
 
-### `full-page`
+### `fullPage`
 
-Contains the complete state of a page.
+The complete state of a page. The constant is `FULL_PAGE`; note the type string.
 
 ```json
 {
-  "type": "full-page",
-  "page": "<page-uuid>",
+  "type": "fullPage",
+  "page-uuid": "<page-uuid>",
   "history": [<action>, ...],
   "present": <integer>,
-  "page-nr": <integer>,
-  "total-pages": <integer>,
-  "switch": <boolean>,
+  "hash": "<hash-string>",
+  "pageNr": <integer>,
+  "totalPages": <integer>,
+  "do-move": <boolean>,
   "requestId": "<request-uuid>"
 }
 ```
 
-- `switch`: If true, the client should switch to this page.
-- `history`: Array of all actions in the timeline.
-- `present`: Current position in the timeline (for undo/redo).
+- `history`: all actions of the page, including an undone tail beyond `present`.
+- `present`: number of history entries currently in effect (undo/redo position).
+- `hash`: the hash chain value at `present`.
+- `do-move`: if true, the client should switch to this page (the server has already made it the connection's current page).
 
 ---
 
 ### `page-info`
 
-Contains metadata about a page (snapshots for hash-chain verification).
+The hash and snapshots of a page.
 
 ```json
 {
   "type": "page-info",
-  "page": "<page-uuid>",
+  "page-uuid": "<page-uuid>",
   "hash": "<hash-string>",
   "snapshots": ["<hash-string>", ...],
-  "page-nr": <integer>,
-  "total-pages": <integer>,
-  "switch": <boolean>,
+  "pageNr": <integer>,
+  "totalPages": <integer>,
+  "do-move": <boolean>,
   "requestId": "<request-uuid>"
 }
 ```
 
-The `snapshots` array contains spaced hashes from the page's hash chain, enabling the client to find a matching hash without needing the full history.
+`hash` is the chain value at the page's `present`; `snapshots` is described under *Snapshots*.
 
 ---
 
 ### `page-lost`
 
-Sent when a page has been deleted and the client needs to be redirected.
+The requested page has been deleted; `page-uuid` is its replacement.
 
 ```json
 {
   "type": "page-lost",
-  "page": "<replacement-page-uuid>",
-  "lost": "<deleted-page-uuid>",
-  "page-nr": <integer>,
-  "total-pages": <integer>,
+  "lost-uuid": "<deleted-page-uuid>",
+  "page-uuid": "<replacement-page-uuid>",
+  "pageNr": <integer>,
+  "totalPages": <integer>,
+  "do-move": <boolean>,
   "requestId": "<request-uuid>"
 }
 ```
@@ -313,130 +350,171 @@ Sent when a page has been deleted and the client needs to be redirected.
 
 ### `replay`
 
-Contains actions from a specific point in the hash chain forward.
+A run of history entries starting at a position of the hash chain.
 
 ```json
 {
   "type": "replay",
-  "page": "<page-uuid>",
-  "before-hash": "<hash-string>",
-  "after-hash": "<hash-string>",
-  "sequence": [<action>, ...],
+  "page-uuid": "<page-uuid>",
+  "beforeHash": "<hash-string>",
+  "afterHash": "<hash-string>",
+  "edits": [<action>, ...],
   "present": <integer>,
-  "current-hash": "<hash-string>",
-  "page-nr": <integer>,
-  "total-pages": <integer>,
-  "requestId": "<request-uuid>",
-  "switch": <boolean>
+  "currentHash": "<hash-string>",
+  "pageNr": <integer>,
+  "totalPages": <integer>,
+  "do-move": <boolean>,
+  "requestId": "<request-uuid>"
 }
 ```
+
+- `beforeHash`: chain value just before the first entry of `edits`.
+- `afterHash`: in a reply to `replay-requests`, the value at the server's `present`; in an action broadcast, the value at the end of the history.
+- `present` / `currentHash`: the server's present position and the chain value there.
+- In an action broadcast, `requestId` is the UUID of the accepted action and `do-move` is false.
 
 ---
 
 ### `accept`
 
-Sent when a modification action is accepted by the server.
+Sent to the proposer when a draw, erase, group, undo or redo action is accepted.
 
 ```json
 {
   "type": "accept",
-  "page": "<page-uuid>",
+  "page-uuid": "<page-uuid>",
   "action-index": <integer>,
   "action-uuid": "<action-uuid>",
   "before-hash": "<hash-string>",
   "after-hash": "<hash-string>",
-  "page-nr": <integer>,
-  "total-pages": <integer>,
-  "requestId": "<request-uuid>"
+  "pageNr": <integer>,
+  "totalPages": <integer>
 }
 ```
+
+`action-index` is `present - 1` after the action; `before-hash` and `after-hash` are the chain values at `present - 1` and `present`. There is no `requestId`; the client matches on `action-uuid`.
 
 ---
 
 ### `decline`
 
-Sent when a modification action is declined by the server.
+Sent to the proposer when a proposal is refused.
 
 ```json
 {
   "type": "decline",
-  "page": "<page-uuid>",
+  "page-uuid": "<page-uuid>",
   "action-uuid": "<action-uuid>",
-  "reason": "<string>",
-  "requestId": "<request-uuid>"
+  "reason": "<string>"
 }
 ```
+
+See *Appendix C* for the reasons.
 
 ---
 
 ### `ping`
 
-Periodic state verification message sent by the server.
+Sent every 5 seconds to every open connection that has a current board and page.
 
 ```json
 {
   "type": "ping",
-  "page": "<page-uuid>",
+  "page-uuid": "<page-uuid>",
   "hash": "<hash-string>",
-  "page-nr": <integer>,
-  "total-pages": <integer>,
-  "snapshots": ["<hash-string>", ...],
-  "requestId": "<request-uuid>"
+  "pageNr": <integer>,
+  "totalPages": <integer>,
+  "snapshots": ["<hash-string>", ...]
 }
 ```
 
-The `snapshots` array contains spaced hashes from the page's hash chain, enabling the client to find a matching hash for efficient reconciliation without requesting a full page.
+Before sending, the server maps the connection's current page through the deletion map, so a client whose page was deleted is moved to the replacement and receives a ping for it. Pings are also sent to all connections on a board right after a page was added or deleted. There is no `requestId`.
 
 ---
 
 ### `board-info`
 
-Contains the current page order of a board. Sent in response to `board-info-request` or broadcast after a successful `shuffle-proposal`.
+The current page order of a board.
 
 ```json
 {
   "type": "board-info",
-  "board": "<board-uuid>",
+  "board-uuid": "<board-uuid>",
   "pages": ["<page-uuid>", ...],
   "requestId": "<request-uuid>"
 }
 ```
 
+Sent:
+- in response to `board-info-request`;
+- in response to a `shuffle-proposal` (broadcast on success, to the proposer only on failure);
+- broadcast to the board after a page was added or deleted;
+- every 5 seconds to every open connection with a current board, with `requestId` set to `NULL_UUID`.
+
+---
+
+### `error`
+
+Sent when a message is rejected before reaching a handler, and for failed board creation.
+
+```json
+{
+  "type": "error",
+  "message": "<string>"
+}
+```
+
+`message` is the `JSON.parse` error text, `Unhandled message type: <type>`, `credential not accepted`, or `a board creation request is already being checked`.
+
 ---
 
 ## Action Types
 
-Actions are the fundamental units of modification. Each action has a `type` and a `uuid`.
+Actions are the units of modification. Each action has a `uuid` (string) and a `type` (string). The type strings are:
+
+| Constant | `type` |
+|---|---|
+| `MOD_ACTIONS.DRAW` | `draw` |
+| `MOD_ACTIONS.ERASE` | `erase` |
+| `MOD_ACTIONS.GROUP` | `group` |
+| `MOD_ACTIONS.UNDO` | `undo` |
+| `MOD_ACTIONS.REDO` | `redo` |
+| `MOD_ACTIONS.NEW_PAGE` | `new page` |
+| `MOD_ACTIONS.DELETE_PAGE` | `delete page` |
+
+Draw, erase and group are *edit* actions: they enter the page history. Undo and redo only move `present`. New page and delete page change the board's page order and never enter a history.
 
 ### `draw`
 
-Add a new stroke to the page.
+Add a stroke to the page.
 
 ```json
 {
   "type": "draw",
   "uuid": "<action-uuid>",
-  "stroke": { <stroke-object> }
+  "stroke": <stroke-array>
 }
 ```
 
+The stroke becomes a visible element whose UUID is the draw action's `uuid`. Declined if an element with that UUID is already visible.
+
 ### `erase`
 
-Remove a stroke from the page.
+Hide an element.
 
 ```json
 {
   "type": "erase",
   "uuid": "<action-uuid>",
-  "target-action": "<element-uuid>"
+  "targetActionUuid": "<uuid of the draw action>"
 }
 ```
 
-The `target-action` field references the UUID of the element to erase (not the action that created it, but the element's UUID).
+Elements are identified by the UUID of the draw action that created them (also when that draw is nested in a group). Declined if the element is not visible.
 
 ### `group`
 
-Group multiple actions into a single atomic operation.
+Several edit actions applied atomically: if one of them cannot be applied, the state is rolled back and the whole group is declined.
 
 ```json
 {
@@ -446,129 +524,119 @@ Group multiple actions into a single atomic operation.
 }
 ```
 
-Used for operations like cut, move, layer change, and batch erase.
+Sub-actions may only be `draw`, `erase` or `group`; nesting deeper than 10 levels (`MAX_GROUP_DEPTH`) fails validation. Used for operations like cut, move, layer change, paste and batch erase.
 
 ### `undo`
-
-Undo the most recent action.
 
 ```json
 {
   "type": "undo",
   "uuid": "<action-uuid>",
-  "target-action": "<action-uuid>"
+  "targetActionUuid": "<action-uuid>"
 }
 ```
 
-The `target-action` references the UUID of the action to undo. The server verifies this is the immediate past action.
+Accepted only if `targetActionUuid` is the UUID of the history entry just before `present` (the immediate past); `present` then decreases by one.
 
 ### `redo`
-
-Redo the most recently undone action.
 
 ```json
 {
   "type": "redo",
   "uuid": "<action-uuid>",
-  "target-action": "<action-uuid>"
+  "targetActionUuid": "<action-uuid>"
 }
 ```
 
-The `target-action` references the UUID of the action to redo. The server verifies this is the immediate future action.
+Accepted only if `targetActionUuid` is the UUID of the history entry at `present` (the immediate future); `present` then increases by one.
 
-### `new-page`
+A new edit action discards the undone tail of the history beyond `present`.
 
-Insert a new page after the current page.
+### `new page`
 
 ```json
 {
-  "type": "new-page",
+  "type": "new page",
   "uuid": "<action-uuid>"
 }
 ```
 
-The server creates a new empty page and inserts it into the board's page order after the page specified in the enclosing `mod-action-proposals` message. The new page UUID is generated server-side. The response includes a `full-page` for the new page and a `board-info` broadcast to all subscribers.
+Inserts a new empty page after the page named in the enclosing proposal. See *Page Management Protocol*.
 
-### `delete-page`
-
-Delete the current page.
+### `delete page`
 
 ```json
 {
-  "type": "delete-page",
+  "type": "delete page",
   "uuid": "<action-uuid>"
 }
 ```
 
-The server removes the page from the board's page order. If it was the last page, a replacement empty page is created. A deletion map entry is created to redirect future requests for the deleted UUID. The response includes a `page-info` or `full-page` for the replacement page and a `board-info` broadcast.
+Deletes the page named in the enclosing proposal. See *Page Management Protocol*.
 
 ---
 
-## Stroke Object Structure
+## Stroke Structure
 
-A stroke represents a drawn element on the canvas:
+A stroke is a 13-element array indexed by the `ELEMENT` constants in `shared.js`:
 
-```json
-{
-  "type": <0|1>,           // 0 = STROKE, 1 = FILL
-  "path": <0|1>,           // 0 = OPEN, 1 = CLOSED
-  "points": [[x, y, pressure], ...],
-  "color": "<css-color>",
-  "width": <number>,
-  "opacity": <number>,
-  "cap-style": <0|1|2>,    // 0 = ROUND, 1 = BUTT, 2 = SQUARE
-  "join-style": <0|1|2>,   // 0 = ROUND, 1 = BEVEL, 2 = MITER
-  "sensitivity": <number>,
-  "dash-pattern": [<number>, ...],
-  "layer": <0-7>,
-  "transform": [a, b, c, d, e, f]
-}
-```
+| Index | `ELEMENT` | Content | Accepted values |
+|---|---|---|---|
+| 0 | `TYPE` | drawable type | `"stroke"` or `"fill"` |
+| 1 | `PATH` | path kind | `"opl"`, `"cpl"`, `"obz"`, `"cbz"` (open/closed piecewise linear, open/closed Bézier) |
+| 2 | `POINTS` | points | non-empty list of `[x, y, pressure]` or `[x, y, pressure, timestamp]`, finite numbers |
+| 3 | `COLOR` | color | `#RGB`, `#RRGGBB`, or 1–20 lowercase letters (a color name) |
+| 4 | `WIDTH` | width | finite number > 0 |
+| 5 | `TRANSFORM` | affine transform `[a, b, c, d, e, f]` | 6 finite numbers |
+| 6 | `OPACITY` | opacity | 0 … 1 |
+| 7 | `CAP_STYLE` | cap style | 0 = round, 1 = butt, 2 = square |
+| 8 | `JOIN_STYLE` | join style | 0 = round, 1 = bevel, 2 = miter |
+| 9 | `DASH_PATTERN` | dash pattern | up to 16 non-negative numbers (empty = solid) |
+| 10 | `SENSITIVITY` | pressure sensitivity | finite number |
+| 11 | `LAYER` | layer | integer 0 … 7 |
+| 12 | `PEN_TYPE` | pen type | 0 = marker, 1 = pencil, 2 = highlighter, 3 = brush |
 
 ---
 
 ## Hash Chain
 
-The protocol uses a hash chain to ensure state consistency between clients and server:
+The protocol uses a hash chain to detect diverging copies of a page:
 
-1. **Initial hash**: `hashAny(pageUuid)` — a hash derived from the page UUID
-2. **Subsequent hashes**: `hashNext(previousHash, action)` — combines the previous hash with the new action
-3. **Verification**: Clients and server independently compute hashes. Mismatches trigger replay requests.
+1. **Anchor**: `hashes[0] = hashAny(pageUuid)`.
+2. **Chain**: `hashes[i+1] = hashNext(hashes[i], history[i])`, where `hashNext(h, action) = hashAny([h, action])`.
+3. **Page hash**: the value reported for a page (`hash` in `page-info`, `fullPage`, `ping`, …) is `hashes[present]`.
 
-**Note:** Client and server use the exact same anchor and chain function (both from `shared.js`). The server's page state starts with `hashes: [hashAny(pageId)]` and extends via `hashNext`, matching the client's `hashes[0] = hashAny(pageUuid)`, `hashes[i+1] = hashNext(hashes[i], history[i])`. Any deviation on either side breaks all hash comparisons and causes replay/full-page loops.
+The chain covers the whole history, including an undone tail; undo and redo only move `present`.
+
+`hashAny` is a non-cryptographic 128-bit hash (the cyrb128 construction, four 32-bit lanes) over the text produced by `serialize`, returned as 32 hex digits. Client and server use the same functions from `shared.js`, so any deviation breaks every hash comparison. The server stores the chain with the page; when it loads a page whose stored chain was produced by a different hash function, it rebuilds the chain from the history.
 
 ### Snapshots
 
-The server maintains spaced snapshots of the hash chain (every few actions). These are sent in `page-info` and `ping` messages, allowing clients to find a matching hash point without needing the full history.
+`snapshots` (in `page-registered`, `page-info` and `ping`) are chain values at a sparse set of positions, computed by `recent_snapshots(history.length)`: position 0 plus positions at power-of-two distances back from `history.length - 1`. For example, a history of 100 actions gives positions `[0, 64, 80, 88, 92, 96, 98, 99]`; an empty history gives no snapshots. The positions depend on the history length, not on `present`. Clients use them to find the latest position their own chain shares with the server's and request a `replay` from there.
 
 ---
 
-## Board States
+## Action Broadcast
+
+When a draw, erase, group, undo or redo action is accepted, the server sends `accept` to the proposer and a `replay` to every other open connection registered with the same board (whatever page it is on). Let `p` be `present` after the action. The replay's `edits` are the history entries from position `max(0, p - 1)` to the end of the history:
+- for a new or redone action, this is that action (plus the remaining redo tail after a redo);
+- for an undo, it starts with the entry just before the undone one and contains the undone tail.
+
+---
+
+## Board State
 
 ### Page Order
 
-Each board maintains an ordered list of page UUIDs (`pageOrder`). This order determines:
-- Page numbering (1-based)
-- Navigation order (next/prev)
-- Overview mode display order
+Each board stores its edit password (`passwd`) and an ordered list of page UUIDs (`pageOrder`). The order determines page numbering (1-based `pageNr`), next/previous navigation, and the overview display order. Boards are never deleted, and `pageOrder` is never empty.
 
 ### Shuffle Protocol
 
-Page reordering follows a proposal-acceptance protocol:
+Page reordering follows a proposal/acceptance protocol:
 
-1. **Client** sends `shuffle-proposal` with `before` (current order) and `after` (desired order)
-2. **Server** validates:
-   - Password matches board password
-   - `before` matches current server state (sync check)
-   - `after` is a valid permutation of the same UUIDs
-3. **Server** applies the new order and broadcasts `board-info` to all subscribers
-
-### Board Info
-
-The `board-info` message is used to synchronize page order across all clients. It is sent:
-- In response to `board-info-request`
-- After a successful `shuffle-proposal`
-- Periodically as part of the board info broadcast
+1. The client sends `shuffle-proposal` with `before` (the order it knows) and `after` (the desired order).
+2. The server validates the password, the sync check and the permutation (see `shuffle-proposal`).
+3. The server applies and saves the new order and broadcasts `board-info`, or sends the unchanged order back to the proposer.
 
 ---
 
@@ -576,40 +644,38 @@ The `board-info` message is used to synchronize page order across all clients. I
 
 ### Adding a Page
 
-1. Client sends `mod-action-proposals` with a `new-page` action
-2. Server creates a new page with a server-generated UUID
-3. Server inserts the new page into `board.pageOrder` after the specified page
-4. Server sends `full-page` to the requesting client (with `switch: true`)
-5. Server broadcasts `board-info` to all subscribers
-6. Server sends a `ping` to trigger state verification
+1. The client sends `mod-action-proposals` with a `new page` action; `page-uuid` names the page after which to insert.
+2. The server creates an empty page with a server-generated UUID and inserts it after that page.
+3. The server sends `fullPage` for the new page to the proposer, with `do-move: true`.
+4. The server pings every connection on the board.
+5. The server broadcasts `board-info` to the board.
 
 ### Deleting a Page
 
-1. Client sends `mod-action-proposals` with a `delete-page` action
-2. Server removes the page from `board.pageOrder`
-3. If it was the last page, a replacement empty page is created
-4. A deletion map entry maps the deleted UUID to the replacement UUID
-5. Server sends `page-info` or `full-page` to the requesting client
-6. Server broadcasts `board-info` to all subscribers
-7. Server sends a `ping` to trigger state verification
+1. The client sends `mod-action-proposals` with a `delete page` action for `page-uuid`.
+2. If the board has more than one page, the page is removed from the page order and the page now at its position (or the new last page) becomes its replacement; the server sends `page-info` for the replacement to the proposer, with `do-move: true`.
+3. If it is the board's only page, a new empty page takes its place in the page order; the server sends `fullPage` for it to the proposer, with `do-move: true`.
+4. In both cases, the deletion map records deleted UUID → replacement UUID.
+5. The server pings every connection on the board (which moves other clients off the deleted page).
+6. The server broadcasts `board-info` to the board.
 
 ### Deletion Map
 
-When a page is deleted, the server maintains a mapping from the deleted UUID to its replacement. This ensures that clients requesting the deleted page (e.g., from cache) are redirected to the correct replacement page. The mapping is persisted to `data/to_be_removed.json`.
+The deletion map lets clients that still ask for a deleted page (e.g., from their cache) be redirected. The server follows the chain of replacements; if the final replacement is not on the board, it falls back to the board's first page. The map is saved to `data/to_be_removed.json` (every 10 seconds and on shutdown). The file of a deleted page stays on disk.
 
 ---
 
 ## Overview Mode
 
-Overview mode is a client-side feature that displays all pages as thumbnails in a grid. It interacts with the protocol as follows:
+Overview mode is a client-side feature that displays all pages as thumbnails in a grid. It uses the protocol as follows:
 
-1. **Entering overview**: The client commits the current page to cache and requests `board-info` to get the current page order
-2. **Rendering thumbnails**: The client renders each page from its local cache. Pages not in cache are requested via `full-page-request`
-3. **Reordering**: The client performs drag-and-drop locally. On confirm, it sends a `shuffle-proposal` with the new order
-4. **Deleting**: The client sends `mod-action-proposals` with `delete-page` actions for each selected page
-5. **Adding**: The client sends `mod-action-proposals` with a `new-page` action
-6. **Exporting**: The client requests `page-info` and `replay` for each page, then renders them as PDF pages
-7. **Real-time updates**: While in overview mode, the client processes `board-info` and `ping` messages to keep the grid up to date. New pages are inserted into the grid, deleted pages are removed.
+1. **Entering**: the client stores the current page in its cache, builds the grid from the page order it knows, and sends `board-info-request`.
+2. **Thumbnails**: pages in the client's cache are rendered from it; missing pages are fetched with `fullPage-requests` (`delta: 0`, `register: false`).
+3. **Reordering**: drag-and-drop and "move to front/back" are local; on Confirm, the client sends a `shuffle-proposal` if the order changed. Cancel, or clicking a thumbnail to open that page, discards the local order.
+4. **Deleting**: after a confirmation dialog, the client immediately sends one `mod-action-proposals` with a `delete page` action per selected page.
+5. **Adding**: the client sends a `new page` action anchored at the last page.
+6. **Exporting**: for each page, the client sends `page-info-request`, finds the latest snapshot its cached history matches, and, unless the cached copy is already current, sends `replay-requests` from there; if that gives no data it falls back to `fullPage-requests`. The pages are then rendered into one PDF.
+7. **Updates**: while the overview is open, incoming `board-info` and `ping` messages refresh the grid; new pages are inserted and deleted pages removed, while a pending local reordering is preserved.
 
 ---
 
@@ -617,21 +683,25 @@ Overview mode is a client-side feature that displays all pages as thumbnails in 
 
 ### Message Validation
 
-All incoming messages are validated against their expected schema. Invalid messages are silently dropped.
+Every client message type has a validator in `shared.js` (see *Appendix B*). Messages that fail validation are dropped without a reply. Messages that cannot be parsed, or have an unknown type, are answered with `error`.
 
 ### State Inconsistency
 
-When a hash mismatch is detected (via `ping` or `accept`/`decline`), the client:
-1. Attempts to find a matching hash in its chain using the server's snapshots
-2. If found, requests a `replay` from that point
-3. If not found, requests a `full-page` refresh
+On a `ping` for its current page (ignored while one of its own proposals awaits an answer, for at most 100 ms), the client looks up the server's hash in its own chain:
+1. if it is there at the client's `present`, the client is in sync;
+2. if it is there at another position, the client moves its `present` to that position (an undo or redo it missed);
+3. if it is not there, the client rewinds to the latest of the server's snapshots that occurs in its own chain (position 0, the anchor, always does) and sends `replay-requests` from that position.
+
+### Unconfirmed edits
+
+Edit actions the client has made but the server has not yet confirmed (e.g., while offline) are kept in the client's history and saved in `sessionStorage`, so they survive a reload of the tab. After reconnecting, the client fetches the page and proposes the edits again, skipping those the server already has.
 
 ### Reconnection
 
-Clients use exponential backoff for reconnection:
-- Initial delay: 1 second
-- Maximum delay: 30 seconds
-- On successful connection, the client re-registers with the board
+The client reconnects with exponential backoff:
+- initial delay 1 second, doubling per attempt, at most 30 seconds;
+- no limit on the number of attempts; the Reconnect button retries at once and resets the delay;
+- after connecting, the client sends `register-board` (or `create-board` when it was creating a board).
 
 ---
 
@@ -641,35 +711,36 @@ Clients use exponential backoff for reconnection:
 // Client → Server
 MESSAGES.CLIENT_TO_SERVER = {
   REGISTER_BOARD:        { TYPE: "register-board" },
+  BOARD_INFO_REQUEST:    { TYPE: "board-info-request" },
   REGISTER_PAGE:         { TYPE: "register-page" },
   PAGE_INFO_REQUEST:     { TYPE: "page-info-request" },
-  FULL_PAGE_REQUEST:     { TYPE: "full-page-request" },
-  REPLAY_REQUEST:        { TYPE: "replay-request" },
-  MOD_ACTION_PROPOSALS:  { TYPE: "mod-action-proposals" },
-  BOARD_INFO_REQUEST:    { TYPE: "board-info-request" },
+  CREATE_BOARD:          { TYPE: "create-board" },
+  FULL_PAGE_REQUEST:     { TYPE: "fullPage-requests" },
   SHUFFLE_PROPOSAL:      { TYPE: "shuffle-proposal" },
-  CREATE_BOARD:          { TYPE: "create-board" }
+  MOD_ACTION_PROPOSALS:  { TYPE: "mod-action-proposals" },
+  REPLAY_REQUEST:        { TYPE: "replay-requests" }
 };
 
 // Server → Client
 MESSAGES.SERVER_TO_CLIENT = {
   BOARD_CREATED:    { TYPE: "board-created" },
   BOARD_REGISTERED: { TYPE: "board-registered" },
+  BOARD_INFO:       { TYPE: "board-info" },
   PAGE_REGISTERED:  { TYPE: "page-registered" },
-  FULL_PAGE:        { TYPE: "full-page" },
   PAGE_INFO:        { TYPE: "page-info" },
   PAGE_LOST:        { TYPE: "page-lost" },
-  REPLAY:           { TYPE: "replay" },
+  FULL_PAGE:        { TYPE: "fullPage" },
   ACCEPT:           { TYPE: "accept" },
   DECLINE:          { TYPE: "decline" },
-  PING:             { TYPE: "ping" },
-  BOARD_INFO:       { TYPE: "board-info" }
+  REPLAY:           { TYPE: "replay" },
+  PING:             { TYPE: "ping" }
 };
+// plus the "error" message, which has no constant
 ```
 
 ## Appendix B: Validation
 
-All message types have corresponding validation functions in `shared.js`:
+All client message types have validation functions in `shared.js`:
 
 ```javascript
 is_invalid_REGISTER_BOARD_message(data)
@@ -683,39 +754,42 @@ is_invalid_BOARD_INFO_REQUEST_message(data)
 is_invalid_SHUFFLE_PROPOSAL_message(data)
 ```
 
-Each validation function checks:
-- Data is a non-null object
-- UUID fields are valid UUIDs
-- Numeric fields are finite numbers
-- Required fields are present
+They check that:
+- the message is a non-null object;
+- UUID fields are version-4 UUIDs (`isUuid`), and required ones are present;
+- integer fields (`delta`, `present`) are integers and boolean fields (`register`) are booleans;
+- password fields are non-empty strings;
+- shuffle lists are non-empty lists of UUIDs;
+- action payloads have a known type and the fields that type needs, strokes have the structure in *Stroke Structure*, and groups contain only edit actions and are at most 10 levels deep.
 
-Invalid messages are silently dropped.
+## Appendix C: Decline Reasons
 
----
-
-## Appendix C: Error Codes
-
-Server may return DECLINE with reasons:
-
-- `"unauthorized"` - Invalid or missing board password
-- `"cannot apply action to current visual state"` - Element already hidden/shown
-- `"can only undo the immediate past"` - Undo target mismatch
-- `"can only redo the immediate future"` - Redo target mismatch
-- `"unknown action type"` - Invalid action.type
-- `"Server error: ..."` - Internal server error
+| Reason | When |
+|---|---|
+| `unauthorized` | `passwd` does not match the board password |
+| `page not on board` | `page-uuid` is not in the board's page order |
+| `cannot apply action to current visual state` | a draw whose element is already visible, an erase whose target is not visible, or a group with such a sub-action |
+| `can only undo the immediate past` | undo target is not the entry before `present` |
+| `can only redo the immediate future` | redo target is not the entry at `present` |
+| `unknown action type` | not reachable in practice: validation drops unknown types first |
 
 ---
 
 ## Changelog
 
+### Document revision (October 2026)
+- Corrected the document to match `shared.js` and `server.js`: the literal wire keys (`board-uuid`, `page-uuid`, `clientId`, `passwd`, `do-move`, `pageNr`, `totalPages`, `edits`, `beforeHash`, …), the type strings `fullPage-requests`, `replay-requests`, `fullPage`, `new page` and `delete page`, and the stroke format (a 13-element array, not an object).
+- Documented the `error` message, the `page not on board` decline, the `replay` broadcast that follows each accepted action, the periodic `board-info` broadcast, and the `hash` / `snapshots` fields of `page-registered` and `fullPage`.
+- Corrected: wire messages are plain JSON; the server does not check `before-hash`; `ping` and `accept` carry no `requestId`; shuffle failures go to the proposer only; there is no `Server error: …` decline.
+
 ### Version 3.1 (July 2026)
-- Added `first-page` field to `board-created` message (was sent under a wrong key before; now matches `board-registered`)
+- Added the first page's UUID (`first-page-uuid`) to `board-created` (was sent under a wrong key before; now matches `board-registered`)
 - Documented that client and server share the identical hash-chain anchor (`hashAny(pageUuid)`)
 
 ### Version 3.0 (May 2026)
 - Added `board-info-request` / `board-info` messages for page order synchronization
 - Added `shuffle-proposal` message for collaborative page reordering
-- Added `new-page` and `delete-page` action types for page management
+- Added `new page` and `delete page` action types for page management
 - Added `snapshots` field to `ping` message for efficient hash-chain verification
 - Added overview mode protocol description
 - Added board states and page management protocol sections
@@ -723,7 +797,7 @@ Server may return DECLINE with reasons:
 
 ### Version 2.0 (April 2026)
 - Added comprehensive validation layer
-- Introduced `SWITCH`/`do-move` flag for client state management
+- Introduced the `do-move` (`SWITCH`) flag for client state management
 - Fixed boardId validation consistency
 - Removed stack traces from error responses
 - Added spaced snapshot system for efficient replay

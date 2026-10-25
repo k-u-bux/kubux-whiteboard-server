@@ -10,19 +10,19 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Multi-page support** - Create, delete, and reorder pages in a whiteboard
 - **Page Overview Mode** - Grid of page thumbnails with drag-and-drop reordering, batch delete, and multi-page PDF export
 - **Spectator mode** - You can send invites that enable viewing (including navigation) but not editing
-- **Rich drawing tools** - Pen, highlighter, and chalk tools with customizable properties
-- **Shape tools** - Draw circles, rectangles, curves, and horizontal/vertical/diagonal lines
+- **Pen slots** - Six pens, each remembering its own shape, color, width, opacity, and stroke style, plus an eraser
+- **Shape tools** - Draw freehand curves, rectangles, circles, and horizontal, vertical, or straight lines
 - **Advanced stroke controls** - Cap style (round/butt/square), join style (round/bevel/miter), and dash patterns (solid/dashed/dotted/longdash/dashdot)
 - **Pressure sensitivity** - Adjustable sensitivity levels (0-9) for variable-width strokes
 - **Path modes** - Open paths, closed paths, and filled shapes
 - **Selection tools** - Rectangle, lasso, and stroke-based selection with cut/copy/paste
-- **Interactive paste** - Paste with affine transform controls (move, rotate, scale, shear), plus multi-paste modes that place copies evenly along a path, line, circle, or in a grid
-- **Canvas formats** - Optional page format presets (A4, Letter, Legal, 16:9, 16:10, 4:3, 3:2, 2:1, custom) with fit-width/fit-height zoom
+- **Interactive paste** - Paste with affine transform controls (move, rotate, scale, shear), plus multi-paste modes that place 2–36 copies evenly along an open path, a straight, horizontal, or vertical line, around a circle, or in a rectangular grid
+- **Canvas formats** - Optional page format presets (A4, Letter, Legal, each portrait or landscape; 16:9, 16:10, 4:3, 3:2, 2:1; custom) with fit-width/fit-height zoom
 - **Layer system** - Organize content across 8 separate layers with visibility control
-- **PDF export** - Export single pages, selected pages, or entire whiteboards as vector PDFs
+- **PDF export** - Export the current page from the toolbar, or selected pages or the entire board from the overview, as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
-- **Board navigation** - Switch between multiple boards, copy shareable links, create new boards from within the app
-- **Timer** - Times auto-undo for temporary annotations during presentations
+- **Board navigation** - Switch between multiple boards, copy view or edit links, create new boards from within the app
+- **Timer** - A per-pen switch: strokes drawn with that pen are erased automatically after 3 seconds, for temporary annotations during presentations
 - **Page caching** - Client-side LRU cache for fast page switching with server hash verification
 - **Progressive Web App (PWA)** - Install as a standalone app on tablets and mobile devices
 
@@ -31,7 +31,7 @@ A real-time collaborative whiteboard application designed for mathematics educat
 ### Prerequisites
 
 - Nix package manager (recommended) - Provides Node.js and all dependencies automatically
-- Alternatively: Node.js (v14 or higher) and npm (v6 or higher)
+- Alternatively: Node.js (v18 or higher; the server uses `structuredClone` and `Object.hasOwn`) and npm
 
 ### Setup
 
@@ -104,7 +104,7 @@ KUBUX_WHITEBOARD_URL=http://localhost:3000 npm start
 - If the specified port is exposed (not blocked by a firewall) and your computer is accessible from the outside, you can use this mode to create an ad-hoc whiteboard session without a dedicated server
 
 
-**Access:** Open your browser to the URL specified in `KUBUX_WHITEBOARD_URL` (e.g., http://localhost:8080)
+**Access:** Open your browser to the URL specified in `KUBUX_WHITEBOARD_URL` with a query parameter, e.g. `http://localhost:8080/?credential=<your_password>` to create a board, or `http://localhost:8080/?board=<board-uuid>` to open one. The bare URL without a `board`, `passwd`, or `credential` parameter returns 404.
 
 
 ### Mode 2: Docker with Reverse Proxy (Production)
@@ -129,8 +129,10 @@ For production deployments, the repository includes a Dockerfile and docker-comp
    
    # In the whiteboard service:
    - <your_whiteboard_domain> # Your domain (e.g., whiteboard.example.com)
-   - <app-dir>                # Directory containing your app data (e.g., /home/user/whiteboard-data)
+   - <app-dir>                # The repository checkout, containing conf/, data/, logs/ and node_modules/
    ```
+
+   Also adjust `build.context` (the path to the repository, relative to the compose file), `container_name`, and `user` (the owner of `<app-dir>` on the host, `stat -c %u:%g <app-dir>`); the template has values from the author's setup. The checkout is mounted read-only, with only `data/` and `logs/` writable.
 
 2. **Create required directories on host**
    
@@ -140,10 +142,10 @@ For production deployments, the repository includes a Dockerfile and docker-comp
    ```
    
 3. **Start docker-compose**
-   The docker-compose file does build the container for the whiteboard server directly from the Dockerfile. The provided Dockerfile employ the somewhat hacky trick of mounting the development directory directly into the container. If you have set up the data, logs, and conf directories and the password file for local testing, they can be directly reused for deployment.
+   The docker-compose file builds the container for the whiteboard server directly from the Dockerfile. The Dockerfile copies nothing into the image; it relies on the somewhat hacky trick of mounting the development directory directly into the container, so run `npm install` in the checkout first. If you have set up the data, logs, and conf directories and the password file for local testing, they can be directly reused for deployment.
 
 4. **Support for PWA**
-   Manually create the whiteboard referenced in manifest.json to support installation as a progressive web app. When the client points the browser to a shared URL, they should be offered the option to create a progressive web app. The advantage on a tablet is that the browser interface is removed in the web app which enlarges the available board space.
+   The `start_url` in `manifest.json` is the page an installed app opens. The shipped value is a placeholder (`board=00000000-0000-0000-0000-000000000000`) that the server rejects, because it is not a version-4 UUID; replace it with the URL of a board on your server. When the client points the browser to a shared URL, they should be offered the option to install the progressive web app. The advantage on a tablet is that the browser interface is removed in the web app which enlarges the available board space.
    
 
 #### How it works
@@ -198,19 +200,16 @@ A new board will be created and the URL will change to point towards that board.
 ### Basic Controls
 
 - **Drawing** - Select a drawing tool and draw directly on the canvas
-- **Navigation** - Use the hand tool (✋) to pan around the canvas
-- **Zooming** - Use the zoom controls or mouse wheel to zoom in/out
-- **Undo/Redo** - Use the undo (↩) and redo (↪) buttons or keyboard shortcuts (Ctrl+Z, Ctrl+Y)
-- **Page Management** - Add new pages, delete pages, navigate between pages using the controls at the top. Click the page info label ("Page X of Y") to open the page menu for reordering and quick navigation.
-- **Board Navigation** - Click the folder icon (🗂️) to open the board navigation overlay, where you can copy board links, create new boards, or navigate to different boards by URL/UUID
-- **Keyboard Shortcuts**:
-  - `Ctrl+Z` — Undo
-  - `Ctrl+Y` or `Ctrl+Shift+Z` — Redo
+- **Navigation** - Use the hand tool (✋) to pan around the canvas; the reset button centers the view at 100%
+- **Zooming** - Use the zoom buttons (−/+) or the zoom menu (fit width, fit height, 50%–200%)
+- **Undo/Redo** - Use the undo (↩) and redo (↪) buttons. There are no keyboard shortcuts.
+- **Page Management** - Add new pages, delete pages, navigate between pages using the controls at the top. Click the page info label ("Page X of Y") to open the page overview for reordering and quick navigation.
+- **Board Navigation** - Click the folder icon (🗂️) to open the board navigation overlay, where you can copy view or edit links, create new boards, or navigate to different boards by URL/UUID
 
 ### Tool Options
 
-- **Color** - Select from predefined colors or open the color picker for custom colors
-- **Width** - Adjust the stroke width using the slider (1-20)
+- **Color** - Select from the color swatches; press and hold a swatch to change it with the color picker
+- **Width** - Adjust the stroke width using the slider (0.5-20)
 - **Opacity** - Control transparency with the opacity slider
 - **Shape Mode** - Toggle between freeform drawing and shape modes (curve, rectangle, circle, horizontal/vertical/diagonal lines)
 - **Pressure Sensitivity** - Adjust sensitivity (0-9) for variable-width strokes based on input pressure
@@ -241,23 +240,19 @@ The sidebar provides access to additional stroke properties:
 
 ### Page Management
 
-- **Add Page** — Click the "+" button to insert a new page after the current page
-- **Delete Page** — Click the "−" button to delete the current page (with confirmation dialog)
-- **Page Menu** — Click the page info label ("Page X of Y") to open the page menu:
-  - **Overview** — Enter overview mode (see below)
-  - **Go to page** — Navigate directly to any page by number
-  - **Move up/down** — Reorder the current page
-  - **Move to position** — Jump the current page to a specific position
-- **Keyboard Shortcuts** — Use the page navigation buttons (first, prev, next, last) in the toolbar
+- **Add Page** — Click the "➕" button to insert a new page after the current page
+- **Delete Page** — Click the "➖" button to delete the current page (with confirmation dialog)
+- **Page Navigation** — Use the first, previous, next, and last page buttons in the toolbar
+- **Overview** — Click the page info label ("Page X of Y") to open overview mode (see below)
 
 ### Overview Mode
 
 Overview mode displays all pages as thumbnails in a grid, enabling batch operations:
 
-- **Enter** — Click the page info label and select "Overview", or click the page info label directly
-- **Navigate** — Click any thumbnail to jump to that page
+- **Enter** — Click the page info label
+- **Navigate** — Click any thumbnail to jump to that page (this leaves the overview and discards an unconfirmed reordering)
 - **Reorder** — Drag and drop thumbnails to reorder pages
-- **Delete** — Select pages via checkboxes and click "Delete"
+- **Delete** — Select pages via checkboxes and click "Delete"; after a confirmation dialog the pages are deleted at once, independent of Confirm/Cancel
 - **Add** — Click "Add" to insert a new page at the end
 - **Move to Front/Back** — Select pages and move them to the beginning or end of the board
 - **Export** — Export selected pages or all pages as a multi-page PDF
@@ -265,7 +260,7 @@ Overview mode displays all pages as thumbnails in a grid, enabling batch operati
 
 ### Timer
 
-- Toggle the timer (🕐) in the sidebar to auto-undo drawing within a few seconds: think of temporarily highlighting an element during a presentation.
+- Toggle the timer (🕐) in the sidebar to switch on auto-erase for the current pen: every stroke drawn with it is erased 3 seconds later. Think of temporarily highlighting an element during a presentation. The setting is stored per pen and is not available for the eraser.
 
 
 ## Technical Overview
@@ -283,7 +278,7 @@ Key components:
 
 The communication protocol between clients and the server uses:
 - WebSockets for real-time data exchange
-- JSON message format with support for complex data types (Map, Set, BigInt)
+- Plain JSON messages (the data files on disk use a JSON encoding that also supports Map, Set, and BigInt)
 - Hash-chain verification for ensuring state consistency
 - Optimistic local updates for responsive UI
 - Replay mechanism for resolving inconsistencies
@@ -303,10 +298,10 @@ The client uses an optimized two-canvas rendering approach:
 ### Server Architecture
 
 - **Dual-mode operation**: Direct mode (standalone) or proxy mode (behind nginx)
-- **Page caching**: LRU cache (max 10 pages) with automatic eviction and persistence
+- **Page caching**: LRU cache (max 24 pages) with automatic eviction and persistence
 - **Board caching**: LRU cache (max 10 boards) with automatic eviction and persistence
-- **Periodic persistence**: State is saved to disk every 10 seconds
-- **Ping mechanism**: Server pings connected clients every 5 seconds for state verification, including hash snapshots for efficient reconciliation
+- **Periodic persistence**: All cached boards and pages and the deletion map are saved to disk every 10 seconds, each file written atomically (temporary file, fsync, rename)
+- **Ping mechanism**: Server pings connected clients every 5 seconds for state verification, including hash snapshots for efficient reconciliation, and sends each client its board's page order every 5 seconds
 - **Page deletion mapping**: When a page is deleted, a redirect chain maps the old UUID to its replacement
 - **Graceful shutdown**: SIGTERM and SIGINT handlers persist state before exit
 
@@ -332,7 +327,8 @@ The client uses an optimized two-canvas rendering approach:
 
 Only the root path (`/`) and a strict whitelist of PWA files are served:
 - `/manifest.json`, `/sw.js`, `/icon-192.png`, `/icon-512.png`, `/apple-touch-icon.png`, `/favicon.ico`, `/robots.txt`
-- The server embeds `shared.js` directly into `index.html` at request time to avoid serving raw JavaScript files
+- `/` is served only with at least one of the query parameters `board`, `passwd`, `credential` and no others; anything else returns 404
+- The server embeds `shared.js` directly into `index.html` at request time to avoid serving raw JavaScript files, and in direct mode also injects the WebSocket URL
 
 ## Progressive Web App Support
 
@@ -361,7 +357,7 @@ kubux-whiteboard-server/
 ├── conf/               # Configuration directory
 │   └── passwd.json     # Password file
 └── logs/               # Log files
-    └── debug.log       # Server debug log
+    └── debug.log       # Server log (errors and rejected messages; debug-level output is discarded)
 ```
 
 

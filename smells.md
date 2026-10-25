@@ -2,20 +2,20 @@
 
 This document catalogs defensive programming patterns that may be masking underlying bugs rather than properly handling edge cases.
 
-> **Review note (2026-07-25):** The `loadItem` corrupted-file crash flagged in server-security.md is fixed (try-catch → null). The assert list in section 3 is unchanged, but the security audit confirmed all listed asserts are unreachable by malformed client input. Instance counts below are approximate after recent edits.
+> **Review note (2026-10-25, checked against commit d414690):** Examples, locations and counts below were re-checked against the code. Earlier versions of this note said the `loadItem` corrupted-file crash was fixed by a try-catch; that is not the current code. `loadItem` has no try-catch, and a damaged data file ends the server process on purpose (see section 3). Counts are `grep` counts of the stated pattern and therefore approximate.
 
 ## 1. Silent Early Returns in index.html
 
 **Pattern**: `if (!condition) return;`
 
-**Count**: 29 instances
+**Count**: 86 lines in index.html match a one-line `if (…) return` (of these, 20 have the plain form `if (!x) return`)
 
 **Notable Examples**:
 
 ### Settings Functions
 ```javascript
 if (!boardId) return; // Can't save without boardId
-if (!boardId) return false; // Can't load without boardId
+if (!boardId) return false; // Cannot load without boardId
 ```
 **Smell**: Silent failure - caller doesn't know settings weren't saved/loaded
 
@@ -26,13 +26,6 @@ if (!pasteBounds) return;
 ```
 **Smell**: Functions silently do nothing if state is missing. Is this expected or a bug?
 
-### Cache Functions
-```javascript
-if (!cacheDB) return;
-if (!cacheDB) return null;
-```
-**Smell**: If IndexedDB failed to initialize, operations silently fail. Should user be notified?
-
 ### Rendering Functions
 ```javascript
 if (!element) return;
@@ -42,7 +35,7 @@ if (!backgroundCanvas || !backgroundCtx) return;
 
 ### Clipboard Operations
 ```javascript
-if (!clipboard.elements.length) return;
+if (!clipboard.elements.length || positions.length === 0) return;
 if (!pasteMode || pastedElements.length === 0) return;
 ```
 **Smell**: Silent no-ops when clipboard is empty - expected or bug?
@@ -54,7 +47,7 @@ if (!pasteMode || pastedElements.length === 0) return;
 
 ## 2. Try-Catch Blocks That Swallow Errors (index.html)
 
-**Count**: 9 instances
+**Count**: 23 `catch` clauses in index.html
 
 ### Pattern 1: console.warn and continue
 ```javascript
@@ -70,28 +63,33 @@ try {
 
 **Smell**: Settings silently fail to persist, user never knows
 
-### Pattern 2: Remove corrupted data silently
+### Pattern 2: Empty catch blocks
 ```javascript
 try {
-    const data = shared.deserialize(sessionStorage.getItem(key));
-    cached.push({ key, data });
+    sessionStorage.setItem(SAVED_EDITS_KEY, JSON.stringify({ board: boardId, page: currentPageUuid, edits }));
 } catch (err) {
-    // Corrupted cache entry, remove it
-    sessionStorage.removeItem(key);
+    // storage full or blocked
 }
 ```
-**Smell**: Data corruption is silently fixed, no investigation possible
+**Locations**:
+- saveUnconfirmedEdits()
+- takeSavedEdits() (also swallows an unreadable entry)
 
-### Pattern 3: Continue without cache
+**Smell**: If storage fails, unconfirmed edits are no longer kept across a reload of the tab, and nobody is told
+
+### Pattern 3: console.error and continue
 ```javascript
 try {
-    // cache operations
-} catch (err) {
-    console.warn('Failed to cache page:', err);
-    // Continue without caching - not critical
+    // page cache operations (in-memory LRU, 24 entries)
+} catch (e) {
+    console.error('Error saving item to LRU cache:', e);
+    return false;
 }
 ```
-**Smell**: Cache failures are "not critical" but user experience degrades silently
+**Locations**:
+- saveItem(), loadItem(), removeItem() of the client page cache
+
+**Smell**: Cache failures are logged to the console only; the user experience degrades silently
 
 ### Pattern 4: Error in PDF export
 ```javascript
@@ -106,31 +104,37 @@ try {
 
 ## 3. Assert Statements in server.js
 
-**Count**: 11 instances
+**Count**: 20 `assert()` calls
 
 **Locations**:
 - `getPage()`: `assert(board.pageOrder.includes(pageId))`
 - `insertPage()`: `assert(0 <= where && where <= board.pageOrder.length)`
 - `insertPage()`: `assert(!board.pageOrder.includes(pageId))`
-- `existingPage()`: `assert(!(replacementId === pageId))`
-- `existingPage()`: `assert(N < 100000)`
+- `existingPage()`: `assert(!visited.has(currentId))` (cycle in the deletion map)
 - `existingPage()`: `assert(board.pageOrder.length > 0)`
-- `sendFullPage()`: `assert(board)`
-- `sendFullPage()`: `assert(page)`
-- `ping_client_with_page()`: `assert(board.pageOrder.includes(pageId))`
+- `sendFullPage()`: `assert(board)`, `assert(page)`
+- `sendPageInfo()`: `assert(board)`, `assert(page)`
+- `ping_client_with_page()`: `assert(board)`, `assert(page)`, `assert(board.pageOrder.includes(pageId))`
 - `ping_client()`: `assert(board)`
-- `ping_client_with_page()`: `assert(page)`
+- `describePage()`: `assert(page)`
+- `registerPage()`: `assert(page)`
+- `handleEditAction()`: `assert(page.hashes.length === page.history.length + 1)`
+- `handleUndoAction()`: `assert(reverted)`
+- `handleRedoAction()`: `assert(committed)`
+- `mod-action-proposals` handler: `assert(page)`
+- `replay-requests` handler: `assert(page)`
+
+`getPage()` and `insertPage()` are not called anywhere.
 
 **Smell**:
-- Assertions crash the server in production
+- A failed assert throws, and since handler exceptions are deliberately not caught, it ends the server process
 - No graceful error handling or recovery
-- Client gets disconnected with no explanation
-- Should these be proper error responses instead?
+- All connected clients are disconnected with no explanation
 
-**Questions**:
-- Are these invariants that should never be violated?
-- Or are they conditions that could occur with malicious/buggy clients?
-- Should server send DECLINE messages instead of crashing?
+**Context**: The questions an earlier version of this section asked are answered in the code. The "Lookup invariants" comment in server.js (I1: every page in a board's page order has a page file; I2: the page order is never empty; I3: a connection's board exists) names the invariants the asserts rely on, and states that a missing or damaged data file is meant to stop the server rather than be silently recreated. The security audit found no assert reachable by malformed client input. The same fail-fast policy applies to damaged files: `loadItem` has no try-catch, so a data file that is not valid JSON makes `deserialize` throw, and `loadPage` throws on a hash chain of the wrong length.
+
+**Open question**:
+- Is ending the process (and disconnecting every board) the right response to one damaged file, or should only requests for that board/page fail?
 
 ## 4. Disabled Debugging Code
 
@@ -138,6 +142,7 @@ try {
 
 ```javascript
 function flag_and_fix_inconsistent_state( page, msg ) {
+    // this is dead in production. the function is a debug tool.
     return;  // ← FUNCTION IMMEDIATELY RETURNS
     const current_visible = compileVisualState( page.history.slice( 0, page.present ) ).visible;
     const visible = page.state.visible;
@@ -147,6 +152,8 @@ function flag_and_fix_inconsistent_state( page, msg ) {
     }
 }
 ```
+
+It is still called on entry and exit of `handleEditAction`, `handleUndoAction` and `handleRedoAction`.
 
 **Smell**:
 - Function that detects and fixes inconsistent state is disabled
@@ -171,32 +178,36 @@ ws.onerror = (error) => {
 - User sees "check your connection" for all errors
 - Actual error only in console (users don't see it)
 
-## 6. State Fallback Pattern
+## 6. Optimistic Use of Cached Pages
 
-**Pattern**: Using previous state when new state is unavailable
+**Pattern**: Showing cached data before the server confirms it
 
-**Example**: In `handleFullPageMessage()`:
+**Example**: In `joinPage()` (index.html):
 ```javascript
-if (cachedPage && cachedPage.hash === data.hash) {
-    // Use cached data
+const cachedPage = loadPageFromCache(currentPageUuid);
+if (cachedPage) {
+    // render the cached history at once ...
+    verifiedIndex = present;
+    // ... and ask the server for what changed since
+    requestReplay( currentPageUuid, true );
 } else {
-    // Use server data
+    requestFullPage(currentPageUuid, true, 0);
 }
 ```
 
 **Smell**:
-- Hash mismatch silently falls through to server data
-- What if cache is stale but server is slow?
-- No logging of cache hit/miss rates
+- The cached copy is marked verified (`verifiedIndex = present`) before the server has confirmed it
+- A stale cache is visible until the replay arrives; if the server is slow, the user may draw on top of an outdated page
+- No logging of cache hit/miss rates (only a `debugLog` line)
 
 ## Summary Statistics
 
 | Category | Count | Severity |
 |----------|-------|----------|
-| Silent early returns (index.html) | 29 | MEDIUM - hard to debug |
-| Silent early returns (server.js) | 9 | MEDIUM - hard to debug |
-| Try-catch swallowing errors | 9 | MEDIUM - silent failures |
-| Assert statements (server crash) | 11 | HIGH - crashes server |
+| Silent early returns (index.html) | 86 one-line `if (…) return` | MEDIUM - hard to debug |
+| Silent early returns (server.js) | not re-counted | MEDIUM - hard to debug |
+| Try-catch blocks (index.html) | 23 | MEDIUM - silent failures |
+| Assert statements (server crash) | 20 | HIGH - crashes server |
 | Disabled debug function | 1 | CRITICAL - hides state bugs |
 
 ## Recommendations
@@ -210,13 +221,12 @@ if (cachedPage && cachedPage.hash === data.hash) {
    - Consider showing user-facing errors for critical failures
    - Don't silently fix data corruption
 
-3. **Replace asserts with proper error responses**
-   - Send DECLINE messages to clients
+3. **Reconsider what an assert failure takes down**
    - Log assertion failures for investigation
-   - Don't crash server for client errors
+   - Consider failing only the request (or board) concerned instead of the whole process
 
 4. **Investigate disabled debugging code**
-   - Re-enable flag_and_fix_inconsistent_state()
+   - Re-enable flag_and_fix_inconsistent_state() in testing
    - Find and fix the root cause of state inconsistencies
    - Don't silently patch over bugs
 

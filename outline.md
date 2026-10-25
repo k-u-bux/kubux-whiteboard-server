@@ -8,7 +8,7 @@
 
 ## Advanced Drawing Features
 - The overall UI/UX and drawing features will be modeled after Xournal++.
-- A diverse set of drawing tools such as pens, markers, and highlighters.
+- Six pen slots, each remembering its own shape, color, width, opacity, and stroke style, plus an eraser.
 - Customization of tools, including adjustable stroke size, color, and opacity.
 - Tools for creating basic shapes like lines, rectangles, and circles.
 - Layers: The ability to organize and control different elements of the drawing independently.
@@ -23,7 +23,7 @@
 - Canvas format presets (A4, Letter, Legal, 16:9, 16:10, 4:3, 3:2, 2:1, custom) with fit-width/fit-height zoom.
 - Transform operations: scaling, rotation, and translation of selections.
 - Eraser tool for removing drawn elements.
-- Timer for timed drawing sessions.
+- Timer: a per-pen switch that erases each stroke drawn with that pen 3 seconds later (temporary annotations).
 
 ## Multi-Board Support
 - Multiple independent whiteboards, each with its own set of pages and password.
@@ -33,7 +33,7 @@
 
 ## Multi-Page Support
 - Each board can have multiple pages in an ordered list.
-- Navigate pages via first/prev/next/last controls or jump-to-page menu.
+- Navigate pages via first/prev/next/last controls, or by clicking a thumbnail in the page overview.
 - Add and delete pages (deleted pages redirect to a replacement).
 - Page overview mode: thumbnail grid with drag-and-drop reordering, batch delete, and multi-page PDF export.
 - Page reordering via shuffle proposals (validated against server state).
@@ -41,17 +41,17 @@
 
 ## Import/Export Features
 - Exports: The ability to export the whiteboard's content as a PDF.
-- Single page export and entire board export (multi-page PDF).
+- Current-page export, and export of selected pages or the entire board from the overview (multi-page PDF).
 - Vector rendering with FlateDecode compression.
 
 ## Progressive Web App (PWA)
 - manifest.json for standalone app installation on tablets and mobile devices.
-- Service worker (sw.js) for offline resource caching.
+- Minimal service worker (sw.js) that enables installation; it caches nothing and passes all requests through to the network.
 - Multiple icon sizes including apple-touch-icon for iOS.
 
 ## Protocol and Architecture (see protocol.md for details)
-- WebSocket-based communication with JSON message format.
-- Memory-hard authentication: scrypt password hashing.
+- WebSocket-based communication with plain JSON messages.
+- Memory-hard authentication: scrypt hashing of the server-level credentials (board edit passwords are random strings stored with the board).
 - Hash chain state verification with spaced snapshots for efficient synchronization.
 - Optimistic updates with server authority and replay-based conflict resolution.
 - Server: Node.js with dual-mode operation (direct or reverse proxy).

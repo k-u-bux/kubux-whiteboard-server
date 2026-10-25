@@ -2,7 +2,7 @@
 
 **Audit Date:** October 25, 2026
 **Auditor:** Security Review (re-audit of v2.2)
-**Version:** Current (commit 79fc50a — HEAD; server.js, shared.js, index.html all changed after v2.2)
+**Version:** Live tests at commit 79fc50a + working tree; text corrected against commit d414690 (see Changelog 3.2); unauthenticated board-creation search (see Changelog 3.3)
 **Focus Areas:** RCE, Arbitrary File Access, DoS, Crash Vectors, Client-Side XSS
 
 ---
@@ -11,13 +11,13 @@
 
 Re-audit of `server.js`, `shared.js` and `index.html` at HEAD. Unlike v2.2 (static only), the findings in this version were **verified against a live test instance** (`ws://localhost:8099`, isolated data/log dirs).
 
-**Overall Assessment:** ⚠️ **No RCE, no file access, no XSS, no client-reachable crash. DoS surface reduced but still exploitable; two new findings.**
+**Overall Assessment:** ⚠️ **No RCE, no file access, no XSS, no client-reachable crash. DoS surface reduced but still exploitable; two new findings. No way to create a board without the server credential exists (verified live, v3.3).**
 
 | # | Finding | Severity | Status |
 |---|---------|----------|--------|
 | 1 | `create-board` scrypt flood (no rate limit) | HIGH | Open; partially mitigated vs v2.2 |
 | 2 | Unbounded error-log growth → disk-full crash | MEDIUM | Open (**new** in v3.0) |
-| 3 | Plaintext board passwords in `logs/debug.log` | MEDIUM | Open (**new** in v3.0) |
+| 3 | Plaintext board passwords in `logs/debug.log` | MEDIUM | Partially fixed: payload logging redacts `passwd` since d414690; the old log file remains |
 | 4 | Unbounded state: history, pages, deletionMap, files | MEDIUM | Open (unchanged) |
 | 5 | No Origin check on WebSocket handshake | LOW | Open (**new** in v3.0) |
 | 6 | `x-forwarded-proto` trusted unconditionally | LOW | Open (unchanged) |
@@ -29,7 +29,7 @@ Key changes vs v2.2:
 - **`maxPayload` enforced.** A 6 MiB message closed the connection (limit 5 MB, commit d6197cd). `ws` upgraded to 8.22.0 (CVE-2026-48779, commit c9694cb).
 - **GROUP validation verified live:** a depth-15 nested GROUP payload is silently dropped (`MAX_GROUP_DEPTH = 10`), closing the v2.2 assert-crash / stack-overflow finding.
 - **New log-growth finding:** every malformed message writes one `debug.error` line with no cap or rotation. Measured ~1000 lines/s ≈ 87 KB/s from a *single* connection. A full disk turns into a crash: `writeFileAtomic` throws inside the 10 s persist timer (unhandled), losing up to 10 s of edits.
-- **New data-exposure finding:** the existing `logs/debug.log` contains board passwords in cleartext (`passwd: 'e0k5ndiszdig'` ×N), written by a pre-current logging configuration. The current config sends `debug.log` to a NullStream, making the entire payload-logging layer dead code — the live leak is one commented-out line away (server.js:71–72).
+- **New data-exposure finding:** the existing `logs/debug.log` contains board passwords in cleartext (`passwd: 'e0k5ndiszdig'` ×N), written by a pre-current logging configuration. The current config sends `debug.log` to a NullStream, making the entire payload-logging layer dead code. Since commit d414690 that layer masks every `passwd` field (`redactSecrets`), so re-enabling the commented-out configs (server.js:71–72) no longer leaks passwords.
 - **Erratum (v3.0 → v3.1):** v3.0's claim that the Dockerfile's `node:20` base "cannot start the server" was **wrong**. A full boot test under node **v20.18.1** succeeded (HTTP 200, WS up, scrypt credential check working) — Node 20.18 has `require('console')`, `require('stream')`, `fs.createWriteStream` and async `crypto.scrypt`. The bump to `node:23` was **verified the same way under v23.11.1** (the version the `node:23` tag resolves to). The bump is still correct: Node 20 went end-of-life 2026-04-30 (nixpkgs removed it). The Dockerfile's real open issue is running as root (Finding 8).
 
 ---
@@ -79,7 +79,7 @@ Unchanged: `deserialize` reviver handles only `__type: BigInt|Set|Map`; no `__pr
 ### ✅ No Client-Side XSS (new verification)
 - All DOM text assignment goes through `textContent` (incl. server error messages)
 - Strokes are rendered on `<canvas>`; stroke colors regex-restricted (`#RGB`/`#RRGGBB`/`[a-z]{1,20}`)
-- The only `innerHTML` assignments are static icon glyphs (cap/join style menus)
+- The only `innerHTML` assignments are static icon glyphs (cap/join style menus) and clearing the overview grid (`''`)
 - Storage audit: the server-level credential is persisted to `localStorage['whiteboard_credential']` (design decision; see Recommendation 8)
 
 ---
@@ -98,7 +98,7 @@ Unchanged: `deserialize` reviver handles only `__type: BigInt|Set|Map`; no `__pr
 - Pending scrypt jobs queue without bound → memory exhaustion with enough connections.
 - `ws.credentialCheckPending` serializes checks *per connection* only; connections are unlimited.
 
-**Location:** `server.js` `CREATE_BOARD` handler (1411–1442), `isValidCredential` (180–187), `verifyPassword` (141–177).
+**Location:** `server.js` `CREATE_BOARD` handler (1417–1448), `isValidCredential` (180–187), `verifyPassword` (141–177).
 
 **Recommended fix:**
 - Token-bucket rate limit per IP on `create-board` (e.g., 5/min)
@@ -115,23 +115,25 @@ Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` �
 
 **Crash chain:** when the disk fills, `writeFileAtomic` throws (ENOSPC) inside `periodicallyPersist` (10 s timer) — unhandled → process crash, losing up to 10 s of edits.
 
-**Location:** `server.js` `rejectMessage` (1803), `periodicallyPersist` (1875), `writeFileAtomic` (301).
+**Location:** `server.js` `rejectMessage` (1809), `periodicallyPersist` (1881), `writeFileAtomic` (301).
 
 **Recommended fix:** log rotation + size cap; rate-limit malformed-input logging (dedupe per second); catch/tolerate persist failures (log + retry) instead of crashing.
 
 ---
 
-### ⚠️ 3. Plaintext board passwords in `logs/debug.log` [OPEN — NEW]
+### ⚠️ 3. Plaintext board passwords in `logs/debug.log` [PARTIALLY FIXED]
 
 **Risk Level:** MEDIUM (historical credential exposure + fragile config)
 
 The existing production `logs/debug.log` (~792 KB) contains board passwords in cleartext: `passwd: 'e0k5ndiszdig'` (and others) in the `BOARD_CREATED` payload dumps and incoming `shuffle-proposal`/`mod-action-proposals` messages.
 
-**Why:** an earlier run used `new Console({ stdout: debugTee, stderr: debugTee })` (server.js:72, now commented out), logging every sent/received message with full payload. The **current** config (`stdout: debugNull`) sends `debug.log` to a NullStream — the entire payload-logging layer (`routeMessage`, `logSentMessage`) is dead code. The live leak is one commented-out line away from being re-enabled.
+**Why:** an earlier run used `new Console({ stdout: debugTee, stderr: debugTee })` (server.js:72, now commented out), logging every sent/received message with full payload. The **current** config (`stdout: debugNull`) sends `debug.log` to a NullStream — the entire payload-logging layer (`routeMessage`, `logSentMessage`) is dead code.
+
+**Fixed since d414690:** `routeMessage`, `logSentMessage` and the dropped-proposal log of `mod-action-proposals` pass payloads through `redactSecrets`, which masks every `passwd` field (the key used for board passwords and credentials on the wire). Re-enabling payload logging therefore no longer writes passwords.
 
 **Additional notes:** the file is never rotated/truncated; board passwords persist in it indefinitely.
 
-**Recommended fix:** rotate/truncate the existing log file; delete the commented-out `debugTee` stdout configs; never log `passwd` fields; if payload logging is ever re-enabled, redact secrets.
+**Recommended fix (remaining):** rotate/truncate the existing log file; delete the commented-out `debugTee` stdout configs.
 
 ---
 
@@ -152,7 +154,7 @@ The existing production `logs/debug.log` (~792 KB) contains board passwords in c
 
 **Risk Level:** LOW
 
-`wss.on('connection', ...)` (server.js:1839) never inspects `req.headers.origin`. Any webpage can open a WebSocket to the server and act as an unauthenticated client (read boards whose ID is known — view access is open by design; participate in the DoS vectors above). Impact is bounded because every privileged action requires the board password or admin credential, which live in the URL / `localStorage` — a cookie-based session this is not. Still, with any future credential-bearing cookie or same-origin-gapless auth change, missing Origin verification becomes CSWSH.
+`wss.on('connection', ...)` (server.js:1845) never inspects `req.headers.origin`. Any webpage can open a WebSocket to the server and act as an unauthenticated client (read boards whose ID is known — view access is open by design; participate in the DoS vectors above). Impact is bounded because every privileged action requires the board password or admin credential, which live in the URL / `localStorage` — a cookie-based session this is not. Still, with any future credential-bearing cookie or same-origin-gapless auth change, missing Origin verification becomes CSWSH.
 
 **Recommended fix:** verify `Origin` against the configured host, or deny cross-origin handshakes.
 
@@ -188,6 +190,14 @@ Node 20.18 has `console`/`stream`/`fs.createWriteStream`/async `crypto.scrypt`. 
 
 `node -e "…hashPassword('$passwd')…"` interpolates the password into a JS string literal inside shell double quotes. Embedded `'` runs arbitrary JS as the admin who invoked the tool. **Not remotely exploitable** (local admin tool, self-inflicted), but the utility should quote/clean its input.
 
+### ℹ️ Stale credential backup `conf/passwd.json~`
+
+The repo ships a leftover backup `conf/passwd.json~` containing a single legacy **salt-less** hash (one hex string, no `:`), which the current `salt:hash` splitter in `verifyPassword` rejects. It is **never loaded** (`initializeGlobals` reads only `conf/passwd.json`) and **not served** (HTTP dotfile block + static whitelist). Inert; delete it for hygiene.
+
+### ℹ️ Damaged data files end the process (by design, not fixed)
+
+Earlier versions of this report listed a "corrupted-file crash" as fixed by a try-catch in `loadItem`. **That is not the current code:** `loadItem` (server.js:329–344) has no try-catch, so a board or page file that is not valid JSON makes `deserialize` throw inside the message handler, and the exception ends the process. `loadPage` also throws on a stored hash chain of the wrong length. This is deliberate fail-fast behaviour (see the "Lookup invariants" comment in server.js: a damaged file "shows up as a failed assert, never as a silently recreated empty board or page"). It is reachable only through damaged or hand-edited files in `data/`, not through client input. Note that `writeFileAtomic` (temp file + fsync + rename) makes a truncated file from a crash or full disk unlikely.
+
 ### ℹ️ `generatePasswd` modulo bias
 
 `b % 36` with `b ∈ [0,255]` makes digits 0–3 slightly more likely (8/256 vs 7/256). Negligible — the 12-char base36 keyspace (~62 bits) dominates; constant-time compare (79fc50a) prevents timing attacks.
@@ -211,9 +221,6 @@ Node 20.18 has `console`/`stream`/`fs.createWriteStream`/async `crypto.scrypt`. 
 ### ✅ Constant-time board-password comparison [FIXED]
 SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no length leak, no timing leak.
 
-### ✅ Corrupted-file crash [FIXED, confirmed in code]
-`loadItem` wraps read/deserialize in try-catch → `null` (cache miss) instead of crashing.
-
 ### ✅ Crash via deep JSON nesting [NOT A FINDING, verified live]
 500 000-deep array parsed without crash (V8 is depth-safe here).
 
@@ -234,7 +241,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 
 1. **Rate-limit `create-board`** (per IP/per connection) and **cap WebSocket connections** (Finding 1).
 2. **Log rotation + size cap + malformed-input logging rate limit**; make persist failures non-fatal (Finding 2).
-3. **Rotate/truncate existing `debug.log`; remove secret-logging configs** (Finding 3).
+3. **Rotate/truncate existing `debug.log`; remove the commented-out logging configs** (Finding 3; payload redaction is done).
 4. **State caps + GC:** history per page, page count, `deletionMap`, delete page files (Finding 4).
 5. **Verify `Origin` on the WS handshake** (Finding 5).
 6. **Fix Dockerfile:** add a non-root `USER` (base image already corrected to `node:23`, verified — Erratum; Finding 8).
@@ -257,20 +264,27 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 | 6 MiB WebSocket message | connection closed (maxPayload) |
 | 500 000-deep JSON array | rejected, no crash |
 | 3000 invalid messages | ~3000 log lines ≈ 87 KB/s log growth |
+| create-board bypass battery (missing/empty/number/array/object/null/`"true"`/`"undefined"`/`"NaN"`/1 MiB passwd, stored-hash-as-passwd, double-send race) | dropped by validation or `credential not accepted`; exactly **1 board per check**; **0 files created** |
+| indirect-creation battery (register-board, board-info(register), fullPage, page-info(register), replay, register-page, mod-action draw / new-page, shuffle-proposal — all on unknown boards) | all dropped silently, zero replies, **0 `.board`/`.page` files** created |
+| WS path strictness (`//ws`, `/ws?x=1`), HTTP methods POST/HEAD/OPTIONS on `/` | 400 / 404 / 200 (app page only, no state change) |
 
 ---
 
 ## Conclusion
 
-The kubux-whiteboard-server remains solid against RCE, file access, deserialization and XSS, and the crash-on-malformed-input class is closed. The DoS surface is smaller than v2.2 suggested (event loop survives the scrypt flood; message sizes are capped), but three availability issues remain exploitable: **unauthenticated scrypt flooding** (HIGH), **log-growth disk fill** (MEDIUM) and **unbounded state growth by board members** (MEDIUM) — plus a historical credential exposure in the unrotated log file. The Dockerfile was bumped to `node:23` (verified working) and its only remaining deployment issue is running as root.
+The kubux-whiteboard-server remains solid against RCE, file access, deserialization, XSS and — verified live in v3.3 — **unauthorized board creation**, and the crash-on-malformed-input class is closed. The DoS surface is smaller than v2.2 suggested (event loop survives the scrypt flood; message sizes are capped), but three availability issues remain exploitable: **unauthenticated scrypt flooding** (HIGH), **log-growth disk fill** (MEDIUM) and **unbounded state growth by board members** (MEDIUM) — plus a historical credential exposure in the unrotated log file. The Dockerfile was bumped to `node:23` (verified working) and its only remaining deployment issue is running as root.
 
 **Action required:** Findings 1–4 (rate limits, log management, state caps) before Findings 5–8.
 
 ---
 
-**Document Version:** 3.1
+**Document Version:** 3.3
 **Last Updated:** October 25, 2026
 **Next Review:** after Findings 1–4 are addressed
+
+**Changelog 3.3 (Oct 25, 2026):** Targeted search: "create a board without credentials". **Verified negative.** Statically, `createBoard()` is reachable only from `createNewBoard` (server.js:1095) via the `create-board` handler after `isValidCredential` (1417–1448); no other handler calls `loadOrCreateBoard(id, true)`, and mutation handlers require an existing board plus its password. Live instance: a 14-variant bypass battery (missing/empty/non-string/`"true"`/`"undefined"`/`"NaN"`/1 MiB passwd, stored-hash-as-passwd, same-connection double-send) created nothing — malformed inputs dropped by validation, others `credential not accepted`, exactly one board per completed check with a valid credential (control). An indirect-creation battery over register-board, board-info(register), fullPage, page-info(register), replay, register-page, mod-action draw/new-page and shuffle-proposal on unknown boards produced zero replies and zero `.board`/`.page` files. Missing/empty `conf/passwd.json` is fail-closed (board creation disabled, server.js:271–288). Client refuses to send `create-board` without a credential. WS path option is enforced (`//ws`, `/ws?x=1` refused); POST/HEAD/OPTIONS on `/` serve only the app page. New informational note: stale `conf/passwd.json~` backup (salt-less legacy hash, never loaded, never served).
+
+**Changelog 3.2 (Oct 25, 2026):** Text checked against the code at d414690; no new live tests. Finding 3 marked partially fixed (payload logging redacts `passwd` since d414690). Removed the "Corrupted-file crash [FIXED]" entry from *Resolved*: `loadItem` has no try-catch; damaged data files end the process by design (new informational note). Updated line numbers for Findings 1, 2 and 5. Noted the overview-grid `innerHTML = ''` in the XSS sweep.
 
 **Changelog 3.1 (Oct 25, 2026):** Dockerfile `node:20` → `node:23` (user change). **Erratum:** v3.0's "cannot start on node:20" claim retracted — server verified booting under node v20.18.1 and v23.11.1 (HTTP 200, WS, scrypt check). Finding 8 reduced to the root-user issue (MEDIUM, as v2.2); recommendation 6 updated accordingly. Node 20 EOL 2026-04-30 noted as the reason the bump remains correct.
 
