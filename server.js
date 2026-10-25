@@ -93,6 +93,13 @@ function generatePasswd() {
     return Array.from(randomBytes, b => (b % 36).toString(36)).join('');
 }
 
+// Constant-time comparison of a board password. Comparing digests gives
+// timingSafeEqual the equal lengths it needs and hides the length, too.
+function passwdMatches(password, passwd) {
+    const digest = (text) => crypto.createHash('sha256').update(text).digest();
+    return crypto.timingSafeEqual(digest(password), digest(passwd));
+}
+
 /**
  * Hash a password using scrypt
  * scrypt is a password-based key derivation function that is intentionally slow and memory-hard,
@@ -1285,7 +1292,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.TYPE] = (ws, data, re
     }
 
     // Password check
-    if ( !password || password != board.passwd ) {
+    if ( !password || !passwdMatches(password, board.passwd) ) {
         debug.log(`[SERVER] Shuffle proposal declined: unauthorized`);
         // decline: send BOARD_INFO with current state
         const declineMessage = {
@@ -1573,7 +1580,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     }
 
     // debug.log(`password = ${password},  board.passwd = ${board.passwd}`);
-    if ( !password || password != board.passwd ) {
+    if ( !password || !passwdMatches(password, board.passwd) ) {
         const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, "unauthorized");
         ws.send(JSON.stringify(declineMessage));
         logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
