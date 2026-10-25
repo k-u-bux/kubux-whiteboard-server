@@ -229,6 +229,9 @@ const {
     NOT_LOGGED_IN,
     PATH_INVALID,
     PATH_TAKEN,
+    NOT_OWNER,
+    NO_SUCH_FOLDER,
+    RENAME_BLOCKED,
     normalizePath,
     findPathConflict,
     MOD_ACTIONS, 
@@ -241,6 +244,8 @@ const {
     is_invalid_LOGIN_message,
     is_invalid_CREATE_BOARD_message,
     is_invalid_LIST_BOARDS_message,
+    is_invalid_SET_PATH_message,
+    is_invalid_RENAME_PREFIX_message,
     is_invalid_FULL_PAGE_REQUEST_message,
     is_invalid_REPLAY_REQUEST_message,
     is_invalid_MOD_ACTION_PROPOSALS_message,
@@ -718,6 +723,53 @@ function buildBoardIndex() {
 }
 
 buildBoardIndex();
+
+// Path changes
+// ============
+// A change of one or more board paths is checked against the owner's final set of
+// paths and then written board by board, each board file (and the directory) synced
+// before the next. The order keeps every state on disk within the path rules: a board
+// moves to its new path only after every board whose old path equals, contains or lies
+// inside that path has been written. Then a crash between two writes leaves some boards
+// moved and the others not, never two boards with one path, so the startup check of
+// the index fails only on a bug.
+
+function pathsOverlap(a, b) {
+    return a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
+}
+
+// changes: [{ boardId, oldPath, newPath }]; the same changes in a safe write order,
+// or null if there is none
+function writeOrder(changes) {
+    const pending = [...changes];
+    const order = [];
+    while (pending.length > 0) {
+        const next = pending.findIndex(change =>
+            pending.every(other => other === change || !pathsOverlap(change.newPath, other.oldPath)));
+        if (next === -1) {
+            return null;
+        }
+        order.push(...pending.splice(next, 1));
+    }
+    return order;
+}
+
+// Write ordered changes of one owner's board paths and update the index
+function applyPathChanges(owner, orderedChanges) {
+    const paths = pathsOf(owner);
+    for (const { boardId, oldPath, newPath } of orderedChanges) {
+        const board = useBoard(boardId);
+        assert( board ); // the index lists only boards whose files it read
+        board.path = newPath;
+        saveBoard(boardId, board);
+        syncDataDir();
+        releaseBoard(boardId);
+        assert( paths.get(oldPath) === boardId );
+        paths.delete(oldPath);
+        paths.set(newPath, boardId);
+        boardIndex.get(boardId).path = newPath;
+    }
+}
 
 
 // page manipulation
@@ -1605,6 +1657,87 @@ function sendBoardList(ws, requestId) {
     ws.send(JSON.stringify(message));
     logSentMessage(message.type, message, requestId, ws.clientId);
 }
+
+// Handler for moving or renaming one board (owner only)
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.SET_PATH.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_SET_PATH_message( data ) ) {
+        debug.log(`[SERVER] dropped set-path request from `, ws.clientId);
+        return;
+    }
+    if ( !ws.userId ) {
+        rejectMessage(ws, NOT_LOGGED_IN, requestId);
+        return;
+    }
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD];
+    const entry = boardIndex.get(boardId);
+    if ( !entry || entry.owner !== ws.userId ) {
+        rejectMessage(ws, NOT_OWNER, requestId);
+        return;
+    }
+    const newPath = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH] );
+    if ( newPath === null ) {
+        rejectMessage(ws, PATH_INVALID, requestId);
+        return;
+    }
+    if ( newPath !== entry.path ) {
+        const others = [...pathsOf(ws.userId).keys()].filter(path => path !== entry.path);
+        if ( findPathConflict( [...others, newPath] ) ) {
+            rejectMessage(ws, PATH_TAKEN, requestId);
+            return;
+        }
+        applyPathChanges(ws.userId, [{ boardId, oldPath: entry.path, newPath }]);
+    }
+    sendBoardList(ws, requestId);
+};
+
+// Handler for moving or renaming a folder, i.e. every board below it (owner only)
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_RENAME_PREFIX_message( data ) ) {
+        debug.log(`[SERVER] dropped rename-prefix request from `, ws.clientId);
+        return;
+    }
+    if ( !ws.userId ) {
+        rejectMessage(ws, NOT_LOGGED_IN, requestId);
+        return;
+    }
+    const from = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM] );
+    const to = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO] );
+    if ( from === null || to === null ) {
+        rejectMessage(ws, PATH_INVALID, requestId);
+        return;
+    }
+    const paths = pathsOf(ws.userId);
+    const changes = [];
+    for (const [path, boardId] of paths) {
+        if ( path.startsWith(from + '/') ) {
+            changes.push({ boardId, oldPath: path, newPath: to + path.slice(from.length) });
+        }
+    }
+    if ( changes.length === 0 ) {
+        rejectMessage(ws, NO_SUCH_FOLDER, requestId);
+        return;
+    }
+    if ( from !== to ) {
+        // the new paths must be normalized paths of acceptable length themselves
+        if ( changes.some(change => normalizePath(change.newPath) !== change.newPath) ) {
+            rejectMessage(ws, PATH_INVALID, requestId);
+            return;
+        }
+        const moved = new Set(changes.map(change => change.oldPath));
+        const others = [...paths.keys()].filter(path => !moved.has(path));
+        if ( findPathConflict( [...others, ...changes.map(change => change.newPath)] ) ) {
+            rejectMessage(ws, PATH_TAKEN, requestId);
+            return;
+        }
+        const ordered = writeOrder(changes);
+        if ( ordered === null ) {
+            rejectMessage(ws, RENAME_BLOCKED, requestId);
+            return;
+        }
+        applyPathChanges(ws.userId, ordered);
+    }
+    sendBoardList(ws, requestId);
+};
 
 // Handler for the owner's board list (needs a login)
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.TYPE] = (ws, data, requestId) => {

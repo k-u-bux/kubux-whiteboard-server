@@ -2915,14 +2915,24 @@
               return;
           }
           for (const folder of folders) {
+              const folderPath = currentFolder ? currentFolder + '/' + folder : folder;
               const item = document.createElement('div');
               item.className = 'board-list-item folder';
               const name = document.createElement('span');
               name.className = 'board-list-name';
               name.textContent = '📁 ' + folder;
-              item.appendChild(name);
+              const rename = document.createElement('button');
+              rename.className = 'board-list-btn';
+              rename.textContent = 'Rename';
+              rename.title = 'Rename or move this folder with all boards in it';
+              rename.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  const to = prompt('New path of the folder (folders separated by "/"):', folderPath);
+                  if (to !== null) { renameFolder(folderPath, to); }
+              });
+              item.append(name, rename);
               item.addEventListener('click', () => {
-                  currentFolder = currentFolder ? currentFolder + '/' + folder : folder;
+                  currentFolder = folderPath;
                   renderBoardList();
               });
               list.appendChild(item);
@@ -2943,8 +2953,48 @@
               open.addEventListener('click', () => {
                   window.location.href = `${window.location.origin}${window.location.pathname}?board=${entry.board}&passwd=${entry.passwd}`;
               });
-              item.append(name, date, open);
+              const rename = document.createElement('button');
+              rename.className = 'board-list-btn';
+              rename.textContent = 'Rename';
+              rename.title = 'Rename or move this board';
+              rename.addEventListener('click', () => {
+                  const to = prompt('New path of the board (folders separated by "/"):', entry.path);
+                  if (to !== null) { setBoardPath(entry.board, to); }
+              });
+              item.append(name, date, open, rename);
               list.appendChild(item);
+          }
+      }
+
+      // Rename or move one board; the reply is the updated board list
+      async function setBoardPath(board, path) {
+          const feedback = document.getElementById('manager-feedback');
+          feedback.textContent = '';
+          try {
+              showBoardListReply(await sendWithCallback({
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD]: board,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH]: path,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.REQUEST_ID]: createRequestId()
+              }));
+          } catch (err) {
+              feedback.textContent = `Board not renamed: ${err.message}`;
+          }
+      }
+
+      // Rename or move a folder, i.e. every board below it; the reply is the updated board list
+      async function renameFolder(from, to) {
+          const feedback = document.getElementById('manager-feedback');
+          feedback.textContent = '';
+          try {
+              showBoardListReply(await sendWithCallback({
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM]: from,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO]: to,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.REQUEST_ID]: createRequestId()
+              }));
+          } catch (err) {
+              feedback.textContent = `Folder not renamed: ${err.message}`;
           }
       }
 

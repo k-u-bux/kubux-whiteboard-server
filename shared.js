@@ -259,6 +259,18 @@ const MESSAGES = {
             TYPE: 'list-boards',
             REQUEST_ID: 'requestId'
         },
+        SET_PATH: {
+            TYPE: 'set-path',
+            BOARD: 'board-uuid',
+            PATH: 'path',
+            REQUEST_ID: 'requestId'
+        },
+        RENAME_PREFIX: {
+            TYPE: 'rename-prefix',
+            FROM: 'from', // a folder: every board below it moves
+            TO: 'to',
+            REQUEST_ID: 'requestId'
+        },
         FULL_PAGE_REQUEST: {
             TYPE: 'fullPage-requests',
             BOARD: 'board-uuid',
@@ -413,6 +425,9 @@ const CREDENTIAL_NOT_ACCEPTED = 'credential not accepted';           // login or
 const NOT_LOGGED_IN = 'not logged in';                               // board management needs a login
 const PATH_INVALID = 'invalid path';                                 // no name left after normalizing, or too long
 const PATH_TAKEN = 'path taken';                                     // exists, or a board would lie inside another
+const NOT_OWNER = 'not your board';                                  // unknown board, or owned by someone else
+const NO_SUCH_FOLDER = 'no such folder';                             // no board lies below the folder to rename
+const RENAME_BLOCKED = 'rename cannot be written safely';            // no write order keeps the disk consistent
 
 // Board paths
 // ===========
@@ -734,6 +749,32 @@ function is_invalid_LIST_BOARDS_message(data) {
     if (!data || typeof data !== 'object') return true;
 
     const requestId = data[MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+
+    return false;
+}
+
+function is_invalid_SET_PATH_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    const boardId = data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD];
+    if (!boardId || !isUuid(boardId)) return true;
+
+    if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH])) return true;
+
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+
+    return false;
+}
+
+function is_invalid_RENAME_PREFIX_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM])) return true;
+    if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO])) return true;
+
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.REQUEST_ID];
     if (!requestId || !isUuid(requestId)) return true;
 
     return false;
@@ -1843,6 +1884,9 @@ if (typeof module !== 'undefined' && module.exports) {
         NOT_LOGGED_IN,
         PATH_INVALID,
         PATH_TAKEN,
+        NOT_OWNER,
+        NO_SUCH_FOLDER,
+        RENAME_BLOCKED,
         MAX_PATH_LENGTH,
         normalizePath,
         findPathConflict,
@@ -1865,6 +1909,8 @@ if (typeof module !== 'undefined' && module.exports) {
         is_invalid_LOGIN_message,
         is_invalid_CREATE_BOARD_message,
         is_invalid_LIST_BOARDS_message,
+        is_invalid_SET_PATH_message,
+        is_invalid_RENAME_PREFIX_message,
         is_invalid_FULL_PAGE_REQUEST_message,
         is_invalid_REPLAY_REQUEST_message,
         is_invalid_MOD_ACTION_PROPOSALS_message,
@@ -1933,6 +1979,9 @@ else if (typeof window !== 'undefined') {
         NOT_LOGGED_IN,
         PATH_INVALID,
         PATH_TAKEN,
+        NOT_OWNER,
+        NO_SUCH_FOLDER,
+        RENAME_BLOCKED,
         MAX_PATH_LENGTH,
         normalizePath,
         findPathConflict,
