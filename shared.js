@@ -251,7 +251,12 @@ const MESSAGES = {
         },
         CREATE_BOARD: {
             TYPE: 'create-board',
+            PATH: 'path',
             CLIENT_ID: 'clientId',
+            REQUEST_ID: 'requestId'
+        },
+        LIST_BOARDS: {
+            TYPE: 'list-boards',
             REQUEST_ID: 'requestId'
         },
         FULL_PAGE_REQUEST: {
@@ -292,6 +297,15 @@ const MESSAGES = {
         LOGGED_IN: {
             TYPE: 'logged-in',
             LOGIN: 'login',
+            REQUEST_ID: 'requestId'
+        },
+        BOARD_LIST: {
+            TYPE: 'board-list',
+            BOARDS: 'boards', // list of entries, sorted by path
+            ENTRY_BOARD: 'board-uuid',
+            ENTRY_PATH: 'path',
+            ENTRY_PASSWORD: 'passwd',
+            ENTRY_CREATED_AT: 'createdAt',
             REQUEST_ID: 'requestId'
         },
         BOARD_CREATED: {
@@ -397,6 +411,45 @@ const MESSAGES = {
 // Reasons in the server's 'error' message
 const CREDENTIAL_NOT_ACCEPTED = 'credential not accepted';           // login or credential check failed
 const NOT_LOGGED_IN = 'not logged in';                               // board management needs a login
+const PATH_INVALID = 'invalid path';                                 // no name left after normalizing, or too long
+const PATH_TAKEN = 'path taken';                                     // exists, or a board would lie inside another
+
+// Board paths
+// ===========
+// A board's path names it for its owner, like a file path: segments separated by '/'.
+// Folders are not stored: boards whose paths share a prefix appear in the same folder.
+// Per owner, a path appears only once, and a path is either a board or a folder,
+// never both (no board lies inside another board's path).
+
+const MAX_PATH_LENGTH = 256;
+
+// The normalized path (segments trimmed, empty segments dropped), or null if none is left,
+// it is too long, or it contains control characters.
+function normalizePath(raw) {
+    if (typeof raw !== 'string' || raw.length > 4 * MAX_PATH_LENGTH) return null;
+    const segments = raw.split('/').map(segment => segment.trim()).filter(segment => segment.length > 0);
+    if (segments.length === 0) return null;
+    const path = segments.join('/');
+    if (path.length > MAX_PATH_LENGTH || /[\u0000-\u001f\u007f]/.test(path)) return null;
+    return path;
+}
+
+// The first violation of the path rules among one owner's paths, or null
+function findPathConflict(paths) {
+    const seen = new Set();
+    for (const path of paths) {
+        if (seen.has(path)) return `path ${path} appears twice`;
+        seen.add(path);
+    }
+    for (const path of seen) {
+        const segments = path.split('/');
+        for (let i = 1; i < segments.length; i++) {
+            const prefix = segments.slice(0, i).join('/');
+            if (seen.has(prefix)) return `board ${path} lies inside board ${prefix}`;
+        }
+    }
+    return null;
+}
 
 const DRAWABLE = {
     TYPE: {
@@ -657,12 +710,32 @@ function is_invalid_LOGIN_message(data) {
     return false;
 }
 
+// A raw path from a client: checked for type and size only, so that the server can
+// answer a path that normalizes to nothing with PATH_INVALID instead of dropping it.
+function is_invalid_raw_path(raw) {
+    return typeof raw !== 'string' || raw.length > 4 * MAX_PATH_LENGTH;
+}
+
 function is_invalid_CREATE_BOARD_message(data) {
     if (!data || typeof data !== 'object') return true;
     
+    if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH])) return true;
+
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     if (clientId !== undefined && (typeof clientId !== 'string' || !isUuid(clientId))) return true;
     
+    return false;
+}
+
+function is_invalid_LIST_BOARDS_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+
     return false;
 }
 
@@ -1768,6 +1841,11 @@ if (typeof module !== 'undefined' && module.exports) {
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
         NOT_LOGGED_IN,
+        PATH_INVALID,
+        PATH_TAKEN,
+        MAX_PATH_LENGTH,
+        normalizePath,
+        findPathConflict,
         DRAWABLE,
         POINT,
         ELEMENT,
@@ -1786,6 +1864,7 @@ if (typeof module !== 'undefined' && module.exports) {
         is_invalid_PAGE_INFO_REQUEST_message,
         is_invalid_LOGIN_message,
         is_invalid_CREATE_BOARD_message,
+        is_invalid_LIST_BOARDS_message,
         is_invalid_FULL_PAGE_REQUEST_message,
         is_invalid_REPLAY_REQUEST_message,
         is_invalid_MOD_ACTION_PROPOSALS_message,
@@ -1852,6 +1931,11 @@ else if (typeof window !== 'undefined') {
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
         NOT_LOGGED_IN,
+        PATH_INVALID,
+        PATH_TAKEN,
+        MAX_PATH_LENGTH,
+        normalizePath,
+        findPathConflict,
         DRAWABLE,
         POINT,
         ELEMENT,

@@ -227,6 +227,10 @@ const {
     MESSAGES, 
     CREDENTIAL_NOT_ACCEPTED,
     NOT_LOGGED_IN,
+    PATH_INVALID,
+    PATH_TAKEN,
+    normalizePath,
+    findPathConflict,
     MOD_ACTIONS, 
     NULL_UUID,
     ELEMENT, 
@@ -236,6 +240,7 @@ const {
     is_invalid_PAGE_INFO_REQUEST_message,
     is_invalid_LOGIN_message,
     is_invalid_CREATE_BOARD_message,
+    is_invalid_LIST_BOARDS_message,
     is_invalid_FULL_PAGE_REQUEST_message,
     is_invalid_REPLAY_REQUEST_message,
     is_invalid_MOD_ACTION_PROPOSALS_message,
@@ -345,6 +350,17 @@ function writeFileAtomic(filePath, text) {
     } catch (error) {
         try { fs.unlinkSync(tmpPath); } catch (ignored) {}
         throw error;
+    }
+}
+
+// A rename makes the new file durable only once the directory is synced. Path changes
+// sync after every board file they write, so their write order survives a power loss.
+function syncDataDir() {
+    const fd = fs.openSync(DATA_DIR, 'r');
+    try {
+        fs.fsyncSync(fd);
+    } finally {
+        fs.closeSync(fd);
     }
 }
 
@@ -462,7 +478,7 @@ function loadPage(pageId) {
 }
 
 
-function createBoard(boardId) {
+function createBoard(boardId, owner, path) {
     if ( ! isUuid( boardId ) ) { 
         debug.log( `refuse to create a board with ID ${boardId}.` );
         return null; 
@@ -472,7 +488,10 @@ function createBoard(boardId) {
     const password = generatePasswd();
     const board = {
         passwd: password,
-        pageOrder: [pageId]
+        pageOrder: [pageId],
+        owner: owner,
+        path: path,
+        createdAt: Date.now()
     };
     // Every entry of pageOrder must have a page (see "Lookup invariants" below).
     // The page is written before the board, so no board on disk ever lists a
@@ -642,6 +661,63 @@ function releaseBoard(boardId) {
         }
     }
 }
+
+
+// Board index
+// ===========
+// Owner, path, password and creation time of every owned board, read from the board
+// files at startup and updated wherever a board file with a new path is written. The
+// board files stay the single source of truth; the index saves reading them for
+// listing boards and checking the path rules. A board's password never changes, so
+// the index may hold it. Boards from before ownership have no owner and no entry.
+
+const boardIndex = new Map(); // boardId -> { owner, path, passwd, createdAt }
+const ownerPaths = new Map(); // owner -> Map( path -> boardId )
+
+function indexBoard(boardId, entry) {
+    boardIndex.set(boardId, entry);
+    if (!ownerPaths.has(entry.owner)) {
+        ownerPaths.set(entry.owner, new Map());
+    }
+    ownerPaths.get(entry.owner).set(entry.path, boardId);
+}
+
+function pathsOf(owner) {
+    return ownerPaths.get(owner) || new Map();
+}
+
+// Startup: index every owned board. A board file this server wrote that is damaged
+// or breaks the path rules is inconsistent data: the server refuses to start.
+function buildBoardIndex() {
+    for (const file of fs.readdirSync(DATA_DIR)) {
+        if (!file.endsWith('.board')) { continue; }
+        const boardId = file.slice(0, -'.board'.length);
+        if (!isUuid(boardId)) { continue; }
+        const board = loadBoard(boardId);
+        if (!board) {
+            throw new Error(`[SERVER] board file ${file} is empty or unreadable`);
+        }
+        if (board.owner === undefined) { continue; }
+        if (!isUuid(board.owner) || typeof board.path !== 'string' || normalizePath(board.path) !== board.path
+            || typeof board.passwd !== 'string' || typeof board.createdAt !== 'number') {
+            throw new Error(`[SERVER] board ${boardId} has a malformed owner, path, password or creation time`);
+        }
+        const sameName = pathsOf(board.owner).get(board.path);
+        if (sameName !== undefined) {
+            throw new Error(`[SERVER] boards ${sameName} and ${boardId} of user ${board.owner} have the same path ${board.path}`);
+        }
+        indexBoard(boardId, { owner: board.owner, path: board.path, passwd: board.passwd, createdAt: board.createdAt });
+    }
+    for (const [owner, paths] of ownerPaths) {
+        const conflict = findPathConflict(paths.keys());
+        if (conflict) {
+            throw new Error(`[SERVER] boards of user ${owner} break the path rules: ${conflict}`);
+        }
+    }
+    debug.log(`[SERVER] Indexed ${boardIndex.size} owned boards`);
+}
+
+buildBoardIndex();
 
 
 // page manipulation
@@ -1125,10 +1201,12 @@ function trackClient(ws, clientId) {
     }
 }
 
-function createNewBoard(ws, clientId, requestId) {
+function createNewBoard(ws, clientId, owner, path, requestId) {
     const boardId = generateSecureUuid();
-    const board = createBoard(boardId);
+    const board = createBoard(boardId, owner, path);
     if (board) {
+        syncDataDir();
+        indexBoard(boardId, { owner, path, passwd: board.passwd, createdAt: board.createdAt });
         ws.boardId = boardId; // Store boardId in WebSocket client
         trackClient(ws, clientId);
         ws.pageId = board.pageOrder[0]; // Default to first page
@@ -1495,8 +1573,50 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
         rejectMessage(ws, NOT_LOGGED_IN, requestId);
         return;
     }
+    const path = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH] );
+    if ( path === null ) {
+        rejectMessage(ws, PATH_INVALID, requestId);
+        return;
+    }
+    if ( findPathConflict( [...pathsOf(ws.userId).keys(), path] ) ) {
+        rejectMessage(ws, PATH_TAKEN, requestId);
+        return;
+    }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
-    createNewBoard(ws, clientId, requestId);
+    createNewBoard(ws, clientId, ws.userId, path, requestId);
+};
+
+function boardListMessage(owner, requestId) {
+    const L = MESSAGES.SERVER_TO_CLIENT.BOARD_LIST;
+    const boards = [...pathsOf(owner)].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([path, boardId]) => {
+        const entry = boardIndex.get(boardId);
+        return {
+            [L.ENTRY_BOARD]: boardId,
+            [L.ENTRY_PATH]: path,
+            [L.ENTRY_PASSWORD]: entry.passwd,
+            [L.ENTRY_CREATED_AT]: entry.createdAt
+        };
+    });
+    return { type: L.TYPE, [L.BOARDS]: boards, [L.REQUEST_ID]: requestId };
+}
+
+function sendBoardList(ws, requestId) {
+    const message = boardListMessage(ws.userId, requestId);
+    ws.send(JSON.stringify(message));
+    logSentMessage(message.type, message, requestId, ws.clientId);
+}
+
+// Handler for the owner's board list (needs a login)
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_LIST_BOARDS_message( data ) ) {
+        debug.log(`[SERVER] dropped list-boards request from `, ws.clientId);
+        return;
+    }
+    if ( !ws.userId ) {
+        rejectMessage(ws, NOT_LOGGED_IN, requestId);
+        return;
+    }
+    sendBoardList(ws, requestId);
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, requestId) => {

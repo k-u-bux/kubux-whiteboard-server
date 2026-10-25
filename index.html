@@ -486,6 +486,8 @@
           box-shadow: 0 4px 16px rgba(0,0,0,0.3);
           width: 400px;
           max-width: 90%;
+          max-height: 90%;
+          overflow-y: auto;
       }
       
       #board-nav-header {
@@ -555,6 +557,70 @@
           font-size: 13px;
           color: #555;
           margin-bottom: 10px;
+      }
+
+      #board-crumbs {
+          font-size: 13px;
+          margin-bottom: 6px;
+      }
+
+      #board-crumbs .crumb {
+          color: #0078d7;
+          cursor: pointer;
+      }
+
+      #board-list {
+          max-height: 260px;
+          overflow-y: auto;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          margin-bottom: 10px;
+      }
+
+      .board-list-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 10px;
+          border-bottom: 1px solid #f0f0f0;
+          font-size: 14px;
+      }
+
+      .board-list-item:last-child {
+          border-bottom: none;
+      }
+
+      .board-list-item.folder {
+          cursor: pointer;
+      }
+
+      .board-list-name {
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+      }
+
+      .board-list-date {
+          font-size: 12px;
+          color: #999;
+          white-space: nowrap;
+      }
+
+      .board-list-empty {
+          padding: 12px;
+          color: #999;
+          font-size: 13px;
+          text-align: center;
+      }
+
+      .board-list-btn {
+          padding: 2px 8px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          background: #fff;
+          cursor: pointer;
+          font-size: 12px;
       }
 
       .board-nav-form input:focus {
@@ -1247,7 +1313,10 @@
           </form>
           <div id="board-manager" style="display: none;">
             <div class="board-manager-user">Logged in as <span id="logged-in-as"></span></div>
+            <div id="board-crumbs"></div>
+            <div id="board-list"></div>
             <form class="board-nav-form" id="new-board-form">
+              <input type="text" id="new-board-name" placeholder="Name of a new board in this folder" required>
               <div class="board-nav-actions">
                 <button type="submit" class="board-nav-btn" id="new-board-btn">New Board</button>
               </div>
@@ -1952,6 +2021,9 @@
       // Board management: the login is kept for the tab (sessionStorage), the credential
       // as before in storedCredential; loggedIn mirrors the server's view of this connection
       let session = { login: null, loggedIn: false };
+      // The owner's boards as last listed by the server, and the folder shown
+      let boardList = [];     // [{ board, path, passwd, createdAt }], sorted by path
+      let currentFolder = ''; // '' is the top level, else a path prefix without trailing '/'
       const SESSION_LOGIN_KEY = 'whiteboard_login';
       let clientId = shared.generateUuid(); // Unique client identifier
       let currentPageUuid = null;
@@ -2736,6 +2808,7 @@
               storedCredential = credential;
               localStorage.setItem('whiteboard_credential', credential);
               updateBoardManager();
+              listBoards();
               return true;
           }
           session.loggedIn = false;
@@ -2756,14 +2829,134 @@
           return false;
       }
 
+      // Fetch the owner's board list and show it
+      async function listBoards() {
+          const feedback = document.getElementById('manager-feedback');
+          let reply;
+          try {
+              reply = await sendWithCallback({
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.REQUEST_ID]: createRequestId()
+              });
+          } catch (err) {
+              feedback.textContent = `Boards not listed: ${err.message}`;
+              return;
+          }
+          showBoardListReply(reply);
+      }
+
+      // A board-list reply (to listing or to a path change): remember and show it;
+      // anything else is a refusal, shown as feedback
+      function showBoardListReply(reply) {
+          const L = shared.MESSAGES.SERVER_TO_CLIENT.BOARD_LIST;
+          if (reply.type !== L.TYPE) {
+              document.getElementById('manager-feedback').textContent = reply.message;
+              return false;
+          }
+          boardList = reply[L.BOARDS].map(entry => ({
+              board: entry[L.ENTRY_BOARD],
+              path: entry[L.ENTRY_PATH],
+              passwd: entry[L.ENTRY_PASSWORD],
+              createdAt: entry[L.ENTRY_CREATED_AT]
+          }));
+          renderBoardList();
+          return true;
+      }
+
+      // The folders and boards directly inside a folder
+      function folderContents(folder) {
+          const prefix = folder ? folder + '/' : '';
+          const folders = new Set();
+          const boards = [];
+          for (const entry of boardList) {
+              if (!entry.path.startsWith(prefix)) { continue; }
+              const rest = entry.path.slice(prefix.length);
+              const slash = rest.indexOf('/');
+              if (slash === -1) {
+                  boards.push({ name: rest, entry });
+              } else {
+                  folders.add(rest.slice(0, slash));
+              }
+          }
+          return { folders: [...folders].sort(), boards };
+      }
+
+      function renderBoardList() {
+          // a folder exists only while a board lies in it: fall back to the nearest one left
+          while (currentFolder && !boardList.some(entry => entry.path.startsWith(currentFolder + '/'))) {
+              const slash = currentFolder.lastIndexOf('/');
+              currentFolder = slash === -1 ? '' : currentFolder.slice(0, slash);
+          }
+
+          const crumbs = document.getElementById('board-crumbs');
+          crumbs.textContent = '';
+          const segments = currentFolder ? currentFolder.split('/') : [];
+          const addCrumb = (label, folder) => {
+              const crumb = document.createElement('span');
+              crumb.className = 'crumb';
+              crumb.textContent = label;
+              crumb.addEventListener('click', () => { currentFolder = folder; renderBoardList(); });
+              crumbs.appendChild(crumb);
+          };
+          addCrumb('My boards', '');
+          segments.forEach((segment, i) => {
+              crumbs.appendChild(document.createTextNode(' / '));
+              addCrumb(segment, segments.slice(0, i + 1).join('/'));
+          });
+
+          const list = document.getElementById('board-list');
+          list.textContent = '';
+          const { folders, boards } = folderContents(currentFolder);
+          if (folders.length === 0 && boards.length === 0) {
+              const empty = document.createElement('div');
+              empty.className = 'board-list-empty';
+              empty.textContent = 'No boards yet';
+              list.appendChild(empty);
+              return;
+          }
+          for (const folder of folders) {
+              const item = document.createElement('div');
+              item.className = 'board-list-item folder';
+              const name = document.createElement('span');
+              name.className = 'board-list-name';
+              name.textContent = '📁 ' + folder;
+              item.appendChild(name);
+              item.addEventListener('click', () => {
+                  currentFolder = currentFolder ? currentFolder + '/' + folder : folder;
+                  renderBoardList();
+              });
+              list.appendChild(item);
+          }
+          for (const { name: boardName, entry } of boards) {
+              const item = document.createElement('div');
+              item.className = 'board-list-item';
+              const name = document.createElement('span');
+              name.className = 'board-list-name';
+              name.textContent = '📄 ' + boardName;
+              name.title = entry.path;
+              const date = document.createElement('span');
+              date.className = 'board-list-date';
+              date.textContent = new Date(entry.createdAt).toLocaleDateString();
+              const open = document.createElement('button');
+              open.className = 'board-list-btn';
+              open.textContent = 'Open';
+              open.addEventListener('click', () => {
+                  window.location.href = `${window.location.origin}${window.location.pathname}?board=${entry.board}&passwd=${entry.passwd}`;
+              });
+              item.append(name, date, open);
+              list.appendChild(item);
+          }
+      }
+
       // Create a new board owned by the logged-in user
-      async function createBoard() {
+      async function createBoard(path) {
           const feedback = document.getElementById('manager-feedback');
           feedback.textContent = '';
           let reply;
           try {
               reply = await sendWithCallback({
                   type: shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH]: path,
                   [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID]: clientId,
                   [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.REQUEST_ID]: createRequestId()
               });
@@ -8111,6 +8304,9 @@
               document.getElementById('login-input').value = session.login;
           }
           updateBoardManager();
+          if (session.loggedIn) {
+              listBoards();
+          }
           
           // Pre-fill current board ID if available
           if (boardId) {
@@ -8147,7 +8343,9 @@
 
       function handleNewBoard(e) {
           e.preventDefault();
-          createBoard();
+          const name = document.getElementById('new-board-name').value;
+          // the name may itself contain '/' to start new folders; the server normalizes
+          createBoard(currentFolder ? `${currentFolder}/${name}` : name);
       }
       
       function handleGotoBoard(e) {
