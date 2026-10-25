@@ -811,7 +811,7 @@ const wss = new WebSocket.Server({
     path: '/ws',
     // Largest message a client may send (after decompression); ws closes the
     // connection on anything bigger. The ws default is 100 MiB.
-    maxPayload: 2 * 1024 * 1024,
+    maxPayload: 5 * 1024 * 1024,
     perMessageDeflate: {
         zlibDeflateOptions: { level: 1 },
         zlibInflateOptions: { chunkSize: 32 * 1024 },
