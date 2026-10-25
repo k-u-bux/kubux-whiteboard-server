@@ -21,7 +21,8 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Layer system** - Organize content across 8 separate layers with visibility control
 - **PDF export** - Export the current page from the toolbar, or selected pages or the entire board from the overview, as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
-- **Board navigation** - Switch between multiple boards, copy view or edit links, create new boards from within the app
+- **Board navigation** - Switch between multiple boards, copy view or edit links, navigate to boards by URL/UUID
+- **Board manager** - Users log in and see the boards they own as folders (from paths like `teaching/algebra/week1`), create, open, rename and move boards and folders, and change their credential
 - **Timer** - A per-pen switch: strokes drawn with that pen are erased automatically after 3 seconds, for temporary annotations during presentations
 - **Page caching** - Client-side LRU cache for fast page switching with server hash verification
 - **Progressive Web App (PWA)** - Install as a standalone app on tablets and mobile devices
@@ -46,22 +47,28 @@ A real-time collaborative whiteboard application designed for mathematics educat
    mkdir -p data conf logs
    ```
 
-3. Set up authentication (for board creation):
+3. Set up users (for creating and managing boards):
    ```bash
-   # Create a password hash using the provided utility
-   ./passwd_hash your-secret-password
-   
-   # Copy the hash and create conf/passwd.json
-   echo '["your-hash-here"]' > conf/passwd.json
+   # Create a user entry: a new id, the login, and the hash of the credential
+   ./passwd_hash alice alices-secret-credential
    ```
-   
-   Example:
+   The output is one entry such as
+   ```json
+   {
+     "id": "08166a51-4c8b-4cd8-b441-7a43b28ffef5",
+     "login": "alice",
+     "hash": "5d90cd98...salt...:8c1fce6c...hash..."
+   }
+   ```
+   `conf/users.json` is a list of such entries:
+   ```json
+   [ { "id": "...", "login": "alice", "hash": "..." }, { "id": "...", "login": "bob", "hash": "..." } ]
+   ```
+   The id is what boards record as their owner, so it must never change once the user owns boards. Users change their credential themselves in the board manager, which rewrites `conf/users.json`; for that, `conf/` has to be writable by the server. The server reads `conf/users.json` only at startup; if it is malformed, the error is logged and nobody can log in.
+
+   **Upgrading from `conf/passwd.json`:** that file is no longer read. Create `conf/users.json` as above. Boards created before boards had owners appear in nobody's board list; give them an owner and a path with the server stopped, in the server's working directory:
    ```bash
-   ./passwd_hash mypassword123
-   # Output: mypassword123  ->  a3f2b8c...salt...:d4e9f1a...hash...
-   
-   # Create conf/passwd.json with the hash
-   echo '["a3f2b8c...salt...:d4e9f1a...hash..."]' > conf/passwd.json
+   ./assign_board <board-uuid> alice "archive/old-lecture"
    ```
    
    **Security Note:** The password hashing uses **scrypt**, a memory-hard key derivation function that is highly resistant to:
@@ -104,7 +111,7 @@ KUBUX_WHITEBOARD_URL=http://localhost:3000 npm start
 - If the specified port is exposed (not blocked by a firewall) and your computer is accessible from the outside, you can use this mode to create an ad-hoc whiteboard session without a dedicated server
 
 
-**Access:** Open your browser to the URL specified in `KUBUX_WHITEBOARD_URL` with a query parameter, e.g. `http://localhost:8080/?credential=<your_password>` to create a board, or `http://localhost:8080/?board=<board-uuid>` to open one. The bare URL without a `board`, `passwd`, or `credential` parameter returns 404.
+**Access:** Open your browser to the URL specified in `KUBUX_WHITEBOARD_URL` with a query parameter, e.g. `http://localhost:8080/?login=<your_login>` to log in and manage your boards, or `http://localhost:8080/?board=<board-uuid>` to open a board. The bare URL without a `board`, `passwd`, `login`, or `credential` parameter returns 404.
 
 
 ### Mode 2: Docker with Reverse Proxy (Production)
@@ -132,7 +139,7 @@ For production deployments, the repository includes a Dockerfile and docker-comp
    - <app-dir>                # The repository checkout, containing conf/, data/, logs/ and node_modules/
    ```
 
-   Also adjust `build.context` (the path to the repository, relative to the compose file), `container_name`, and `user` (the owner of `<app-dir>` on the host, `stat -c %u:%g <app-dir>`); the template has values from the author's setup. The checkout is mounted read-only, with only `data/` and `logs/` writable.
+   Also adjust `build.context` (the path to the repository, relative to the compose file), `container_name`, and `user` (the owner of `<app-dir>` on the host, `stat -c %u:%g <app-dir>`); the template has values from the author's setup. The checkout is mounted read-only, with only `conf/` (for credential changes), `data/` and `logs/` writable.
 
 2. **Create required directories on host**
    
@@ -171,7 +178,7 @@ The Docker deployment uses a multi-container setup:
 2. nginx-proxy → HTTP:80 (whiteboard container)
 3. Client connects via WSS (WebSocket Secure) through nginx-proxy
 
-**Access:** https://your-whiteboard-domain/?credential=<your_password>
+**Access:** https://your-whiteboard-domain/?login=<your_login>
 
 #### Managing the deployment
 
@@ -192,9 +199,20 @@ docker-compose up -d --build
 ## Usage
 
 ### Creating a New Whiteboard
-    Point your browser at: "https://your-whiteboard-domain/?credential=<your_password>"
-    
-A new board will be created and the URL will change to point towards that board. The URL contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
+    Point your browser at: "https://your-whiteboard-domain/?login=<your_login>"
+
+The board navigation opens; log in with your credential (or add `&credential=<your_credential>` to the URL to log in directly). The board manager then shows your boards. Type a name and press "New Board" to create a board in the folder shown; a name with `/` in it creates subfolders. The new board opens, and its link is copied to the clipboard. The URL contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
+
+### Managing Boards
+
+Open the board navigation (🗂️) and log in. The board manager shows your boards as folders: a board's path, such as `teaching/algebra/week1`, puts it into the folder `teaching/algebra`. Folders are not created separately; a folder exists while a board lies in it.
+
+- **Open** a board, with its edit password, from its row.
+- **Rename** a board or a folder: enter the new path. A new path can move it to another folder; moving a folder moves every board in it.
+- Paths are unique per user, and a path is either a board or a folder, never both (no board named `teaching/algebra` while `teaching/algebra/week1` exists).
+- **Change credential** at the bottom of the board manager.
+
+Only the owner sees a board's path; spectators and collaborators with a link see no names.
     
 
 ### Basic Controls
@@ -204,7 +222,7 @@ A new board will be created and the URL will change to point towards that board.
 - **Zooming** - Use the zoom buttons (−/+) or the zoom menu (fit width, fit height, 50%–200%)
 - **Undo/Redo** - Use the undo (↩) and redo (↪) buttons. There are no keyboard shortcuts.
 - **Page Management** - Add new pages, delete pages, navigate between pages using the controls at the top. Click the page info label ("Page X of Y") to open the page overview for reordering and quick navigation.
-- **Board Navigation** - Click the folder icon (🗂️) to open the board navigation overlay, where you can copy view or edit links, create new boards, or navigate to different boards by URL/UUID
+- **Board Navigation** - Click the folder icon (🗂️) to open the board navigation overlay, where you can copy view or edit links, log in to manage and create your boards, or navigate to different boards by URL/UUID
 
 ### Tool Options
 
@@ -317,7 +335,7 @@ The client uses an optimized two-canvas rendering approach:
 
 - **scrypt password hashing**: Memory-hard KDF resistant to brute force and rainbow table attacks
 - **Password-protected editing**: Editing requires a board-specific password
-- **Credential-based board creation**: Creation requires a server-level credential
+- **Login-based board management**: Creating, listing and renaming boards requires logging in with a login and credential from `conf/users.json`; only the owner can rename a board
 - **No-auth viewing**: Viewing is possible without any authentication
 - **Request validation**: Server validates all incoming requests for proper structure
 - **Path traversal protection**: Hidden files and non-whitelisted paths are blocked
@@ -327,7 +345,7 @@ The client uses an optimized two-canvas rendering approach:
 
 Only the root path (`/`) and a strict whitelist of PWA files are served:
 - `/manifest.json`, `/sw.js`, `/icon-192.png`, `/icon-512.png`, `/apple-touch-icon.png`, `/favicon.ico`, `/robots.txt`
-- `/` is served only with at least one of the query parameters `board`, `passwd`, `credential` and no others; anything else returns 404
+- `/` is served only with at least one of the query parameters `board`, `passwd`, `login`, `credential` and no others; anything else returns 404
 - The server embeds `shared.js` directly into `index.html` at request time to avoid serving raw JavaScript files, and in direct mode also injects the WebSocket URL
 
 ## Progressive Web App Support
@@ -349,13 +367,14 @@ kubux-whiteboard-server/
 ├── Dockerfile          # Docker image definition
 ├── docker-compose.yml  # Docker deployment template
 ├── flake.nix           # Nix flake for reproducible dev environment
-├── passwd_hash         # Password hashing utility
+├── passwd_hash         # Prints a user entry for conf/users.json
+├── assign_board        # Gives a board without owner an owner and a path (server stopped)
 ├── data/               # Data storage directory
-│   ├── *.board         # Board data files
+│   ├── *.board         # Board data files (edit password, page order, owner, path, creation time)
 │   ├── *.page          # Page data files
 │   └── to_be_removed.json  # Deletion redirect mapping
 ├── conf/               # Configuration directory
-│   └── passwd.json     # Password file
+│   └── users.json      # Users: id, login, credential hash
 └── logs/               # Log files
     └── debug.log       # Server log (errors and rejected messages; debug-level output is discarded)
 ```

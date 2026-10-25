@@ -41,9 +41,10 @@ services:
       - 80
     # not root: the owner of <app-dir> on the host (stat -c %u:%g <app-dir>)
     user: "1000:1000"
-    # the code is read-only; the server writes only data/ and logs/
+    # the code is read-only; the server writes only conf/ (credential changes), data/ and logs/
     volumes:
       - <app-dir>:/app:ro
+      - <app-dir>/conf:/app/conf:rw
       - <app-dir>/data:/app/data:rw
       - <app-dir>/logs:/app/logs:rw
       - /etc/localtime:/etc/localtime:ro

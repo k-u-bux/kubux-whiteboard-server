@@ -18,9 +18,12 @@ The authoritative definitions are the `MESSAGES` and `MOD_ACTIONS` constants and
 
 Each connection has a current board (`ws.boardId`) and a current page (`ws.pageId`). They decide which broadcasts and pings the connection receives. They are set by `register-board`, `register-page`, `board-info-request` with `register: true`, `page-info-request` / `full-page` request / `replay-requests` with `register: true`, `create-board`, and by the server itself when it redirects a client away from a deleted page (see `ping`).
 
+A connection can also be logged in (`ws.userId`, set by `login`). The login is needed only for board management (`create-board`, `list-boards`, `set-path`, `rename-prefix`, `change-credential`) and lasts as long as the connection.
+
 ### Validation and rejection
 
 - A message whose JSON cannot be parsed, or whose `type` has no handler, is answered with an `error` message.
+- A board-management request that is refused (not logged in, invalid path, …) is answered with an `error` message carrying the request's `requestId`.
 - A message that fails its validator (`is_invalid_*` in `shared.js`) is dropped without a reply.
 - A request that names an unknown board is dropped without a reply.
 
@@ -210,25 +213,117 @@ The proposal is dropped unless the connection is registered with `board-uuid`. T
 
 ---
 
+### `login`
+
+Log the connection in for board management.
+
+```json
+{
+  "type": "login",
+  "login": "<login>",
+  "passwd": "<credential>",
+  "requestId": "<request-uuid>"
+}
+```
+
+- `login`: 1 to 64 characters; `passwd`: 1 to 1024 characters; `requestId`: required.
+- The credential is checked asynchronously with scrypt against the hash of that login in `conf/users.json`. An unknown login costs one scrypt as well, and gets the same answer as a wrong credential. A connection may have only one credential check in progress.
+
+**Response:**
+- on success: `logged-in`; the connection is now logged in as that user;
+- wrong login or credential: `error` with message `credential not accepted`;
+- a check already running on this connection: `error` with message `a credential is already being checked`.
+
+---
+
+### `change-credential`
+
+Change the logged-in user's credential.
+
+```json
+{
+  "type": "change-credential",
+  "passwd": "<current credential>",
+  "new-passwd": "<new credential>",
+  "requestId": "<request-uuid>"
+}
+```
+
+The current credential is checked with scrypt like a login. The server then rewrites `conf/users.json` atomically with the new hash; id and login stay.
+
+**Response:** `credential-changed`, or `error` with message `not logged in`, `credential not accepted`, `a credential is already being checked`, or `credential could not be saved` (the user file could not be written; the old credential stays valid).
+
+---
+
 ### `create-board`
 
-Create a new board (requires a server-level credential from `conf/passwd.json`).
+Create a new board owned by the logged-in user.
 
 ```json
 {
   "type": "create-board",
-  "passwd": "<credential>",
+  "path": "<path>",
   "clientId": "<client-uuid>",
   "requestId": "<request-uuid>"
 }
 ```
 
-The credential is checked asynchronously with scrypt against each stored hash. A connection may have only one check in progress.
+`path` names the board for its owner (see *Users, Owners and Paths*); the server normalizes it.
 
 **Response:**
 - on success: `board-created`, followed by a `fullPage` of the board's first (empty) page with `do-move: true`; the connection is registered with the new board;
-- wrong credential: `error` with message `credential not accepted`;
-- a check already running on this connection: `error` with message `a board creation request is already being checked`.
+- `error` with message `not logged in`, `invalid path`, or `path taken`.
+
+---
+
+### `list-boards`
+
+List the logged-in user's boards.
+
+```json
+{
+  "type": "list-boards",
+  "requestId": "<request-uuid>"
+}
+```
+
+**Response:** `board-list`, or `error` with message `not logged in`.
+
+---
+
+### `set-path`
+
+Rename or move one of the logged-in user's boards.
+
+```json
+{
+  "type": "set-path",
+  "board-uuid": "<board-uuid>",
+  "path": "<new path>",
+  "requestId": "<request-uuid>"
+}
+```
+
+**Response:** `board-list` with the updated list, or `error` with message `not logged in`, `not your board` (also for an unknown board), `invalid path`, or `path taken`.
+
+---
+
+### `rename-prefix`
+
+Rename or move a folder of the logged-in user: every board whose path lies below `from` gets `to` in place of `from`.
+
+```json
+{
+  "type": "rename-prefix",
+  "from": "<folder path>",
+  "to": "<new folder path>",
+  "requestId": "<request-uuid>"
+}
+```
+
+Moving a folder onto an existing folder merges the two if no path collides.
+
+**Response:** `board-list` with the updated list, or `error` with message `not logged in`, `invalid path` (also if a new path would be too long), `no such folder`, `path taken`, or `rename cannot be written safely` (no write order keeps the disk consistent; see *Writing Path Changes*).
 
 ---
 
@@ -248,6 +343,52 @@ The credential is checked asynchronously with scrypt against each stored hash. A
 
 - `passwd`: the board's edit password (12 characters, `0-9a-z`).
 - `first-page-uuid`: the board's initial (empty) page.
+
+---
+
+### `logged-in`
+
+Answer to a successful `login`.
+
+```json
+{
+  "type": "logged-in",
+  "login": "<login>",
+  "requestId": "<request-uuid>"
+}
+```
+
+---
+
+### `credential-changed`
+
+Answer to a successful `change-credential`.
+
+```json
+{
+  "type": "credential-changed",
+  "requestId": "<request-uuid>"
+}
+```
+
+---
+
+### `board-list`
+
+The logged-in user's boards, sorted by path. Answer to `list-boards`, `set-path` and `rename-prefix`.
+
+```json
+{
+  "type": "board-list",
+  "boards": [
+    { "board-uuid": "<board-uuid>", "path": "<path>", "passwd": "<edit password>", "createdAt": <unix time in ms> },
+    ...
+  ],
+  "requestId": "<request-uuid>"
+}
+```
+
+The edit password lets the owner open each board with edit rights.
 
 ---
 
@@ -455,16 +596,20 @@ Sent:
 
 ### `error`
 
-Sent when a message is rejected before reaching a handler, and for failed board creation.
+Sent when a message is rejected before reaching a handler, and when a login or board-management request is refused.
 
 ```json
 {
   "type": "error",
-  "message": "<string>"
+  "message": "<string>",
+  "requestId": "<request-uuid>"
 }
 ```
 
-`message` is the `JSON.parse` error text, `Unhandled message type: <type>`, `credential not accepted`, or `a board creation request is already being checked`.
+`requestId` is present for refused requests. `message` is one of:
+- the `JSON.parse` error text, or `Unhandled message type: <type>` (no `requestId`);
+- `credential not accepted`, `a credential is already being checked`, `credential could not be saved`;
+- `not logged in`, `invalid path`, `path taken`, `not your board`, `no such folder`, `rename cannot be written safely`.
 
 ---
 
@@ -624,6 +769,36 @@ When a draw, erase, group, undo or redo action is accepted, the server sends `ac
 
 ---
 
+## Users, Owners and Paths
+
+### Users
+
+`conf/users.json` is a list of users `{ "id": "<uuid>", "login": "<login>", "hash": "<salt>:<hash>" }`, created by the admin with `passwd_hash`. The id never changes and is what boards record as their owner; the login is what people type; the hash is the scrypt hash of the credential. The server reads the file at startup and rewrites it on `change-credential`.
+
+### Board files
+
+A board file holds the edit password (`passwd`), the page order (`pageOrder`), and, for boards created with an owner, `owner` (user id), `path` and `createdAt` (unix time in ms). Boards from before ownership have no owner, are listed for nobody, and can be given an owner and a path with `assign_board` while the server is stopped.
+
+Owner and path never reach clients other than the owner: `board-info` and all other board messages carry neither, and only `board-list` contains paths.
+
+### Path rules
+
+A path names a board like a file path: segments separated by `/` (`teaching/algebra/week1`). Folders are not stored; boards whose paths share a prefix appear in the same folder.
+
+- **Normalization** (`normalizePath` in `shared.js`): segments are trimmed and empty segments dropped (`" a // b "` becomes `a/b`). A path with no segment left, longer than 256 characters, or with control characters is invalid.
+- **Unique per owner:** a path appears only once among one owner's boards.
+- **Board or folder, never both:** no board lies inside another board's path; while `teaching/algebra/week1` exists, no board may be called `teaching/algebra`, and vice versa.
+
+`findPathConflict` in `shared.js` checks the last two rules for a set of paths. The server checks every change against the owner's paths after the change.
+
+### Board index
+
+At startup the server reads every board file into an index of owned boards (owner, path, edit password, creation time), which answers `list-boards` and the path checks. A damaged board file, a malformed owner or path, a duplicate path or a board inside another board's path stops the server: the board files are the single source of truth, and such a state is a bug or damage.
+
+### Writing Path Changes
+
+`create-board`, `set-path` and `rename-prefix` write the affected board files at once, each followed by a sync of the data directory, before answering. A change of several boards is written in an order in which every state on disk keeps the path rules: a board moves to its new path only after every board whose old path equals, contains or lies inside that path has been written. A crash in between leaves a partly moved folder, never two boards with the same path.
+
 ## Board State
 
 ### Page Order
@@ -714,7 +889,12 @@ MESSAGES.CLIENT_TO_SERVER = {
   BOARD_INFO_REQUEST:    { TYPE: "board-info-request" },
   REGISTER_PAGE:         { TYPE: "register-page" },
   PAGE_INFO_REQUEST:     { TYPE: "page-info-request" },
+  LOGIN:                 { TYPE: "login" },
+  CHANGE_CREDENTIAL:     { TYPE: "change-credential" },
   CREATE_BOARD:          { TYPE: "create-board" },
+  LIST_BOARDS:           { TYPE: "list-boards" },
+  SET_PATH:              { TYPE: "set-path" },
+  RENAME_PREFIX:         { TYPE: "rename-prefix" },
   FULL_PAGE_REQUEST:     { TYPE: "fullPage-requests" },
   SHUFFLE_PROPOSAL:      { TYPE: "shuffle-proposal" },
   MOD_ACTION_PROPOSALS:  { TYPE: "mod-action-proposals" },
@@ -723,6 +903,9 @@ MESSAGES.CLIENT_TO_SERVER = {
 
 // Server → Client
 MESSAGES.SERVER_TO_CLIENT = {
+  LOGGED_IN:          { TYPE: "logged-in" },
+  CREDENTIAL_CHANGED: { TYPE: "credential-changed" },
+  BOARD_LIST:         { TYPE: "board-list" },
   BOARD_CREATED:    { TYPE: "board-created" },
   BOARD_REGISTERED: { TYPE: "board-registered" },
   BOARD_INFO:       { TYPE: "board-info" },
@@ -746,7 +929,12 @@ All client message types have validation functions in `shared.js`:
 is_invalid_REGISTER_BOARD_message(data)
 is_invalid_REGISTER_PAGE_message(data)
 is_invalid_PAGE_INFO_REQUEST_message(data)
+is_invalid_LOGIN_message(data)
+is_invalid_CHANGE_CREDENTIAL_message(data)
 is_invalid_CREATE_BOARD_message(data)
+is_invalid_LIST_BOARDS_message(data)
+is_invalid_SET_PATH_message(data)
+is_invalid_RENAME_PREFIX_message(data)
 is_invalid_FULL_PAGE_REQUEST_message(data)
 is_invalid_REPLAY_REQUEST_message(data)
 is_invalid_MOD_ACTION_PROPOSALS_message(data)
@@ -758,7 +946,8 @@ They check that:
 - the message is a non-null object;
 - UUID fields are version-4 UUIDs (`isUuid`), and required ones are present;
 - integer fields (`delta`, `present`) are integers and boolean fields (`register`) are booleans;
-- password fields are non-empty strings;
+- password fields are non-empty strings (logins and credentials of at most 64 and 1024 characters);
+- raw paths are strings of at most 1024 characters (the server then normalizes them and answers an invalid path with `error`);
 - shuffle lists are non-empty lists of UUIDs;
 - action payloads have a known type and the fields that type needs, strokes have the structure in *Stroke Structure*, and groups contain only edit actions and are at most 10 levels deep.
 
@@ -776,6 +965,12 @@ They check that:
 ---
 
 ## Changelog
+
+### Version 4.0 (October 2026)
+- Users: `conf/users.json` (id, login, credential hash) replaces `conf/passwd.json`; `login` / `logged-in` log a connection in; `change-credential` / `credential-changed`.
+- Boards get an owner (user id), a path and a creation time; `create-board` takes a `path` instead of a credential and needs a login.
+- `list-boards` / `board-list`, `set-path`, `rename-prefix` for the owner's board manager; path rules, board index and ordered writes (see *Users, Owners and Paths*).
+- `error` carries the `requestId` of refused requests; new reasons.
 
 ### Document revision (October 2026)
 - Corrected the document to match `shared.js` and `server.js`: the literal wire keys (`board-uuid`, `page-uuid`, `clientId`, `passwd`, `do-move`, `pageNr`, `totalPages`, `edits`, `beforeHash`, …), the type strings `fullPage-requests`, `replay-requests`, `fullPage`, `new page` and `delete page`, and the stroke format (a 13-element array, not an object).

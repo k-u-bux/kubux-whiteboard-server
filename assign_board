@@ -1,0 +1,89 @@
+#!/usr/bin/env node
+'use strict';
+// Give a board that has no owner yet (created before boards had owners) an owner
+// and a path, so that it appears in the owner's board list.
+//
+// Usage: ./assign_board <board-uuid> <login> <path>
+//
+// Run it in the server's working directory (it reads conf/users.json and data/),
+// and only while the server is STOPPED: the server keeps boards in memory and
+// would overwrite the change, and it reads owners and paths only at startup.
+// The path follows the same rules as in the board manager: unique per owner, and
+// no board inside another board's path.
+
+const fs = require('fs');
+const path = require('path');
+const { isUuid, serialize, deserialize, normalizePath, findPathConflict } = require(path.join(__dirname, 'shared.js'));
+
+const DATA_DIR = './data';
+const USERS_FILE = './conf/users.json';
+
+function fail(message) {
+    console.error(`assign_board: ${message}`);
+    process.exit(1);
+}
+
+const [boardId, login, rawPath] = process.argv.slice(2);
+if (!boardId || !login || rawPath === undefined) {
+    fail('usage: ./assign_board <board-uuid> <login> <path>   (server stopped, run in its working directory)');
+}
+if (!isUuid(boardId)) {
+    fail(`not a board id: ${boardId}`);
+}
+const boardPath = normalizePath(rawPath);
+if (boardPath === null) {
+    fail(`not a valid path: ${JSON.stringify(rawPath)}`);
+}
+
+const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+const user = users.find(entry => entry.login === login);
+if (!user) {
+    fail(`no user with login ${login} in ${USERS_FILE}`);
+}
+
+const boardFile = path.join(DATA_DIR, `${boardId}.board`);
+if (!fs.existsSync(boardFile)) {
+    fail(`no board file ${boardFile}`);
+}
+const board = deserialize(fs.readFileSync(boardFile, 'utf8'));
+if (board.owner !== undefined) {
+    fail(`board ${boardId} already has an owner; rename it in the board manager instead`);
+}
+
+// the owner's paths so far, from all board files
+const ownerPaths = [];
+for (const file of fs.readdirSync(DATA_DIR)) {
+    if (!file.endsWith('.board') || file === `${boardId}.board`) { continue; }
+    const other = deserialize(fs.readFileSync(path.join(DATA_DIR, file), 'utf8'));
+    if (other.owner === user.id) {
+        ownerPaths.push(other.path);
+    }
+}
+const conflict = findPathConflict([...ownerPaths, boardPath]);
+if (conflict) {
+    fail(`path ${boardPath} is taken for ${login}: ${conflict}`);
+}
+
+// the board's creation time is not recorded: the board file's last change stands in for it
+board.owner = user.id;
+board.path = boardPath;
+board.createdAt = Math.round(fs.statSync(boardFile).mtimeMs);
+
+// write via a temporary file and a rename, then sync the directory, as the server does
+const tmpFile = `${boardFile}.tmp`;
+const fd = fs.openSync(tmpFile, 'w');
+try {
+    fs.writeFileSync(fd, serialize(board), 'utf8');
+    fs.fsyncSync(fd);
+} finally {
+    fs.closeSync(fd);
+}
+fs.renameSync(tmpFile, boardFile);
+const dirFd = fs.openSync(DATA_DIR, 'r');
+try {
+    fs.fsyncSync(dirFd);
+} finally {
+    fs.closeSync(dirFd);
+}
+
+console.log(`board ${boardId} now belongs to ${login} as ${boardPath}`);
