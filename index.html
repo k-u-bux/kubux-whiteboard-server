@@ -559,6 +559,20 @@
           margin-bottom: 10px;
       }
 
+      .board-manager-credential {
+          margin-top: 12px;
+          font-size: 13px;
+      }
+
+      .board-manager-credential .crumb {
+          color: #0078d7;
+          cursor: pointer;
+      }
+
+      .board-manager-credential form {
+          margin-top: 8px;
+      }
+
       #board-crumbs {
           font-size: 13px;
           margin-bottom: 6px;
@@ -1322,6 +1336,18 @@
               </div>
             </form>
             <span class="board-nav-feedback" id="manager-feedback"></span>
+            <div class="board-manager-credential">
+              <span class="crumb" id="change-credential-toggle">Change credential…</span>
+              <form class="board-nav-form" id="change-credential-form" style="display: none;">
+                <input type="password" id="current-credential-input" placeholder="Current credential" autocomplete="current-password" required>
+                <input type="password" id="new-credential-input" placeholder="New credential" autocomplete="new-password" required>
+                <input type="password" id="repeat-credential-input" placeholder="New credential again" autocomplete="new-password" required>
+                <div class="board-nav-actions">
+                  <button type="submit" class="board-nav-btn">Change Credential</button>
+                </div>
+              </form>
+              <span class="board-nav-feedback" id="credential-feedback"></span>
+            </div>
           </div>
         </div>
         
@@ -2964,6 +2990,49 @@
               item.append(name, date, open, rename);
               list.appendChild(item);
           }
+      }
+
+      // Change the logged-in user's credential
+      async function changeCredential(current, replacement) {
+          const feedback = document.getElementById('credential-feedback');
+          feedback.textContent = '';
+          let reply;
+          try {
+              reply = await sendWithCallback({
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.PASSWORD]: current,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.NEW_PASSWORD]: replacement,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.REQUEST_ID]: createRequestId()
+              });
+          } catch (err) {
+              feedback.textContent = `Credential not changed: ${err.message}`;
+              return;
+          }
+          if (reply.type !== shared.MESSAGES.SERVER_TO_CLIENT.CREDENTIAL_CHANGED.TYPE) {
+              feedback.textContent = `Credential not changed: ${reply.message}`;
+              return;
+          }
+          // the new credential replaces the remembered one, as a login would
+          storedCredential = replacement;
+          localStorage.setItem('whiteboard_credential', replacement);
+          document.getElementById('change-credential-form').reset();
+          document.getElementById('change-credential-form').style.display = 'none';
+          feedback.style.color = '#2e7d32';
+          feedback.textContent = 'Credential changed';
+          setTimeout(() => { feedback.textContent = ''; feedback.style.color = ''; }, 3000);
+      }
+
+      function handleChangeCredential(e) {
+          e.preventDefault();
+          const current = document.getElementById('current-credential-input').value;
+          const replacement = document.getElementById('new-credential-input').value;
+          const repeated = document.getElementById('repeat-credential-input').value;
+          const feedback = document.getElementById('credential-feedback');
+          if (replacement !== repeated) {
+              feedback.textContent = 'The new credentials differ';
+              return;
+          }
+          changeCredential(current, replacement);
       }
 
       // Rename or move one board; the reply is the updated board list
@@ -5563,6 +5632,11 @@
           // Board navigation forms
           document.getElementById('login-form').addEventListener('submit', handleLogin);
           document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
+          document.getElementById('change-credential-form').addEventListener('submit', handleChangeCredential);
+          document.getElementById('change-credential-toggle').addEventListener('click', () => {
+              const form = document.getElementById('change-credential-form');
+              form.style.display = form.style.display === 'none' ? '' : 'none';
+          });
           document.getElementById('goto-board-form').addEventListener('submit', handleGotoBoard);
           
           // Close overlay when clicking outside the window

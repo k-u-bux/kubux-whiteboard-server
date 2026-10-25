@@ -249,6 +249,12 @@ const MESSAGES = {
             PASSWORD: 'passwd',
             REQUEST_ID: 'requestId'
         },
+        CHANGE_CREDENTIAL: {
+            TYPE: 'change-credential',
+            PASSWORD: 'passwd',         // the current credential
+            NEW_PASSWORD: 'new-passwd',
+            REQUEST_ID: 'requestId'
+        },
         CREATE_BOARD: {
             TYPE: 'create-board',
             PATH: 'path',
@@ -309,6 +315,10 @@ const MESSAGES = {
         LOGGED_IN: {
             TYPE: 'logged-in',
             LOGIN: 'login',
+            REQUEST_ID: 'requestId'
+        },
+        CREDENTIAL_CHANGED: {
+            TYPE: 'credential-changed',
             REQUEST_ID: 'requestId'
         },
         BOARD_LIST: {
@@ -423,6 +433,7 @@ const MESSAGES = {
 // Reasons in the server's 'error' message
 const CREDENTIAL_NOT_ACCEPTED = 'credential not accepted';           // login or credential check failed
 const NOT_LOGGED_IN = 'not logged in';                               // board management needs a login
+const CREDENTIAL_NOT_SAVED = 'credential could not be saved';        // the user file could not be written
 const PATH_INVALID = 'invalid path';                                 // no name left after normalizing, or too long
 const PATH_TAKEN = 'path taken';                                     // exists, or a board would lie inside another
 const NOT_OWNER = 'not your board';                                  // unknown board, or owned by someone else
@@ -729,6 +740,18 @@ function is_invalid_LOGIN_message(data) {
 // answer a path that normalizes to nothing with PATH_INVALID instead of dropping it.
 function is_invalid_raw_path(raw) {
     return typeof raw !== 'string' || raw.length > 4 * MAX_PATH_LENGTH;
+}
+
+function is_invalid_CHANGE_CREDENTIAL_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    if (is_invalid_credential_text(data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.PASSWORD])) return true;
+    if (is_invalid_credential_text(data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.NEW_PASSWORD])) return true;
+
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+
+    return false;
 }
 
 function is_invalid_CREATE_BOARD_message(data) {
@@ -1882,6 +1905,7 @@ if (typeof module !== 'undefined' && module.exports) {
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
         NOT_LOGGED_IN,
+        CREDENTIAL_NOT_SAVED,
         PATH_INVALID,
         PATH_TAKEN,
         NOT_OWNER,
@@ -1907,6 +1931,7 @@ if (typeof module !== 'undefined' && module.exports) {
         is_invalid_REGISTER_PAGE_message,
         is_invalid_PAGE_INFO_REQUEST_message,
         is_invalid_LOGIN_message,
+        is_invalid_CHANGE_CREDENTIAL_message,
         is_invalid_CREATE_BOARD_message,
         is_invalid_LIST_BOARDS_message,
         is_invalid_SET_PATH_message,
@@ -1977,6 +2002,7 @@ else if (typeof window !== 'undefined') {
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
         NOT_LOGGED_IN,
+        CREDENTIAL_NOT_SAVED,
         PATH_INVALID,
         PATH_TAKEN,
         NOT_OWNER,

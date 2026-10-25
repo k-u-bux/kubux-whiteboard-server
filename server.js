@@ -127,6 +127,20 @@ function hashPassword(password) {
   return salt.toString('hex') + ':' + hash.toString('hex');
 }
 
+// hashPassword in Node's worker pool, so that a credential change does not block the event loop
+function hashPasswordAsync(password) {
+  return new Promise((resolve, reject) => {
+    const salt = crypto.randomBytes(32);
+    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1 }, (error, hash) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(salt.toString('hex') + ':' + hash.toString('hex'));
+    });
+  });
+}
+
 /**
  * Verify a password against a stored hash
  * 
@@ -227,6 +241,7 @@ const {
     MESSAGES, 
     CREDENTIAL_NOT_ACCEPTED,
     NOT_LOGGED_IN,
+    CREDENTIAL_NOT_SAVED,
     PATH_INVALID,
     PATH_TAKEN,
     NOT_OWNER,
@@ -242,6 +257,7 @@ const {
     is_invalid_REGISTER_PAGE_message,
     is_invalid_PAGE_INFO_REQUEST_message,
     is_invalid_LOGIN_message,
+    is_invalid_CHANGE_CREDENTIAL_message,
     is_invalid_CREATE_BOARD_message,
     is_invalid_LIST_BOARDS_message,
     is_invalid_SET_PATH_message,
@@ -311,6 +327,13 @@ function parseUsers(text) {
         logins.add(entry.login);
     }
     return parsed.map(entry => ({ id: entry.id, login: entry.login, hash: entry.hash }));
+}
+
+// Write the user file with one user's hash replaced. Throws if the file cannot be
+// written (e.g. conf/ mounted read-only); the users in memory stay unchanged then.
+function saveUsersWithHash(userId, hash) {
+    const entries = users.map(user => ({ id: user.id, login: user.login, hash: user.id === userId ? hash : user.hash }));
+    writeFileAtomic(getUsersFilePath(), JSON.stringify(entries, null, 2) + '\n');
 }
 
 function initializeGlobals() {
@@ -1003,8 +1026,9 @@ httpServer.listen(serverPort, () => {
 
 // Never let secrets reach the logs: a copy of a payload with passwd fields masked.
 // Wire messages are plain JSON (no BigInt/Set/Map), so JSON round-trips safely here.
+const SECRET_KEYS = new Set(['passwd', 'new-passwd']);
 function redactSecrets(value) {
-    return JSON.parse(JSON.stringify(value, (key, v) => (key === 'passwd' ? '[redacted]' : v)));
+    return JSON.parse(JSON.stringify(value, (key, v) => (SECRET_KEYS.has(key) ? '[redacted]' : v)));
 }
 
 function logSentMessage(type, payload, requestId = 'N/A', clientId = 'unknown' ) {
@@ -1612,6 +1636,58 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.LOGIN.TYPE] = (ws, data, requestId) =>
         };
         ws.send(JSON.stringify(response));
         logSentMessage(response.type, response, requestId, ws.clientId);
+    });
+};
+
+// Handler for changing the logged-in user's credential
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_CHANGE_CREDENTIAL_message( data ) ) {
+        debug.log(`[SERVER] dropped change-credential request from `, ws.clientId);
+        return;
+    }
+    if ( !ws.userId ) {
+        rejectMessage(ws, NOT_LOGGED_IN, requestId);
+        return;
+    }
+    const current = data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.PASSWORD];
+    const replacement = data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.NEW_PASSWORD];
+
+    // Each check costs ~50 ms of CPU and 16 MiB: one check per connection at a time.
+    if ( ws.credentialCheckPending ) {
+        rejectMessage(ws, 'a credential is already being checked', requestId);
+        return;
+    }
+    ws.credentialCheckPending = true;
+
+    const user = usersById.get(ws.userId);
+    assert( user ); // users are only added at startup and never removed
+
+    // An exception here is a bug and, as an unhandled rejection, ends the process.
+    verifyPassword(current, user.hash).then(async (matches) => {
+        if (!matches) {
+            ws.credentialCheckPending = false;
+            rejectMessage(ws, CREDENTIAL_NOT_ACCEPTED, requestId);
+            return;
+        }
+        const hash = await hashPasswordAsync(replacement);
+        ws.credentialCheckPending = false;
+        try {
+            saveUsersWithHash(user.id, hash);
+        } catch (error) {
+            debug.error(`[SERVER] Cannot write ${getUsersFilePath()}: ${error.message}`);
+            rejectMessage(ws, CREDENTIAL_NOT_SAVED, requestId);
+            return;
+        }
+        user.hash = hash;
+        debug.log(`[SERVER] User ${user.id} changed their credential`);
+        if (ws.readyState === WebSocket.OPEN) {
+            const response = {
+                type: MESSAGES.SERVER_TO_CLIENT.CREDENTIAL_CHANGED.TYPE,
+                [MESSAGES.SERVER_TO_CLIENT.CREDENTIAL_CHANGED.REQUEST_ID]: requestId
+            };
+            ws.send(JSON.stringify(response));
+            logSentMessage(response.type, response, requestId, ws.clientId);
+        }
     });
 };
 
