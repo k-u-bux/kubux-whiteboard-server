@@ -22,7 +22,7 @@ Re-audit of `server.js`, `shared.js` and `index.html` at HEAD. Unlike v2.2 (stat
 | 5 | No Origin check on WebSocket handshake | LOW | Open (**new** in v3.0) |
 | 6 | `x-forwarded-proto` trusted unconditionally | LOW | Open (unchanged) |
 | 7 | Error details (`e.message`) sent to clients | LOW | Open (unchanged) |
-| 8 | Dockerfile: `node:20` cannot start the server; runs as root | INFRA | Open (**new** in v3.0) |
+| 8 | Dockerfile runs as root (no `USER`); base image bumped to `node:23` | MEDIUM | Open; bump verified, startup claim retracted (Erratum) |
 
 Key changes vs v2.2:
 - **`create-board` CPU DoS recharacterized:** `scryptSync` was replaced by async `crypto.scrypt`. The event loop is *not* blocked anymore — measured fullPage latency of **3 ms during a sustained 60-connection flood** (v2.2 predicted "pins CPU at 100%, unresponsive host" — that impact is gone). The remaining impact is worker-pool starvation: legitimate board creation queues behind an attacker's jobs, and the queue is unbounded (memory). About **50 attempts/sec** were sustained from 60 connections, each attempt costing **one scrypt per stored credential** (~100 ms, 16 MiB each; currently 2 credentials).
@@ -30,6 +30,7 @@ Key changes vs v2.2:
 - **GROUP validation verified live:** a depth-15 nested GROUP payload is silently dropped (`MAX_GROUP_DEPTH = 10`), closing the v2.2 assert-crash / stack-overflow finding.
 - **New log-growth finding:** every malformed message writes one `debug.error` line with no cap or rotation. Measured ~1000 lines/s ≈ 87 KB/s from a *single* connection. A full disk turns into a crash: `writeFileAtomic` throws inside the 10 s persist timer (unhandled), losing up to 10 s of edits.
 - **New data-exposure finding:** the existing `logs/debug.log` contains board passwords in cleartext (`passwd: 'e0k5ndiszdig'` ×N), written by a pre-current logging configuration. The current config sends `debug.log` to a NullStream, making the entire payload-logging layer dead code — the live leak is one commented-out line away (server.js:71–72).
+- **Erratum (v3.0 → v3.1):** v3.0's claim that the Dockerfile's `node:20` base "cannot start the server" was **wrong**. A full boot test under node **v20.18.1** succeeded (HTTP 200, WS up, scrypt credential check working) — Node 20.18 has `require('console')`, `require('stream')`, `fs.createWriteStream` and async `crypto.scrypt`. The bump to `node:23` was **verified the same way under v23.11.1** (the version the `node:23` tag resolves to). The bump is still correct: Node 20 went end-of-life 2026-04-30 (nixpkgs removed it). The Dockerfile's real open issue is running as root (Finding 8).
 
 ---
 
@@ -169,11 +170,19 @@ The existing production `logs/debug.log` (~792 KB) contains board passwords in c
 
 ## Deployment Findings
 
-### ⚠️ 8. Dockerfile cannot start the server [NEW]
+### ⚠️ 8. Dockerfile runs as root [OPEN — Erratum: "cannot start" claim retracted]
 
-`FROM node:20` — but `server.js` requires `module 'console'` (line 14) and uses `fs.createWriteStream` (line 19), both of which need **Node ≥ 23**. A standalone `docker build` produces a container that exits at startup (`MODULE_NOT_FOUND`). It also runs as root (no `USER`).
+**Risk Level:** MEDIUM (unchanged from v2.2)
 
-**Note:** the documented `docker-compose.yml` path is fine — `user: "1000:1000"`, app mounted `:ro`, only `data/` + `logs/` writable. Fix the Dockerfile base image (e.g. `node:24`) and add `USER`.
+**Remaining issue:** the standalone `Dockerfile` has no `USER` directive — the Node.js process runs as root inside the container. If any file-write vulnerability appears, the blast radius is root. (The documented `docker-compose.yml` path already mitigates this: `user: "1000:1000"`, app mounted `:ro`, only `data/` + `logs/` writable.)
+
+**Erratum — the v3.0 startup claim was wrong:** v3.0 stated the `node:20` base "cannot start the server" because of `require('console')` / `fs.createWriteStream`. **Retracted.** Verified by booting the server under official binaries:
+- **node v20.18.1:** full boot OK — HTTP 200, WebSocket up, scrypt credential check returns the expected rejection.
+- **node v23.11.1** (= what the `node:23` tag resolves to): same tests, all OK.
+
+Node 20.18 has `console`/`stream`/`fs.createWriteStream`/async `crypto.scrypt`. The `node:20` → `node:23` bump (Dockerfile, Oct 25, 2026) is still a correct change: Node 20 reached end-of-life 2026-04-30 (removed from nixpkgs), and pinning a current LTS avoids future module drift.
+
+**Recommended fix:** add `RUN useradd -r -u 1001 appuser` + `USER appuser` to the standalone `Dockerfile` (as v2.2 originally suggested); the compose override stays.
 
 ### ℹ️ `passwd_hash` shell-injection footgun
 
@@ -228,7 +237,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 3. **Rotate/truncate existing `debug.log`; remove secret-logging configs** (Finding 3).
 4. **State caps + GC:** history per page, page count, `deletionMap`, delete page files (Finding 4).
 5. **Verify `Origin` on the WS handshake** (Finding 5).
-6. **Fix Dockerfile:** `node:24` base, non-root user (Finding 8).
+6. **Fix Dockerfile:** add a non-root `USER` (base image already corrected to `node:23`, verified — Erratum; Finding 8).
 7. **Configurable proxy trust** for `x-forwarded-proto` (Finding 6); generic client error messages (Finding 7).
 8. **Storage note:** the admin credential persists in `localStorage['whiteboard_credential']` — acceptable only while there is no XSS and the machine is single-user; add CSP as defense-in-depth.
 
@@ -253,14 +262,16 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 
 ## Conclusion
 
-The kubux-whiteboard-server remains solid against RCE, file access, deserialization and XSS, and the crash-on-malformed-input class is closed. The DoS surface is smaller than v2.2 suggested (event loop survives the scrypt flood; message sizes are capped), but three availability issues remain exploitable: **unauthenticated scrypt flooding** (HIGH), **log-growth disk fill** (MEDIUM) and **unbounded state growth by board members** (MEDIUM) — plus a historical credential exposure in the unrotated log file. One deployment bug stands out: the provided Dockerfile cannot run the server on its declared base image.
+The kubux-whiteboard-server remains solid against RCE, file access, deserialization and XSS, and the crash-on-malformed-input class is closed. The DoS surface is smaller than v2.2 suggested (event loop survives the scrypt flood; message sizes are capped), but three availability issues remain exploitable: **unauthenticated scrypt flooding** (HIGH), **log-growth disk fill** (MEDIUM) and **unbounded state growth by board members** (MEDIUM) — plus a historical credential exposure in the unrotated log file. The Dockerfile was bumped to `node:23` (verified working) and its only remaining deployment issue is running as root.
 
 **Action required:** Findings 1–4 (rate limits, log management, state caps) before Findings 5–8.
 
 ---
 
-**Document Version:** 3.0
+**Document Version:** 3.1
 **Last Updated:** October 25, 2026
 **Next Review:** after Findings 1–4 are addressed
 
-**Changelog 3.0 (Oct 25, 2026):** Full re-audit at HEAD 79fc50a with live verification. Recharacterized Finding 1 (async scrypt: event loop no longer blocked; impact is worker-pool starvation + unbounded queue — with measurements). Added Findings 2 (error-log disk fill → crash), 3 (plaintext passwords in existing debug.log, dead logging config), 5 (missing Origin check), 8 (Dockerfile node:20 broken). Marked GROUP fix, maxPayload, ws 8.22.0, constant-time compare, corrupt-file guard as verified. Added client-side XSS verification and live test-case table. v2.2 Finding 2 (memory DoS) superseded in part: maxPayload fixed, connection/history caps still open (Finding 4).
+**Changelog 3.1 (Oct 25, 2026):** Dockerfile `node:20` → `node:23` (user change). **Erratum:** v3.0's "cannot start on node:20" claim retracted — server verified booting under node v20.18.1 and v23.11.1 (HTTP 200, WS, scrypt check). Finding 8 reduced to the root-user issue (MEDIUM, as v2.2); recommendation 6 updated accordingly. Node 20 EOL 2026-04-30 noted as the reason the bump remains correct.
+
+**Changelog 3.0 (Oct 25, 2026):** Full re-audit at HEAD 79fc50a with live verification. Recharacterized Finding 1 (async scrypt: event loop no longer blocked; impact is worker-pool starvation + unbounded queue — with measurements). Added Findings 2 (error-log disk fill → crash), 3 (plaintext passwords in existing debug.log, dead logging config), 5 (missing Origin check) and 8 (Dockerfile runs as root; the initial "cannot start on node:20" wording was retracted in 3.1). Marked GROUP fix, maxPayload, ws 8.22.0, constant-time compare, corrupt-file guard as verified. Added client-side XSS verification and live test-case table. v2.2 Finding 2 (memory DoS) superseded in part: maxPayload fixed, connection/history caps still open (Finding 4).
