@@ -840,8 +840,14 @@ httpServer.listen(serverPort, () => {
 });
 
 
+// Never let secrets reach the logs: a copy of a payload with passwd fields masked.
+// Wire messages are plain JSON (no BigInt/Set/Map), so JSON round-trips safely here.
+function redactSecrets(value) {
+    return JSON.parse(JSON.stringify(value, (key, v) => (key === 'passwd' ? '[redacted]' : v)));
+}
+
 function logSentMessage(type, payload, requestId = 'N/A', clientId = 'unknown' ) {
-    debug.log(`[SERVER > CLIENT] Sending message of type '${type}' to '${clientId}' in response to '${requestId}' with payload:`, payload);
+    debug.log(`[SERVER > CLIENT] Sending message of type '${type}' to '${clientId}' in response to '${requestId}' with payload:`, redactSecrets(payload));
 }
 
 // Wire messages are plain JSON. serialize/deserialize, with their replacer, reviver
@@ -1559,7 +1565,7 @@ function createDeclineMessage(boardId, pageId, targetActionId, reason = "") {
 // Handler for modification actions
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_MOD_ACTION_PROPOSALS_message( data ) ) { 
-        debug.log(`[SERVER] dropped mod action proposal from '${ws.clientId}' data = `, data); 
+        debug.log(`[SERVER] dropped mod action proposal from '${ws.clientId}' data = `, redactSecrets(data));
         return;
     }
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD];
@@ -1826,7 +1832,7 @@ function routeMessage(ws, message) {
     const requestId = data.requestId || data['action-uuid'] || 'N/A';
     const message_type = data['type'] || 'unknown';
 
-    debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, data );
+    debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, redactSecrets(data) );
 
     // own properties only: inherited ones (toString, hasOwnProperty, ...) are not handlers
     if ( ! Object.hasOwn( messageHandlers, message_type ) ) {
