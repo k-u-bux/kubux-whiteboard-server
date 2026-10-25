@@ -546,6 +546,17 @@
           font-size: 14px;
       }
       
+      .board-nav-feedback {
+          color: #c62828;
+          font-size: 13px;
+      }
+
+      .board-manager-user {
+          font-size: 13px;
+          color: #555;
+          margin-bottom: 10px;
+      }
+
       .board-nav-form input:focus {
           outline: none;
           border-color: #0078d7;
@@ -1223,15 +1234,26 @@
           </div>
         </div>
         
-        <!-- New Board Section -->
+        <!-- My Boards Section: login, then the owner's boards -->
         <div class="board-nav-section">
-          <h3>Create New Board</h3>
-          <form class="board-nav-form" id="new-board-form">
-            <input type="password" id="new-board-credential-input" placeholder="Enter credential" required>
+          <h3>My Boards</h3>
+          <form class="board-nav-form" id="login-form">
+            <input type="text" id="login-input" placeholder="Login" autocomplete="username" required>
+            <input type="password" id="new-board-credential-input" placeholder="Credential" autocomplete="current-password" required>
             <div class="board-nav-actions">
-              <button type="submit" class="board-nav-btn" id="new-board-btn">New Board</button>
+              <button type="submit" class="board-nav-btn" id="login-btn">Log in</button>
             </div>
+            <span class="board-nav-feedback" id="login-feedback"></span>
           </form>
+          <div id="board-manager" style="display: none;">
+            <div class="board-manager-user">Logged in as <span id="logged-in-as"></span></div>
+            <form class="board-nav-form" id="new-board-form">
+              <div class="board-nav-actions">
+                <button type="submit" class="board-nav-btn" id="new-board-btn">New Board</button>
+              </div>
+            </form>
+            <span class="board-nav-feedback" id="manager-feedback"></span>
+          </div>
         </div>
         
         <!-- Go to Board Section -->
@@ -1927,6 +1949,10 @@
       let boardId = null;
       let passwd = null; // needed for edits
       let storedCredential = null; // Store credential from URL for creating new boards
+      // Board management: the login is kept for the tab (sessionStorage), the credential
+      // as before in storedCredential; loggedIn mirrors the server's view of this connection
+      let session = { login: null, loggedIn: false };
+      const SESSION_LOGIN_KEY = 'whiteboard_login';
       let clientId = shared.generateUuid(); // Unique client identifier
       let currentPageUuid = null;
       let pageNr = 1;
@@ -2263,6 +2289,13 @@
               debugLog('Credential stored from URL and saved to localStorage');
           }
           
+          const loginParam = urlParams.get('login');
+          if (loginParam) {
+              session.login = loginParam;
+          } else {
+              try { session.login = sessionStorage.getItem(SESSION_LOGIN_KEY); } catch (err) { /* storage blocked */ }
+          }
+          
           // Note: loadSettings() will be called after board registration
           // when we have a valid boardId
           
@@ -2418,7 +2451,6 @@
       
       function setupWebSocket() {
           const urlParams = new URLSearchParams(window.location.search);
-          const credential = urlParams.get('credential');
           boardId = urlParams.get('board');
           passwd = urlParams.get('passwd');
 
@@ -2433,16 +2465,6 @@
               debugLog( 'not loading most recent board. current board:', boardId );
           }
 
-          // Determine if we are creating or registering
-          const isCreating = !!credential;
-          const isEditing = !!passwd;
-          
-          // If neither board nor credential provided, show error
-          if (!boardId && !isCreating) {
-              showError('Please provide credentials to create a new board.');
-              return; // Do not attempt to connect
-          }
-          
           let wsUrl;
           
           // Check if server injected a specific WebSocket URL (direct mode)
@@ -2474,12 +2496,17 @@
                   reconnectTimer = null;
               }
               
-              if (isCreating) {
-                  // Send board creation request
-                  createBoard(credential);
-              } else if (boardId) {
+              if (boardId) {
                   // Register with existing board
                   registerBoard(boardId);
+              }
+              // A login belongs to the connection: log in again after a reconnect,
+              // and on load when the login and credential are known
+              if (session.login && storedCredential) {
+                  logIn(session.login, storedCredential, true);
+              }
+              if (!boardId) {
+                  openBoardNavigation();
               }
           };
           
@@ -2683,41 +2710,82 @@
           });
       }
 
-      // Create a new board with credentials
-      function createBoard(credential) {
-          const requestId = createRequestId();
-          
-          const createMessage = {
-              type: shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD]: credential,
-              [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID]: clientId,
-              [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.REQUEST_ID]: requestId
-          };
-          
-          debugLog('Sending board creation request:', createMessage);
-          ws.send(JSON.stringify(createMessage));
+      // Log this connection in for board management. quiet: an automatic login (on
+      // load or after a reconnect) that reports only into the board navigation.
+      async function logIn(login, credential, quiet = false) {
+          const feedback = document.getElementById('login-feedback');
+          feedback.textContent = '';
+          let reply;
+          try {
+              reply = await sendWithCallback({
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.LOGIN.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.LOGIN.LOGIN]: login,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.LOGIN.PASSWORD]: credential,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.LOGIN.REQUEST_ID]: createRequestId()
+              });
+          } catch (err) {
+              session.loggedIn = false;
+              feedback.textContent = `Login failed: ${err.message}`;
+              updateBoardManager();
+              return false;
+          }
+          if (reply.type === shared.MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.TYPE) {
+              session.login = reply[shared.MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.LOGIN];
+              session.loggedIn = true;
+              try { sessionStorage.setItem(SESSION_LOGIN_KEY, session.login); } catch (err) { /* storage blocked */ }
+              storedCredential = credential;
+              localStorage.setItem('whiteboard_credential', credential);
+              updateBoardManager();
+              return true;
+          }
+          session.loggedIn = false;
+          if (reply.message === shared.CREDENTIAL_NOT_ACCEPTED) {
+              // do not offer the rejected credential again, nor retry it on a reload
+              storedCredential = null;
+              localStorage.removeItem('whiteboard_credential');
+              const params = new URLSearchParams(window.location.search);
+              if (params.has('credential')) {
+                  params.set('credential', 'YOU_NEED_A_VALID_PASSWORD');
+                  window.history.replaceState(null, null, `${window.location.pathname}?${params.toString()}`);
+              }
+              feedback.textContent = 'Login or credential not accepted';
+          } else {
+              feedback.textContent = `Login failed: ${reply.message}`;
+          }
+          updateBoardManager();
+          return false;
+      }
+
+      // Create a new board owned by the logged-in user
+      async function createBoard() {
+          const feedback = document.getElementById('manager-feedback');
+          feedback.textContent = '';
+          let reply;
+          try {
+              reply = await sendWithCallback({
+                  type: shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID]: clientId,
+                  [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.REQUEST_ID]: createRequestId()
+              });
+          } catch (err) {
+              feedback.textContent = `Board not created: ${err.message}`;
+              return;
+          }
+          if (reply.type !== shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE) {
+              feedback.textContent = `Board not created: ${reply.message}`;
+              return;
+          }
+          handleBoardCreated(reply);
       }
       
-      // Handle board creation response
+      // Handle board creation response: hand out the link and open the new board
       function handleBoardCreated(data) {
           debugLog('Board created successfully');
-          connectionEstablished = true;
-          hideError();
-          
-          const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID];
-          
-          // Reset local state
-          history = [];
-          present = 0;
-          hashes = [];
-          verifiedIndex = 0;
-          visualState = shared.createEmptyVisualState();
-          
-          boardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD];
-          passwd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
+          const newBoardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD];
+          const newPasswd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
           
           // Build the full URL with board ID and password
-          const boardUrl = `${window.location.origin}${window.location.pathname}?board=${boardId}&passwd=${passwd}`;
+          const boardUrl = `${window.location.origin}${window.location.pathname}?board=${newBoardId}&passwd=${newPasswd}`;
           
           // Copy to clipboard
           navigator.clipboard.writeText(boardUrl).then(() => {
@@ -2727,14 +2795,10 @@
           });
           
           // Show dialog with URL
-          alert(`New board created!\n\nURL (copied to clipboard):\n${boardUrl}\n\nBoard ID: ${boardId}\nPassword: ${passwd}\n\nShare this URL with others to collaborate.`);
+          alert(`New board created!\n\nURL (copied to clipboard):\n${boardUrl}\n\nBoard ID: ${newBoardId}\nPassword: ${newPasswd}\n\nShare this URL with others to collaborate.`);
           
-          // Update URL without reloading
-          window.history.replaceState(null, null, `?board=${boardId}&passwd=${passwd}`);
-          
-          // Load settings now that we have a boardId
-          loadSettings();
-          updateKnobs();
+          // Open it with a fresh page; the login is restored from the tab's session
+          window.location.href = boardUrl;
       }
       
           
@@ -5254,6 +5318,7 @@
           document.getElementById('copy-edit-link-btn').addEventListener('click', () => copyBoardLink(true));
           
           // Board navigation forms
+          document.getElementById('login-form').addEventListener('submit', handleLogin);
           document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
           document.getElementById('goto-board-form').addEventListener('submit', handleGotoBoard);
           
@@ -8037,11 +8102,15 @@
           // Only a client that has the edit password can hand it on
           document.getElementById('copy-edit-link-btn').style.display = passwd ? '' : 'none';
           
-          // Pre-fill credential field if stored
+          // Pre-fill login and credential fields if known
           const credentialInput = document.getElementById('new-board-credential-input');
           if (storedCredential) {
               credentialInput.value = storedCredential;
           }
+          if (session.login) {
+              document.getElementById('login-input').value = session.login;
+          }
+          updateBoardManager();
           
           // Pre-fill current board ID if available
           if (boardId) {
@@ -8059,24 +8128,26 @@
           document.getElementById('board-password-input').value = '';
       }
       
-      function handleNewBoard(e) {
+      // Show the login form or, once logged in, the board manager
+      function updateBoardManager() {
+          document.getElementById('login-form').style.display = session.loggedIn ? 'none' : '';
+          document.getElementById('board-manager').style.display = session.loggedIn ? '' : 'none';
+          document.getElementById('logged-in-as').textContent = session.login || '';
+      }
+
+      function handleLogin(e) {
           e.preventDefault();
-          
-          // Read credential from input field
+          const login = document.getElementById('login-input').value.trim();
           const credential = document.getElementById('new-board-credential-input').value.trim();
-          
-          if (!credential) {
-              alert('Please enter a credential');
+          if (!login || !credential) {
               return;
           }
-          
-          // Save credential for future reuse
-          storedCredential = credential;
-          localStorage.setItem('whiteboard_credential', credential);
-          
-          // Use credential to create new board
-          const newUrl = `${window.location.origin}${window.location.pathname}?credential=${encodeURIComponent(credential)}`;
-          window.location.href = newUrl;
+          logIn(login, credential);
+      }
+
+      function handleNewBoard(e) {
+          e.preventDefault();
+          createBoard();
       }
       
       function handleGotoBoard(e) {

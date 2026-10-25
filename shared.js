@@ -243,9 +243,14 @@ const MESSAGES = {
             REGISTER: 'register',
             REQUEST_ID: 'requestId'
         },
+        LOGIN: {
+            TYPE: 'login',
+            LOGIN: 'login',
+            PASSWORD: 'passwd',
+            REQUEST_ID: 'requestId'
+        },
         CREATE_BOARD: {
             TYPE: 'create-board',
-            PASSWORD: 'passwd',
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
@@ -284,6 +289,11 @@ const MESSAGES = {
         }
     },
     SERVER_TO_CLIENT: {
+        LOGGED_IN: {
+            TYPE: 'logged-in',
+            LOGIN: 'login',
+            REQUEST_ID: 'requestId'
+        },
         BOARD_CREATED: {
             TYPE: 'board-created',
             BOARD: 'board-uuid',
@@ -384,8 +394,9 @@ const MESSAGES = {
     }
 };
 
-// Reason in the server's 'error' message when a create-board credential fails the check
-const CREDENTIAL_NOT_ACCEPTED = 'credential not accepted';
+// Reasons in the server's 'error' message
+const CREDENTIAL_NOT_ACCEPTED = 'credential not accepted';           // login or credential check failed
+const NOT_LOGGED_IN = 'not logged in';                               // board management needs a login
 
 const DRAWABLE = {
     TYPE: {
@@ -622,11 +633,32 @@ function is_invalid_PAGE_INFO_REQUEST_message(data) {
     return false;
 }
 
+// Longest login and credential accepted
+const MAX_LOGIN_LENGTH = 64;
+const MAX_CREDENTIAL_LENGTH = 1024;
+
+function is_invalid_login_text(text) {
+    return !text || typeof text !== 'string' || text.length > MAX_LOGIN_LENGTH;
+}
+
+function is_invalid_credential_text(text) {
+    return !text || typeof text !== 'string' || text.length > MAX_CREDENTIAL_LENGTH;
+}
+
+function is_invalid_LOGIN_message(data) {
+    if (!data || typeof data !== 'object') return true;
+
+    if (is_invalid_login_text(data[MESSAGES.CLIENT_TO_SERVER.LOGIN.LOGIN])) return true;
+    if (is_invalid_credential_text(data[MESSAGES.CLIENT_TO_SERVER.LOGIN.PASSWORD])) return true;
+
+    const requestId = data[MESSAGES.CLIENT_TO_SERVER.LOGIN.REQUEST_ID];
+    if (!requestId || !isUuid(requestId)) return true;
+
+    return false;
+}
+
 function is_invalid_CREATE_BOARD_message(data) {
     if (!data || typeof data !== 'object') return true;
-    
-    const password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
-    if (!password || typeof password !== 'string') return true;
     
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     if (clientId !== undefined && (typeof clientId !== 'string' || !isUuid(clientId))) return true;
@@ -1735,6 +1767,7 @@ if (typeof module !== 'undefined' && module.exports) {
         MOD_ACTIONS,
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
+        NOT_LOGGED_IN,
         DRAWABLE,
         POINT,
         ELEMENT,
@@ -1751,6 +1784,7 @@ if (typeof module !== 'undefined' && module.exports) {
         is_invalid_REGISTER_BOARD_message,
         is_invalid_REGISTER_PAGE_message,
         is_invalid_PAGE_INFO_REQUEST_message,
+        is_invalid_LOGIN_message,
         is_invalid_CREATE_BOARD_message,
         is_invalid_FULL_PAGE_REQUEST_message,
         is_invalid_REPLAY_REQUEST_message,
@@ -1817,6 +1851,7 @@ else if (typeof window !== 'undefined') {
         MOD_ACTIONS,
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
+        NOT_LOGGED_IN,
         DRAWABLE,
         POINT,
         ELEMENT,

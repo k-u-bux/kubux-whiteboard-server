@@ -176,14 +176,12 @@ function verifyPassword(password, storedHash) {
   });
 }
 
-// Checks the credentials one after the other and stops at the first match.
-async function isValidCredential(password) {
-  for (const storedHash of credentials) {
-    if (await verifyPassword(password, storedHash)) {
-      return true;
-    }
-  }
-  return false;
+// The user with this login if the credential matches, else null. An unknown login
+// costs one scrypt like a wrong credential, so the answer does not tell which logins exist.
+async function checkLogin(login, password) {
+  const user = usersByLogin.get(login);
+  const matches = await verifyPassword(password, user ? user.hash : DUMMY_HASH);
+  return (matches && user) ? user : null;
 }
 
 // Dual-mode configuration: proxy vs direct
@@ -228,6 +226,7 @@ const {
     commitGroup, 
     MESSAGES, 
     CREDENTIAL_NOT_ACCEPTED,
+    NOT_LOGGED_IN,
     MOD_ACTIONS, 
     NULL_UUID,
     ELEMENT, 
@@ -235,6 +234,7 @@ const {
     is_invalid_REGISTER_BOARD_message,
     is_invalid_REGISTER_PAGE_message,
     is_invalid_PAGE_INFO_REQUEST_message,
+    is_invalid_LOGIN_message,
     is_invalid_CREATE_BOARD_message,
     is_invalid_FULL_PAGE_REQUEST_message,
     is_invalid_REPLAY_REQUEST_message,
@@ -254,13 +254,23 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 // Path helpers
-const getPasswdFilePath = () => path.join(CONF_DIR, 'passwd.json');
+const getUsersFilePath = () => path.join(CONF_DIR, 'users.json');
+const getOldPasswdFilePath = () => path.join(CONF_DIR, 'passwd.json');
 const getRemovalLogPath = () => path.join(DATA_DIR, 'to_be_removed.json');
 const getFilePath = (uuid,ext) => path.join(DATA_DIR, `${uuid}.${ext}`);
 
 
 // Server state structures
-const credentials = [];
+
+// Users: conf/users.json is a list of { id, login, hash }. The id never changes and
+// is what boards record as their owner; the login is what people type.
+const users = [];
+const usersByLogin = new Map(); // login -> user
+const usersById = new Map();    // id -> user
+
+// Stands in for the hash of an unknown login (see checkLogin)
+const DUMMY_HASH = hashPassword(crypto.randomBytes(16).toString('hex'));
+
 const deletionMap = {};
 const clients = {}; // Map client IDs to WebSocket instances
 const pingInterval = 5000;
@@ -268,23 +278,46 @@ const boardInterval = 5000;
 let pingTimer;
 let boardTimer;
 
+// The user file is edited by the admin and treated like input: if it is unreadable
+// or malformed, the error is logged and no users are loaded, so nobody can log in
+// until it is fixed.
+function parseUsers(text) {
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) {
+        throw new Error('expected a list of { "id", "login", "hash" } entries');
+    }
+    const ids = new Set();
+    const logins = new Set();
+    for (const entry of parsed) {
+        if (!entry || typeof entry !== 'object'
+            || !isUuid(entry.id)
+            || typeof entry.login !== 'string' || entry.login.length === 0
+            || typeof entry.hash !== 'string' || !entry.hash.includes(':')) {
+            throw new Error(`malformed entry ${JSON.stringify(entry)}`);
+        }
+        if (ids.has(entry.id)) { throw new Error(`id ${entry.id} appears twice`); }
+        if (logins.has(entry.login)) { throw new Error(`login ${entry.login} appears twice`); }
+        ids.add(entry.id);
+        logins.add(entry.login);
+    }
+    return parsed.map(entry => ({ id: entry.id, login: entry.login, hash: entry.hash }));
+}
+
 function initializeGlobals() {
-    // The password file is edited by the admin and treated like input: if it is
-    // unreadable or not a list of strings, the error is logged and no credentials
-    // are loaded, so no new boards can be created until it is fixed.
-    const filePath = getPasswdFilePath();
+    const filePath = getUsersFilePath();
     if (fs.existsSync(filePath)) {
         try {
-            const itemText = fs.readFileSync(filePath, 'utf8');
-            const parsed = JSON.parse(itemText);
-            if (!Array.isArray(parsed) || !parsed.every(entry => typeof entry === 'string')) {
-                throw new Error('expected a list of "salt:hash" strings');
+            for (const user of parseUsers(fs.readFileSync(filePath, 'utf8'))) {
+                users.push(user);
+                usersByLogin.set(user.login, user);
+                usersById.set(user.id, user);
             }
-            credentials.push(...parsed);
-            debug.log(`[SERVER] Loaded ${credentials.length} passwords`);
+            debug.log(`[SERVER] Loaded ${users.length} users`);
         } catch (error) {
-            debug.error(`[SERVER] Invalid password file ${filePath}, board creation is disabled: ${error.message}`);
+            debug.error(`[SERVER] Invalid user file ${filePath}, nobody can log in: ${error.message}`);
         }
+    } else if (fs.existsSync(getOldPasswdFilePath())) {
+        debug.error(`[SERVER] ${getOldPasswdFilePath()} is no longer read; create ${filePath} with passwd_hash (see readme.md)`);
     }
     const removalLogPath = getRemovalLogPath();
     if (fs.existsSync(removalLogPath)) {
@@ -691,7 +724,7 @@ function isValidRequest(req) {
 
     // 2. Query Parameter Validation
     const queryKeys = Object.keys(urlParts.query);
-    const allowedKeys = ['board', 'passwd', 'credential'];
+    const allowedKeys = ['board', 'passwd', 'login', 'credential'];
 
     // Ensure all keys used are in the whitelist
     const hasInvalidParams = queryKeys.some(key => !allowedKeys.includes(key));
@@ -1413,38 +1446,57 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
     }
 };
 
-// Handler for board creation
+// Handler for login: binds the connection to a user for board management
+messageHandlers[MESSAGES.CLIENT_TO_SERVER.LOGIN.TYPE] = (ws, data, requestId) => {
+    if ( is_invalid_LOGIN_message( data ) ) {
+        debug.log(`[SERVER] dropped login request from `, ws.clientId);
+        return;
+    }
+    const login = data[MESSAGES.CLIENT_TO_SERVER.LOGIN.LOGIN];
+    const password = data[MESSAGES.CLIENT_TO_SERVER.LOGIN.PASSWORD];
+
+    // Each check costs ~50 ms of CPU and 16 MiB: one check per connection at a time.
+    if ( ws.credentialCheckPending ) {
+        rejectMessage(ws, 'a credential is already being checked', requestId);
+        return;
+    }
+    ws.credentialCheckPending = true;
+
+    // An exception here is a bug and, as an unhandled rejection, ends the process.
+    checkLogin(login, password).then((user) => {
+        ws.credentialCheckPending = false;
+        if (!user) {
+            debug.log(`[SERVER] Client ${ws.clientId} failed to log in`);
+            rejectMessage(ws, CREDENTIAL_NOT_ACCEPTED, requestId);
+            return;
+        }
+        if (ws.readyState !== WebSocket.OPEN) {
+            return;
+        }
+        ws.userId = user.id;
+        debug.log(`[SERVER] Client ${ws.clientId} logged in as user ${user.id}`);
+        const response = {
+            type: MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.TYPE,
+            [MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.LOGIN]: user.login,
+            [MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.REQUEST_ID]: requestId
+        };
+        ws.send(JSON.stringify(response));
+        logSentMessage(response.type, response, requestId, ws.clientId);
+    });
+};
+
+// Handler for board creation (needs a login)
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_CREATE_BOARD_message( data ) ) { 
         debug.log(`[SERVER] dropped create board request from `, ws.clientId); 
         return;
     }
-    const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
-    let password = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PASSWORD];
-
-    // Each check costs ~50 ms of CPU and 16 MiB: one check per connection at a time.
-    if ( ws.credentialCheckPending ) {
-        rejectMessage(ws, 'a board creation request is already being checked');
+    if ( !ws.userId ) {
+        rejectMessage(ws, NOT_LOGGED_IN, requestId);
         return;
     }
-    ws.credentialCheckPending = true;
-
-    // Check credentials using scrypt. An exception in createNewBoard is a bug and,
-    // as an unhandled rejection, ends the process like any other handler bug.
-    isValidCredential(password).then((isAuthorized) => {
-        ws.credentialCheckPending = false;
-        if (!isAuthorized) {
-            debug.log(`[SERVER] Client ${clientId} failed authentication`);
-            rejectMessage(ws, CREDENTIAL_NOT_ACCEPTED);
-            return;
-        }
-        // the client may have left while the check ran: no board for nobody
-        if (ws.readyState !== WebSocket.OPEN) {
-            return;
-        }
-        debug.log(`[SERVER] Client ${clientId} is allowed to create boards`);
-        createNewBoard(ws, clientId, requestId);
-    });
+    const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
+    createNewBoard(ws, clientId, requestId);
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, requestId) => {
@@ -1806,13 +1858,17 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
 // only their failures are caught: they reject the message. Every handler
 // validates its message before using it, so an exception escaping a handler
 // means a bug or damaged data. It is deliberately not caught and ends the process.
-function rejectMessage(ws, reason) {
+// The requestId, if given, lets the client match the refusal to its request.
+function rejectMessage(ws, reason, requestId) {
     debug.error('[SERVER] Rejected message:', reason);
     if (ws && ws.readyState === WebSocket.OPEN) {
         const errorMessage = {
             type: "error",
             message: reason,
         };
+        if (requestId !== undefined) {
+            errorMessage.requestId = requestId;
+        }
         ws.send(JSON.stringify(errorMessage));
     }
 }

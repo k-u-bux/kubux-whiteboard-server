@@ -1,24 +1,22 @@
 #!/usr/bin/env bash
 
-# Password hashing utility using scrypt
-# Usage: ./passwd_hash password1 [password2 ...]
+# User entry generator for conf/users.json
+# Usage: ./passwd_hash <login> <credential>
 #
-# This script generates secure password hashes using the scrypt algorithm,
+# Prints one user entry { "id", "login", "hash" } for conf/users.json. The id is a
+# fresh random UUID: boards record it as their owner, so it must never change once
+# the user owns boards. The hash is scrypt (format salt:hash, both hex-encoded),
 # which is resistant to rainbow table and brute-force attacks.
-#
-# Output format: salt:hash (both hex-encoded)
 
-if [ $# -eq 0 ]; then
-    echo "Usage: $0 <password> [<password2> ...]"
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <login> <credential>"
     echo ""
-    echo "Generates scrypt hashes for the given passwords."
-    echo "Each hash includes a random salt and is resistant to rainbow table attacks."
+    echo "Prints a user entry with a new id and the scrypt hash of the credential."
     exit 1
 fi
 
-for passwd in "$@"; do
-    echo -n "$passwd  ->  "
-    node -e "
+# Login and credential reach node through the environment, never as code.
+LOGIN="$1" CREDENTIAL="$2" node -e "
 const crypto = require('crypto');
 
 function hashPassword(password) {
@@ -31,14 +29,11 @@ function hashPassword(password) {
   return salt.toString('hex') + ':' + hash.toString('hex');
 }
 
-console.log(hashPassword('$passwd'));
+const entry = { id: crypto.randomUUID(), login: process.env.LOGIN, hash: hashPassword(process.env.CREDENTIAL) };
+console.log(JSON.stringify(entry, null, 2));
 "
-done
 
 echo ""
-echo "Copy the hash(es) above to your conf/passwd.json file in the format:"
-echo '["hash1", "hash2", ...]'
-echo ""
-echo "Note: These are scrypt hashes (format: salt:hash). The salt is stored"
-echo "alongside the hash and used during verification. This approach is highly"
-echo "resistant to rainbow table and brute-force attacks."
+echo "Add the entry above to the list in conf/users.json:"
+echo '[ { "id": ..., "login": ..., "hash": ... }, ... ]'
+echo "To change a credential, keep the id and replace only the hash."
