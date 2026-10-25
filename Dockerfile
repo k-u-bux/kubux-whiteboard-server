@@ -1,3 +1,3 @@
-FROM node:20 AS builder
+FROM node:23 AS builder
 WORKDIR /app
 CMD ["npm", "start"]
