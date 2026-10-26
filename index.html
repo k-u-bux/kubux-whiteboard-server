@@ -8495,6 +8495,7 @@
           // Hide overview, restore normal UI
           document.body.classList.remove('overview-active');
           document.getElementById('page-overview').classList.remove('visible');
+          resizeCanvas(); // the window may have changed while the canvas was hidden
       }
       
       function renderThumbnails() {
