@@ -4000,10 +4000,18 @@
           const afterHash = data[shared.MESSAGES.SERVER_TO_CLIENT.ACCEPT.AFTER_HASH];
 
           pending_actions.delete( acceptedActionUuid );
-          
-                                                    
+
+          // The next action in our history is confirmed. verifiedIndex is the end of the
+          // confirmed prefix of the history, not of the part before present: it may pass
+          // present when actions were undone here before their confirmation came (draw,
+          // then undo at once: the stroke's accept moves verifiedIndex past present until
+          // the next ping), and an accepted redo can do the same. That is allowed; the
+          // readers that compare it with present clamp it (Math.min(verifiedIndex,
+          // present)). What does hold: the hash matched at verifiedIndex + 1, so that
+          // index exists in hashes, which has one entry more than history.
           if ( afterHash === hashes[ verifiedIndex + 1 ] ) {
               ++ verifiedIndex;
+              // assert( verifiedIndex <= history.length );
               updateSyncStatus();
               updateUndoRedoButtons();
               return;
