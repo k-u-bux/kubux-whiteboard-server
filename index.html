@@ -1421,11 +1421,11 @@
         <h3>Change Credential</h3>
         <form id="change-credential-form">
           <div class="boards-row">
-            <input type="password" id="current-credential-input" placeholder="Current credential" autocomplete="current-password" required>
+            <input type="password" id="current-credential-input" placeholder="Current credential" autocomplete="current-password">
           </div>
           <div class="boards-row">
-            <input type="password" id="new-credential-input" placeholder="New credential" autocomplete="new-password" required>
-            <input type="password" id="repeat-credential-input" placeholder="New credential again" autocomplete="new-password" required>
+            <input type="password" id="new-credential-input" placeholder="New credential" autocomplete="new-password">
+            <input type="password" id="repeat-credential-input" placeholder="New credential again" autocomplete="new-password">
             <button type="submit" class="board-nav-btn">Change Credential</button>
           </div>
         </form>
@@ -1452,8 +1452,8 @@
         <h3>My Boards</h3>
         <form id="login-form">
           <div class="boards-row">
-            <input type="text" id="login-input" placeholder="Login" autocomplete="username" required>
-            <input type="password" id="new-board-credential-input" placeholder="Credential" autocomplete="current-password" required>
+            <input type="text" id="login-input" placeholder="Login" autocomplete="username">
+            <input type="password" id="new-board-credential-input" placeholder="Credential" autocomplete="current-password">
             <button type="submit" class="board-nav-btn" id="login-btn">Log in</button>
           </div>
           <span class="board-nav-feedback" id="login-feedback"></span>
@@ -3444,6 +3444,11 @@
           const replacement = document.getElementById('new-credential-input').value;
           const repeated = document.getElementById('repeat-credential-input').value;
           const feedback = document.getElementById('credential-feedback');
+          // checked here, not by the browser, as for the login
+          if (current === '' || replacement === '' || repeated === '') {
+              setFeedback('credential-feedback', 'Fill in all three fields');
+              return;
+          }
           if (replacement !== repeated) {
               feedback.textContent = 'The new credentials differ';
               return;
@@ -8899,7 +8904,10 @@
           const login = document.getElementById('login-input').value.trim();
           // the credential as typed: spaces belong to it like any other character
           const credential = document.getElementById('new-board-credential-input').value;
-          if (!login || !credential) {
+          // checked here, not by the browser (password managers may fill the fields
+          // without the page seeing it, so the button is never greyed out)
+          if (!login || credential === '') {
+              setFeedback('login-feedback', 'Enter your login and credential');
               return;
           }
           logIn(login, credential);
