@@ -327,11 +327,23 @@ function parseUsers(text) {
     return parsed.map(entry => ({ id: entry.id, login: entry.login, hash: entry.hash }));
 }
 
-// Write the user file with one user's hash replaced. Throws if the file cannot be
-// written (e.g. conf/ mounted read-only); the users in memory stay unchanged then.
+// Replace one user's hash in the user file. The file on disk is the truth, not the
+// users in memory: it is read again, so entries the admin added or changed since
+// startup stay as they are, and only this user's hash changes. Throws, and writes
+// nothing, if the file cannot be read, is invalid, no longer holds the user, or
+// cannot be written (e.g. conf/ mounted read-only); the users in memory stay
+// unchanged then.
 function saveUsersWithHash(userId, hash) {
-    const entries = users.map(user => ({ id: user.id, login: user.login, hash: user.id === userId ? hash : user.hash }));
-    writeFileAtomic(getUsersFilePath(), JSON.stringify(entries, null, 2) + '\n');
+    const filePath = getUsersFilePath();
+    const text = fs.readFileSync(filePath, 'utf8');
+    parseUsers(text); // throws if the admin left the file invalid
+    const entries = JSON.parse(text); // written back as it is, apart from the hash
+    const entry = entries.find(candidate => candidate.id === userId);
+    if (!entry) {
+        throw new Error(`user ${userId} is no longer in ${filePath}`);
+    }
+    entry.hash = hash;
+    writeFileAtomic(filePath, JSON.stringify(entries, null, 2) + '\n');
 }
 
 function initializeGlobals() {
@@ -1641,7 +1653,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.TYPE] = (ws, data, r
         try {
             saveUsersWithHash(user.id, hash);
         } catch (error) {
-            debug.error(`[SERVER] Cannot write ${getUsersFilePath()}: ${error.message}`);
+            debug.error(`[SERVER] Cannot save the credential of user ${user.id} in ${getUsersFilePath()}: ${error.message}`);
             rejectMessage(ws, CREDENTIAL_NOT_SAVED, requestId);
             return;
         }
