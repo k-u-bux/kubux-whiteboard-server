@@ -553,6 +553,19 @@
           font-size: 13px;
       }
 
+      .board-nav-feedback.ok {
+          color: #2e7d32;
+      }
+
+      .board-list-rename {
+          flex: 1;
+          min-width: 0;
+          padding: 3px 6px;
+          border: 1px solid #0078d7;
+          border-radius: 4px;
+          font-size: 13px;
+      }
+
       .board-manager-user {
           font-size: 13px;
           color: #555;
@@ -2043,14 +2056,16 @@
       let ws = null;
       let boardId = null;
       let passwd = null; // needed for edits
-      let storedCredential = null; // Store credential from URL for creating new boards
-      // Board management: the login is kept for the tab (sessionStorage), the credential
-      // as before in storedCredential; both go with every owner request. loggedIn exists
+      let storedCredential = null; // the credential for owner requests: in memory only
+      // Board management: the login is kept for the tab (sessionStorage); the credential is
+      // never stored, it comes from the URL or the login form (a password manager may fill
+      // it) and is forgotten with the page. Both go with every owner request. loggedIn exists
       // only here: the server accepted them the last time, and keeps no login state itself
       let session = { login: null, loggedIn: false };
       // The owner's boards as last listed by the server, and the folder shown
       let boardList = [];     // [{ board, path, passwd, createdAt }], sorted by path
       let currentFolder = ''; // '' is the top level, else a path prefix without trailing '/'
+      let renaming = null;    // { kind: 'board' | 'folder', path } while a row is edited in place
       const SESSION_LOGIN_KEY = 'whiteboard_login';
       let clientId = shared.generateUuid(); // Unique client identifier
       let currentPageUuid = null;
@@ -2372,20 +2387,14 @@
       function init() {
           // Initialize IndexedDB cache first
           
-          // Load stored credential from localStorage
-          const savedCredential = localStorage.getItem('whiteboard_credential');
-          if (savedCredential) {
-              storedCredential = savedCredential;
-              debugLog('Credential loaded from localStorage');
-          }
+          // Earlier versions remembered the credential in localStorage: forget it
+          localStorage.removeItem('whiteboard_credential');
           
-          // Check for credential in URL and store it (overrides localStorage)
+          // A credential in the URL is used for this page, never stored
           const urlParams = new URLSearchParams(window.location.search);
           const credential = urlParams.get('credential');
           if (credential) {
               storedCredential = credential;
-              localStorage.setItem('whiteboard_credential', credential);
-              debugLog('Credential stored from URL and saved to localStorage');
           }
           
           const loginParam = urlParams.get('login');
@@ -2703,7 +2712,6 @@
           if (data.message === shared.CREDENTIAL_NOT_ACCEPTED) {
               // do not offer the rejected credential again in the new-board form
               storedCredential = null;
-              localStorage.removeItem('whiteboard_credential');
               // nor retry it on a reload or reconnect (the server serves the app only
               // with a credential, board or passwd parameter, so one is kept)
               const params = new URLSearchParams(window.location.search);
@@ -2855,7 +2863,6 @@
               session.loggedIn = true;
               try { sessionStorage.setItem(SESSION_LOGIN_KEY, session.login); } catch (err) { /* storage blocked */ }
               storedCredential = credential;
-              localStorage.setItem('whiteboard_credential', credential);
               updateBoardManager();
               showBoardListReply(reply);
               return true;
@@ -2864,7 +2871,6 @@
           if (reply.message === shared.CREDENTIAL_NOT_ACCEPTED) {
               // do not offer the rejected credential again, nor retry it on a reload
               storedCredential = null;
-              localStorage.removeItem('whiteboard_credential');
               const params = new URLSearchParams(window.location.search);
               if (params.has('credential')) {
                   params.set('credential', 'YOU_NEED_A_VALID_PASSWORD');
@@ -2876,6 +2882,14 @@
           }
           updateBoardManager();
           return false;
+      }
+
+      // Messages in the board navigation stay until the next action there; ok: a
+      // confirmation rather than a refusal
+      function setFeedback(id, text, ok = false) {
+          const feedback = document.getElementById(id);
+          feedback.textContent = text;
+          feedback.classList.toggle('ok', ok);
       }
 
       // Fetch the owner's board list and show it
@@ -2968,14 +2982,18 @@
               const name = document.createElement('span');
               name.className = 'board-list-name';
               name.textContent = '📁 ' + folder;
+              if (renaming && renaming.kind === 'folder' && renaming.path === folderPath) {
+                  list.appendChild(renameRow(folderPath, to => renameFolder(folderPath, to)));
+                  continue;
+              }
               const rename = document.createElement('button');
               rename.className = 'board-list-btn';
               rename.textContent = 'Rename';
               rename.title = 'Rename or move this folder with all boards in it';
               rename.addEventListener('click', (e) => {
                   e.stopPropagation();
-                  const to = prompt('New path of the folder (folders separated by "/"):', folderPath);
-                  if (to !== null) { renameFolder(folderPath, to); }
+                  renaming = { kind: 'folder', path: folderPath };
+                  renderBoardList();
               });
               item.append(name, rename);
               item.addEventListener('click', () => {
@@ -2985,6 +3003,10 @@
               list.appendChild(item);
           }
           for (const { name: boardName, entry } of boards) {
+              if (renaming && renaming.kind === 'board' && renaming.path === entry.path) {
+                  list.appendChild(renameRow(entry.path, to => setBoardPath(entry.board, to)));
+                  continue;
+              }
               const item = document.createElement('div');
               item.className = 'board-list-item';
               const name = document.createElement('span');
@@ -2998,25 +3020,64 @@
               open.className = 'board-list-btn';
               open.textContent = 'Open';
               open.addEventListener('click', () => {
-                  window.location.href = `${window.location.origin}${window.location.pathname}?board=${entry.board}&passwd=${entry.passwd}`;
+                  switchToBoard(entry.board, entry.passwd);
+                  closeBoardNavigation();
               });
               const rename = document.createElement('button');
               rename.className = 'board-list-btn';
               rename.textContent = 'Rename';
               rename.title = 'Rename or move this board';
               rename.addEventListener('click', () => {
-                  const to = prompt('New path of the board (folders separated by "/"):', entry.path);
-                  if (to !== null) { setBoardPath(entry.board, to); }
+                  renaming = { kind: 'board', path: entry.path };
+                  renderBoardList();
               });
               item.append(name, date, open, rename);
               list.appendChild(item);
           }
+          // the row being edited gets the focus, with its path selected
+          const editor = list.querySelector('.board-list-rename');
+          if (editor) {
+              editor.focus();
+              editor.select();
+          }
+      }
+
+      // A list row that edits a full path in place (a new folder in it moves the board or
+      // folder); save(newPath) resolves to whether the server accepted it. Enter saves,
+      // Escape cancels; a refusal keeps the row open with the reason below the list.
+      function renameRow(currentPath, save) {
+          const item = document.createElement('div');
+          item.className = 'board-list-item';
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'board-list-rename';
+          input.value = currentPath;
+          input.title = 'New path; folders are separated by "/"';
+          const done = () => { renaming = null; renderBoardList(); };
+          const submit = async () => {
+              if (input.value.trim() === currentPath) { done(); return; }
+              if (await save(input.value)) { done(); }
+          };
+          const ok = document.createElement('button');
+          ok.className = 'board-list-btn';
+          ok.textContent = 'Save';
+          ok.addEventListener('click', submit);
+          const cancel = document.createElement('button');
+          cancel.className = 'board-list-btn';
+          cancel.textContent = 'Cancel';
+          cancel.addEventListener('click', done);
+          input.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') { e.preventDefault(); submit(); }
+              else if (e.key === 'Escape') { e.preventDefault(); done(); }
+          });
+          item.append(input, ok, cancel);
+          return item;
       }
 
       // Change the logged-in user's credential (current: as typed into the form)
       async function changeCredential(current, replacement) {
           const feedback = document.getElementById('credential-feedback');
-          feedback.textContent = '';
+          setFeedback('credential-feedback', '');
           let reply;
           try {
               reply = await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL, {
@@ -3032,12 +3093,9 @@
           }
           // the new credential replaces the remembered one, as a login would
           storedCredential = replacement;
-          localStorage.setItem('whiteboard_credential', replacement);
           document.getElementById('change-credential-form').reset();
           document.getElementById('change-credential-form').style.display = 'none';
-          feedback.style.color = '#2e7d32';
-          feedback.textContent = 'Credential changed';
-          setTimeout(() => { feedback.textContent = ''; feedback.style.color = ''; }, 3000);
+          setFeedback('credential-feedback', 'Credential changed. Use the new one from now on.', true);
       }
 
       function handleChangeCredential(e) {
@@ -3056,35 +3114,37 @@
       // Rename or move one board; the reply is the updated board list
       async function setBoardPath(board, path) {
           const feedback = document.getElementById('manager-feedback');
-          feedback.textContent = '';
+          setFeedback('manager-feedback', '');
           try {
-              showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH, {
+              return showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH, {
                   [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD]: board,
                   [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH]: path
               }));
           } catch (err) {
               feedback.textContent = `Board not renamed: ${err.message}`;
+              return false;
           }
       }
 
       // Rename or move a folder, i.e. every board below it; the reply is the updated board list
       async function renameFolder(from, to) {
           const feedback = document.getElementById('manager-feedback');
-          feedback.textContent = '';
+          setFeedback('manager-feedback', '');
           try {
-              showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, {
+              return showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, {
                   [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM]: from,
                   [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO]: to
               }));
           } catch (err) {
               feedback.textContent = `Folder not renamed: ${err.message}`;
+              return false;
           }
       }
 
       // Create a new board owned by the logged-in user
       async function createBoard(path) {
           const feedback = document.getElementById('manager-feedback');
-          feedback.textContent = '';
+          setFeedback('manager-feedback', '');
           let reply;
           try {
               reply = await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD, {
@@ -3100,30 +3160,22 @@
               ownerRefused(reply);
               return;
           }
-          handleBoardCreated(reply);
+          handleBoardCreated(reply, shared.normalizePath(path));
       }
       
-      // Handle board creation response: hand out the link and open the new board
-      function handleBoardCreated(data) {
+      // Handle board creation response: open the new board in this page and say so in
+      // the board manager, whose Current Board section now has its links
+      function handleBoardCreated(data, path = null) {
           debugLog('Board created successfully');
           const newBoardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD];
           const newPasswd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
-          
-          // Build the full URL with board ID and password
-          const boardUrl = `${window.location.origin}${window.location.pathname}?board=${newBoardId}&passwd=${newPasswd}`;
-          
-          // Copy to clipboard
-          navigator.clipboard.writeText(boardUrl).then(() => {
-              debugLog('Board URL copied to clipboard');
-          }).catch(err => {
-              console.warn('Failed to copy to clipboard:', err);
-          });
-          
-          // Show dialog with URL
-          alert(`New board created!\n\nURL (copied to clipboard):\n${boardUrl}\n\nBoard ID: ${newBoardId}\nPassword: ${newPasswd}\n\nShare this URL with others to collaborate.`);
-          
-          // Open it with a fresh page; the login is restored from the tab's session
-          window.location.href = boardUrl;
+          switchToBoard(newBoardId, newPasswd);
+          document.getElementById('new-board-name').value = '';
+          setFeedback('manager-feedback',
+              `Created ${path ? `"${path}" ` : 'the board '}and opened it. Share it with "Copy Edit Link" or "Copy View Link" above.`, true);
+          if (session.loggedIn) {
+              listBoards();
+          }
       }
       
           
@@ -8454,6 +8506,9 @@
       function closeBoardNavigation() {
           const overlay = document.getElementById('board-nav-overlay');
           overlay.style.display = 'none';
+          setFeedback('manager-feedback', '');
+          setFeedback('credential-feedback', '');
+          renaming = null;
           
           // Clear form inputs
           document.getElementById('board-url-input').value = '';
@@ -8515,20 +8570,23 @@
               return;
           }
           
-          // Build URL with board ID and optional password
+          switchToBoard(targetBoardId, targetPassword);
+          closeBoardNavigation();
+      }
+
+      // Show another board in this page, without a reload: the login and the credential,
+      // which live only in this page, stay
+      function switchToBoard(targetBoardId, targetPassword) {
           let newUrl = `${window.location.origin}${window.location.pathname}?board=${encodeURIComponent(targetBoardId)}`;
-          
           if (targetPassword) {
               newUrl += `&passwd=${encodeURIComponent(targetPassword)}`;
           }
-          
-          // Change URL and (not) reload page
           boardId = targetBoardId;
           passwd = targetPassword;
           registerBoard(boardId);
-          // window.location.assign( newUrl );
           window.history.replaceState(null, null, newUrl);
-          closeBoardNavigation();
+          // only a client that has the edit password can hand it on
+          document.getElementById('copy-edit-link-btn').style.display = passwd ? '' : 'none';
       }
       
       // Register Service Worker for PWA

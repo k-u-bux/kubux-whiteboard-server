@@ -201,14 +201,14 @@ docker-compose up -d --build
 ### Creating a New Whiteboard
     Point your browser at: "https://your-whiteboard-domain/?login=<your_login>"
 
-The board navigation opens; log in with your credential (or add `&credential=<your_credential>` to the URL to log in directly). The board manager then shows your boards. Type a name and press "New Board" to create a board in the folder shown; a name with `/` in it creates subfolders. The new board opens, and its link is copied to the clipboard. The URL contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
+The board navigation opens; log in with your credential (or add `&credential=<your_credential>` to the URL to log in directly). The client does not remember the credential: it is kept only while the page is open, so let your browser's password manager fill it in. The board manager then shows your boards. Type a name and press "New Board" to create a board in the folder shown; a name with `/` in it creates subfolders. The new board opens in the same page, and the board navigation's "Copy Edit Link" and "Copy View Link" hand out its links. The URL contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
 
 ### Managing Boards
 
 Open the board navigation (🗂️) and log in. The board manager shows your boards as folders: a board's path, such as `teaching/algebra/week1`, puts it into the folder `teaching/algebra`. Folders are not created separately; a folder exists while a board lies in it.
 
 - **Open** a board, with its edit password, from its row.
-- **Rename** a board or a folder: enter the new path. A new path can move it to another folder; moving a folder moves every board in it.
+- **Rename** a board or a folder: the row turns into a field with the full path; edit it and press Enter (or Save), Escape cancels. A new path can move it to another folder; moving a folder moves every board in it. A refused path (e.g. "path taken") is shown below the list and the field stays open.
 - Paths are unique per user, and a path is either a board or a folder, never both (no board named `teaching/algebra` while `teaching/algebra/week1` exists).
 - **Change credential** at the bottom of the board manager.
 
