@@ -8819,7 +8819,7 @@
               const parsed = parseWhiteboardURL(boardUrlInput);
               
               if (!parsed) {
-                  alert('Invalid whiteboard URL. Please check the URL and try again.');
+                  setFeedback('current-feedback', 'Not a link to a board on this server');
                   return;
               }
               
@@ -8830,7 +8830,7 @@
               targetBoardId = boardIdInput;
               targetPassword = boardPasswordInput;
           } else {
-              alert('Please enter either a board URL or board UUID');
+              setFeedback('current-feedback', 'Paste a board link or enter a board ID');
               return;
           }
           
