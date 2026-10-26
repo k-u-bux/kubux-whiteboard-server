@@ -545,16 +545,6 @@ function createPage(pageId) {
     return (page);
 }
 
-function loadOrCreateBoard(boardId, create=false) {
-    let board = loadBoard(boardId);
-    if (board) { return board; }
-    if ( create ) {
-        return createBoard(boardId);
-    } else {
-        return null;
-    }
-}
-
 function loadOrCreatePage(pageId, create=false) {
     let page = loadPage(pageId);
     if (page) { return page; }
@@ -568,10 +558,10 @@ function loadOrCreatePage(pageId, create=false) {
 
 // Lookup invariants
 // =================
-// useBoard / usePage do not create by default: boards are created only by
-// createNewBoard, pages only by createBoard, new-page and delete-page. A lookup
-// therefore returns null for an unknown ID, and every caller whose ID comes
-// straight from a client message has to handle that. Callers whose ID comes
+// useBoard never creates and usePage does not create by default: boards are
+// created only by createNewBoard, pages only by createBoard, new-page and
+// delete-page. A lookup therefore returns null for an unknown ID, and every
+// caller whose ID comes straight from a client message has to handle that. Callers whose ID comes
 // from server state may instead assert non-null, based on:
 //
 // I1: every entry of a board's pageOrder has a page. pageOrder is written by
@@ -645,14 +635,14 @@ const boardCache = new Map();
 const boardCacheMax = 10;
 const evictableBoards = new Set();
 
-function useBoard(boardId, create = false) {
+function useBoard(boardId) {
     if (evictableBoards.has(boardId)) {
         evictableBoards.delete(boardId);
     }
     if (boardCache.has(boardId)) {
         return boardCache.get(boardId);
     }
-    const board = loadOrCreateBoard(boardId, create);
+    const board = loadBoard(boardId);
     if (board) {
         boardCache.set(boardId, board);
     }
@@ -1251,7 +1241,7 @@ function sendBoardInfo() {
     wss.clients.forEach(client => {
         if ( client.readyState === WebSocket.OPEN && client.boardId ) {
             const boardId = client.boardId;
-            const board = useBoard( boardId, false );
+            const board = useBoard( boardId );
             if ( board ) {
                 const message = boardInfo( boardId, board, NULL_UUID );
                 releaseBoard( boardId );
@@ -1304,7 +1294,7 @@ function createNewBoard(ws, clientId, owner, path, requestId) {
 }
 
 function registerBoard(ws, boardId, clientId, requestId) {
-    const board = useBoard(boardId, false);
+    const board = useBoard(boardId);
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
         trackClient(ws, clientId);
@@ -1442,7 +1432,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.TYPE] = (ws, data, 
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.BOARD];
     const do_register = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REGISTER];
 
-    const board = useBoard( boardId, false );
+    const board = useBoard( boardId );
     if ( board ) {
         if ( do_register ) {
             ws.boardId = boardId;
@@ -1477,7 +1467,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.TYPE] = (ws, data, re
     const before = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.BEFORE];
     const after = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.AFTER];
 
-    const board = useBoard( boardId, false );
+    const board = useBoard( boardId );
     if ( !board ) {
         debug.log(`[SERVER] Cannot find board ${boardId}`);
         releaseBoard(boardId);
@@ -1837,7 +1827,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, r
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD];
     if ( ! boardId ) { return; }
     if ( ! isUuid( boardId ) ) { return; }
-    const board = useBoard( boardId, false );
+    const board = useBoard( boardId );
     if ( ! board ) {
         debug.log(`[SERVER] full page request for unknown board ${boardId}, dropped`);
         releaseBoard( boardId );
@@ -1959,7 +1949,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 
     debug.log(`[SERVER]: actionId = ${actionId}`);
 
-    const board = useBoard( boardId, false );
+    const board = useBoard( boardId );
     if (!board) {
         releaseBoard( boardId );
         debug.log(`[SERVER]: Cannot find board ${boardId}`);
@@ -2131,7 +2121,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
     const presentHash = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH];
     const do_register = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.REGISTER];
     
-    const board = useBoard(boardId, false);
+    const board = useBoard(boardId);
     if ( ! board ) {
         debug.log(`[SERVER] replay request for unknown board ${boardId}, dropped`);
         releaseBoard( boardId );
