@@ -3135,15 +3135,30 @@
           [shared.NO_SUCH_FOLDER]: 'No such folder'
       };
       const problemText = (reason) => PATH_PROBLEM_TEXT[reason] || reason;
+      // a path is taken as typed: what keeps it from normal form, in words
+      const PATH_FORM_TEXT = {
+          [shared.PATH_FORM.EMPTY_NAME]: 'No empty names: no "//", and no "/" at the start or end',
+          [shared.PATH_FORM.SPACE]: 'No space at the start or end of a name',
+          [shared.PATH_FORM.TOO_LONG]: `Path too long (at most ${shared.MAX_PATH_LENGTH} characters)`,
+          [shared.PATH_FORM.CONTROL]: 'No control characters'
+      };
+      // The text for a reason the path rules gave for path, or null
+      function pathProblemText(reason, path) {
+          if (!reason) return null;
+          if (reason === shared.PATH_INVALID) {
+              return PATH_FORM_TEXT[shared.pathFormProblem(path)] || problemText(reason);
+          }
+          return problemText(reason);
+      }
       const ownPaths = () => boardList.map(entry => entry.path);
 
       // The New Board form: the button only while the path typed can be created, the
       // reason under the form while it cannot; an empty path just greys the button out
       function updateNewBoardForm() {
           const value = document.getElementById('new-board-name').value;
-          const problem = value.trim() ? shared.newBoardProblem(ownPaths(), value) : null;
+          const problem = value.trim() ? pathProblemText(shared.newBoardProblem(ownPaths(), value), value) : null;
           document.getElementById('new-board-btn').disabled = !value.trim() || problem !== null;
-          setFeedback('new-board-flag', problem ? problemText(problem) : '');
+          setFeedback('new-board-flag', problem || '');
       }
 
       // The board tree: folders come from the paths, each with its subfolders and boards
@@ -3252,10 +3267,10 @@
               const folder = node.folders.get(name);
               if (renaming && renaming.kind === 'folder' && renaming.path === folder.path) {
                   tree.appendChild(pathEditRow(depth, folder.path,
-                      to => shared.folderMove(ownPaths(), folder.path, to).problem || null,
+                      to => pathProblemText(shared.folderMove(ownPaths(), folder.path, to).problem, to),
                       async (to) => {
                           const refusal = await renameFolder(folder.path, to);
-                          if (!refusal) { moveExpansion(folder.path, shared.normalizePath(to)); }
+                          if (!refusal) { moveExpansion(folder.path, to); }
                           return refusal;
                       }));
               } else {
@@ -3294,7 +3309,7 @@
           for (const { name, entry } of [...node.boards].sort((a, b) => byName(a.name, b.name))) {
               if (renaming && renaming.kind === 'board' && renaming.path === entry.path) {
                   tree.appendChild(pathEditRow(depth, entry.path,
-                      to => shared.boardMoveProblem(ownPaths(), entry.path, to),
+                      to => pathProblemText(shared.boardMoveProblem(ownPaths(), entry.path, to), to),
                       to => setBoardPath(entry.board, to)));
                   continue;
               }
@@ -3322,9 +3337,9 @@
       }
 
       // A tree row with a text field: Enter or the check button submits, Escape or the
-      // cancel button closes it. check(value) gives, as the value is typed, the reason
-      // it cannot be submitted, shown right under the field with the check button
-      // greyed out; an empty field greys the button out, and Enter closes the field.
+      // cancel button closes it. check(value) gives, as the value is typed, the text of
+      // the reason it cannot be submitted, shown right under the field with the check
+      // button greyed out; an empty field greys the button out, and Enter closes it.
       // submit(value, refuse) may show the server's reason under the field with refuse,
       // keeping it open; typing on replaces it with the check of the new value.
       function editRow(depth, value, placeholder, check, submit, cancel) {
@@ -3341,8 +3356,7 @@
           const usable = () => !pending && input.value.trim() !== '' && !check(input.value);
           const ok = treeButton('check', 'Save', () => trySubmit());
           const update = () => {
-              const problem = input.value.trim() ? check(input.value) : null;
-              flag.textContent = problem ? problemText(problem) : '';
+              flag.textContent = (input.value.trim() && check(input.value)) || '';
               ok.disabled = !usable();
           };
           const refuse = (text) => { flag.textContent = text; };
@@ -3376,11 +3390,11 @@
       function pathEditRow(depth, currentPath, check, save) {
           const done = () => { renaming = null; renderBoardTree(); };
           return editRow(depth, currentPath, 'New path; folders are separated by "/"', check, async (value, refuse) => {
-              if (shared.normalizePath(value) === currentPath) { done(); return; }
+              if (value === currentPath) { done(); return; }
               const refusal = await save(value);
               if (refusal) { refuse(refusal); return; }
               renaming = null;
-              ancestorsOf(shared.normalizePath(value)).forEach(folder => expandedFolders.add(folder));
+              ancestorsOf(value).forEach(folder => expandedFolders.add(folder));
               renderBoardTree();
           }, done);
       }
@@ -3389,7 +3403,7 @@
       function newBoardRow(depth, folderPath) {
           const pathOf = (name) => `${folderPath}/${name}`;
           return editRow(depth, '', `Name of a new board in ${folderPath}`,
-              name => shared.newBoardProblem(ownPaths(), pathOf(name)),
+              name => pathProblemText(shared.newBoardProblem(ownPaths(), pathOf(name)), pathOf(name)),
               async (name, refuse) => {
                   const refusal = await createBoard(pathOf(name));
                   if (refusal) { refuse(refusal); }
@@ -3505,7 +3519,7 @@
               ownerRefused(reply);
               return problemText(reply.message);
           }
-          ancestorsOf(shared.normalizePath(path)).forEach(folder => expandedFolders.add(folder));
+          ancestorsOf(path).forEach(folder => expandedFolders.add(folder));
           creatingIn = null;
           await listBoards();
           return null;

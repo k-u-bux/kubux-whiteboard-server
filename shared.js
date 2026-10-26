@@ -449,15 +449,27 @@ const RENAME_BLOCKED = 'rename cannot be written safely';            // no write
 
 const MAX_PATH_LENGTH = 256;
 
-// The normalized path (segments trimmed, empty segments dropped), or null if none is left,
-// it is too long, or it contains control characters.
-function normalizePath(raw) {
-    if (typeof raw !== 'string' || raw.length > 4 * MAX_PATH_LENGTH) return null;
-    const segments = raw.split('/').map(segment => segment.trim()).filter(segment => segment.length > 0);
-    if (segments.length === 0) return null;
-    const path = segments.join('/');
-    if (path.length > MAX_PATH_LENGTH || /[\u0000-\u001f\u007f]/.test(path)) return null;
-    return path;
+// A path is taken as it is typed, never cleaned up: a path not in normal form is
+// refused. Normal form: names separated by '/', no empty name (so no '//' and no '/'
+// at either end), no name with a space at its start or end, at most MAX_PATH_LENGTH
+// characters, no control characters.
+const PATH_FORM = {
+    EMPTY: 'empty',
+    EMPTY_NAME: 'empty name',
+    SPACE: 'space at the start or end of a name',
+    TOO_LONG: 'too long',
+    CONTROL: 'control character'
+};
+
+// Why the path is not in normal form (one of PATH_FORM), or null if it is
+function pathFormProblem(path) {
+    if (typeof path !== 'string' || path.length === 0) return PATH_FORM.EMPTY;
+    if (path.length > MAX_PATH_LENGTH) return PATH_FORM.TOO_LONG;
+    if (/[\u0000-\u001f\u007f]/.test(path)) return PATH_FORM.CONTROL;
+    const names = path.split('/');
+    if (names.some(name => name.length === 0)) return PATH_FORM.EMPTY_NAME;
+    if (names.some(name => name.trim() !== name)) return PATH_FORM.SPACE;
+    return null;
 }
 
 // The first violation of the path rules among one owner's paths, or null
@@ -479,34 +491,31 @@ function findPathConflict(paths) {
 
 // The path rules for one owner's changes, as the server applies them before it
 // changes anything, and as the client checks a path while it is typed. paths: the
-// owner's board paths; raw: the path as typed. Each gives the reason the server
+// owner's board paths; the new path as given. Each gives the reason the server
 // refuses the change with (PATH_INVALID, PATH_TAKEN, NO_SUCH_FOLDER), or none.
 
-// A new board at raw: the reason it is refused, or null
-function newBoardProblem(paths, raw) {
-    const path = normalizePath(raw);
-    if (path === null) return PATH_INVALID;
+// A new board at path: the reason it is refused, or null
+function newBoardProblem(paths, path) {
+    if (pathFormProblem(path)) return PATH_INVALID;
     return findPathConflict([...paths, path]) ? PATH_TAKEN : null;
 }
 
-// The board at oldPath moved to raw: the reason it is refused, or null
-function boardMoveProblem(paths, oldPath, raw) {
-    const path = normalizePath(raw);
-    if (path === null) return PATH_INVALID;
+// The board at oldPath moved to path: the reason it is refused, or null
+function boardMoveProblem(paths, oldPath, path) {
+    if (pathFormProblem(path)) return PATH_INVALID;
     if (path === oldPath) return null;
     return findPathConflict([...paths.filter(other => other !== oldPath), path]) ? PATH_TAKEN : null;
 }
 
-// The folder from (a normalized path), with every board below it, moved to raw:
+// The folder from, with every board below it, moved to to:
 // { moves: [[oldPath, newPath], ...] } (none if it stays where it is), or { problem }
-function folderMove(paths, from, raw) {
-    const to = normalizePath(raw);
-    if (from === null || to === null) return { problem: PATH_INVALID };
+function folderMove(paths, from, to) {
+    if (pathFormProblem(from) || pathFormProblem(to)) return { problem: PATH_INVALID };
     const moves = paths.filter(path => path.startsWith(from + '/')).map(path => [path, to + path.slice(from.length)]);
     if (moves.length === 0) return { problem: NO_SUCH_FOLDER };
     if (from === to) return { moves: [] };
-    // the new paths must be normalized paths of acceptable length themselves
-    if (moves.some(([, newPath]) => normalizePath(newPath) !== newPath)) return { problem: PATH_INVALID };
+    // the new paths must be in normal form themselves (not too long)
+    if (moves.some(([, newPath]) => pathFormProblem(newPath))) return { problem: PATH_INVALID };
     const moved = new Set(moves.map(([oldPath]) => oldPath));
     const others = paths.filter(path => !moved.has(path));
     if (findPathConflict([...others, ...moves.map(([, newPath]) => newPath)])) return { problem: PATH_TAKEN };
@@ -1935,7 +1944,8 @@ if (typeof module !== 'undefined' && module.exports) {
         NO_SUCH_FOLDER,
         RENAME_BLOCKED,
         MAX_PATH_LENGTH,
-        normalizePath,
+        PATH_FORM,
+        pathFormProblem,
         findPathConflict,
         newBoardProblem,
         boardMoveProblem,
@@ -2034,7 +2044,8 @@ else if (typeof window !== 'undefined') {
         NO_SUCH_FOLDER,
         RENAME_BLOCKED,
         MAX_PATH_LENGTH,
-        normalizePath,
+        PATH_FORM,
+        pathFormProblem,
         findPathConflict,
         newBoardProblem,
         boardMoveProblem,

@@ -268,7 +268,7 @@ Create a new board owned by the sender.
 }
 ```
 
-`path` names the board for its owner (see *Users, Owners and Paths*); the server normalizes it.
+`path` names the board for its owner (see *Users, Owners and Paths*); it must be in normal form, the server does not clean it up.
 
 **Response:**
 - on success: `board-created`. The board is only created: the connection stays with the board and page it is on (opening the new board is a `register-board` of its own);
@@ -780,7 +780,7 @@ Owner and path never reach clients other than the owner: `board-info` and all ot
 
 A path names a board like a file path: segments separated by `/` (`teaching/algebra/week1`). Folders are not stored; boards whose paths share a prefix appear in the same folder.
 
-- **Normalization** (`normalizePath` in `shared.js`): segments are trimmed and empty segments dropped (`" a // b "` becomes `a/b`). A path with no segment left, longer than 256 characters, or with control characters is invalid.
+- **Normal form** (`pathFormProblem` in `shared.js`): names separated by `/`, no empty name (no `//`, no `/` at either end), no name with a space at its start or end, at most 256 characters, no control characters. A path is taken as given: one not in normal form is refused with `invalid path`, never cleaned up (`" a // b "` is invalid, not `a/b`).
 - **Unique per owner:** a path appears only once among one owner's boards.
 - **Board or folder, never both:** no board lies inside another board's path; while `teaching/algebra/week1` exists, no board may be called `teaching/algebra`, and vice versa.
 
@@ -939,7 +939,7 @@ They check that:
 - UUID fields are version-4 UUIDs (`isUuid`), and required ones are present;
 - integer fields (`delta`, `present`) are integers and boolean fields (`register`) are booleans;
 - password fields are non-empty strings; owner messages carry a login (at most 64 characters) and a credential (at most 1024);
-- raw paths are strings of at most 1024 characters (the server then normalizes them and answers an invalid path with `error`);
+- raw paths are strings of at most 1024 characters (the server answers a path not in normal form with `error` `invalid path`);
 - shuffle lists are non-empty lists of UUIDs;
 - action payloads have a known type and the fields that type needs, strokes have the structure in *Stroke Structure*, and groups contain only edit actions and are at most 10 levels deep.
 

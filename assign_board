@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { isUuid, serialize, deserialize, normalizePath, findPathConflict } = require(path.join(__dirname, 'shared.js'));
+const { isUuid, serialize, deserialize, pathFormProblem, findPathConflict } = require(path.join(__dirname, 'shared.js'));
 const { loadUsers } = require(path.join(__dirname, 'users.js'));
 
 const DATA_DIR = './data';
@@ -31,9 +31,11 @@ if (!boardId || !login || rawPath === undefined) {
 if (!isUuid(boardId)) {
     fail(`not a board id: ${boardId}`);
 }
-const boardPath = normalizePath(rawPath);
-if (boardPath === null) {
-    fail(`not a valid path: ${JSON.stringify(rawPath)}`);
+// taken as given, as in the board manager: a path not in normal form is refused
+const boardPath = rawPath;
+const formProblem = pathFormProblem(boardPath);
+if (formProblem) {
+    fail(`not a valid path (${formProblem}): ${JSON.stringify(rawPath)}`);
 }
 
 let users;

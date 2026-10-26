@@ -161,7 +161,7 @@ const {
     NOT_OWNER,
     NO_SUCH_BOARD,
     RENAME_BLOCKED,
-    normalizePath,
+    pathFormProblem,
     findPathConflict,
     newBoardProblem,
     boardMoveProblem,
@@ -610,7 +610,7 @@ function buildBoardIndex() {
             throw new Error(`[SERVER] board file ${file} is empty or unreadable`);
         }
         if (board.owner === undefined) { continue; }
-        if (!isUuid(board.owner) || typeof board.path !== 'string' || normalizePath(board.path) !== board.path
+        if (!isUuid(board.owner) || typeof board.path !== 'string' || pathFormProblem(board.path)
             || typeof board.passwd !== 'string' || typeof board.createdAt !== 'number') {
             throw new Error(`[SERVER] board ${boardId} has a malformed owner, path, password or creation time`);
         }
@@ -1555,7 +1555,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
             rejectMessage(ws, problem, requestId);
             return;
         }
-        createNewBoard(ws, clientId, user.id, normalizePath(raw), requestId);
+        createNewBoard(ws, clientId, user.id, raw, requestId);
     });
 };
 
@@ -1598,9 +1598,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SET_PATH.TYPE] = (ws, data, requestId)
             rejectMessage(ws, problem, requestId);
             return;
         }
-        const newPath = normalizePath(raw);
-        if ( newPath !== entry.path ) {
-            applyPathChanges(user.id, [{ boardId, oldPath: entry.path, newPath }]);
+        if ( raw !== entry.path ) {
+            applyPathChanges(user.id, [{ boardId, oldPath: entry.path, newPath: raw }]);
         }
         sendBoardList(ws, user.id, requestId);
     });
@@ -1612,7 +1611,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TYPE] = (ws, data, reque
         debug.log(`[SERVER] dropped rename-prefix request from `, ws.clientId);
         return;
     }
-    const from = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM] );
+    const from = data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM];
     const raw = data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO];
     asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, requestId, (user) => {
         const paths = pathsOf(user.id);
