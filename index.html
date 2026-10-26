@@ -3083,11 +3083,11 @@
       }
 
       // A board-list reply (to listing or to a path change): remember and show it;
-      // anything else is a refusal, shown as feedback
-      function showBoardListReply(reply) {
+      // anything else is a refusal, shown as feedback after what was refused
+      function showBoardListReply(reply, refused = 'Boards not listed') {
           const L = shared.MESSAGES.SERVER_TO_CLIENT.BOARD_LIST;
           if (reply.type !== L.TYPE) {
-              document.getElementById('manager-feedback').textContent = reply.message;
+              document.getElementById('manager-feedback').textContent = `${refused}: ${reply.message}`;
               ownerRefused(reply);
               return false;
           }
@@ -3361,7 +3361,7 @@
               return showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH, {
                   [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD]: board,
                   [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH]: path
-              }));
+              }), 'Board not renamed');
           } catch (err) {
               feedback.textContent = `Board not renamed: ${err.message}`;
               return false;
@@ -3376,7 +3376,7 @@
               return showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, {
                   [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM]: from,
                   [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO]: to
-              }));
+              }), 'Folder not renamed');
           } catch (err) {
               feedback.textContent = `Folder not renamed: ${err.message}`;
               return false;
