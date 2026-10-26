@@ -252,6 +252,11 @@ This document contains actionable items for improving code quality, security, pe
   - Done: the error banner shows the offline state and the number of waiting edits; page actions are refused while offline
   - Conflicts: resent edits are applied to the server's current page; an edit whose target is gone is declined, with no further resolution
 
+- [ ] **Keep the board manager current across an owner's sessions** (server.js, index.html)
+  - A board list is a snapshot: when the same owner creates, renames or moves boards in another tab or on another device, an open board manager does not learn of it until it is opened again (or the owner acts in it)
+  - An action based on the stale list is still checked against the server's current paths (refused with `path taken`, `not your board`, …), so nothing inconsistent can happen
+  - Possible fix: the server sends the updated `board-list` to every connection logged in as the same user after each path change
+
 ---
 
 ## Architecture Strengths (Keep These)

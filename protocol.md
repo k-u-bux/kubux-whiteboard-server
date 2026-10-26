@@ -390,6 +390,8 @@ The logged-in user's boards, sorted by path. Answer to `list-boards`, `set-path`
 
 The edit password lets the owner open each board with edit rights.
 
+A `board-list` is a snapshot for the requesting connection only. Other connections logged in as the same user are not told about creations or path changes; their board manager shows the old list until it asks again. Requests based on an old list are still checked against the current paths.
+
 ---
 
 ### `board-registered`

@@ -213,6 +213,8 @@ Open the board navigation (🗂️) and log in. The board manager shows your boa
 - **Change credential** at the bottom of the board manager.
 
 Only the owner sees a board's path; spectators and collaborators with a link see no names.
+
+**Shortcoming:** the board manager shows the list as of opening it. Changes made by the same user in another tab or on another device appear only when the board manager is opened again; actions on an outdated list are still checked by the server (e.g. "path taken").
     
 
 ### Basic Controls

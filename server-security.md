@@ -15,7 +15,7 @@ Re-audit of `server.js`, `shared.js` and `index.html` at HEAD. Unlike v2.2 (stat
 
 | # | Finding | Severity | Status |
 |---|---------|----------|--------|
-| 1 | `create-board` scrypt flood (no rate limit) | HIGH | Open; partially mitigated vs v2.2 |
+| 1 | `login` scrypt flood (no rate limit) | HIGH | Open; one scrypt per attempt since logins (was one per stored credential) |
 | 2 | Unbounded error-log growth → disk-full crash | MEDIUM | Open (**new** in v3.0) |
 | 3 | Plaintext board passwords in `logs/debug.log` | MEDIUM | Partially fixed: payload logging redacts `passwd` since d414690; the old log file remains |
 | 4 | Unbounded state: history, pages, deletionMap, files | MEDIUM | Open (unchanged) |
@@ -86,24 +86,27 @@ Unchanged: `deserialize` reviver handles only `__type: BigInt|Set|Map`; no `__pr
 
 ## Findings
 
-### ⚠️ 1. `create-board` scrypt flood — no rate limiting [OPEN, recharacterized]
+### ⚠️ 1. `login` scrypt flood — no rate limiting [OPEN, recharacterized for logins]
 
-**Risk Level:** HIGH (availability of board creation; memory via unbounded queue)
+**Risk Level:** HIGH (availability of logging in and of credential changes; memory via unbounded queue)
 
-**Old impact (v2.2):** "pins the server CPU at 100%" — **no longer true.** `verifyPassword` now uses async `crypto.scrypt` (worker pool), verified: fullPage latency stayed at **3 ms** while 60 connections hammered `create-board` for 2 s (~60 attempts served).
+**Since logins (development branch, d66fe02):** board creation no longer checks a credential; the credential check moved to the `login` message, which anyone can send without being logged in. `checkLogin` looks up the login and runs **one scrypt per attempt** (~50 ms, 16 MiB), whatever the number of users; an unknown login is checked against a dummy hash, so it costs the same and gets the same answer as a wrong credential (no login oracle). Before, every `create-board` attempt cost one scrypt **per stored credential**, so the cost per attempt no longer grows with the number of users.
 
-**Current impact (measured):**
-- ~50 attempts/sec sustained from 60 connections; each attempt = **one scrypt per stored credential** (currently 2 × ~100 ms, 16 MiB memory each).
-- Node's worker pool saturates: legitimate `create-board` requests (and any other pool work) starve behind attacker jobs.
+**What is unchanged:**
+- Login attempts are **unlimited across connections**. `ws.credentialCheckPending` (shared by `login` and `change-credential`) allows one check at a time *per connection* only; connections are unlimited.
+- Node's worker pool saturates: legitimate logins and credential changes (and any other pool work) queue behind an attacker's checks.
 - Pending scrypt jobs queue without bound → memory exhaustion with enough connections.
-- `ws.credentialCheckPending` serializes checks *per connection* only; connections are unlimited.
+- `change-credential` costs two scrypts (check of the current credential, hash of the new one), but only for a logged-in connection.
 
-**Location:** `server.js` `CREATE_BOARD` handler (1417–1448), `isValidCredential` (180–187), `verifyPassword` (141–177).
+**Old impact (v2.2):** "pins the server CPU at 100%" — no longer true since async `crypto.scrypt`.
+
+**Measurements (v3.0, before logins):** fullPage latency stayed at **3 ms** while 60 connections hammered `create-board`; about **50 attempts/s** were sustained, each costing one scrypt per stored credential (2 credentials then). The same flood against `login` costs half the scrypt work per attempt with 2 users; not re-measured.
+
+**Location:** `server.js` `LOGIN` handler (1594–1630), `CHANGE_CREDENTIAL` handler (1633–1682), `checkLogin` (195–199), `verifyPassword` (155–191).
 
 **Recommended fix:**
-- Token-bucket rate limit per IP on `create-board` (e.g., 5/min)
+- Token-bucket rate limit per IP on `login` (e.g., 5/min), perhaps also per login
 - Cap concurrent WebSocket connections per IP and globally
-- Cap the number of stored credentials (flood cost is linear in it)
 
 ---
 
@@ -231,7 +234,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 1. **Message validation layer** — every handler validates before use; GROUP sub-actions recursively.
 2. **UUID-based access control** — `isUuid` gates all file IDs and message IDs; no traversal.
 3. **Safe deserialization** — BigInt/Set/Map only; no prototype pollution.
-4. **scrypt password auth** — N=16384/r=8/p=1, 32-byte salt, timing-safe compare.
+4. **scrypt password auth** — N=16384/r=8/p=1, 32-byte salt, timing-safe compare; one scrypt per login attempt, unknown logins cost the same as wrong credentials.
 5. **HTTP hardening** — whitelist serving, hidden-file block, HSTS (behind proxy).
 6. **Assert safety** — all remaining asserts reachable only via disk damage/programmer error, not malformed input.
 
@@ -239,7 +242,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 
 ## Recommendations (prioritized)
 
-1. **Rate-limit `create-board`** (per IP/per connection) and **cap WebSocket connections** (Finding 1).
+1. **Rate-limit `login`** (per IP, perhaps per login) and **cap WebSocket connections** (Finding 1).
 2. **Log rotation + size cap + malformed-input logging rate limit**; make persist failures non-fatal (Finding 2).
 3. **Rotate/truncate existing `debug.log`; remove the commented-out logging configs** (Finding 3; payload redaction is done).
 4. **State caps + GC:** history per page, page count, `deletionMap`, delete page files (Finding 4).
@@ -278,9 +281,11 @@ The kubux-whiteboard-server remains solid against RCE, file access, deserializat
 
 ---
 
-**Document Version:** 3.3
-**Last Updated:** October 25, 2026
+**Document Version:** 3.4
+**Last Updated:** October 26, 2026
 **Next Review:** after Findings 1–4 are addressed
+
+**Changelog 3.4 (Oct 26, 2026):** Finding 1 recharacterized for logins (development branch, d66fe02): the scrypt flood now targets `login`, which costs one scrypt per attempt regardless of the number of users (was one per stored credential on `create-board`); unknown logins cost the same as wrong credentials. Attempts are still unlimited across connections. Recommendation 1 and control 4 updated; the recommendation to cap stored credentials dropped. Text only, no new live tests; the v3.3 statements about `create-board` and `conf/passwd.json` describe the code before logins.
 
 **Changelog 3.3 (Oct 25, 2026):** Targeted search: "create a board without credentials". **Verified negative.** Statically, `createBoard()` is reachable only from `createNewBoard` (server.js:1095) via the `create-board` handler after `isValidCredential` (1417–1448); no other handler calls `loadOrCreateBoard(id, true)`, and mutation handlers require an existing board plus its password. Live instance: a 14-variant bypass battery (missing/empty/non-string/`"true"`/`"undefined"`/`"NaN"`/1 MiB passwd, stored-hash-as-passwd, same-connection double-send) created nothing — malformed inputs dropped by validation, others `credential not accepted`, exactly one board per completed check with a valid credential (control). An indirect-creation battery over register-board, board-info(register), fullPage, page-info(register), replay, register-page, mod-action draw/new-page and shuffle-proposal on unknown boards produced zero replies and zero `.board`/`.page` files. Missing/empty `conf/passwd.json` is fail-closed (board creation disabled, server.js:271–288). Client refuses to send `create-board` without a credential. WS path option is enforced (`//ws`, `/ws?x=1` refused); POST/HEAD/OPTIONS on `/` serve only the app page. New informational note: stale `conf/passwd.json~` backup (salt-less legacy hash, never loaded, never served).
 
