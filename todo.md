@@ -255,7 +255,8 @@ This document contains actionable items for improving code quality, security, pe
 - [ ] **Keep the board manager current across an owner's sessions** (server.js, index.html)
   - A board list is a snapshot: when the same owner creates, renames or moves boards in another tab or on another device, an open board manager does not learn of it until it is opened again (or the owner acts in it)
   - An action based on the stale list is still checked against the server's current paths (refused with `path taken`, `not your board`, …), so nothing inconsistent can happen
-  - Possible fix: the server sends the updated `board-list` to every connection logged in as the same user after each path change
+  - The server keeps no login state, so it cannot push a new list to an owner's other sessions
+  - Possible fix: the board manager lists again whenever it is shown or its tab regains focus
 
 ---
 

@@ -337,7 +337,7 @@ The client uses an optimized two-canvas rendering approach:
 
 - **scrypt password hashing**: Memory-hard KDF resistant to brute force and rainbow table attacks
 - **Password-protected editing**: Editing requires a board-specific password
-- **Login-based board management**: Creating, listing and renaming boards requires logging in with a login and credential from `conf/users.json`; only the owner can rename a board
+- **Owner-only board management**: Every request to create, list or rename boards carries a login and credential from `conf/users.json` and is checked on its own (the server keeps no login state); only the owner can rename a board
 - **No-auth viewing**: Viewing is possible without any authentication
 - **Request validation**: Server validates all incoming requests for proper structure
 - **Path traversal protection**: Hidden files and non-whitelisted paths are blocked
