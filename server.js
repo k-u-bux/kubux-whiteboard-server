@@ -244,6 +244,7 @@ const {
     PATH_INVALID,
     PATH_TAKEN,
     NOT_OWNER,
+    NO_SUCH_BOARD,
     NO_SUCH_FOLDER,
     RENAME_BLOCKED,
     normalizePath,
@@ -1308,6 +1309,8 @@ function registerBoard(ws, boardId, clientId, requestId) {
         };
         ws.send(JSON.stringify(response));
         releaseBoard(boardId);
+    } else {
+        rejectMessage(ws, NO_SUCH_BOARD, requestId);
     }
 }
 

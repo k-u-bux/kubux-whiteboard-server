@@ -2889,6 +2889,10 @@
       // Handle server error message
       function handleErrorMessage(data) {
           console.error(`[SERVER ERROR] ${data.message}`, data.stack);
+          if (data.message === shared.NO_SUCH_BOARD) {
+              showError('No board with this ID on this server');
+              return;
+          }
           showError(`Server error: ${data.message}`);
           if (data.message === shared.CREDENTIAL_NOT_ACCEPTED) {
               // do not offer the rejected credential again (the address never holds it)

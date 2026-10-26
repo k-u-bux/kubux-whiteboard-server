@@ -25,7 +25,7 @@ The server keeps no login state. Owner messages (`create-board`, `list-boards`, 
 - A message whose JSON cannot be parsed, or whose `type` has no handler, is answered with an `error` message.
 - An owner message that is refused (credential not accepted, invalid path, …) is answered with an `error` message carrying the request's `requestId`.
 - A message that fails its validator (`is_invalid_*` in `shared.js`) is dropped without a reply.
-- A request that names an unknown board is dropped without a reply.
+- A request that names an unknown board is dropped without a reply, except `register-board`, which is answered with an `error` message (`no such board`).
 
 ## Client → Server Messages
 
@@ -45,7 +45,7 @@ Register the connection with a board. The connection's current page becomes the 
 - `board-uuid`: required, UUID.
 - `clientId`: optional, UUID.
 
-**Response:** `board-registered`. No response if the board does not exist.
+**Response:** `board-registered`, or `error` with message `no such board` (and the request's `requestId`) if the board does not exist.
 
 ---
 
@@ -590,7 +590,7 @@ Sent:
 
 ### `error`
 
-Sent when a message is rejected before reaching a handler, and when an owner message is refused.
+Sent when a message is rejected before reaching a handler, when an owner message is refused, and when `register-board` names an unknown board.
 
 ```json
 {
@@ -603,7 +603,8 @@ Sent when a message is rejected before reaching a handler, and when an owner mes
 `requestId` is present for refused requests. `message` is one of:
 - the `JSON.parse` error text, or `Unhandled message type: <type>` (no `requestId`);
 - `credential not accepted`, `a credential is already being checked`, `credential could not be saved`;
-- `invalid path`, `path taken`, `not your board`, `no such folder`, `rename cannot be written safely`.
+- `invalid path`, `path taken`, `not your board`, `no such folder`, `rename cannot be written safely`;
+- `no such board` (to `register-board`).
 
 ---
 

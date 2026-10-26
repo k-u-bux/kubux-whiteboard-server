@@ -436,6 +436,7 @@ const CREDENTIAL_NOT_SAVED = 'credential could not be saved';        // the user
 const PATH_INVALID = 'invalid path';                                 // no name left after normalizing, or too long
 const PATH_TAKEN = 'path taken';                                     // exists, or a board would lie inside another
 const NOT_OWNER = 'not your board';                                  // unknown board, or owned by someone else
+const NO_SUCH_BOARD = 'no such board';                               // register-board: the board does not exist
 const NO_SUCH_FOLDER = 'no such folder';                             // no board lies below the folder to rename
 const RENAME_BLOCKED = 'rename cannot be written safely';            // no write order keeps the disk consistent
 
@@ -1894,6 +1895,7 @@ if (typeof module !== 'undefined' && module.exports) {
         PATH_INVALID,
         PATH_TAKEN,
         NOT_OWNER,
+        NO_SUCH_BOARD,
         NO_SUCH_FOLDER,
         RENAME_BLOCKED,
         MAX_PATH_LENGTH,
@@ -1989,6 +1991,7 @@ else if (typeof window !== 'undefined') {
         PATH_INVALID,
         PATH_TAKEN,
         NOT_OWNER,
+        NO_SUCH_BOARD,
         NO_SUCH_FOLDER,
         RENAME_BLOCKED,
         MAX_PATH_LENGTH,
