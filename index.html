@@ -8864,6 +8864,7 @@
       function switchToBoard(targetBoardId, targetPassword) {
           boardId = targetBoardId;
           passwd = targetPassword;
+          adoptOwnerPassword();
           registerBoard(boardId);
           showShareAddress();
           expandToCurrent = true;
