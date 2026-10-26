@@ -2481,7 +2481,15 @@
       let history = [];          // All actions in timeline
       let present = 0;           // Current position in timeline
       let hashes = [];           // Hash chain for all states
-      let verifiedIndex = 0;     // Last index confirmed by server
+      let verifiedIndex = 0;     // The server's position in history, as last confirmed
+      // present and verifiedIndex are both positions in history: present is where this
+      // client is, verifiedIndex where the server was last confirmed to be (by an accept
+      // or a ping). verifiedIndex < present: edits on their way to the server, the
+      // unconfirmed edits history[verifiedIndex .. present). verifiedIndex > present: an
+      // undo on its way. An undo here moves present back at once, while the server stays
+      // where it was until it accepts the undo; an action accepted after it was undone
+      // here, and an accepted redo, leave the same picture. Then there are no unconfirmed
+      // edits, which is why their readers start at Math.min(verifiedIndex, present).
       
       // Visual state
       let visualState = shared.createEmptyVisualState();
@@ -3608,7 +3616,7 @@
           // On a reconnect: the page we were on, and the edits the server has not
           // confirmed, before the reset drops them (on the first load there is no page)
           const previousPage = currentPageUuid;
-          const unconfirmedEdits = history.slice(Math.min(verifiedIndex, present), present);
+          const unconfirmedEdits = history.slice(Math.min(verifiedIndex, present), present); // none while an undo is on its way
           
           // Reset local state
           history = [];
@@ -3657,7 +3665,7 @@
 
       function saveUnconfirmedEdits() {
           if (!boardId || !currentPageUuid) return;
-          const edits = history.slice(Math.min(verifiedIndex, present), present);
+          const edits = history.slice(Math.min(verifiedIndex, present), present); // see verifiedIndex
           try {
               if (edits.length > 0) {
                   sessionStorage.setItem(SAVED_EDITS_KEY, JSON.stringify({ board: boardId, page: currentPageUuid, edits }));
@@ -3716,7 +3724,7 @@
 
       // While offline: how many edits wait in the unconfirmed tail of the history
       function waitingEditsNote() {
-          const waiting = present - Math.min(verifiedIndex, present);
+          const waiting = present - Math.min(verifiedIndex, present); // see verifiedIndex
           return waiting > 0 ? ` ${waiting} edit${waiting === 1 ? '' : 's'} waiting to be sent.` : '';
       }
 
@@ -4001,14 +4009,12 @@
 
           pending_actions.delete( acceptedActionUuid );
 
-          // The next action in our history is confirmed. verifiedIndex is the end of the
-          // confirmed prefix of the history, not of the part before present: it may pass
-          // present when actions were undone here before their confirmation came (draw,
-          // then undo at once: the stroke's accept moves verifiedIndex past present until
-          // the next ping), and an accepted redo can do the same. That is allowed; the
-          // readers that compare it with present clamp it (Math.min(verifiedIndex,
-          // present)). What does hold: the hash matched at verifiedIndex + 1, so that
-          // index exists in hashes, which has one entry more than history.
+          // The server has accepted the next action of our history: it is one position
+          // further. That may take verifiedIndex past present, if the action was undone
+          // here before its accept came (draw, then undo at once): an undo on its way,
+          // as after any undo (see verifiedIndex). What does hold: the hash matched at
+          // verifiedIndex + 1, so that index exists in hashes, which has one entry more
+          // than history.
           if ( afterHash === hashes[ verifiedIndex + 1 ] ) {
               ++ verifiedIndex;
               // assert( verifiedIndex <= history.length );
@@ -5499,8 +5505,9 @@
               history = history.slice(0, present);
               hashes = hashes.slice(0, present + 1);
           }
-          // The new action is unconfirmed: the confirmed prefix ends at present at most
-          // (an accepted redo can leave verifiedIndex past the history until the next ping)
+          // The new action is unconfirmed. With an undo on its way (verifiedIndex past
+          // present, see verifiedIndex), the server is going back to present: the undo
+          // was sent before this action, and the history after present is cut off.
           verifiedIndex = Math.min(verifiedIndex, present);
           // Add to history and advance present
           history.push( action );
