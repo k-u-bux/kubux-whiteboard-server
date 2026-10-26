@@ -31,18 +31,20 @@ The server keeps no login state. Owner messages (`create-board`, `list-boards`, 
 
 ### `register-board`
 
-Register the connection with a board. The connection's current page becomes the board's first page.
+Register the connection with a board. The connection's current page becomes `page-uuid` if given (or its replacement, if it was deleted), else the board's first page.
 
 ```json
 {
   "type": "register-board",
   "board-uuid": "<board-uuid>",
+  "page-uuid": "<page-uuid>",
   "clientId": "<client-uuid>",
   "requestId": "<request-uuid>"
 }
 ```
 
 - `board-uuid`: required, UUID.
+- `page-uuid`: optional, UUID: the page the client returns to and registers next (after a reconnect, the page it was on; after a reload, the page last shown). Naming it here puts the connection on it at once: otherwise a `ping` sent before the `register-page` arrives reports the first page, and the client would follow it there. A page that is not on the board falls back to the first page.
 - `clientId`: optional, UUID.
 
 **Response:** `board-registered`, or `error` with message `no such board` (and the request's `requestId`) if the board does not exist.
@@ -965,6 +967,8 @@ They check that:
 - `list-boards` / `board-list`, `set-path`, `rename-prefix` for the owner's board manager; path rules, board index and ordered writes (see *Users, Owners and Paths*).
 - `error` carries the `requestId` of refused requests; new reasons.
 - `create-board` only creates the board: the connection is no longer registered with it, and no `fullPage` follows.
+- `register-board` takes an optional `page-uuid`, the page the client returns to.
+- Paths are taken as given and must be in normal form; the server no longer normalizes them.
 
 ### Document revision (October 2026)
 - Corrected the document to match `shared.js` and `server.js`: the literal wire keys (`board-uuid`, `page-uuid`, `clientId`, `passwd`, `do-move`, `pageNr`, `totalPages`, `edits`, `beforeHash`, …), the type strings `fullPage-requests`, `replay-requests`, `fullPage`, `new page` and `delete page`, and the stroke format (a 13-element array, not an object).

@@ -218,6 +218,7 @@ const MESSAGES = {
         REGISTER_BOARD: {
             TYPE: 'register-board',
             BOARD: 'board-uuid',
+            PAGE: 'page-uuid', // optional: the page the client returns to
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
@@ -711,6 +712,9 @@ function is_invalid_REGISTER_BOARD_message(data) {
     
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
+    
+    const pageId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.PAGE];
+    if (pageId !== undefined && (typeof pageId !== 'string' || !isUuid(pageId))) return true;
     
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
     if (clientId !== undefined && (typeof clientId !== 'string' || !isUuid(clientId))) return true;

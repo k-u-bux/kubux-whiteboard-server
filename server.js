@@ -1185,12 +1185,15 @@ function createNewBoard(ws, clientId, owner, path, requestId) {
     }
 }
 
-function registerBoard(ws, boardId, clientId, requestId) {
+// pageId: the page the client returns to (it registers that page next); the connection
+// is on it at once, so that no ping in between reports another page. Without one, or
+// for a page that is not (or no longer) on the board, the first page or its replacement.
+function registerBoard(ws, boardId, clientId, pageId, requestId) {
     const board = useBoard(boardId);
     if (board) {
         ws.boardId = boardId; // Store boardId in WebSocket client
         trackClient(ws, clientId);
-        ws.pageId = board.pageOrder[0]; // Default to first page
+        ws.pageId = pageId ? existingPage(pageId, board) : board.pageOrder[0];
         
         debug.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
         
@@ -1311,7 +1314,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.TYPE] = (ws, data, requ
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID];
     let boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD];
     if ( boardId && isUuid( boardId ) ) {
-        registerBoard(ws, boardId, clientId, requestId);
+        registerBoard(ws, boardId, clientId, data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.PAGE], requestId);
     } else {
         debug.error( `Client ${clientId} wants to register invalid board ${boardId}` );
     }

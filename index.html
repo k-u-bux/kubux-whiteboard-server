@@ -3562,6 +3562,9 @@
       }
 
       // Register with an existing board
+      // Register with the board, naming the page this tab returns to (see
+      // handleBoardRegistered), so that the server is on that page right away: a ping
+      // before the page's own registration would otherwise report the first page.
       function registerBoard(boardId) {
           const requestId = createRequestId();
           
@@ -3571,11 +3574,29 @@
               [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.CLIENT_ID]: clientId,
               [shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.REQUEST_ID]: requestId
           };
+          const page = pageToReturnTo();
+          if (page) {
+              registerMessage[shared.MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.PAGE] = page;
+          }
           
           debugLog('Sending board registration:', registerMessage);
           ws.send(JSON.stringify(registerMessage));
       }
       
+      // The page a registration returns to: the page this tab was on (a reconnect), else
+      // the page this browser showed last on the board (its settings), else none
+      function pageToReturnTo() {
+          if (currentPageUuid) {
+              return currentPageUuid;
+          }
+          try {
+              const settings = JSON.parse(localStorage.getItem(getSettingsStorageKey()) || 'null');
+              return (settings && settings.currentPageUuid) || null;
+          } catch (err) {
+              return null; // storage blocked or unreadable
+          }
+      }
+
       // Handle board registration response
       function handleBoardRegistered(data) {
           debugLog('Board registered successfully');
