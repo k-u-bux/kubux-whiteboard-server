@@ -243,36 +243,41 @@ const MESSAGES = {
             REGISTER: 'register',
             REQUEST_ID: 'requestId'
         },
-        LOGIN: {
-            TYPE: 'login',
-            LOGIN: 'login',
-            PASSWORD: 'passwd',
-            REQUEST_ID: 'requestId'
-        },
+        // Owner messages: each carries the owner's login and credential and is
+        // checked on its own; the server keeps no login state.
         CHANGE_CREDENTIAL: {
             TYPE: 'change-credential',
+            LOGIN: 'login',
             PASSWORD: 'passwd',         // the current credential
             NEW_PASSWORD: 'new-passwd',
             REQUEST_ID: 'requestId'
         },
         CREATE_BOARD: {
             TYPE: 'create-board',
+            LOGIN: 'login',
+            PASSWORD: 'passwd',
             PATH: 'path',
             CLIENT_ID: 'clientId',
             REQUEST_ID: 'requestId'
         },
         LIST_BOARDS: {
             TYPE: 'list-boards',
+            LOGIN: 'login',
+            PASSWORD: 'passwd',
             REQUEST_ID: 'requestId'
         },
         SET_PATH: {
             TYPE: 'set-path',
+            LOGIN: 'login',
+            PASSWORD: 'passwd',
             BOARD: 'board-uuid',
             PATH: 'path',
             REQUEST_ID: 'requestId'
         },
         RENAME_PREFIX: {
             TYPE: 'rename-prefix',
+            LOGIN: 'login',
+            PASSWORD: 'passwd',
             FROM: 'from', // a folder: every board below it moves
             TO: 'to',
             REQUEST_ID: 'requestId'
@@ -312,11 +317,6 @@ const MESSAGES = {
         }
     },
     SERVER_TO_CLIENT: {
-        LOGGED_IN: {
-            TYPE: 'logged-in',
-            LOGIN: 'login',
-            REQUEST_ID: 'requestId'
-        },
         CREDENTIAL_CHANGED: {
             TYPE: 'credential-changed',
             REQUEST_ID: 'requestId'
@@ -432,7 +432,6 @@ const MESSAGES = {
 
 // Reasons in the server's 'error' message
 const CREDENTIAL_NOT_ACCEPTED = 'credential not accepted';           // login or credential check failed
-const NOT_LOGGED_IN = 'not logged in';                               // board management needs a login
 const CREDENTIAL_NOT_SAVED = 'credential could not be saved';        // the user file could not be written
 const PATH_INVALID = 'invalid path';                                 // no name left after normalizing, or too long
 const PATH_TAKEN = 'path taken';                                     // exists, or a board would lie inside another
@@ -724,16 +723,12 @@ function is_invalid_credential_text(text) {
     return !text || typeof text !== 'string' || text.length > MAX_CREDENTIAL_LENGTH;
 }
 
-function is_invalid_LOGIN_message(data) {
-    if (!data || typeof data !== 'object') return true;
-
-    if (is_invalid_login_text(data[MESSAGES.CLIENT_TO_SERVER.LOGIN.LOGIN])) return true;
-    if (is_invalid_credential_text(data[MESSAGES.CLIENT_TO_SERVER.LOGIN.PASSWORD])) return true;
-
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.LOGIN.REQUEST_ID];
-    if (!requestId || !isUuid(requestId)) return true;
-
-    return false;
+// Login, credential and request id of an owner message (keys from its MESSAGES entry)
+function is_invalid_owner_fields(data, keys) {
+    if (is_invalid_login_text(data[keys.LOGIN])) return true;
+    if (is_invalid_credential_text(data[keys.PASSWORD])) return true;
+    const requestId = data[keys.REQUEST_ID];
+    return !requestId || !isUuid(requestId);
 }
 
 // A raw path from a client: checked for type and size only, so that the server can
@@ -745,11 +740,8 @@ function is_invalid_raw_path(raw) {
 function is_invalid_CHANGE_CREDENTIAL_message(data) {
     if (!data || typeof data !== 'object') return true;
 
-    if (is_invalid_credential_text(data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.PASSWORD])) return true;
+    if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL)) return true;
     if (is_invalid_credential_text(data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.NEW_PASSWORD])) return true;
-
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.REQUEST_ID];
-    if (!requestId || !isUuid(requestId)) return true;
 
     return false;
 }
@@ -757,10 +749,8 @@ function is_invalid_CHANGE_CREDENTIAL_message(data) {
 function is_invalid_CREATE_BOARD_message(data) {
     if (!data || typeof data !== 'object') return true;
     
+    if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD)) return true;
     if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH])) return true;
-
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.REQUEST_ID];
-    if (!requestId || !isUuid(requestId)) return true;
 
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     if (clientId !== undefined && (typeof clientId !== 'string' || !isUuid(clientId))) return true;
@@ -771,8 +761,7 @@ function is_invalid_CREATE_BOARD_message(data) {
 function is_invalid_LIST_BOARDS_message(data) {
     if (!data || typeof data !== 'object') return true;
 
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.REQUEST_ID];
-    if (!requestId || !isUuid(requestId)) return true;
+    if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS)) return true;
 
     return false;
 }
@@ -780,13 +769,12 @@ function is_invalid_LIST_BOARDS_message(data) {
 function is_invalid_SET_PATH_message(data) {
     if (!data || typeof data !== 'object') return true;
 
+    if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.SET_PATH)) return true;
+
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
 
     if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH])) return true;
-
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.REQUEST_ID];
-    if (!requestId || !isUuid(requestId)) return true;
 
     return false;
 }
@@ -794,11 +782,9 @@ function is_invalid_SET_PATH_message(data) {
 function is_invalid_RENAME_PREFIX_message(data) {
     if (!data || typeof data !== 'object') return true;
 
+    if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX)) return true;
     if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM])) return true;
     if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO])) return true;
-
-    const requestId = data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.REQUEST_ID];
-    if (!requestId || !isUuid(requestId)) return true;
 
     return false;
 }
@@ -1904,7 +1890,6 @@ if (typeof module !== 'undefined' && module.exports) {
         MOD_ACTIONS,
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
-        NOT_LOGGED_IN,
         CREDENTIAL_NOT_SAVED,
         PATH_INVALID,
         PATH_TAKEN,
@@ -1930,7 +1915,6 @@ if (typeof module !== 'undefined' && module.exports) {
         is_invalid_REGISTER_BOARD_message,
         is_invalid_REGISTER_PAGE_message,
         is_invalid_PAGE_INFO_REQUEST_message,
-        is_invalid_LOGIN_message,
         is_invalid_CHANGE_CREDENTIAL_message,
         is_invalid_CREATE_BOARD_message,
         is_invalid_LIST_BOARDS_message,
@@ -2001,7 +1985,6 @@ else if (typeof window !== 'undefined') {
         MOD_ACTIONS,
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
-        NOT_LOGGED_IN,
         CREDENTIAL_NOT_SAVED,
         PATH_INVALID,
         PATH_TAKEN,

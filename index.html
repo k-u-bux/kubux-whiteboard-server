@@ -2045,7 +2045,8 @@
       let passwd = null; // needed for edits
       let storedCredential = null; // Store credential from URL for creating new boards
       // Board management: the login is kept for the tab (sessionStorage), the credential
-      // as before in storedCredential; loggedIn mirrors the server's view of this connection
+      // as before in storedCredential; both go with every owner request. loggedIn exists
+      // only here: the server accepted them the last time, and keeps no login state itself
       let session = { login: null, loggedIn: false };
       // The owner's boards as last listed by the server, and the folder shown
       let boardList = [];     // [{ board, path, passwd, createdAt }], sorted by path
@@ -2598,9 +2599,8 @@
                   // Register with existing board
                   registerBoard(boardId);
               }
-              // A login belongs to the connection: log in again after a reconnect,
-              // and on load when the login and credential are known
-              if (session.login && storedCredential) {
+              // On load, check a login and credential known from the URL or the tab
+              if (!session.loggedIn && session.login && storedCredential) {
                   logIn(session.login, storedCredential, true);
               }
               if (!boardId) {
@@ -2808,33 +2808,56 @@
           });
       }
 
-      // Log this connection in for board management. quiet: an automatic login (on
-      // load or after a reconnect) that reports only into the board navigation.
+      // Owner requests carry the login and credential; the server checks each one on
+      // its own and keeps no login state. It runs one check per connection at a time,
+      // so the requests are sent one after the other.
+      let ownerRequests = Promise.resolve();
+      function ownerRequest(keys, fields, login = session.login, credential = storedCredential) {
+          const request = {
+              type: keys.TYPE,
+              [keys.LOGIN]: login,
+              [keys.PASSWORD]: credential,
+              ...fields,
+              [keys.REQUEST_ID]: createRequestId()
+          };
+          const reply = ownerRequests.then(() => sendWithCallback(request));
+          ownerRequests = reply.catch(() => {});
+          return reply;
+      }
+
+      // A refusal of an owner request: a credential no longer accepted (changed in
+      // another session, say) ends this client's login
+      function ownerRefused(reply) {
+          if (reply.message === shared.CREDENTIAL_NOT_ACCEPTED && session.loggedIn) {
+              session.loggedIn = false;
+              updateBoardManager();
+              document.getElementById('login-feedback').textContent = 'Credential not accepted any more, please log in again';
+          }
+      }
+
+      // "Logged in" exists only in this client: a login and credential that the server
+      // accepted for listing the owner's boards. quiet: the automatic check on load,
+      // which reports only into the board navigation.
       async function logIn(login, credential, quiet = false) {
           const feedback = document.getElementById('login-feedback');
           feedback.textContent = '';
           let reply;
           try {
-              reply = await sendWithCallback({
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.LOGIN.TYPE,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.LOGIN.LOGIN]: login,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.LOGIN.PASSWORD]: credential,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.LOGIN.REQUEST_ID]: createRequestId()
-              });
+              reply = await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS, {}, login, credential);
           } catch (err) {
               session.loggedIn = false;
               feedback.textContent = `Login failed: ${err.message}`;
               updateBoardManager();
               return false;
           }
-          if (reply.type === shared.MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.TYPE) {
-              session.login = reply[shared.MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.LOGIN];
+          if (reply.type === shared.MESSAGES.SERVER_TO_CLIENT.BOARD_LIST.TYPE) {
+              session.login = login;
               session.loggedIn = true;
               try { sessionStorage.setItem(SESSION_LOGIN_KEY, session.login); } catch (err) { /* storage blocked */ }
               storedCredential = credential;
               localStorage.setItem('whiteboard_credential', credential);
               updateBoardManager();
-              listBoards();
+              showBoardListReply(reply);
               return true;
           }
           session.loggedIn = false;
@@ -2860,10 +2883,7 @@
           const feedback = document.getElementById('manager-feedback');
           let reply;
           try {
-              reply = await sendWithCallback({
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.TYPE,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.REQUEST_ID]: createRequestId()
-              });
+              reply = await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS, {});
           } catch (err) {
               feedback.textContent = `Boards not listed: ${err.message}`;
               return;
@@ -2877,6 +2897,7 @@
           const L = shared.MESSAGES.SERVER_TO_CLIENT.BOARD_LIST;
           if (reply.type !== L.TYPE) {
               document.getElementById('manager-feedback').textContent = reply.message;
+              ownerRefused(reply);
               return false;
           }
           boardList = reply[L.BOARDS].map(entry => ({
@@ -2992,18 +3013,15 @@
           }
       }
 
-      // Change the logged-in user's credential
+      // Change the logged-in user's credential (current: as typed into the form)
       async function changeCredential(current, replacement) {
           const feedback = document.getElementById('credential-feedback');
           feedback.textContent = '';
           let reply;
           try {
-              reply = await sendWithCallback({
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.TYPE,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.PASSWORD]: current,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.NEW_PASSWORD]: replacement,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.REQUEST_ID]: createRequestId()
-              });
+              reply = await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL, {
+                  [shared.MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.NEW_PASSWORD]: replacement
+              }, session.login, current);
           } catch (err) {
               feedback.textContent = `Credential not changed: ${err.message}`;
               return;
@@ -3040,11 +3058,9 @@
           const feedback = document.getElementById('manager-feedback');
           feedback.textContent = '';
           try {
-              showBoardListReply(await sendWithCallback({
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.TYPE,
+              showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH, {
                   [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD]: board,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH]: path,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.REQUEST_ID]: createRequestId()
+                  [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH]: path
               }));
           } catch (err) {
               feedback.textContent = `Board not renamed: ${err.message}`;
@@ -3056,11 +3072,9 @@
           const feedback = document.getElementById('manager-feedback');
           feedback.textContent = '';
           try {
-              showBoardListReply(await sendWithCallback({
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TYPE,
+              showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, {
                   [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM]: from,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO]: to,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.REQUEST_ID]: createRequestId()
+                  [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO]: to
               }));
           } catch (err) {
               feedback.textContent = `Folder not renamed: ${err.message}`;
@@ -3073,11 +3087,9 @@
           feedback.textContent = '';
           let reply;
           try {
-              reply = await sendWithCallback({
-                  type: shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE,
+              reply = await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD, {
                   [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH]: path,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID]: clientId,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.REQUEST_ID]: createRequestId()
+                  [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID]: clientId
               });
           } catch (err) {
               feedback.textContent = `Board not created: ${err.message}`;
@@ -3085,6 +3097,7 @@
           }
           if (reply.type !== shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE) {
               feedback.textContent = `Board not created: ${reply.message}`;
+              ownerRefused(reply);
               return;
           }
           handleBoardCreated(reply);

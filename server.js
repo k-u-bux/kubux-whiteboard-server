@@ -240,7 +240,6 @@ const {
     commitGroup, 
     MESSAGES, 
     CREDENTIAL_NOT_ACCEPTED,
-    NOT_LOGGED_IN,
     CREDENTIAL_NOT_SAVED,
     PATH_INVALID,
     PATH_TAKEN,
@@ -256,7 +255,6 @@ const {
     is_invalid_REGISTER_BOARD_message,
     is_invalid_REGISTER_PAGE_message,
     is_invalid_PAGE_INFO_REQUEST_message,
-    is_invalid_LOGIN_message,
     is_invalid_CHANGE_CREDENTIAL_message,
     is_invalid_CREATE_BOARD_message,
     is_invalid_LIST_BOARDS_message,
@@ -292,7 +290,6 @@ const getFilePath = (uuid,ext) => path.join(DATA_DIR, `${uuid}.${ext}`);
 // is what boards record as their owner; the login is what people type.
 const users = [];
 const usersByLogin = new Map(); // login -> user
-const usersById = new Map();    // id -> user
 
 // Stands in for the hash of an unknown login (see checkLogin)
 const DUMMY_HASH = hashPassword(crypto.randomBytes(16).toString('hex'));
@@ -343,7 +340,6 @@ function initializeGlobals() {
             for (const user of parseUsers(fs.readFileSync(filePath, 'utf8'))) {
                 users.push(user);
                 usersByLogin.set(user.login, user);
-                usersById.set(user.id, user);
             }
             debug.log(`[SERVER] Loaded ${users.length} users`);
         } catch (error) {
@@ -1590,77 +1586,44 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
     }
 };
 
-// Handler for login: binds the connection to a user for board management
-messageHandlers[MESSAGES.CLIENT_TO_SERVER.LOGIN.TYPE] = (ws, data, requestId) => {
-    if ( is_invalid_LOGIN_message( data ) ) {
-        debug.log(`[SERVER] dropped login request from `, ws.clientId);
-        return;
-    }
-    const login = data[MESSAGES.CLIENT_TO_SERVER.LOGIN.LOGIN];
-    const password = data[MESSAGES.CLIENT_TO_SERVER.LOGIN.PASSWORD];
+// Owner messages
+// ==============
+// Every message an owner sends because they have an account carries their login
+// and credential, and each is checked on its own: the server keeps no login state.
+// A check costs one scrypt; one check runs per connection at a time. The action
+// runs once the check has succeeded, so it sees the board index as it is then.
 
-    // Each check costs ~50 ms of CPU and 16 MiB: one check per connection at a time.
+function asOwner(ws, data, keys, requestId, act) {
     if ( ws.credentialCheckPending ) {
         rejectMessage(ws, 'a credential is already being checked', requestId);
         return;
     }
     ws.credentialCheckPending = true;
-
-    // An exception here is a bug and, as an unhandled rejection, ends the process.
-    checkLogin(login, password).then((user) => {
+    // An exception in act is a bug and, as an unhandled rejection, ends the process.
+    checkLogin(data[keys.LOGIN], data[keys.PASSWORD]).then((user) => {
         ws.credentialCheckPending = false;
-        if (!user) {
-            debug.log(`[SERVER] Client ${ws.clientId} failed to log in`);
+        if ( !user ) {
+            debug.log(`[SERVER] Client ${ws.clientId} sent a login and credential that do not match`);
             rejectMessage(ws, CREDENTIAL_NOT_ACCEPTED, requestId);
             return;
         }
-        if (ws.readyState !== WebSocket.OPEN) {
+        // the client may have left while the check ran: nothing to do for nobody
+        if ( ws.readyState !== WebSocket.OPEN ) {
             return;
         }
-        ws.userId = user.id;
-        debug.log(`[SERVER] Client ${ws.clientId} logged in as user ${user.id}`);
-        const response = {
-            type: MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.TYPE,
-            [MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.LOGIN]: user.login,
-            [MESSAGES.SERVER_TO_CLIENT.LOGGED_IN.REQUEST_ID]: requestId
-        };
-        ws.send(JSON.stringify(response));
-        logSentMessage(response.type, response, requestId, ws.clientId);
+        return act(user);
     });
-};
+}
 
-// Handler for changing the logged-in user's credential
+// Handler for changing an owner's credential
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_CHANGE_CREDENTIAL_message( data ) ) {
         debug.log(`[SERVER] dropped change-credential request from `, ws.clientId);
         return;
     }
-    if ( !ws.userId ) {
-        rejectMessage(ws, NOT_LOGGED_IN, requestId);
-        return;
-    }
-    const current = data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.PASSWORD];
     const replacement = data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.NEW_PASSWORD];
-
-    // Each check costs ~50 ms of CPU and 16 MiB: one check per connection at a time.
-    if ( ws.credentialCheckPending ) {
-        rejectMessage(ws, 'a credential is already being checked', requestId);
-        return;
-    }
-    ws.credentialCheckPending = true;
-
-    const user = usersById.get(ws.userId);
-    assert( user ); // users are only added at startup and never removed
-
-    // An exception here is a bug and, as an unhandled rejection, ends the process.
-    verifyPassword(current, user.hash).then(async (matches) => {
-        if (!matches) {
-            ws.credentialCheckPending = false;
-            rejectMessage(ws, CREDENTIAL_NOT_ACCEPTED, requestId);
-            return;
-        }
+    asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL, requestId, async (user) => {
         const hash = await hashPasswordAsync(replacement);
-        ws.credentialCheckPending = false;
         try {
             saveUsersWithHash(user.id, hash);
         } catch (error) {
@@ -1681,27 +1644,25 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.TYPE] = (ws, data, r
     });
 };
 
-// Handler for board creation (needs a login)
+// Handler for board creation
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_CREATE_BOARD_message( data ) ) { 
         debug.log(`[SERVER] dropped create board request from `, ws.clientId); 
         return;
     }
-    if ( !ws.userId ) {
-        rejectMessage(ws, NOT_LOGGED_IN, requestId);
-        return;
-    }
     const path = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH] );
-    if ( path === null ) {
-        rejectMessage(ws, PATH_INVALID, requestId);
-        return;
-    }
-    if ( findPathConflict( [...pathsOf(ws.userId).keys(), path] ) ) {
-        rejectMessage(ws, PATH_TAKEN, requestId);
-        return;
-    }
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
-    createNewBoard(ws, clientId, ws.userId, path, requestId);
+    asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD, requestId, (user) => {
+        if ( path === null ) {
+            rejectMessage(ws, PATH_INVALID, requestId);
+            return;
+        }
+        if ( findPathConflict( [...pathsOf(user.id).keys(), path] ) ) {
+            rejectMessage(ws, PATH_TAKEN, requestId);
+            return;
+        }
+        createNewBoard(ws, clientId, user.id, path, requestId);
+    });
 };
 
 function boardListMessage(owner, requestId) {
@@ -1718,8 +1679,8 @@ function boardListMessage(owner, requestId) {
     return { type: L.TYPE, [L.BOARDS]: boards, [L.REQUEST_ID]: requestId };
 }
 
-function sendBoardList(ws, requestId) {
-    const message = boardListMessage(ws.userId, requestId);
+function sendBoardList(ws, owner, requestId) {
+    const message = boardListMessage(owner, requestId);
     ws.send(JSON.stringify(message));
     logSentMessage(message.type, message, requestId, ws.clientId);
 }
@@ -1730,30 +1691,28 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SET_PATH.TYPE] = (ws, data, requestId)
         debug.log(`[SERVER] dropped set-path request from `, ws.clientId);
         return;
     }
-    if ( !ws.userId ) {
-        rejectMessage(ws, NOT_LOGGED_IN, requestId);
-        return;
-    }
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD];
-    const entry = boardIndex.get(boardId);
-    if ( !entry || entry.owner !== ws.userId ) {
-        rejectMessage(ws, NOT_OWNER, requestId);
-        return;
-    }
     const newPath = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH] );
-    if ( newPath === null ) {
-        rejectMessage(ws, PATH_INVALID, requestId);
-        return;
-    }
-    if ( newPath !== entry.path ) {
-        const others = [...pathsOf(ws.userId).keys()].filter(path => path !== entry.path);
-        if ( findPathConflict( [...others, newPath] ) ) {
-            rejectMessage(ws, PATH_TAKEN, requestId);
+    asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.SET_PATH, requestId, (user) => {
+        const entry = boardIndex.get(boardId);
+        if ( !entry || entry.owner !== user.id ) {
+            rejectMessage(ws, NOT_OWNER, requestId);
             return;
         }
-        applyPathChanges(ws.userId, [{ boardId, oldPath: entry.path, newPath }]);
-    }
-    sendBoardList(ws, requestId);
+        if ( newPath === null ) {
+            rejectMessage(ws, PATH_INVALID, requestId);
+            return;
+        }
+        if ( newPath !== entry.path ) {
+            const others = [...pathsOf(user.id).keys()].filter(path => path !== entry.path);
+            if ( findPathConflict( [...others, newPath] ) ) {
+                rejectMessage(ws, PATH_TAKEN, requestId);
+                return;
+            }
+            applyPathChanges(user.id, [{ boardId, oldPath: entry.path, newPath }]);
+        }
+        sendBoardList(ws, user.id, requestId);
+    });
 };
 
 // Handler for moving or renaming a folder, i.e. every board below it (owner only)
@@ -1762,60 +1721,56 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TYPE] = (ws, data, reque
         debug.log(`[SERVER] dropped rename-prefix request from `, ws.clientId);
         return;
     }
-    if ( !ws.userId ) {
-        rejectMessage(ws, NOT_LOGGED_IN, requestId);
-        return;
-    }
     const from = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM] );
     const to = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO] );
-    if ( from === null || to === null ) {
-        rejectMessage(ws, PATH_INVALID, requestId);
-        return;
-    }
-    const paths = pathsOf(ws.userId);
-    const changes = [];
-    for (const [path, boardId] of paths) {
-        if ( path.startsWith(from + '/') ) {
-            changes.push({ boardId, oldPath: path, newPath: to + path.slice(from.length) });
-        }
-    }
-    if ( changes.length === 0 ) {
-        rejectMessage(ws, NO_SUCH_FOLDER, requestId);
-        return;
-    }
-    if ( from !== to ) {
-        // the new paths must be normalized paths of acceptable length themselves
-        if ( changes.some(change => normalizePath(change.newPath) !== change.newPath) ) {
+    asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, requestId, (user) => {
+        if ( from === null || to === null ) {
             rejectMessage(ws, PATH_INVALID, requestId);
             return;
         }
-        const moved = new Set(changes.map(change => change.oldPath));
-        const others = [...paths.keys()].filter(path => !moved.has(path));
-        if ( findPathConflict( [...others, ...changes.map(change => change.newPath)] ) ) {
-            rejectMessage(ws, PATH_TAKEN, requestId);
+        const paths = pathsOf(user.id);
+        const changes = [];
+        for (const [path, boardId] of paths) {
+            if ( path.startsWith(from + '/') ) {
+                changes.push({ boardId, oldPath: path, newPath: to + path.slice(from.length) });
+            }
+        }
+        if ( changes.length === 0 ) {
+            rejectMessage(ws, NO_SUCH_FOLDER, requestId);
             return;
         }
-        const ordered = writeOrder(changes);
-        if ( ordered === null ) {
-            rejectMessage(ws, RENAME_BLOCKED, requestId);
-            return;
+        if ( from !== to ) {
+            // the new paths must be normalized paths of acceptable length themselves
+            if ( changes.some(change => normalizePath(change.newPath) !== change.newPath) ) {
+                rejectMessage(ws, PATH_INVALID, requestId);
+                return;
+            }
+            const moved = new Set(changes.map(change => change.oldPath));
+            const others = [...paths.keys()].filter(path => !moved.has(path));
+            if ( findPathConflict( [...others, ...changes.map(change => change.newPath)] ) ) {
+                rejectMessage(ws, PATH_TAKEN, requestId);
+                return;
+            }
+            const ordered = writeOrder(changes);
+            if ( ordered === null ) {
+                rejectMessage(ws, RENAME_BLOCKED, requestId);
+                return;
+            }
+            applyPathChanges(user.id, ordered);
         }
-        applyPathChanges(ws.userId, ordered);
-    }
-    sendBoardList(ws, requestId);
+        sendBoardList(ws, user.id, requestId);
+    });
 };
 
-// Handler for the owner's board list (needs a login)
+// Handler for an owner's board list
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_LIST_BOARDS_message( data ) ) {
         debug.log(`[SERVER] dropped list-boards request from `, ws.clientId);
         return;
     }
-    if ( !ws.userId ) {
-        rejectMessage(ws, NOT_LOGGED_IN, requestId);
-        return;
-    }
-    sendBoardList(ws, requestId);
+    asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS, requestId, (user) => {
+        sendBoardList(ws, user.id, requestId);
+    });
 };
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE] = (ws, data, requestId) => {
