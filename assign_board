@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { isUuid, serialize, deserialize, normalizePath, findPathConflict } = require(path.join(__dirname, 'shared.js'));
+const { loadUsers } = require(path.join(__dirname, 'users.js'));
 
 const DATA_DIR = './data';
 const USERS_FILE = './conf/users.json';
@@ -35,7 +36,12 @@ if (boardPath === null) {
     fail(`not a valid path: ${JSON.stringify(rawPath)}`);
 }
 
-const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+let users;
+try {
+    users = loadUsers(USERS_FILE);
+} catch (error) {
+    fail(error.message);
+}
 const user = users.find(entry => entry.login === login);
 if (!user) {
     fail(`no user with login ${login} in ${USERS_FILE}`);
