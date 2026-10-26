@@ -21,8 +21,8 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Layer system** - Organize content across 8 separate layers with visibility control
 - **PDF export** - Export the current page from the toolbar, or selected pages or the entire board from the overview, as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
-- **Board navigation** - Switch between multiple boards, copy view or edit links, navigate to boards by URL/UUID
-- **Board manager** - Users log in and see the boards they own as folders (from paths like `teaching/algebra/week1`), create, open, rename and move boards and folders, and change their credential
+- **Boards view** - A full-window page for the current board (its links, going to another board) and, after logging in, your boards
+- **Board manager** - Your boards as an expandable folder tree (from paths like `teaching/algebra/week1`), with a filter; create, open, rename and move boards and folders, copy their links, change your credential
 - **Timer** - A per-pen switch: strokes drawn with that pen are erased automatically after 3 seconds, for temporary annotations during presentations
 - **Page caching** - Client-side LRU cache for fast page switching with server hash verification
 - **Progressive Web App (PWA)** - Install as a standalone app on tablets and mobile devices
@@ -201,21 +201,29 @@ docker-compose up -d --build
 ### Creating a New Whiteboard
     Point your browser at: "https://your-whiteboard-domain/?login=<your_login>"
 
-The board navigation opens; log in with your credential (or add `&credential=<your_credential>` to the URL to log in directly). The client does not remember the credential: it is kept only while the page is open, so let your browser's password manager fill it in. The board manager then shows your boards. Type a name and press "New Board" to create a board in the folder shown; a name with `/` in it creates subfolders. The new board opens in the same page, and the board navigation's "Copy Edit Link" and "Copy View Link" hand out its links. The URL contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
+The boards view opens; log in with your credential (or add `&credential=<your_credential>` to the URL to log in directly). The client does not remember the credential: it is kept only while the page is open, so let your browser's password manager fill it in. "Log out" in the top bar makes the page forget login and credential at once. Type a path into "Path of a new board" and press "New Board", or use a folder's "new board" button to create a board in that folder; a name with `/` in it creates subfolders. The new board opens in the same page, and the "Current Board" section's "Copy Edit Link" and "Copy View Link" hand out its links. The URL contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
 
 ### Managing Boards
 
-Open the board navigation (🗂️) and log in. The board manager shows your boards as folders: a board's path, such as `teaching/algebra/week1`, puts it into the folder `teaching/algebra`. Folders are not created separately; a folder exists while a board lies in it.
+Click the folder icon (🗂️) to open the boards view; Close or Escape returns to the board. The view has three parts, one above the other:
 
-- **Open** a board, with its edit password, from its row.
-- **Rename** a board or a folder: the row turns into a field with the full path; edit it and press Enter (or Save), Escape cancels. A new path can move it to another folder; moving a folder moves every board in it. A refused path (e.g. "path taken") is shown below the list and the field stays open.
+- **Top bar** - your login, "Change credential", "Log out" and "Close".
+- **Current Board** - the board's path (if it is one of yours; the links do not contain it), "Copy View Link" / "Copy Edit Link", and "Go to Board" by link or board ID.
+- **My Boards** - after logging in, your boards as a tree: a board's path, such as `teaching/algebra/week1`, puts it into the folder `teaching/algebra`. Folders are not created separately; a folder exists while a board lies in it. When the view opens, the folders along the current board's path are expanded and the board is highlighted; click a folder to expand or collapse it.
+
+In the tree:
+
+- **Filter** - type part of a path: only matching boards are shown, with their folders expanded; clearing the filter restores the tree.
+- **Open** a board (with its edit password), **copy** its view or edit link, or **rename** it, from the buttons in its row.
+- **Rename** a board or a folder: the row turns into a field with the full path; edit it and press Enter (or the check button), Escape cancels. A new path can move it to another folder; moving a folder moves every board in it. A refused path (e.g. "path taken") is shown above the tree and the field stays open.
+- **New board in a folder** - a folder's "new board" button opens a name field in that folder.
 - Paths are unique per user, and a path is either a board or a folder, never both (no board named `teaching/algebra` while `teaching/algebra/week1` exists).
-- **Change credential** at the bottom of the board manager.
 
-Only the owner sees a board's path; spectators and collaborators with a link see no names. When you are logged in and the open board is one of yours, the board navigation's "Current Board" section shows its path, which the links do not contain.
+Only the owner sees a board's path; spectators and collaborators with a link see no names.
 
-**Shortcoming:** the board manager shows the list as of opening it. Changes made by the same user in another tab or on another device appear only when the board manager is opened again; actions on an outdated list are still checked by the server (e.g. "path taken").
-    
+Without a board in the URL (e.g. `?login=<your_login>`), the boards view is the start page.
+
+**Shortcoming:** the tree shows the list as of opening the view. Changes made by the same user in another tab or on another device appear only when the view is opened again; actions on an outdated list are still checked by the server (e.g. "path taken").
 
 ### Basic Controls
 
@@ -224,7 +232,7 @@ Only the owner sees a board's path; spectators and collaborators with a link see
 - **Zooming** - Use the zoom buttons (−/+) or the zoom menu (fit width, fit height, 50%–200%)
 - **Undo/Redo** - Use the undo (↩) and redo (↪) buttons. There are no keyboard shortcuts.
 - **Page Management** - Add new pages, delete pages, navigate between pages using the controls at the top. Click the page info label ("Page X of Y") to open the page overview for reordering and quick navigation.
-- **Board Navigation** - Click the folder icon (🗂️) to open the board navigation overlay, where you can copy view or edit links, log in to manage and create your boards, or navigate to different boards by URL/UUID
+- **Boards** - Click the folder icon (🗂️) to open the boards view (see *Managing Boards*)
 
 ### Tool Options
 

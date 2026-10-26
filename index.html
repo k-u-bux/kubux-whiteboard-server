@@ -466,88 +466,6 @@
           cursor: pointer;
       }
       
-      /* Board Navigation Overlay */
-      #board-nav-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background-color: rgba(0, 0, 0, 0.5);
-          display: none;
-          justify-content: center;
-          align-items: center;
-          z-index: 2000;
-      }
-      
-      #board-nav-window {
-          background: white;
-          border-radius: 8px;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-          width: 400px;
-          max-width: 90%;
-          max-height: 90%;
-          overflow-y: auto;
-      }
-      
-      #board-nav-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 15px 20px;
-          border-bottom: 1px solid #ddd;
-      }
-      
-      #board-nav-title {
-          font-size: 18px;
-          font-weight: bold;
-          margin: 0;
-      }
-      
-      #board-nav-close {
-          background: none;
-          border: none;
-          font-size: 24px;
-          cursor: pointer;
-          color: #666;
-          padding: 0;
-          width: 30px;
-          height: 30px;
-          line-height: 1;
-      }
-      
-      #board-nav-close:hover {
-          color: #000;
-      }
-      
-      .board-nav-section {
-          padding: 20px;
-          border-bottom: 1px solid #ddd;
-      }
-      
-      .board-nav-section:last-child {
-          border-bottom: none;
-      }
-      
-      .board-nav-section h3 {
-          margin: 0 0 15px 0;
-          font-size: 16px;
-          color: #333;
-      }
-      
-      .board-nav-form {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-      }
-      
-      .board-nav-form input {
-          padding: 10px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-size: 14px;
-      }
-      
       /* Icons (see ICONS in the script) */
       .icon {
           display: inline-flex;
@@ -563,129 +481,121 @@
           margin-left: 6px;
       }
 
-      .board-nav-feedback {
-          color: #c62828;
-          font-size: 13px;
-      }
-
-      .board-nav-feedback.ok {
-          color: #2e7d32;
-      }
-
-      .board-list-rename {
-          flex: 1;
-          min-width: 0;
-          padding: 3px 6px;
-          border: 1px solid #0078d7;
-          border-radius: 4px;
-          font-size: 13px;
-      }
-
-      .current-board-path {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 10px;
-          font-size: 14px;
-          overflow-wrap: anywhere;
-      }
-
-      .board-manager-user {
-          font-size: 13px;
-          color: #555;
-          margin-bottom: 10px;
-      }
-
-      .board-manager-credential {
-          margin-top: 12px;
-          font-size: 13px;
-      }
-
-      .board-manager-credential .crumb {
-          color: #0078d7;
-          cursor: pointer;
-      }
-
-      .board-manager-credential form {
-          margin-top: 8px;
-      }
-
-      #board-crumbs {
-          font-size: 13px;
-          margin-bottom: 6px;
-      }
-
-      #board-crumbs .crumb {
-          color: #0078d7;
-          cursor: pointer;
-      }
-
-      #board-list {
-          max-height: 260px;
+      /* Boards View: a full-window page that scrolls, with a sticky top bar */
+      #boards-view {
+          position: fixed;
+          inset: 0;
+          z-index: 3000;
+          display: none;
           overflow-y: auto;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          margin-bottom: 10px;
+          background-color: #f4f4f4;
+          font-size: 14px;
       }
 
-      .board-list-item {
+      #boards-view.visible {
+          display: block;
+      }
+
+      body.boards-active .toolbar,
+      body.boards-active .sidebar,
+      body.boards-active .app-container {
+          display: none;
+      }
+
+      #boards-topbar {
+          position: sticky;
+          top: 0;
+          z-index: 1;
           display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px 16px;
+          padding: 10px 16px;
+          background-color: #fff;
+          border-bottom: 1px solid #ddd;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      }
+
+      #boards-topbar h2 {
+          margin: 0;
+          font-size: 18px;
+      }
+
+      .boards-topbar-right {
+          display: flex;
+          flex-wrap: wrap;
           align-items: center;
           gap: 8px;
-          padding: 6px 10px;
-          border-bottom: 1px solid #f0f0f0;
-          font-size: 14px;
       }
 
-      .board-list-item:last-child {
-          border-bottom: none;
+      #boards-user {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: #555;
+          margin-right: 4px;
       }
 
-      .board-list-item.folder {
-          cursor: pointer;
-      }
-
-      .board-list-name {
-          flex: 1;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-      }
-
-      .board-list-date {
-          font-size: 12px;
-          color: #999;
-          white-space: nowrap;
-      }
-
-      .board-list-empty {
-          padding: 12px;
-          color: #999;
-          font-size: 13px;
-          text-align: center;
-      }
-
-      .board-list-btn {
-          padding: 2px 8px;
+      .boards-btn {
+          display: inline-flex;
+          align-items: center;
+          padding: 6px 12px;
           border: 1px solid #ccc;
           border-radius: 4px;
           background: #fff;
           cursor: pointer;
-          font-size: 12px;
+          font-size: 14px;
+          font-family: inherit;
       }
 
-      .board-nav-form input:focus {
+      .boards-btn:hover {
+          background: #f0f0f0;
+      }
+
+      .boards-section {
+          margin: 16px;
+          padding: 16px;
+          background: #fff;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+      }
+
+      .boards-section h3 {
+          margin: 0 0 12px 0;
+          font-size: 16px;
+          color: #333;
+      }
+
+      .boards-row {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+      }
+
+      .boards-row + .boards-row {
+          margin-top: 10px;
+      }
+
+      .boards-row input[type=text], .boards-row input[type=password], .boards-row input[type=search] {
+          flex: 1 1 220px;
+          min-width: 0;
+          padding: 8px 10px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-size: 14px;
+      }
+
+      .boards-row input:focus {
           outline: none;
           border-color: #0078d7;
       }
-      
-      .board-nav-actions {
-          display: flex;
-          justify-content: flex-end;
-      }
-      
+
       .board-nav-btn {
-          padding: 10px 20px;
+          display: inline-flex;
+          align-items: center;
+          padding: 8px 16px;
           border: none;
           border-radius: 4px;
           font-size: 14px;
@@ -693,16 +603,158 @@
           background-color: #0078d7;
           color: white;
       }
-      
+
       .board-nav-btn:hover {
           background-color: #005a9e;
       }
-      
+
       .board-nav-btn:disabled {
           background-color: #ccc;
           cursor: not-allowed;
       }
-      
+
+      .board-nav-feedback {
+          display: block;
+          margin-top: 8px;
+          color: #c62828;
+          font-size: 13px;
+      }
+
+      .board-nav-feedback:empty {
+          display: none;
+      }
+
+      .board-nav-feedback.ok {
+          color: #2e7d32;
+      }
+
+      .current-board-path {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 12px;
+          font-size: 15px;
+          font-weight: 500;
+          overflow-wrap: anywhere;
+      }
+
+      .boards-hint {
+          color: #888;
+          margin: 0 0 12px 0;
+      }
+
+      /* The file tree */
+      #board-tree {
+          margin-top: 12px;
+          border-top: 1px solid #eee;
+      }
+
+      .tree-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 36px;
+          padding: 2px 8px 2px calc(8px + var(--depth, 0) * 22px);
+          border-bottom: 1px solid #f0f0f0;
+      }
+
+      .tree-row:hover {
+          background-color: #fafafa;
+      }
+
+      .tree-row.folder {
+          cursor: pointer;
+      }
+
+      .tree-row.current {
+          background-color: #e8f1fb;
+      }
+
+      .tree-toggle {
+          display: inline-flex;
+          width: 18px;
+          justify-content: center;
+          color: #666;
+          flex-shrink: 0;
+      }
+
+      .tree-name {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+      }
+
+      .tree-date {
+          color: #999;
+          font-size: 12px;
+          white-space: nowrap;
+      }
+
+      .tree-actions {
+          display: flex;
+          gap: 4px;
+          flex-shrink: 0;
+      }
+
+      .tree-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+          height: 30px;
+          padding: 0;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          background: #fff;
+          color: #333;
+          cursor: pointer;
+      }
+
+      .tree-btn:hover {
+          background: #f0f0f0;
+      }
+
+      .tree-edit {
+          flex: 1;
+          min-width: 0;
+          padding: 5px 8px;
+          border: 1px solid #0078d7;
+          border-radius: 4px;
+          font-size: 14px;
+      }
+
+      .tree-empty {
+          padding: 14px 8px;
+          color: #999;
+      }
+
+      /* Phones: less indentation, no date, and the buttons wrap below a name that
+         would get narrower than 140 px */
+      @media (max-width: 600px) {
+          .boards-section {
+              margin: 10px 8px;
+              padding: 12px;
+          }
+          .tree-row {
+              flex-wrap: wrap;
+              padding-left: calc(4px + var(--depth, 0) * 12px);
+          }
+          .tree-name {
+              flex: 1 1 140px;
+          }
+          .tree-date {
+              display: none;
+          }
+          .tree-actions {
+              margin-left: auto;
+          }
+      }
+
       /* Shape popup menu - horizontal */
       #shape-popup-menu, #path-mode-popup-menu, #cap-style-popup-menu, #join-style-popup-menu, #dash-pattern-popup-menu {
           position: fixed;
@@ -1128,7 +1180,7 @@
       </div>      
 
       <div class="tool-section" id="debug-tools">
-        <button class="tool-btn" id="board-nav-btn" title="Board Navigation"><span class="icon" data-icon="folder"></span></button>
+        <button class="tool-btn" id="board-nav-btn" title="Boards"><span class="icon" data-icon="folder"></span></button>
         <!-- <span id="sync-status">✓</span> -->
       </div>
     </div>
@@ -1333,76 +1385,71 @@
       <div id="overview-grid"></div>
     </div>
 
-    <!-- Board Navigation Overlay -->
-    <div id="board-nav-overlay">
-      <div id="board-nav-window">
-        <div id="board-nav-header">
-          <h3 id="board-nav-title">Board Navigation</h3>
-          <button id="board-nav-close">×</button>
-        </div>
-        
-        <!-- Copy Link Section -->
-        <div class="board-nav-section">
-          <h3>Current Board</h3>
-          <div class="current-board-path" id="current-board-path" style="display: none;"></div>
-          <div class="board-nav-form">
-            <button type="button" class="board-nav-btn" id="copy-view-link-btn"><span class="icon" data-icon="view-link"></span><span class="icon-label">Copy View Link</span></button>
-            <button type="button" class="board-nav-btn" id="copy-edit-link-btn"><span class="icon" data-icon="edit-link"></span><span class="icon-label">Copy Edit Link</span></button>
-            <span id="copy-feedback" style="display: none; color: #4CAF50; margin-left: 10px;"><span class="icon" data-icon="check"></span><span class="icon-label">Copied!</span></span>
-          </div>
-        </div>
-        
-        <!-- My Boards Section: login, then the owner's boards -->
-        <div class="board-nav-section">
-          <h3>My Boards</h3>
-          <form class="board-nav-form" id="login-form">
-            <input type="text" id="login-input" placeholder="Login" autocomplete="username" required>
-            <input type="password" id="new-board-credential-input" placeholder="Credential" autocomplete="current-password" required>
-            <div class="board-nav-actions">
-              <button type="submit" class="board-nav-btn" id="login-btn">Log in</button>
-            </div>
-            <span class="board-nav-feedback" id="login-feedback"></span>
-          </form>
-          <div id="board-manager" style="display: none;">
-            <div class="board-manager-user">Logged in as <span id="logged-in-as"></span></div>
-            <div id="board-crumbs"></div>
-            <div id="board-list"></div>
-            <form class="board-nav-form" id="new-board-form">
-              <input type="text" id="new-board-name" placeholder="Name of a new board in this folder" required>
-              <div class="board-nav-actions">
-                <button type="submit" class="board-nav-btn" id="new-board-btn">New Board</button>
-              </div>
-            </form>
-            <span class="board-nav-feedback" id="manager-feedback"></span>
-            <div class="board-manager-credential">
-              <span class="crumb" id="change-credential-toggle">Change credential…</span>
-              <form class="board-nav-form" id="change-credential-form" style="display: none;">
-                <input type="password" id="current-credential-input" placeholder="Current credential" autocomplete="current-password" required>
-                <input type="password" id="new-credential-input" placeholder="New credential" autocomplete="new-password" required>
-                <input type="password" id="repeat-credential-input" placeholder="New credential again" autocomplete="new-password" required>
-                <div class="board-nav-actions">
-                  <button type="submit" class="board-nav-btn">Change Credential</button>
-                </div>
-              </form>
-              <span class="board-nav-feedback" id="credential-feedback"></span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Go to Board Section -->
-        <div class="board-nav-section">
-          <h3>Go to Board</h3>
-          <form class="board-nav-form" id="goto-board-form">
-            <input type="text" id="board-url-input" placeholder="Paste board URL here">
-            <div style="text-align: center; margin: 10px 0; color: #999;">— or enter details —</div>
-            <input type="text" id="board-id-input" placeholder="Board UUID">
-            <input type="password" id="board-password-input" placeholder="Board password (optional)">
-            <div class="board-nav-actions">
-              <button type="submit" class="board-nav-btn">Go to Board</button>
-            </div>
-          </form>
+    <!-- Boards View: the current board, login, and the owner's boards as a file tree -->
+    <div id="boards-view">
+      <div id="boards-topbar">
+        <h2>Boards</h2>
+        <div class="boards-topbar-right">
+          <span id="boards-user" style="display: none;"><span class="icon" data-icon="user"></span><span id="logged-in-as"></span></span>
+          <button type="button" class="boards-btn" id="change-credential-toggle" style="display: none;">Change credential</button>
+          <button type="button" class="boards-btn" id="logout-btn" title="Forget login and credential in this page" style="display: none;">Log out</button>
+          <button type="button" class="boards-btn" id="boards-close" title="Back to the board (Escape)"><span class="icon" data-icon="cancel"></span><span class="icon-label">Close</span></button>
         </div>
       </div>
+
+      <section class="boards-section" id="change-credential-section" style="display: none;">
+        <h3>Change Credential</h3>
+        <form id="change-credential-form">
+          <div class="boards-row">
+            <input type="password" id="current-credential-input" placeholder="Current credential" autocomplete="current-password" required>
+          </div>
+          <div class="boards-row">
+            <input type="password" id="new-credential-input" placeholder="New credential" autocomplete="new-password" required>
+            <input type="password" id="repeat-credential-input" placeholder="New credential again" autocomplete="new-password" required>
+            <button type="submit" class="board-nav-btn">Change Credential</button>
+          </div>
+        </form>
+        <span class="board-nav-feedback" id="credential-feedback"></span>
+      </section>
+
+      <section class="boards-section" id="current-board-section">
+        <h3>Current Board</h3>
+        <div class="current-board-path" id="current-board-path" style="display: none;"></div>
+        <div class="boards-row" id="current-board-links">
+          <button type="button" class="board-nav-btn" id="copy-view-link-btn"><span class="icon" data-icon="view-link"></span><span class="icon-label">Copy View Link</span></button>
+          <button type="button" class="board-nav-btn" id="copy-edit-link-btn"><span class="icon" data-icon="edit-link"></span><span class="icon-label">Copy Edit Link</span></button>
+        </div>
+        <form class="boards-row" id="goto-board-form">
+          <input type="text" id="board-url-input" placeholder="Go to a board: paste its link">
+          <input type="text" id="board-id-input" placeholder="or its board ID">
+          <input type="password" id="board-password-input" placeholder="and password (optional)">
+          <button type="submit" class="board-nav-btn">Go to Board</button>
+        </form>
+        <span class="board-nav-feedback" id="current-feedback"></span>
+      </section>
+
+      <section class="boards-section" id="my-boards-section">
+        <h3>My Boards</h3>
+        <form id="login-form">
+          <div class="boards-row">
+            <input type="text" id="login-input" placeholder="Login" autocomplete="username" required>
+            <input type="password" id="new-board-credential-input" placeholder="Credential" autocomplete="current-password" required>
+            <button type="submit" class="board-nav-btn" id="login-btn">Log in</button>
+          </div>
+          <span class="board-nav-feedback" id="login-feedback"></span>
+        </form>
+        <div id="board-manager" style="display: none;">
+          <div class="boards-row">
+            <input type="search" id="board-filter" placeholder="Filter: show the boards whose path contains …">
+          </div>
+          <form class="boards-row" id="new-board-form">
+            <input type="text" id="new-board-name" placeholder="Path of a new board, e.g. teaching/algebra/week 1" required>
+            <button type="submit" class="board-nav-btn" id="new-board-btn"><span class="icon" data-icon="new-board"></span><span class="icon-label">New Board</span></button>
+          </form>
+          <span class="board-nav-feedback" id="manager-feedback"></span>
+          <div id="board-tree"></div>
+        </div>
+      </section>
     </div>
 
     <!-- Simple Color Picker -->
@@ -1574,7 +1621,14 @@
           'arrow-down':   strokeIcon('M50,12 V86 M24,60 L50,86 L76,60'),
           // links
           'view-link':    svgIcon(`<path d="M8,50 C26,20 74,20 92,50 C74,80 26,80 8,50 Z" ${ICON_STROKE}/><circle cx="50" cy="50" r="12" fill="currentColor"/>`),
-          'edit-link':    svgIcon(`<path d="M20,80 L26,60 L66,20 L80,34 L40,74 Z M58,28 L72,42" ${ICON_STROKE}/>`)
+          'edit-link':    svgIcon(`<path d="M20,80 L26,60 L66,20 L80,34 L40,74 Z M58,28 L72,42" ${ICON_STROKE}/>`),
+          // boards view
+          'chevron-right': strokeIcon('M38,20 L68,50 L38,80', 10),
+          'chevron-down':  strokeIcon('M20,38 L50,68 L80,38', 10),
+          'open':         strokeIcon('M44,18 H22 Q16,18 16,24 V78 Q16,84 22,84 H76 Q82,84 82,78 V56 M56,16 H84 V44 M84,16 L46,54'),
+          'rename':       svgIcon(`<rect x="10" y="30" width="80" height="40" rx="6" ${ICON_STROKE}/><path d="M60,20 V80 M52,20 H68 M52,80 H68" ${ICON_STROKE} stroke-width="6"/>`),
+          'new-board':    svgIcon(`<path d="M58,10 H24 V90 H54 M58,10 L78,30 V50 M58,10 V30 H78" ${ICON_STROKE}/><path d="M74,60 V90 M59,75 H89" ${ICON_STROKE}/>`),
+          'user':         svgIcon(`<circle cx="50" cy="32" r="18" ${ICON_STROKE}/><path d="M16,88 Q16,58 50,58 Q84,58 84,88" ${ICON_STROKE}/>`)
       };
 
       // An element showing one of the icons (static markup only, never user text)
@@ -2173,8 +2227,10 @@
       let session = { login: null, loggedIn: false };
       // The owner's boards as last listed by the server, and the folder shown
       let boardList = [];     // [{ board, path, passwd, createdAt }], sorted by path
-      let currentFolder = ''; // '' is the top level, else a path prefix without trailing '/'
-      let renaming = null;    // { kind: 'board' | 'folder', path } while a row is edited in place
+      let expandedFolders = new Set(); // folder paths open in the tree
+      let expandToCurrent = true;      // open the folders along the current board's path at the next rendering
+      let renaming = null;             // { kind: 'board' | 'folder', path } while a row is edited in place
+      let creatingIn = null;           // folder path with an open "new board here" row
       const SESSION_LOGIN_KEY = 'whiteboard_login';
       let clientId = shared.generateUuid(); // Unique client identifier
       let currentPageUuid = null;
@@ -2535,6 +2591,12 @@
       
       // Resize canvas to fit window
       function resizeCanvas() {
+          // Hidden behind a full-window view, the container has no size: keep the
+          // canvas as it is (a zero-sized one cannot be drawn); the view measures again
+          // when it closes
+          if (container.clientWidth === 0 || container.clientHeight === 0) {
+              return;
+          }
           canvas.width = container.clientWidth;
           canvas.height = container.clientHeight;
           
@@ -2722,7 +2784,7 @@
                   logIn(session.login, storedCredential, true);
               }
               if (!boardId) {
-                  openBoardNavigation();
+                  openBoardsView();
               }
           };
           
@@ -2826,8 +2888,8 @@
               const params = new URLSearchParams(window.location.search);
               params.set('credential', 'YOU_NEED_A_VALID_PASSWORD');
               window.history.replaceState(null, null, `${window.location.pathname}?${params.toString()}`);
-              // the way forward: the new-board form, ready for another credential
-              openBoardNavigation();
+              // the way forward: the login form, ready for another credential
+              openBoardsView();
               const credentialInput = document.getElementById('new-board-credential-input');
               credentialInput.value = '';
               credentialInput.focus();
@@ -2970,6 +3032,7 @@
           if (reply.type === shared.MESSAGES.SERVER_TO_CLIENT.BOARD_LIST.TYPE) {
               session.login = login;
               session.loggedIn = true;
+              expandToCurrent = true;
               try { sessionStorage.setItem(SESSION_LOGIN_KEY, session.login); } catch (err) { /* storage blocked */ }
               storedCredential = credential;
               updateBoardManager();
@@ -3029,159 +3092,223 @@
               passwd: entry[L.ENTRY_PASSWORD],
               createdAt: entry[L.ENTRY_CREATED_AT]
           }));
-          renderBoardList();
-          updateCurrentBoardPath();
+          renderBoardTree();
+          updateCurrentBoardSection();
           return true;
       }
 
-      // The folders and boards directly inside a folder
-      function folderContents(folder) {
-          const prefix = folder ? folder + '/' : '';
-          const folders = new Set();
-          const boards = [];
-          for (const entry of boardList) {
-              if (!entry.path.startsWith(prefix)) { continue; }
-              const rest = entry.path.slice(prefix.length);
-              const slash = rest.indexOf('/');
-              if (slash === -1) {
-                  boards.push({ name: rest, entry });
-              } else {
-                  folders.add(rest.slice(0, slash));
+      // The board tree: folders come from the paths, each with its subfolders and boards
+      function buildBoardTree(entries) {
+          const root = { path: '', folders: new Map(), boards: [] };
+          for (const entry of entries) {
+              const segments = entry.path.split('/');
+              let node = root;
+              for (let i = 0; i < segments.length - 1; i++) {
+                  if (!node.folders.has(segments[i])) {
+                      node.folders.set(segments[i], { path: segments.slice(0, i + 1).join('/'), folders: new Map(), boards: [] });
+                  }
+                  node = node.folders.get(segments[i]);
               }
+              node.boards.push({ name: segments[segments.length - 1], entry });
           }
-          return { folders: [...folders].sort(), boards };
+          return root;
       }
 
-      function renderBoardList() {
-          // a folder exists only while a board lies in it: fall back to the nearest one left
-          while (currentFolder && !boardList.some(entry => entry.path.startsWith(currentFolder + '/'))) {
-              const slash = currentFolder.lastIndexOf('/');
-              currentFolder = slash === -1 ? '' : currentFolder.slice(0, slash);
+      // The folders a path lies in, outermost first
+      function ancestorsOf(path) {
+          const segments = path.split('/');
+          return segments.slice(0, -1).map((_, i) => segments.slice(0, i + 1).join('/'));
+      }
+
+      const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+      // A small icon button in a tree row; its click does not reach the row
+      function treeButton(icon, title, onClick) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'tree-btn';
+          button.title = title;
+          button.appendChild(iconElement(icon));
+          button.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+          return button;
+      }
+
+      function treeRow(depth, className = '') {
+          const row = document.createElement('div');
+          row.className = `tree-row ${className}`.trim();
+          row.style.setProperty('--depth', depth);
+          return row;
+      }
+
+      function treeToggle(icon) {
+          const toggle = document.createElement('span');
+          toggle.className = 'tree-toggle';
+          if (icon) { toggle.appendChild(iconElement(icon)); }
+          return toggle;
+      }
+
+      function treeName(icon, text) {
+          const name = document.createElement('span');
+          name.className = 'tree-name';
+          name.append(iconElement(icon), document.createTextNode(text)); // text, never HTML
+          return name;
+      }
+
+      // Show the owner's boards as a tree. Folders open are those in expandedFolders;
+      // when the view opens, the folders along the current board's path are added. A
+      // filter shows only the boards whose path contains it, with their folders open.
+      function renderBoardTree() {
+          const current = boardList.find(entry => entry.board === boardId);
+          if (expandToCurrent) {
+              if (current) { ancestorsOf(current.path).forEach(folder => expandedFolders.add(folder)); }
+              expandToCurrent = false;
           }
+          const filter = document.getElementById('board-filter').value.trim().toLowerCase();
+          const entries = filter ? boardList.filter(entry => entry.path.toLowerCase().includes(filter)) : boardList;
+          const open = filter ? new Set(entries.flatMap(entry => ancestorsOf(entry.path))) : expandedFolders;
 
-          const crumbs = document.getElementById('board-crumbs');
-          crumbs.textContent = '';
-          const segments = currentFolder ? currentFolder.split('/') : [];
-          const addCrumb = (label, folder) => {
-              const crumb = document.createElement('span');
-              crumb.className = 'crumb';
-              crumb.textContent = label;
-              crumb.addEventListener('click', () => { currentFolder = folder; renderBoardList(); });
-              crumbs.appendChild(crumb);
-          };
-          addCrumb('My boards', '');
-          segments.forEach((segment, i) => {
-              crumbs.appendChild(document.createTextNode(' / '));
-              addCrumb(segment, segments.slice(0, i + 1).join('/'));
-          });
-
-          const list = document.getElementById('board-list');
-          list.textContent = '';
-          const { folders, boards } = folderContents(currentFolder);
-          if (folders.length === 0 && boards.length === 0) {
+          const tree = document.getElementById('board-tree');
+          tree.textContent = '';
+          if (entries.length === 0) {
               const empty = document.createElement('div');
-              empty.className = 'board-list-empty';
-              empty.textContent = 'No boards yet';
-              list.appendChild(empty);
+              empty.className = 'tree-empty';
+              empty.textContent = filter ? 'No board path contains this text' : 'No boards yet';
+              tree.appendChild(empty);
               return;
           }
-          for (const folder of folders) {
-              const folderPath = currentFolder ? currentFolder + '/' + folder : folder;
-              const item = document.createElement('div');
-              item.className = 'board-list-item folder';
-              const name = document.createElement('span');
-              name.className = 'board-list-name';
-              name.append(iconElement('folder'), document.createTextNode(' ' + folder));
-              if (renaming && renaming.kind === 'folder' && renaming.path === folderPath) {
-                  list.appendChild(renameRow(folderPath, to => renameFolder(folderPath, to)));
-                  continue;
-              }
-              const rename = document.createElement('button');
-              rename.className = 'board-list-btn';
-              rename.textContent = 'Rename';
-              rename.title = 'Rename or move this folder with all boards in it';
-              rename.addEventListener('click', (e) => {
-                  e.stopPropagation();
-                  renaming = { kind: 'folder', path: folderPath };
-                  renderBoardList();
-              });
-              item.append(name, rename);
-              item.addEventListener('click', () => {
-                  currentFolder = folderPath;
-                  renderBoardList();
-              });
-              list.appendChild(item);
-          }
-          for (const { name: boardName, entry } of boards) {
-              if (renaming && renaming.kind === 'board' && renaming.path === entry.path) {
-                  list.appendChild(renameRow(entry.path, to => setBoardPath(entry.board, to)));
-                  continue;
-              }
-              const item = document.createElement('div');
-              item.className = 'board-list-item';
-              const name = document.createElement('span');
-              name.className = 'board-list-name';
-              name.append(iconElement('document'), document.createTextNode(' ' + boardName));
-              name.title = entry.path;
-              const date = document.createElement('span');
-              date.className = 'board-list-date';
-              date.textContent = new Date(entry.createdAt).toLocaleDateString();
-              const open = document.createElement('button');
-              open.className = 'board-list-btn';
-              open.textContent = 'Open';
-              open.addEventListener('click', () => {
-                  switchToBoard(entry.board, entry.passwd);
-                  closeBoardNavigation();
-              });
-              const rename = document.createElement('button');
-              rename.className = 'board-list-btn';
-              rename.textContent = 'Rename';
-              rename.title = 'Rename or move this board';
-              rename.addEventListener('click', () => {
-                  renaming = { kind: 'board', path: entry.path };
-                  renderBoardList();
-              });
-              item.append(name, date, open, rename);
-              list.appendChild(item);
-          }
-          // the row being edited gets the focus, with its path selected
-          const editor = list.querySelector('.board-list-rename');
+          renderFolderContents(tree, buildBoardTree(entries), 0, open, current, !filter);
+
+          // a row being edited gets the focus
+          const editor = tree.querySelector('.tree-edit');
           if (editor) {
               editor.focus();
-              editor.select();
+              if (editor.value) { editor.select(); }
           }
       }
 
-      // A list row that edits a full path in place (a new folder in it moves the board or
-      // folder); save(newPath) resolves to whether the server accepted it. Enter saves,
-      // Escape cancels; a refusal keeps the row open with the reason below the list.
-      function renameRow(currentPath, save) {
-          const item = document.createElement('div');
-          item.className = 'board-list-item';
+      function renderFolderContents(tree, node, depth, open, current, canToggle) {
+          for (const name of [...node.folders.keys()].sort(byName)) {
+              const folder = node.folders.get(name);
+              if (renaming && renaming.kind === 'folder' && renaming.path === folder.path) {
+                  tree.appendChild(pathEditRow(depth, folder.path, to => renameFolder(folder.path, to)));
+              } else {
+                  const isOpen = open.has(folder.path);
+                  const row = treeRow(depth, 'folder');
+                  const actions = document.createElement('span');
+                  actions.className = 'tree-actions';
+                  actions.append(
+                      treeButton('new-board', 'New board in this folder', () => {
+                          creatingIn = folder.path;
+                          expandedFolders.add(folder.path);
+                          renderBoardTree();
+                      }),
+                      treeButton('rename', 'Rename or move this folder with all boards in it', () => {
+                          renaming = { kind: 'folder', path: folder.path };
+                          renderBoardTree();
+                      }));
+                  row.append(treeToggle(isOpen ? 'chevron-down' : 'chevron-right'), treeName('folder', name), actions);
+                  row.title = folder.path;
+                  if (canToggle) {
+                      row.addEventListener('click', () => {
+                          if (expandedFolders.has(folder.path)) { expandedFolders.delete(folder.path); }
+                          else { expandedFolders.add(folder.path); }
+                          renderBoardTree();
+                      });
+                  }
+                  tree.appendChild(row);
+              }
+              if (open.has(folder.path)) {
+                  if (creatingIn === folder.path) {
+                      tree.appendChild(newBoardRow(depth + 1, folder.path));
+                  }
+                  renderFolderContents(tree, folder, depth + 1, open, current, canToggle);
+              }
+          }
+          for (const { name, entry } of [...node.boards].sort((a, b) => byName(a.name, b.name))) {
+              if (renaming && renaming.kind === 'board' && renaming.path === entry.path) {
+                  tree.appendChild(pathEditRow(depth, entry.path, to => setBoardPath(entry.board, to)));
+                  continue;
+              }
+              const row = treeRow(depth, entry === current ? 'current' : '');
+              row.title = entry === current ? `${entry.path} (open now)` : entry.path;
+              const date = document.createElement('span');
+              date.className = 'tree-date';
+              date.textContent = new Date(entry.createdAt).toLocaleDateString();
+              const actions = document.createElement('span');
+              actions.className = 'tree-actions';
+              actions.append(
+                  treeButton('open', 'Open this board', () => {
+                      switchToBoard(entry.board, entry.passwd);
+                      closeBoardsView();
+                  }),
+                  treeButton('rename', 'Rename or move this board', () => {
+                      renaming = { kind: 'board', path: entry.path };
+                      renderBoardTree();
+                  }),
+                  treeButton('view-link', 'Copy the view link', () => copyLink(entry.board, null, 'manager-feedback', `View link of "${entry.path}"`)),
+                  treeButton('edit-link', 'Copy the edit link', () => copyLink(entry.board, entry.passwd, 'manager-feedback', `Edit link of "${entry.path}"`)));
+              row.append(treeToggle(null), treeName('document', name), date, actions);
+              tree.appendChild(row);
+          }
+      }
+
+      // A tree row with a text field: Enter or the check button submits, Escape or the
+      // cancel button closes it; a refusal keeps it open with the reason above the tree
+      function editRow(depth, value, placeholder, submit, cancel) {
+          const row = treeRow(depth);
           const input = document.createElement('input');
           input.type = 'text';
-          input.className = 'board-list-rename';
-          input.value = currentPath;
-          input.title = 'New path; folders are separated by "/"';
-          const done = () => { renaming = null; renderBoardList(); };
-          const submit = async () => {
-              if (input.value.trim() === currentPath) { done(); return; }
-              if (await save(input.value)) { done(); }
-          };
-          const ok = document.createElement('button');
-          ok.className = 'board-list-btn';
-          ok.textContent = 'Save';
-          ok.addEventListener('click', submit);
-          const cancel = document.createElement('button');
-          cancel.className = 'board-list-btn';
-          cancel.textContent = 'Cancel';
-          cancel.addEventListener('click', done);
+          input.className = 'tree-edit';
+          input.value = value;
+          input.placeholder = placeholder;
+          const ok = treeButton('check', 'Save', () => submit(input.value));
+          const no = treeButton('cancel', 'Cancel', cancel);
           input.addEventListener('keydown', (e) => {
-              if (e.key === 'Enter') { e.preventDefault(); submit(); }
-              else if (e.key === 'Escape') { e.preventDefault(); done(); }
+              if (e.key === 'Enter') { e.preventDefault(); submit(input.value); }
+              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); }
           });
-          item.append(input, ok, cancel);
-          return item;
+          row.append(treeToggle(null), input, ok, no);
+          return row;
+      }
+
+      // Edit a full path in place (a new folder in it moves the board or folder);
+      // save(newPath) resolves to whether the server accepted it
+      function pathEditRow(depth, currentPath, save) {
+          const done = () => { renaming = null; renderBoardTree(); };
+          return editRow(depth, currentPath, 'New path; folders are separated by "/"', async (value) => {
+              if (value.trim() === currentPath) { done(); return; }
+              if (await save(value)) {
+                  renaming = null;
+                  const moved = shared.normalizePath(value);
+                  if (moved) { ancestorsOf(moved).forEach(folder => expandedFolders.add(folder)); }
+                  renderBoardTree();
+              }
+          }, done);
+      }
+
+      // A new board in a folder: the name may contain '/' to start subfolders
+      function newBoardRow(depth, folderPath) {
+          return editRow(depth, '', `Name of a new board in ${folderPath}`, (name) => {
+              if (name.trim()) { createBoard(`${folderPath}/${name}`); }
+          }, () => { creatingIn = null; renderBoardTree(); });
+      }
+
+      function boardLink(board, password) {
+          let link = `${window.location.origin}${window.location.pathname}?board=${board}`;
+          if (password) {
+              link += `&passwd=${password}`;
+          }
+          return link;
+      }
+
+      // Copy a view link (password null) or an edit link and say so in a feedback line
+      async function copyLink(board, password, feedbackId, what) {
+          try {
+              await navigator.clipboard.writeText(boardLink(board, password));
+              setFeedback(feedbackId, `${what} copied`, true);
+          } catch (err) {
+              setFeedback(feedbackId, `Could not copy the link: ${err.message}`);
+          }
       }
 
       // Change the logged-in user's credential (current: as typed into the form)
@@ -3204,7 +3331,6 @@
           // the new credential replaces the remembered one, as a login would
           storedCredential = replacement;
           document.getElementById('change-credential-form').reset();
-          document.getElementById('change-credential-form').style.display = 'none';
           setFeedback('credential-feedback', 'Credential changed. Use the new one from now on.', true);
       }
 
@@ -3281,8 +3407,9 @@
           const newPasswd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
           switchToBoard(newBoardId, newPasswd);
           document.getElementById('new-board-name').value = '';
+          creatingIn = null;
           setFeedback('manager-feedback',
-              `Created ${path ? `"${path}" ` : 'the board '}and opened it. Share it with "Copy Edit Link" or "Copy View Link" above.`, true);
+              `Created ${path ? `"${path}" ` : 'the board '}and opened it; its links are under Current Board.`, true);
           if (session.loggedIn) {
               listBoards();
           }
@@ -5799,8 +5926,13 @@
           redoBtn.addEventListener('click', handleRedo);
           
           // Board navigation button
-          document.getElementById('board-nav-btn').addEventListener('click', openBoardNavigation);
-          document.getElementById('board-nav-close').addEventListener('click', closeBoardNavigation);
+          document.getElementById('board-nav-btn').addEventListener('click', openBoardsView);
+          document.getElementById('boards-close').addEventListener('click', closeBoardsView);
+          document.getElementById('logout-btn').addEventListener('click', logOut);
+          document.getElementById('board-filter').addEventListener('input', renderBoardTree);
+          document.addEventListener('keydown', (e) => {
+              if (e.key === 'Escape' && boardsViewOpen()) { closeBoardsView(); }
+          });
           document.getElementById('copy-view-link-btn').addEventListener('click', () => copyBoardLink(false));
           document.getElementById('copy-edit-link-btn').addEventListener('click', () => copyBoardLink(true));
           
@@ -5809,17 +5941,10 @@
           document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
           document.getElementById('change-credential-form').addEventListener('submit', handleChangeCredential);
           document.getElementById('change-credential-toggle').addEventListener('click', () => {
-              const form = document.getElementById('change-credential-form');
-              form.style.display = form.style.display === 'none' ? '' : 'none';
+              const section = document.getElementById('change-credential-section');
+              section.style.display = section.style.display === 'none' ? '' : 'none';
           });
           document.getElementById('goto-board-form').addEventListener('submit', handleGotoBoard);
-          
-          // Close overlay when clicking outside the window
-          document.getElementById('board-nav-overlay').addEventListener('click', function(e) {
-              if (e.target === this) {
-                  closeBoardNavigation();
-              }
-          });
           
           // Export PDF buttons
           document.getElementById('pdf-btn').addEventListener('click', exportPageToPDF);
@@ -8157,30 +8282,7 @@
        // Copy current board link to clipboard
        // A view link opens the board without the edit password; an edit link includes it
       function copyBoardLink(withPassword) {
-          if (!boardId) {
-              alert('No board is currently loaded');
-              return;
-          }
-          
-          // Build the full URL with board ID and, for an edit link, password
-          let boardUrl = `${window.location.origin}${window.location.pathname}?board=${boardId}`;
-          if (withPassword && passwd) {
-              boardUrl += `&passwd=${passwd}`;
-          }
-          
-          // Copy to clipboard
-          navigator.clipboard.writeText(boardUrl).then(() => {
-              // Show feedback
-              const feedback = document.getElementById('copy-feedback');
-              feedback.replaceChildren(iconElement('check'), document.createTextNode(withPassword ? ' Edit link copied!' : ' View link copied!'));
-              feedback.style.display = 'inline';
-              setTimeout(() => {
-                  feedback.style.display = 'none';
-              }, 2000);
-          }).catch(err => {
-              alert('Failed to copy to clipboard');
-              console.error('Clipboard error:', err);
-          });
+          copyLink(boardId, withPassword ? passwd : null, 'current-feedback', withPassword ? 'Edit link' : 'View link');
       }
       
       // Parse whiteboard URL to extract board ID and password
@@ -8586,44 +8688,86 @@
           document.getElementById('overview-move-back').addEventListener('click', () => overviewMoveSelected(false));
       });
       
-      // Board Navigation Functions
-      function openBoardNavigation() {
-          const overlay = document.getElementById('board-nav-overlay');
-          overlay.style.display = 'flex';
-          
-          // Only a client that has the edit password can hand it on
-          document.getElementById('copy-edit-link-btn').style.display = passwd ? '' : 'none';
-          
+      // Boards View
+      // ===========
+      // A full-window page: the current board (links, go to another board), the login,
+      // and the owner's boards as a file tree. Without a board in the page it is the
+      // start page and cannot be closed.
+      function openBoardsView() {
+          document.body.classList.add('boards-active');
+          document.getElementById('boards-view').classList.add('visible');
           // Pre-fill login and credential fields if known
-          const credentialInput = document.getElementById('new-board-credential-input');
           if (storedCredential) {
-              credentialInput.value = storedCredential;
+              document.getElementById('new-board-credential-input').value = storedCredential;
           }
           if (session.login) {
               document.getElementById('login-input').value = session.login;
           }
+          expandToCurrent = true;
           updateBoardManager();
           if (session.loggedIn) {
               listBoards();
           }
-          
-          // Pre-fill current board ID if available
-          if (boardId) {
-              document.getElementById('board-id-input').value = boardId;
-          }
       }
       
-      function closeBoardNavigation() {
-          const overlay = document.getElementById('board-nav-overlay');
-          overlay.style.display = 'none';
-          setFeedback('manager-feedback', '');
-          setFeedback('credential-feedback', '');
+      function closeBoardsView() {
+          if (!boardId) {
+              return; // nothing behind the view to go back to
+          }
+          document.body.classList.remove('boards-active');
+          document.getElementById('boards-view').classList.remove('visible');
+          resizeCanvas(); // the window may have changed while the canvas was hidden
+          for (const id of ['manager-feedback', 'credential-feedback', 'current-feedback']) {
+              setFeedback(id, '');
+          }
           renaming = null;
-          
-          // Clear form inputs
+          creatingIn = null;
+          document.getElementById('change-credential-section').style.display = 'none';
           document.getElementById('board-url-input').value = '';
           document.getElementById('board-id-input').value = '';
           document.getElementById('board-password-input').value = '';
+      }
+
+      function boardsViewOpen() {
+          return document.getElementById('boards-view').classList.contains('visible');
+      }
+
+      // The Current Board section: links only with a board, the edit link only with its password
+      function updateCurrentBoardSection() {
+          updateCurrentBoardPath();
+          document.getElementById('current-board-links').style.display = boardId ? '' : 'none';
+          document.getElementById('copy-edit-link-btn').style.display = passwd ? '' : 'none';
+          document.getElementById('boards-close').style.display = boardId ? '' : 'none';
+      }
+
+      // "Logging out" ends what the client remembers: the server keeps no login state
+      function logOut() {
+          session.loggedIn = false;
+          session.login = null;
+          storedCredential = null;
+          boardList = [];
+          expandedFolders.clear();
+          renaming = null;
+          creatingIn = null;
+          try { sessionStorage.removeItem(SESSION_LOGIN_KEY); } catch (err) { /* storage blocked */ }
+          // a reload must not log in again from the address (the login alone may stay:
+          // without any parameter the server does not serve the page)
+          const params = new URLSearchParams(window.location.search);
+          params.delete('credential');
+          if (params.has('login') && [...params.keys()].length > 1) {
+              params.delete('login');
+          }
+          window.history.replaceState(null, null, `${window.location.pathname}?${params.toString()}`);
+          document.getElementById('login-input').value = '';
+          document.getElementById('new-board-credential-input').value = '';
+          document.getElementById('board-tree').textContent = '';
+          document.getElementById('board-filter').value = '';
+          for (const id of ['manager-feedback', 'credential-feedback']) {
+              setFeedback(id, '');
+          }
+          document.getElementById('change-credential-section').style.display = 'none';
+          updateBoardManager();
+          setFeedback('login-feedback', 'Logged out: this page forgot your login and credential.', true);
       }
       
       // The current board's path, shown to its owner only: the path is no part of the
@@ -8636,11 +8780,18 @@
           element.title = entry ? 'Only you see this name; the links do not contain it' : '';
       }
 
-      // Show the login form or, once logged in, the board manager
+      // Show the login form or, once logged in, the board manager and the user in the top bar
       function updateBoardManager() {
-          updateCurrentBoardPath();
-          document.getElementById('login-form').style.display = session.loggedIn ? 'none' : '';
-          document.getElementById('board-manager').style.display = session.loggedIn ? '' : 'none';
+          updateCurrentBoardSection();
+          const loggedIn = session.loggedIn;
+          document.getElementById('login-form').style.display = loggedIn ? 'none' : '';
+          document.getElementById('board-manager').style.display = loggedIn ? '' : 'none';
+          for (const id of ['boards-user', 'logout-btn', 'change-credential-toggle']) {
+              document.getElementById(id).style.display = loggedIn ? '' : 'none';
+          }
+          if (!loggedIn) {
+              document.getElementById('change-credential-section').style.display = 'none';
+          }
           document.getElementById('logged-in-as').textContent = session.login || '';
       }
 
@@ -8656,9 +8807,8 @@
 
       function handleNewBoard(e) {
           e.preventDefault();
-          const name = document.getElementById('new-board-name').value;
-          // the name may itself contain '/' to start new folders; the server normalizes
-          createBoard(currentFolder ? `${currentFolder}/${name}` : name);
+          // a full path: folders separated by '/'; the server normalizes it
+          createBoard(document.getElementById('new-board-name').value);
       }
       
       function handleGotoBoard(e) {
@@ -8692,7 +8842,7 @@
           }
           
           switchToBoard(targetBoardId, targetPassword);
-          closeBoardNavigation();
+          closeBoardsView();
       }
 
       // Show another board in this page, without a reload: the login and the credential,
@@ -8706,9 +8856,8 @@
           passwd = targetPassword;
           registerBoard(boardId);
           window.history.replaceState(null, null, newUrl);
-          // only a client that has the edit password can hand it on
-          document.getElementById('copy-edit-link-btn').style.display = passwd ? '' : 'none';
-          updateCurrentBoardPath();
+          expandToCurrent = true;
+          updateCurrentBoardSection();
       }
       
       // Register Service Worker for PWA
