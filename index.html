@@ -2931,6 +2931,7 @@
               serverPageOrder = pages;
               totalPages = pages.length;
               pageNr = newPageNr + 1;
+              updatePageInfo();
           }
           // If overview is active, refresh the grid
           refreshOverviewIfActive();
@@ -8489,6 +8490,7 @@
           document.body.classList.remove('overview-active');
           document.getElementById('page-overview').classList.remove('visible');
           resizeCanvas(); // the window may have changed while the canvas was hidden
+          updatePageInfo(); // page changes during the overview left the label alone
       }
       
       function renderThumbnails() {
