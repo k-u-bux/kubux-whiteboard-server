@@ -866,7 +866,7 @@ On a `ping` for its current page (ignored while one of its own proposals awaits 
 
 ### Unconfirmed edits
 
-Edit actions the client has made but the server has not yet confirmed (e.g., while offline) are kept in the client's history and saved in `sessionStorage`, so they survive a reload of the tab. After reconnecting, the client fetches the page and proposes the edits again, skipping those the server already has.
+Edit actions the client has made but the server has not yet confirmed (e.g., while offline) are kept in the client's history and saved in `sessionStorage`, so they survive a reload of the tab. After reconnecting, the client fetches the page and proposes the edits again, skipping those the server already has. Leaving the page or the board is refused while offline, so the edits always go back to the page they were made on; switching to another board is not a reconnect: the client then opens the new board's last shown page and resends nothing.
 
 ### Reconnection
 

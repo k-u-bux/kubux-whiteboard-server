@@ -1927,16 +1927,7 @@
                   setTool(settings.lastTool);
               }
               
-              // Store page position for restoration after connection
-              // (Do not navigate yet - wait for WebSocket connection)
-              if (settings.currentPageUuid) {
-                  window.savedPagePosition = {
-                      uuid: settings.currentPageUuid,
-                      pageNr: settings.pageNr,
-                      totalPages: settings.totalPages
-                  };
-                  debugLog('Saved page position loaded', window.savedPagePosition);
-              }
+              // the page position (settings.currentPageUuid) is read by pageToReturnTo
               
               return true;
           } catch (err) {
@@ -2482,6 +2473,7 @@
       let present = 0;           // Current position in timeline
       let hashes = [];           // Hash chain for all states
       let verifiedIndex = 0;     // The server's position in history, as last confirmed
+      let boardSwitch = false;   // from switchToBoard until the new board is registered
       // present and verifiedIndex are both positions in history: present is where this
       // client is, verifiedIndex where the server was last confirmed to be (by an accept
       // or a ping). verifiedIndex < present: edits on their way to the server, the
@@ -3330,8 +3322,9 @@
               actions.className = 'tree-actions';
               actions.append(
                   treeButton('open', 'Open this board', () => {
-                      switchToBoard(entry.board, entry.passwd);
-                      closeBoardsView();
+                      if (switchToBoard(entry.board, entry.passwd, 'manager-feedback')) {
+                          closeBoardsView();
+                      }
                   }),
                   treeButton('rename', 'Rename or move this board', () => {
                       renaming = { kind: 'board', path: entry.path };
@@ -3592,9 +3585,10 @@
       }
       
       // The page a registration returns to: the page this tab was on (a reconnect), else
-      // the page this browser showed last on the board (its settings), else none
+      // (first load, or a switch to another board) the page this browser showed last on
+      // the board (its settings), else none
       function pageToReturnTo() {
-          if (currentPageUuid) {
+          if (currentPageUuid && !boardSwitch) {
               return currentPageUuid;
           }
           try {
@@ -3614,9 +3608,15 @@
           const requestId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID];
           
           // On a reconnect: the page we were on, and the edits the server has not
-          // confirmed, before the reset drops them (on the first load there is no page)
-          const previousPage = currentPageUuid;
-          const unconfirmedEdits = history.slice(Math.min(verifiedIndex, present), present); // none while an undo is on its way
+          // confirmed, before the reset drops them (on the first load there is no page).
+          // After a switch to another board, both belong to the board left: none. (A
+          // switch is made online only; edits still unconfirmed then are on their way
+          // to the server already.)
+          const switched = boardSwitch;
+          const returnPage = pageToReturnTo(); // the page register-board named
+          boardSwitch = false;
+          const previousPage = switched ? null : currentPageUuid;
+          const unconfirmedEdits = switched ? [] : history.slice(Math.min(verifiedIndex, present), present); // none while an undo is on its way
           
           // Reset local state
           history = [];
@@ -3638,13 +3638,12 @@
           loadSettings();
           updateKnobs();
           saveMostRecentBoard();
-          if (previousPage) {
-              // Return to that page. The server resolves a page deleted meanwhile to
-              // its replacement (or the first page) and answers with page-registered.
-              registerPage( previousPage, 0 );
-          } else if (window.savedPagePosition) {
-              // First load: reopen the board at the page this browser showed last
-              registerPage( window.savedPagePosition.uuid, 0 );
+          if (returnPage) {
+              // Return to that page: the page we were on (a reconnect), else the page this
+              // browser showed last on the board (first load, switch). The server resolves
+              // a page deleted meanwhile to its replacement (or the first page) and answers
+              // with page-registered.
+              registerPage( returnPage, 0 );
           } else {
               joinPage( firstPageId, 1, numPages );
               // The server will send a full page message next, so we do not need
@@ -9021,8 +9020,9 @@
               return;
           }
 
-          switchToBoard(targetBoardId, targetPassword);
-          closeBoardsView();
+          if (switchToBoard(targetBoardId, targetPassword, 'current-feedback')) {
+              closeBoardsView();
+          }
       }
 
       // The address bar shows the board's share link and nothing else: the edit link if
@@ -9048,7 +9048,21 @@
 
       // Show another board in this page, without a reload: the login and the credential,
       // which live only in this page, stay
-      function switchToBoard(targetBoardId, targetPassword) {
+      // Offline it is refused, and says so in the given feedback line of the boards view:
+      // as with leaving a page (refusedWhileOffline), leaving the board would strand its
+      // unconfirmed edits, and the new board cannot be loaded without the server.
+      // Returns whether the switch was made.
+      function switchToBoard(targetBoardId, targetPassword, feedbackId) {
+          // online: the connection is up, and the board we are on (if any) is registered;
+          // a registration still pending is a reconnect, which must resend our edits
+          const online = ws && ws.readyState === WebSocket.OPEN && (connectionEstablished || !boardId);
+          if (!online) {
+              setFeedback(feedbackId, 'Not connected to the server: other boards open once it is back');
+              return false;
+          }
+          // the page and the edits in memory belong to the board left: the registration
+          // must not return to that page or send those edits to the new board
+          boardSwitch = true;
           boardId = targetBoardId;
           passwd = targetPassword;
           adoptOwnerPassword();
@@ -9056,6 +9070,7 @@
           showShareAddress();
           expandToCurrent = true;
           updateCurrentBoardSection();
+          return true;
       }
       
       // Register Service Worker for PWA
