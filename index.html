@@ -8512,7 +8512,10 @@
           document.body.classList.remove('overview-active');
           document.getElementById('page-overview').classList.remove('visible');
           resizeCanvas(); // the window may have changed while the canvas was hidden
-          updatePageInfo(); // page changes during the overview left the label alone
+          // page changes during the overview left these alone
+          updatePageInfo();
+          updateSyncStatus();
+          updateUndoRedoButtons();
       }
       
       function renderThumbnails() {
