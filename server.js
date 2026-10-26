@@ -1161,29 +1161,27 @@ function trackClient(ws, clientId) {
     }
 }
 
+// The new board is only created: the connection stays with the board (and page) it is
+// on, since opening a board is an action of its own (register-board).
 function createNewBoard(ws, clientId, owner, path, requestId) {
     const boardId = generateSecureUuid();
     const board = createBoard(boardId, owner, path);
     if (board) {
         syncDataDir();
         indexBoard(boardId, { owner, path, passwd: board.passwd, createdAt: board.createdAt });
-        ws.boardId = boardId; // Store boardId in WebSocket client
-        trackClient(ws, clientId);
-        ws.pageId = board.pageOrder[0]; // Default to first page
         
-        debug.log(`[SERVER] Client ${clientId} registered with board: ${boardId}`);
+        debug.log(`[SERVER] Client ${clientId} created board: ${boardId}`);
         
         const response = {
             type: MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD]: boardId,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD]: board.passwd,
-            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE]: ws.pageId,
+            [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE]: board.pageOrder[0],
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
         };
         ws.send(JSON.stringify(response));
         logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, response, requestId, clientId );
         releaseBoard(boardId);
-        sendFullPage(ws, boardId, ws.pageId, true, requestId);
     }
 }
 

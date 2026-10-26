@@ -271,7 +271,7 @@ Create a new board owned by the sender.
 `path` names the board for its owner (see *Users, Owners and Paths*); the server normalizes it.
 
 **Response:**
-- on success: `board-created`, followed by a `fullPage` of the board's first (empty) page with `do-move: true`; the connection is registered with the new board;
+- on success: `board-created`. The board is only created: the connection stays with the board and page it is on (opening the new board is a `register-board` of its own);
 - `error` with message `invalid path` or `path taken`.
 
 ---
@@ -964,6 +964,7 @@ They check that:
 - Boards get an owner (user id), a path and a creation time; `create-board` carries the owner's login and credential and a `path`.
 - `list-boards` / `board-list`, `set-path`, `rename-prefix` for the owner's board manager; path rules, board index and ordered writes (see *Users, Owners and Paths*).
 - `error` carries the `requestId` of refused requests; new reasons.
+- `create-board` only creates the board: the connection is no longer registered with it, and no `fullPage` follows.
 
 ### Document revision (October 2026)
 - Corrected the document to match `shared.js` and `server.js`: the literal wire keys (`board-uuid`, `page-uuid`, `clientId`, `passwd`, `do-move`, `pageNr`, `totalPages`, `edits`, `beforeHash`, …), the type strings `fullPage-requests`, `replay-requests`, `fullPage`, `new page` and `delete page`, and the stroke format (a 13-element array, not an object).
