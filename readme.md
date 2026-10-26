@@ -373,7 +373,7 @@ The application includes full PWA support:
 kubux-whiteboard-server/
 ├── server.js           # Main WebSocket server
 ├── shared.js           # Shared code (data structures, hashing, PDF, geometry)
-├── users.js            # Reads and checks conf/users.json (server and assign_board, every time)
+├── users.js            # Users and credentials: reads conf/users.json, scrypt hashing (server, assign_board, passwd_hash)
 ├── index.html          # Web client (HTML, CSS, and JavaScript)
 ├── protocol.md         # Protocol documentation
 ├── package.json        # Project configuration and dependencies

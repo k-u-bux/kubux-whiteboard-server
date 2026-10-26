@@ -1,4 +1,7 @@
 'use strict';
+// Users and their credentials, for the server and the admin tools (assign_board,
+// passwd_hash): reading the user file, and hashing and verifying credentials.
+//
 // The user file conf/users.json: a list of { id, login, hash }. The id never changes and
 // is what boards record as their owner; the login is what people type; the hash is the
 // scrypt hash of the credential.
@@ -9,9 +12,73 @@
 // counts at once. The file is small and cached by the system; a read costs far less
 // than the scrypt check that follows it in the server.
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { isUuid } = require(path.join(__dirname, 'shared.js'));
+
+// Credential hashes are scrypt (memory-hard, resistant to rainbow tables and to
+// hardware-accelerated brute force), stored as salt:hash, both hex-encoded. Parameters:
+// N (CPU/memory cost) 2^14, r (block size) 8, p (parallelization) 1; a 64-byte key and
+// a 32-byte random salt. Changing them makes every stored hash invalid.
+const SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1 };
+const KEY_LENGTH = 64;
+const SALT_LENGTH = 32;
+
+const formatHash = (salt, key) => `${salt.toString('hex')}:${key.toString('hex')}`;
+
+// The hash of a credential, for the user file (passwd_hash, the server's dummy hash)
+function hashPassword(password) {
+    const salt = crypto.randomBytes(SALT_LENGTH);
+    return formatHash(salt, crypto.scryptSync(password, salt, KEY_LENGTH, SCRYPT_OPTIONS));
+}
+
+// hashPassword in Node's worker pool, so that a credential change does not block the
+// server's event loop
+function hashPasswordAsync(password) {
+    return new Promise((resolve, reject) => {
+        const salt = crypto.randomBytes(SALT_LENGTH);
+        crypto.scrypt(password, salt, KEY_LENGTH, SCRYPT_OPTIONS, (error, key) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+            resolve(formatHash(salt, key));
+        });
+    });
+}
+
+// Whether the credential matches the stored hash. scrypt runs in Node's worker pool,
+// so the ~50 ms it takes do not block the event loop. The user file is edited by the
+// admin and treated like input: a malformed hash is passed to report and simply does
+// not match.
+function verifyPassword(password, storedHash, report) {
+    return new Promise((resolve) => {
+        const [saltHex, hashHex] = storedHash.split(':');
+        if (!saltHex || !hashHex) {
+            report('Invalid hash format - expected salt:hash format');
+            resolve(false);
+            return;
+        }
+        const salt = Buffer.from(saltHex, 'hex');
+        const storedKey = Buffer.from(hashHex, 'hex');
+        crypto.scrypt(password, salt, KEY_LENGTH, SCRYPT_OPTIONS, (error, computedKey) => {
+            if (error) {
+                report(`Error verifying password: ${error.message}`);
+                resolve(false);
+                return;
+            }
+            // timingSafeEqual throws on a length mismatch, i.e. on a malformed stored hash
+            if (storedKey.length !== computedKey.length) {
+                report('Invalid hash format - stored hash has the wrong length');
+                resolve(false);
+                return;
+            }
+            // timing-safe comparison against timing attacks
+            resolve(crypto.timingSafeEqual(storedKey, computedKey));
+        });
+    });
+}
 
 // The entries as they are in the file (extra fields included), or an error that says
 // whether the file is missing, unreadable (permissions, mounts) or invalid. The file is
@@ -60,4 +127,4 @@ function checkUsers(entries) {
     }
 }
 
-module.exports = { loadUsers };
+module.exports = { loadUsers, hashPassword, hashPasswordAsync, verifyPassword };

@@ -15,23 +15,15 @@ if [ $# -ne 2 ]; then
     exit 1
 fi
 
-# Login and credential reach node through the environment, never as code.
-LOGIN="$1" CREDENTIAL="$2" node -e "
+# Login and credential reach node through the environment, never as code. The hash
+# comes from users.js, the same code the server checks credentials with.
+USERS_JS="$(cd "$(dirname "$0")" && pwd)/users.js"
+LOGIN="$1" CREDENTIAL="$2" USERS_JS="$USERS_JS" node -e "
 const crypto = require('crypto');
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(32);
-  const hash = crypto.scryptSync(password, salt, 64, {
-    N: 16384,
-    r: 8,
-    p: 1
-  });
-  return salt.toString('hex') + ':' + hash.toString('hex');
-}
-
+const { hashPassword } = require(process.env.USERS_JS);
 const entry = { id: crypto.randomUUID(), login: process.env.LOGIN, hash: hashPassword(process.env.CREDENTIAL) };
 console.log(JSON.stringify(entry, null, 2));
-"
+" || exit 1
 
 echo ""
 echo "Add the entry above to the list in conf/users.json:"

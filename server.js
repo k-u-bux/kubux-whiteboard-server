@@ -72,7 +72,6 @@ const debug = new Console({ stdout: debugNull, stderr: debugTee });
 // const debug = new Console({ stdout: debugTee, stderr: debugTee });
 
 
-// Password hashing with scrypt (memory-hard, resistant to rainbow tables and brute-force)
 const crypto = require('crypto');
 
 
@@ -100,96 +99,6 @@ function passwdMatches(password, passwd) {
     return crypto.timingSafeEqual(digest(password), digest(passwd));
 }
 
-/**
- * Hash a password using scrypt
- * scrypt is a password-based key derivation function that is intentionally slow and memory-hard,
- * making it resistant to both rainbow table attacks and hardware-accelerated brute-force attacks.
- * 
- * @param {string} password - The password to hash
- * @returns {string} The hash in format: salt:hash (both hex-encoded)
- */
-function hashPassword(password) {
-  // Generate a random salt (32 bytes = 256 bits)
-  const salt = crypto.randomBytes(32);
-  
-  // scrypt parameters:
-  // - N (cost): 16384 (2^14) - CPU/memory cost parameter (reasonable balance)
-  // - r (blockSize): 8 - block size parameter
-  // - p (parallelization): 1 - parallelization parameter
-  // - keylen: 64 - desired key length in bytes
-  const hash = crypto.scryptSync(password, salt, 64, {
-    N: 16384,
-    r: 8,
-    p: 1
-  });
-  
-  // Return salt:hash (both in hex format)
-  return salt.toString('hex') + ':' + hash.toString('hex');
-}
-
-// hashPassword in Node's worker pool, so that a credential change does not block the event loop
-function hashPasswordAsync(password) {
-  return new Promise((resolve, reject) => {
-    const salt = crypto.randomBytes(32);
-    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1 }, (error, hash) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(salt.toString('hex') + ':' + hash.toString('hex'));
-    });
-  });
-}
-
-/**
- * Verify a password against a stored hash
- * 
- * scrypt runs asynchronously in Node's worker pool, so the ~50 ms it takes do
- * not block the event loop. The password file is edited by the admin and is
- * treated like input: a malformed entry is logged and simply does not match.
- *
- * @param {string} password - The password to verify
- * @param {string} storedHash - The stored hash in format salt:hash
- * @returns {Promise<boolean>} Resolves to true if password matches
- */
-function verifyPassword(password, storedHash) {
-  return new Promise((resolve) => {
-    let salt;
-    let storedHashBuffer;
-    try {
-      const [saltHex, hashHex] = storedHash.split(':');
-      if (!saltHex || !hashHex) {
-        debug.error('[SERVER] Invalid hash format - expected salt:hash format');
-        resolve(false);
-        return;
-      }
-      salt = Buffer.from(saltHex, 'hex');
-      storedHashBuffer = Buffer.from(hashHex, 'hex');
-    } catch (error) {
-      debug.error('[SERVER] Error verifying password:', error.message);
-      resolve(false);
-      return;
-    }
-
-    // Compute hash with same parameters
-    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1 }, (error, computedHash) => {
-      if (error) {
-        debug.error('[SERVER] Error verifying password:', error.message);
-        resolve(false);
-        return;
-      }
-      // timingSafeEqual throws on a length mismatch, i.e. on a malformed stored hash
-      if (storedHashBuffer.length !== computedHash.length) {
-        debug.error('[SERVER] Invalid hash format - stored hash has the wrong length');
-        resolve(false);
-        return;
-      }
-      // Use timing-safe comparison to prevent timing attacks
-      resolve(crypto.timingSafeEqual(storedHashBuffer, computedHash));
-    });
-  });
-}
-
 // The user with this login if the credential matches, else null. Every credential the
 // server gets is checked here, against the user file as it is on disk now: the server
 // keeps no credential information (see users.js). An unknown login costs one scrypt like
@@ -202,7 +111,7 @@ async function checkLogin(login, password) {
   } catch (error) {
     debug.error(`[SERVER] Nobody can log in: ${error.message}`);
   }
-  const matches = await verifyPassword(password, user ? user.hash : DUMMY_HASH);
+  const matches = await verifyPassword(password, user ? user.hash : DUMMY_HASH, message => debug.error(`[SERVER] ${message}`));
   return (matches && user) ? user : null;
 }
 
@@ -275,7 +184,7 @@ const {
     is_invalid_BOARD_INFO_REQUEST_message,
     is_invalid_SHUFFLE_PROPOSAL_message
 } = require('./shared');
-const { loadUsers } = require('./users');
+const { loadUsers, hashPassword, hashPasswordAsync, verifyPassword } = require('./users');
 
 
 // Data storage configuration
