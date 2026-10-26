@@ -3275,7 +3275,8 @@
       }
 
       // A tree row with a text field: Enter or the check button submits, Escape or the
-      // cancel button closes it; a refusal keeps it open with the reason above the tree
+      // cancel button closes it; a refusal keeps it open with the reason above the tree.
+      // submit(value, close) gets the way to close it, too.
       function editRow(depth, value, placeholder, submit, cancel) {
           const row = treeRow(depth);
           const input = document.createElement('input');
@@ -3285,10 +3286,10 @@
           input.placeholder = placeholder;
           // a refusal shown for this field goes with it
           const dismiss = () => { setFeedback('manager-feedback', ''); cancel(); };
-          const ok = treeButton('check', 'Save', () => submit(input.value));
+          const ok = treeButton('check', 'Save', () => submit(input.value, dismiss));
           const no = treeButton('cancel', 'Cancel', dismiss);
           input.addEventListener('keydown', (e) => {
-              if (e.key === 'Enter') { e.preventDefault(); submit(input.value); }
+              if (e.key === 'Enter') { e.preventDefault(); submit(input.value, dismiss); }
               else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dismiss(); }
           });
           row.append(treeToggle(null), input, ok, no);
@@ -3312,8 +3313,9 @@
 
       // A new board in a folder: the name may contain '/' to start subfolders
       function newBoardRow(depth, folderPath) {
-          return editRow(depth, '', `Name of a new board in ${folderPath}`, (name) => {
-              if (name.trim()) { createBoard(`${folderPath}/${name}`); }
+          return editRow(depth, '', `Name of a new board in ${folderPath}`, (name, close) => {
+              // no name, no board: the field just closes
+              if (name.trim()) { createBoard(`${folderPath}/${name}`); } else { close(); }
           }, () => { creatingIn = null; renderBoardTree(); });
       }
 
