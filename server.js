@@ -336,9 +336,22 @@ function saveUsersWithHash(userId, hash) {
 
 function initializeGlobals() {
     const filePath = getUsersFilePath();
-    if (fs.existsSync(filePath)) {
+    let text = null;
+    try {
+        text = fs.readFileSync(filePath, 'utf8');
+    } catch (error) {
+        // a missing file and one the server may not read (permissions, mounts) look alike otherwise
+        if (error.code !== 'ENOENT') {
+            debug.error(`[SERVER] Cannot read user file ${filePath}, nobody can log in: ${error.message}`);
+        } else if (fs.existsSync(getOldPasswdFilePath())) {
+            debug.error(`[SERVER] No user file ${filePath}, nobody can log in: ${getOldPasswdFilePath()} is no longer read; create ${filePath} with passwd_hash (see readme.md)`);
+        } else {
+            debug.error(`[SERVER] No user file ${filePath}, nobody can log in: create it with passwd_hash (see readme.md)`);
+        }
+    }
+    if (text !== null) {
         try {
-            for (const user of parseUsers(fs.readFileSync(filePath, 'utf8'))) {
+            for (const user of parseUsers(text)) {
                 users.push(user);
                 usersByLogin.set(user.login, user);
             }
@@ -346,8 +359,6 @@ function initializeGlobals() {
         } catch (error) {
             debug.error(`[SERVER] Invalid user file ${filePath}, nobody can log in: ${error.message}`);
         }
-    } else if (fs.existsSync(getOldPasswdFilePath())) {
-        debug.error(`[SERVER] ${getOldPasswdFilePath()} is no longer read; create ${filePath} with passwd_hash (see readme.md)`);
     }
     const removalLogPath = getRemovalLogPath();
     if (fs.existsSync(removalLogPath)) {
