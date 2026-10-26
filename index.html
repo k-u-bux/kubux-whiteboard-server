@@ -8797,7 +8797,8 @@
       function handleLogin(e) {
           e.preventDefault();
           const login = document.getElementById('login-input').value.trim();
-          const credential = document.getElementById('new-board-credential-input').value.trim();
+          // the credential as typed: spaces belong to it like any other character
+          const credential = document.getElementById('new-board-credential-input').value;
           if (!login || !credential) {
               return;
           }
