@@ -8833,7 +8833,12 @@
               setFeedback('current-feedback', 'Paste a board link or enter a board ID');
               return;
           }
-          
+
+          if (!shared.isUuid(targetBoardId)) {
+              setFeedback('current-feedback', 'Not a valid board ID');
+              return;
+          }
+
           switchToBoard(targetBoardId, targetPassword);
           closeBoardsView();
       }
