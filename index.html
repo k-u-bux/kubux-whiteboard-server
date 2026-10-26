@@ -3443,14 +3443,13 @@
           const current = document.getElementById('current-credential-input').value;
           const replacement = document.getElementById('new-credential-input').value;
           const repeated = document.getElementById('repeat-credential-input').value;
-          const feedback = document.getElementById('credential-feedback');
           // checked here, not by the browser, as for the login
           if (current === '' || replacement === '' || repeated === '') {
               setFeedback('credential-feedback', 'Fill in all three fields');
               return;
           }
           if (replacement !== repeated) {
-              feedback.textContent = 'The new credentials differ';
+              setFeedback('credential-feedback', 'The new credentials differ');
               return;
           }
           changeCredential(current, replacement);
