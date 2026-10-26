@@ -343,7 +343,8 @@ function saveUsersWithHash(userId, hash) {
         throw new Error(`user ${userId} is no longer in ${filePath}`);
     }
     entry.hash = hash;
-    writeFileAtomic(filePath, JSON.stringify(entries, null, 2) + '\n');
+    // the hashes are for the server alone
+    writeFileAtomic(filePath, JSON.stringify(entries, null, 2) + '\n', 0o600);
 }
 
 function initializeGlobals() {
@@ -384,11 +385,16 @@ function initializeGlobals() {
 // Write via a temporary file and a rename, so that a crash or a full disk
 // leaves either the old or the new content on disk, never a truncated file.
 // Errors are passed on to the caller, as with fs.writeFileSync.
-function writeFileAtomic(filePath, text) {
+// With a mode, the file gets exactly that mode, whatever the umask or a leftover
+// temporary file had.
+function writeFileAtomic(filePath, text, mode) {
     const tmpPath = `${filePath}.tmp`;
     try {
         const fd = fs.openSync(tmpPath, 'w');
         try {
+            if (mode !== undefined) {
+                fs.fchmodSync(fd, mode);
+            }
             fs.writeFileSync(fd, text, 'utf8');
             fs.fsyncSync(fd);
         } finally {

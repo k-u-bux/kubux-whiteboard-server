@@ -247,7 +247,7 @@ Change the owner's credential.
 }
 ```
 
-The server reads `conf/users.json` again, replaces this user's hash with the hash of the new credential, and writes the file back atomically. Everything else in the file stays as it is on disk, including entries the admin added or changed since startup; id and login stay.
+The server reads `conf/users.json` again, replaces this user's hash with the hash of the new credential, and writes the file back atomically, with mode 600 (readable and writable by the server's user only). Everything else in the file stays as it is on disk, including entries the admin added or changed since startup; id and login stay.
 
 **Response:** `credential-changed`, or `error` with message `credential could not be saved` (the user file could not be read, is invalid, no longer holds the user, or could not be written; nothing is written then, and the old credential stays valid).
 
