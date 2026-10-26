@@ -2243,6 +2243,10 @@
       let expandToCurrent = true;      // open the folders along the current board's path at the next rendering
       let renaming = null;             // { kind: 'board' | 'folder', path } while a row is edited in place
       let creatingIn = null;           // folder path with an open "new board here" row
+      // what is typed in an open tree field, and the server's refusal shown under it, by
+      // field: the tree is drawn anew (e.g. with a reloaded list) without losing them
+      const editDrafts = new Map();    // field key -> { value, refusal }
+      let newBoardRefusal = null;      // the server's refusal for the New Board form's path
       const SESSION_LOGIN_KEY = 'whiteboard_login';
       let clientId = shared.generateUuid(); // Unique client identifier
       let currentPageUuid = null;
@@ -3158,7 +3162,7 @@
           const value = document.getElementById('new-board-name').value;
           const problem = value.trim() ? pathProblemText(shared.newBoardProblem(ownPaths(), value), value) : null;
           document.getElementById('new-board-btn').disabled = !value.trim() || problem !== null;
-          setFeedback('new-board-flag', problem || '');
+          setFeedback('new-board-flag', problem || newBoardRefusal || '');
       }
 
       // The board tree: folders come from the paths, each with its subfolders and boards
@@ -3258,7 +3262,11 @@
           const editor = tree.querySelector('.tree-edit');
           if (editor) {
               editor.focus();
-              if (editor.value) { editor.select(); }
+              if (editor.dataset.restored !== undefined) {
+                  editor.setSelectionRange(editor.value.length, editor.value.length);
+              } else if (editor.value) {
+                  editor.select();
+              }
           }
       }
 
@@ -3280,11 +3288,13 @@
                   actions.className = 'tree-actions';
                   actions.append(
                       treeButton('new-board', 'New board in this folder', () => {
+                          editDrafts.delete(`new ${folder.path}`);
                           creatingIn = folder.path;
                           expandedFolders.add(folder.path);
                           renderBoardTree();
                       }),
                       treeButton('rename', 'Rename or move this folder with all boards in it', () => {
+                          editDrafts.delete(`rename ${folder.path}`);
                           renaming = { kind: 'folder', path: folder.path };
                           renderBoardTree();
                       }));
@@ -3327,6 +3337,7 @@
                       }
                   }),
                   treeButton('rename', 'Rename or move this board', () => {
+                      editDrafts.delete(`rename ${entry.path}`);
                       renaming = { kind: 'board', path: entry.path };
                       renderBoardTree();
                   }),
@@ -3342,13 +3353,20 @@
       // the reason it cannot be submitted, shown right under the field with the check
       // button greyed out; an empty field greys the button out, and Enter closes it.
       // submit(value, refuse) may show the server's reason under the field with refuse,
-      // keeping it open; typing on replaces it with the check of the new value.
-      function editRow(depth, value, placeholder, check, submit, cancel) {
+      // keeping it open; typing on replaces it with the check of the new value. key names
+      // the field: its draft (editDrafts) survives the tree being drawn anew.
+      function editRow(key, depth, value, placeholder, check, submit, cancel) {
           const row = treeRow(depth);
           const input = document.createElement('input');
           input.type = 'text';
           input.className = 'tree-edit';
-          input.value = value;
+          if (editDrafts.has(key)) {
+              input.dataset.restored = '';
+          } else {
+              editDrafts.set(key, { value, refusal: null });
+          }
+          const draft = editDrafts.get(key);
+          input.value = draft.value;
           input.placeholder = placeholder;
           const flag = document.createElement('div');
           flag.className = 'tree-flag';
@@ -3357,12 +3375,13 @@
           const usable = () => !pending && input.value.trim() !== '' && !check(input.value);
           const ok = treeButton('check', 'Save', () => trySubmit());
           const update = () => {
-              flag.textContent = (input.value.trim() && check(input.value)) || '';
+              flag.textContent = (input.value.trim() && check(input.value)) || draft.refusal || '';
               ok.disabled = !usable();
           };
-          const refuse = (text) => { flag.textContent = text; };
+          const refuse = (text) => { draft.refusal = text; flag.textContent = text; };
+          const close = () => { editDrafts.delete(key); cancel(); };
           const trySubmit = async () => {
-              if (!input.value.trim()) { cancel(); return; }
+              if (!input.value.trim()) { close(); return; }
               if (!usable()) { return; }
               pending = true;
               ok.disabled = true;
@@ -3373,11 +3392,15 @@
                   ok.disabled = !usable();
               }
           };
-          const no = treeButton('cancel', 'Cancel', cancel);
-          input.addEventListener('input', update);
+          const no = treeButton('cancel', 'Cancel', close);
+          input.addEventListener('input', () => {
+              draft.value = input.value;
+              draft.refusal = null;
+              update();
+          });
           input.addEventListener('keydown', (e) => {
               if (e.key === 'Enter') { e.preventDefault(); trySubmit(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); }
+              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
           });
           row.append(treeToggle(null), input, ok, no);
           update();
@@ -3390,10 +3413,12 @@
       // save(newPath) resolves to null, or the reason the server refused it
       function pathEditRow(depth, currentPath, check, save) {
           const done = () => { renaming = null; renderBoardTree(); };
-          return editRow(depth, currentPath, 'New path; folders are separated by "/"', check, async (value, refuse) => {
-              if (value === currentPath) { done(); return; }
+          const key = `rename ${currentPath}`;
+          return editRow(key, depth, currentPath, 'New path; folders are separated by "/"', check, async (value, refuse) => {
+              if (value === currentPath) { editDrafts.delete(key); done(); return; }
               const refusal = await save(value);
               if (refusal) { refuse(refusal); return; }
+              editDrafts.delete(key);
               renaming = null;
               ancestorsOf(value).forEach(folder => expandedFolders.add(folder));
               renderBoardTree();
@@ -3403,11 +3428,11 @@
       // A new board in a folder: the name may contain '/' to start subfolders
       function newBoardRow(depth, folderPath) {
           const pathOf = (name) => `${folderPath}/${name}`;
-          return editRow(depth, '', `Name of a new board in ${folderPath}`,
+          return editRow(`new ${folderPath}`, depth, '', `Name of a new board in ${folderPath}`,
               name => pathProblemText(shared.newBoardProblem(ownPaths(), pathOf(name)), pathOf(name)),
               async (name, refuse) => {
                   const refusal = await createBoard(pathOf(name));
-                  if (refusal) { refuse(refusal); }
+                  if (refusal) { refuse(refusal); } else { editDrafts.delete(`new ${folderPath}`); }
               },
               () => { creatingIn = null; renderBoardTree(); });
       }
@@ -3497,7 +3522,20 @@
           } catch (err) {
               return err.message;
           }
-          return showBoardListReply(reply) ? null : problemText(reply.message);
+          if (showBoardListReply(reply)) {
+              return null;
+          }
+          reloadAfterRefusal();
+          return problemText(reply.message);
+      }
+
+      // A refusal may come from a change made elsewhere (another tab or device) that the
+      // board list here does not know yet: load the list again, so that the tree and the
+      // checks as the path is typed catch up. Open fields keep their text (editDrafts).
+      function reloadAfterRefusal() {
+          if (session.loggedIn) {
+              listBoards();
+          }
       }
 
       // Create a new board owned by the logged-in user. It is not opened: changing the
@@ -3518,6 +3556,7 @@
           }
           if (reply.type !== shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE) {
               ownerRefused(reply);
+              reloadAfterRefusal();
               return problemText(reply.message);
           }
           ancestorsOf(path).forEach(folder => expandedFolders.add(folder));
@@ -6086,7 +6125,10 @@
           // Board navigation forms
           document.getElementById('login-form').addEventListener('submit', handleLogin);
           document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
-          document.getElementById('new-board-name').addEventListener('input', updateNewBoardForm);
+          document.getElementById('new-board-name').addEventListener('input', () => {
+              newBoardRefusal = null;
+              updateNewBoardForm();
+          });
           document.getElementById('change-credential-form').addEventListener('submit', handleChangeCredential);
           document.getElementById('change-credential-toggle').addEventListener('click', () => {
               const section = document.getElementById('change-credential-section');
@@ -8880,6 +8922,8 @@
           }
           renaming = null;
           creatingIn = null;
+          editDrafts.clear();
+          newBoardRefusal = null;
           document.getElementById('change-credential-section').style.display = 'none';
           document.getElementById('board-url-input').value = '';
           document.getElementById('board-id-input').value = '';
@@ -8907,6 +8951,7 @@
           expandedFolders.clear();
           renaming = null;
           creatingIn = null;
+          editDrafts.clear();
           try { sessionStorage.removeItem(SESSION_LOGIN_KEY); } catch (err) { /* storage blocked */ }
           // the address holds no login then: the share link of the board, or an empty
           // login parameter (without any parameter the server does not serve the page)
@@ -8976,12 +9021,10 @@
           const input = document.getElementById('new-board-name');
           button.disabled = true; // until the server answered
           const refusal = await createBoard(input.value);
-          if (refusal) {
-              updateNewBoardForm();
-              setFeedback('new-board-flag', refusal);
-              return;
+          newBoardRefusal = refusal; // shown until the path is typed on
+          if (!refusal) {
+              input.value = '';
           }
-          input.value = '';
           updateNewBoardForm();
       }
       
