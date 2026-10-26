@@ -80,7 +80,7 @@ Unchanged: `deserialize` reviver handles only `__type: BigInt|Set|Map`; no `__pr
 - All DOM text assignment goes through `textContent` (incl. server error messages)
 - Strokes are rendered on `<canvas>`; stroke colors regex-restricted (`#RGB`/`#RRGGBB`/`[a-z]{1,20}`)
 - The only `innerHTML` assignments are static icon glyphs (cap/join style menus) and clearing the overview grid (`''`)
-- Storage audit: the server-level credential is persisted to `localStorage['whiteboard_credential']` (design decision; see Recommendation 8)
+- Storage audit: the owner's credential is kept **only in the page's memory** (`storedCredential`), never in `localStorage` or `sessionStorage`; a reload forgets it (the owner logs in again; a password manager can fill in the form). The tab remembers the login in `sessionStorage['whiteboard_login']`. A `credential=` URL parameter is read once and removed from the address. Board edit passwords travel in edit links (`?passwd=`) by design; see Recommendation 8
 
 ---
 
@@ -102,7 +102,7 @@ Unchanged: `deserialize` reviver handles only `__type: BigInt|Set|Map`; no `__pr
 
 **Measurements (v3.0, before logins):** fullPage latency stayed at **3 ms** while 60 connections hammered `create-board`; about **50 attempts/s** were sustained, each costing one scrypt per stored credential (2 credentials then). The same flood against an owner message costs half the scrypt work per attempt with 2 users; not re-measured.
 
-**Location:** `server.js` `asOwner` (1596–1616), owner handlers (1619–1774), `checkLogin` (195–199), `verifyPassword` (155–191).
+**Location:** `server.js` `asOwner` (1497–1517), owner handlers (1520–1660), `checkLogin` (107–116); `users.js` `verifyPassword` (55–84), `loadUsers` (86).
 
 **Recommended fix:**
 - Token-bucket rate limit per IP on owner messages (e.g., 5/min), perhaps also per login
@@ -118,7 +118,7 @@ Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` �
 
 **Crash chain:** when the disk fills, `writeFileAtomic` throws (ENOSPC) inside `periodicallyPersist` (10 s timer) — unhandled → process crash, losing up to 10 s of edits.
 
-**Location:** `server.js` `rejectMessage` (1809), `periodicallyPersist` (1881), `writeFileAtomic` (301).
+**Location:** `server.js` `rejectMessage` (2010), `periodicallyPersist` (2085), `writeFileAtomic` (258).
 
 **Recommended fix:** log rotation + size cap; rate-limit malformed-input logging (dedupe per second); catch/tolerate persist failures (log + retry) instead of crashing.
 
@@ -157,7 +157,7 @@ The existing production `logs/debug.log` (~792 KB) contains board passwords in c
 
 **Risk Level:** LOW
 
-`wss.on('connection', ...)` (server.js:1845) never inspects `req.headers.origin`. Any webpage can open a WebSocket to the server and act as an unauthenticated client (read boards whose ID is known — view access is open by design; participate in the DoS vectors above). Impact is bounded because every privileged action requires the board password or admin credential, which live in the URL / `localStorage` — a cookie-based session this is not. Still, with any future credential-bearing cookie or same-origin-gapless auth change, missing Origin verification becomes CSWSH.
+`wss.on('connection', ...)` (server.js:2049) never inspects `req.headers.origin`. Any webpage can open a WebSocket to the server and act as an unauthenticated client (read boards whose ID is known — view access is open by design; participate in the DoS vectors above). Impact is bounded because every privileged action requires the board password or an owner's login and credential, which live in the URL and in the page's memory — a cookie-based session this is not. Still, with any future credential-bearing cookie or same-origin-gapless auth change, missing Origin verification becomes CSWSH.
 
 **Recommended fix:** verify `Origin` against the configured host, or deny cross-origin handshakes.
 
@@ -165,7 +165,7 @@ The existing production `logs/debug.log` (~792 KB) contains board passwords in c
 
 ### ⚠️ 6. `x-forwarded-proto` spoofing [OPEN, unchanged]
 
-**Risk Level:** LOW — HSTS is emitted when the header says `https`, even on plain HTTP (server.js:715–722). Only trustworthy when the server sits behind the documented nginx proxy. Make proxy trust configurable.
+**Risk Level:** LOW — HSTS is emitted when the header says `https`, even on plain HTTP (server.js:783–790). Only trustworthy when the server sits behind the documented nginx proxy. Make proxy trust configurable.
 
 ### ⚠️ 7. Error details sent to clients [OPEN, unchanged]
 
@@ -179,7 +179,7 @@ The existing production `logs/debug.log` (~792 KB) contains board passwords in c
 
 **Risk Level:** MEDIUM (unchanged from v2.2)
 
-**Remaining issue:** the standalone `Dockerfile` has no `USER` directive — the Node.js process runs as root inside the container. If any file-write vulnerability appears, the blast radius is root. (The documented `docker-compose.yml` path already mitigates this: `user: "1000:1000"`, app mounted `:ro`, only `data/` + `logs/` writable.)
+**Remaining issue:** the standalone `Dockerfile` has no `USER` directive — the Node.js process runs as root inside the container. If any file-write vulnerability appears, the blast radius is root. (The documented `docker-compose.yml` path already mitigates this: `user: "1000:1000"`, app mounted `:ro`, only `conf/` (credential changes), `data/` and `logs/` writable.)
 
 **Erratum — the v3.0 startup claim was wrong:** v3.0 stated the `node:20` base "cannot start the server" because of `require('console')` / `fs.createWriteStream`. **Retracted.** Verified by booting the server under official binaries:
 - **node v20.18.1:** full boot OK — HTTP 200, WebSocket up, scrypt credential check returns the expected rejection.
@@ -189,17 +189,17 @@ Node 20.18 has `console`/`stream`/`fs.createWriteStream`/async `crypto.scrypt`. 
 
 **Recommended fix:** add `RUN useradd -r -u 1001 appuser` + `USER appuser` to the standalone `Dockerfile` (as v2.2 originally suggested); the compose override stays.
 
-### ℹ️ `passwd_hash` shell-injection footgun
+### ✅ `passwd_hash` shell-injection footgun [FIXED]
 
-`node -e "…hashPassword('$passwd')…"` interpolates the password into a JS string literal inside shell double quotes. Embedded `'` runs arbitrary JS as the admin who invoked the tool. **Not remotely exploitable** (local admin tool, self-inflicted), but the utility should quote/clean its input.
+`passwd_hash` used to interpolate the password into a JS string literal inside shell double quotes, so an embedded `'` ran arbitrary JS as the admin who invoked the tool. Now login and credential reach node only through environment variables, never as code, and the hash comes from `users.js`, the same scrypt code the server checks with.
 
-### ℹ️ Stale credential backup `conf/passwd.json~`
+### ℹ️ Stale credential files `conf/passwd.json`, `conf/passwd.json~`
 
-The repo ships a leftover backup `conf/passwd.json~` containing a single legacy **salt-less** hash (one hex string, no `:`), which the current `salt:hash` splitter in `verifyPassword` rejects. It is **never loaded** (`initializeGlobals` reads only `conf/passwd.json`) and **not served** (HTTP dotfile block + static whitelist). Inert; delete it for hygiene.
+`conf/` is not part of the repository, but the author's working directory still holds the legacy `conf/passwd.json` and its backup `conf/passwd.json~` (a single **salt-less** hash, one hex string, no `:`). Since logins, the server reads only `conf/users.json` (`loadUsers` in `users.js`); the old files are **never loaded** (at most mentioned in a startup hint) and **not served** (HTTP dotfile block + static whitelist). Inert; delete them for hygiene.
 
 ### ℹ️ Damaged data files end the process (by design, not fixed)
 
-Earlier versions of this report listed a "corrupted-file crash" as fixed by a try-catch in `loadItem`. **That is not the current code:** `loadItem` (server.js:329–344) has no try-catch, so a board or page file that is not valid JSON makes `deserialize` throw inside the message handler, and the exception ends the process. `loadPage` also throws on a stored hash chain of the wrong length. This is deliberate fail-fast behaviour (see the "Lookup invariants" comment in server.js: a damaged file "shows up as a failed assert, never as a silently recreated empty board or page"). It is reachable only through damaged or hand-edited files in `data/`, not through client input. Note that `writeFileAtomic` (temp file + fsync + rename) makes a truncated file from a crash or full disk unlikely.
+Earlier versions of this report listed a "corrupted-file crash" as fixed by a try-catch in `loadItem`. **That is not the current code:** `loadItem` (server.js:300) has no try-catch, so a board or page file that is not valid JSON makes `deserialize` throw inside the message handler, and the exception ends the process. `loadPage` also throws on a stored hash chain of the wrong length. This is deliberate fail-fast behaviour (see the "Lookup invariants" comment in server.js: a damaged file "shows up as a failed assert, never as a silently recreated empty board or page"). It is reachable only through damaged or hand-edited files in `data/`, not through client input. Note that `writeFileAtomic` (temp file + fsync + rename) makes a truncated file from a crash or full disk unlikely.
 
 ### ℹ️ `generatePasswd` modulo bias
 
@@ -234,7 +234,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 1. **Message validation layer** — every handler validates before use; GROUP sub-actions recursively.
 2. **UUID-based access control** — `isUuid` gates all file IDs and message IDs; no traversal.
 3. **Safe deserialization** — BigInt/Set/Map only; no prototype pollution.
-4. **scrypt password auth** — N=16384/r=8/p=1, 32-byte salt, timing-safe compare; one scrypt per owner message, unknown logins cost the same as wrong credentials.
+4. **scrypt password auth** — N=16384/r=8/p=1, 32-byte salt, timing-safe compare (one implementation, `users.js`); one scrypt per owner message, unknown logins cost the same as wrong credentials. The user file is read for every check, so a removed user loses access at once; credential changes rewrite it from disk with mode 600.
 5. **HTTP hardening** — whitelist serving, hidden-file block, HSTS (behind proxy).
 6. **Assert safety** — all remaining asserts reachable only via disk damage/programmer error, not malformed input.
 
@@ -249,7 +249,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 5. **Verify `Origin` on the WS handshake** (Finding 5).
 6. **Fix Dockerfile:** add a non-root `USER` (base image already corrected to `node:23`, verified — Erratum; Finding 8).
 7. **Configurable proxy trust** for `x-forwarded-proto` (Finding 6); generic client error messages (Finding 7).
-8. **Storage note:** the admin credential persists in `localStorage['whiteboard_credential']` — acceptable only while there is no XSS and the machine is single-user; add CSP as defense-in-depth.
+8. **Storage note:** no credential is stored in the browser any more (memory only; see the storage audit). Board edit passwords are part of edit links by design, so whoever has a link can edit. A CSP remains useful as defense-in-depth against XSS, which could read the credential from the page's memory while it is open.
 
 ---
 
@@ -281,9 +281,11 @@ The kubux-whiteboard-server remains solid against RCE, file access, deserializat
 
 ---
 
-**Document Version:** 3.5
+**Document Version:** 3.6
 **Last Updated:** October 26, 2026
 **Next Review:** after Findings 1–4 are addressed
+
+**Changelog 3.6 (Oct 26, 2026):** Text brought in line with the code (development branch, up to 3f20cc7); no new live tests, findings unchanged. Storage audit and Recommendation 8: the credential is no longer persisted in `localStorage`, it is kept in the page's memory only. Finding 5: credentials live in the URL and page memory. Finding 8: the compose file also mounts `conf/` writable. `passwd_hash` footgun marked fixed (environment variables; shared `users.js`). Stale credential note: `conf/` is not in the repository; the server reads only `conf/users.json`. Control 4: one scrypt implementation, user file read per check, written with mode 600. Line numbers updated (Findings 1, 2, 5, 6; damaged-files note).
 
 **Changelog 3.5 (Oct 26, 2026):** Finding 1 follows the stateless protocol: there is no `login` message any more; every owner message carries login and credential and costs one scrypt. Text only, no new live tests.
 
