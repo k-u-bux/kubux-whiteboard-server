@@ -477,6 +477,42 @@ function findPathConflict(paths) {
     return null;
 }
 
+// The path rules for one owner's changes, as the server applies them before it
+// changes anything, and as the client checks a path while it is typed. paths: the
+// owner's board paths; raw: the path as typed. Each gives the reason the server
+// refuses the change with (PATH_INVALID, PATH_TAKEN, NO_SUCH_FOLDER), or none.
+
+// A new board at raw: the reason it is refused, or null
+function newBoardProblem(paths, raw) {
+    const path = normalizePath(raw);
+    if (path === null) return PATH_INVALID;
+    return findPathConflict([...paths, path]) ? PATH_TAKEN : null;
+}
+
+// The board at oldPath moved to raw: the reason it is refused, or null
+function boardMoveProblem(paths, oldPath, raw) {
+    const path = normalizePath(raw);
+    if (path === null) return PATH_INVALID;
+    if (path === oldPath) return null;
+    return findPathConflict([...paths.filter(other => other !== oldPath), path]) ? PATH_TAKEN : null;
+}
+
+// The folder from (a normalized path), with every board below it, moved to raw:
+// { moves: [[oldPath, newPath], ...] } (none if it stays where it is), or { problem }
+function folderMove(paths, from, raw) {
+    const to = normalizePath(raw);
+    if (from === null || to === null) return { problem: PATH_INVALID };
+    const moves = paths.filter(path => path.startsWith(from + '/')).map(path => [path, to + path.slice(from.length)]);
+    if (moves.length === 0) return { problem: NO_SUCH_FOLDER };
+    if (from === to) return { moves: [] };
+    // the new paths must be normalized paths of acceptable length themselves
+    if (moves.some(([, newPath]) => normalizePath(newPath) !== newPath)) return { problem: PATH_INVALID };
+    const moved = new Set(moves.map(([oldPath]) => oldPath));
+    const others = paths.filter(path => !moved.has(path));
+    if (findPathConflict([...others, ...moves.map(([, newPath]) => newPath)])) return { problem: PATH_TAKEN };
+    return { moves };
+}
+
 const DRAWABLE = {
     TYPE: {
         STROKE: 'stroke',
@@ -1901,6 +1937,9 @@ if (typeof module !== 'undefined' && module.exports) {
         MAX_PATH_LENGTH,
         normalizePath,
         findPathConflict,
+        newBoardProblem,
+        boardMoveProblem,
+        folderMove,
         DRAWABLE,
         POINT,
         ELEMENT,
@@ -1997,6 +2036,9 @@ else if (typeof window !== 'undefined') {
         MAX_PATH_LENGTH,
         normalizePath,
         findPathConflict,
+        newBoardProblem,
+        boardMoveProblem,
+        folderMove,
         DRAWABLE,
         POINT,
         ELEMENT,

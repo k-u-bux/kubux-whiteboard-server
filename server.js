@@ -158,14 +158,14 @@ const {
     MESSAGES, 
     CREDENTIAL_NOT_ACCEPTED,
     CREDENTIAL_NOT_SAVED,
-    PATH_INVALID,
-    PATH_TAKEN,
     NOT_OWNER,
     NO_SUCH_BOARD,
-    NO_SUCH_FOLDER,
     RENAME_BLOCKED,
     normalizePath,
     findPathConflict,
+    newBoardProblem,
+    boardMoveProblem,
+    folderMove,
     MOD_ACTIONS, 
     NULL_UUID,
     ELEMENT, 
@@ -1549,18 +1549,15 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.TYPE] = (ws, data, reques
         debug.log(`[SERVER] dropped create board request from `, ws.clientId); 
         return;
     }
-    const path = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH] );
+    const raw = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH];
     const clientId = data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID];
     asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD, requestId, (user) => {
-        if ( path === null ) {
-            rejectMessage(ws, PATH_INVALID, requestId);
+        const problem = newBoardProblem( [...pathsOf(user.id).keys()], raw );
+        if ( problem ) {
+            rejectMessage(ws, problem, requestId);
             return;
         }
-        if ( findPathConflict( [...pathsOf(user.id).keys(), path] ) ) {
-            rejectMessage(ws, PATH_TAKEN, requestId);
-            return;
-        }
-        createNewBoard(ws, clientId, user.id, path, requestId);
+        createNewBoard(ws, clientId, user.id, normalizePath(raw), requestId);
     });
 };
 
@@ -1591,23 +1588,20 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SET_PATH.TYPE] = (ws, data, requestId)
         return;
     }
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD];
-    const newPath = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH] );
+    const raw = data[MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH];
     asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.SET_PATH, requestId, (user) => {
         const entry = boardIndex.get(boardId);
         if ( !entry || entry.owner !== user.id ) {
             rejectMessage(ws, NOT_OWNER, requestId);
             return;
         }
-        if ( newPath === null ) {
-            rejectMessage(ws, PATH_INVALID, requestId);
+        const problem = boardMoveProblem( [...pathsOf(user.id).keys()], entry.path, raw );
+        if ( problem ) {
+            rejectMessage(ws, problem, requestId);
             return;
         }
+        const newPath = normalizePath(raw);
         if ( newPath !== entry.path ) {
-            const others = [...pathsOf(user.id).keys()].filter(path => path !== entry.path);
-            if ( findPathConflict( [...others, newPath] ) ) {
-                rejectMessage(ws, PATH_TAKEN, requestId);
-                return;
-            }
             applyPathChanges(user.id, [{ boardId, oldPath: entry.path, newPath }]);
         }
         sendBoardList(ws, user.id, requestId);
@@ -1621,35 +1615,16 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TYPE] = (ws, data, reque
         return;
     }
     const from = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM] );
-    const to = normalizePath( data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO] );
+    const raw = data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO];
     asOwner(ws, data, MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, requestId, (user) => {
-        if ( from === null || to === null ) {
-            rejectMessage(ws, PATH_INVALID, requestId);
-            return;
-        }
         const paths = pathsOf(user.id);
-        const changes = [];
-        for (const [path, boardId] of paths) {
-            if ( path.startsWith(from + '/') ) {
-                changes.push({ boardId, oldPath: path, newPath: to + path.slice(from.length) });
-            }
-        }
-        if ( changes.length === 0 ) {
-            rejectMessage(ws, NO_SUCH_FOLDER, requestId);
+        const result = folderMove( [...paths.keys()], from, raw );
+        if ( result.problem ) {
+            rejectMessage(ws, result.problem, requestId);
             return;
         }
-        if ( from !== to ) {
-            // the new paths must be normalized paths of acceptable length themselves
-            if ( changes.some(change => normalizePath(change.newPath) !== change.newPath) ) {
-                rejectMessage(ws, PATH_INVALID, requestId);
-                return;
-            }
-            const moved = new Set(changes.map(change => change.oldPath));
-            const others = [...paths.keys()].filter(path => !moved.has(path));
-            if ( findPathConflict( [...others, ...changes.map(change => change.newPath)] ) ) {
-                rejectMessage(ws, PATH_TAKEN, requestId);
-                return;
-            }
+        if ( result.moves.length > 0 ) {
+            const changes = result.moves.map(([oldPath, newPath]) => ({ boardId: paths.get(oldPath), oldPath, newPath }));
             const ordered = writeOrder(changes);
             if ( ordered === null ) {
                 rejectMessage(ws, RENAME_BLOCKED, requestId);
