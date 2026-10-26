@@ -269,6 +269,34 @@
           border-radius: 4px;
       }
       
+      .tooltip {
+          position: relative;
+          display: inline-block;
+      }
+      
+      .tooltip .tooltiptext {
+          visibility: hidden;
+          width: 120px;
+          background-color: #555;
+          color: #fff;
+          text-align: center;
+          border-radius: 6px;
+          padding: 5px;
+          position: absolute;
+          z-index: 1;
+          bottom: 125%;
+          left: 50%;
+          margin-left: -60px;
+          opacity: 0;
+          transition: opacity 0.3s;
+          font-size: 12px;
+      }
+      
+      .tooltip:hover .tooltiptext {
+          visibility: visible;
+          opacity: 1;
+      }
+      
       /* Simple Color Picker Styles */
       #simple-color-picker {
           position: fixed;
@@ -1022,8 +1050,12 @@
       </div>
       
       <div class="tool-section">
-        <button class="tool-btn" id="undo-btn" title="Undo" disabled><span class="icon" data-icon="undo"></span></button>
-        <button class="tool-btn" id="redo-btn" title="Redo" disabled><span class="icon" data-icon="redo"></span></button>
+        <button class="tool-btn tooltip" id="undo-btn" title="Undo" disabled><span class="icon" data-icon="undo"></span>
+          <span class="tooltiptext">Undo</span>
+        </button>
+        <button class="tool-btn tooltip" id="redo-btn" title="Redo" disabled><span class="icon" data-icon="redo"></span>
+          <span class="tooltiptext">Redo</span>
+        </button>
         <button class="tool-btn" id="paste-btn" title="Paste"><span class="icon" data-icon="paste"></span></button>
         <button class="tool-btn" id="cancel-paste-btn" title="Cancel Paste" style="display: none;"><span class="icon" data-icon="cancel"></span></button>
       </div>
