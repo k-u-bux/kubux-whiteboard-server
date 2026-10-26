@@ -548,6 +548,21 @@
           font-size: 14px;
       }
       
+      /* Icons (see ICONS in the script) */
+      .icon {
+          display: inline-flex;
+          align-items: center;
+          vertical-align: middle;
+      }
+
+      .icon svg {
+          display: block;
+      }
+
+      .icon + .icon-label {
+          margin-left: 6px;
+      }
+
       .board-nav-feedback {
           color: #c62828;
           font-size: 13px;
@@ -981,7 +996,7 @@
     
     <div class="toolbar">
       <div class="tool-section" id="export-pdf">
-        <button class="tool-btn" id="pdf-btn" title="Export Current Page to PDF">📃</button>
+        <button class="tool-btn" id="pdf-btn" title="Export Current Page to PDF"><span class="icon" data-icon="export-page"></span></button>
         <!-- <button class="tool-btn" id="pdf-board-btn" title="Export Entire Board to PDF">📚</button> -->
       </div>
 
@@ -1005,21 +1020,21 @@
       </div>
 
       <div class="tool-section page-controls">
-        <button class="tool-btn" id="first-page" title="First Page">⏮️</button>
-        <button class="tool-btn" id="prev-page" title="Previous Page">◀️</button>
+        <button class="tool-btn" id="first-page" title="First Page"><span class="icon" data-icon="first-page"></span></button>
+        <button class="tool-btn" id="prev-page" title="Previous Page"><span class="icon" data-icon="prev-page"></span></button>
         <button id="page-info" title="Click to go to page...">Page 1 of 1</button>
-        <button class="tool-btn" id="next-page" title="Next Page">▶️</button>
-        <button class="tool-btn" id="last-page" title="Last Page">⏭️</button>
-        <button class="tool-btn" id="add-page" title="Add Page">➕</button>
-        <button class="tool-btn" id="delete-page" title="Delete Page">➖</button>
+        <button class="tool-btn" id="next-page" title="Next Page"><span class="icon" data-icon="next-page"></span></button>
+        <button class="tool-btn" id="last-page" title="Last Page"><span class="icon" data-icon="last-page"></span></button>
+        <button class="tool-btn" id="add-page" title="Add Page"><span class="icon" data-icon="plus"></span></button>
+        <button class="tool-btn" id="delete-page" title="Delete Page"><span class="icon" data-icon="minus"></span></button>
       </div>
       
       <div class="tool-section" id="zoom-section">
         <button class="tool-btn" id="zoom-out">-</button>
         <button class="tool-btn" id="zoom-menu-btn">100%</button>
         <button class="tool-btn" id="zoom-in">+</button>
-        <button class="tool-btn" id="hand-tool" title="Pan (Hand Tool)">✋</button>
-        <button class="tool-btn" id="reset-view" title="Reset View (Center, 100%)">⌖</button>
+        <button class="tool-btn" id="hand-tool" title="Pan (Hand Tool)"><span class="icon" data-icon="hand"></span></button>
+        <button class="tool-btn" id="reset-view" title="Reset View (Center, 100%)"><span class="icon" data-icon="reset-view"></span></button>
         <div id="zoom-popup-menu" style="display:none;">
           <button class="popup-option" data-zoom="fit-width">fit width</button>
           <button class="popup-option" data-zoom="fit-height">fit height</button>
@@ -1035,24 +1050,24 @@
       </div>
       
       <div class="tool-section">
-        <button class="tool-btn tooltip" id="undo-btn" title="Undo" disabled>↩
+        <button class="tool-btn tooltip" id="undo-btn" title="Undo" disabled><span class="icon" data-icon="undo"></span>
           <span class="tooltiptext">Undo (Ctrl+Z)</span>
         </button>
-        <button class="tool-btn tooltip" id="redo-btn" title="Redo" disabled>↪
+        <button class="tool-btn tooltip" id="redo-btn" title="Redo" disabled><span class="icon" data-icon="redo"></span>
           <span class="tooltiptext">Redo (Ctrl+Y)</span>
         </button>
-        <button class="tool-btn" id="paste-btn" title="Paste">📌</button>
-        <button class="tool-btn" id="cancel-paste-btn" title="Cancel Paste" style="display: none;">✕</button>
+        <button class="tool-btn" id="paste-btn" title="Paste"><span class="icon" data-icon="paste"></span></button>
+        <button class="tool-btn" id="cancel-paste-btn" title="Cancel Paste" style="display: none;"><span class="icon" data-icon="cancel"></span></button>
       </div>
       
       <div class="tool-section">
-        <button class="tool-btn active" id="pen-slot-0" title="Pen 1">∿</button>
-        <button class="tool-btn" id="pen-slot-1" title="Pen 2">▭</button>
-        <button class="tool-btn" id="pen-slot-2" title="Pen 3">◯</button>
-        <button class="tool-btn" id="pen-slot-3" title="Pen 4">─</button>
-        <button class="tool-btn" id="pen-slot-4" title="Pen 5">│</button>
-        <button class="tool-btn" id="pen-slot-5" title="Pen 6">／</button>
-        <button class="tool-btn" id="eraser-tool" title="Eraser">🧽</button>
+        <button class="tool-btn active" id="pen-slot-0" title="Pen 1"><span class="icon" data-icon="curve"></span></button>
+        <button class="tool-btn" id="pen-slot-1" title="Pen 2"><span class="icon" data-icon="rectangle"></span></button>
+        <button class="tool-btn" id="pen-slot-2" title="Pen 3"><span class="icon" data-icon="circle"></span></button>
+        <button class="tool-btn" id="pen-slot-3" title="Pen 4"><span class="icon" data-icon="horizontal"></span></button>
+        <button class="tool-btn" id="pen-slot-4" title="Pen 5"><span class="icon" data-icon="vertical"></span></button>
+        <button class="tool-btn" id="pen-slot-5" title="Pen 6"><span class="icon" data-icon="line"></span></button>
+        <button class="tool-btn" id="eraser-tool" title="Eraser"><span class="icon" data-icon="eraser"></span></button>
       </div>
 
       <div class="tool-section">
@@ -1104,7 +1119,7 @@
       </div>      
 
       <div class="tool-section" id="debug-tools">
-        <button class="tool-btn" id="board-nav-btn" title="Board Navigation">🗂️</button>
+        <button class="tool-btn" id="board-nav-btn" title="Board Navigation"><span class="icon" data-icon="folder"></span></button>
         <!-- <span id="sync-status">✓</span> -->
       </div>
     </div>
@@ -1112,33 +1127,33 @@
     <div class="app-container">
       <div class="sidebar">
         <div class="tool-section sidebar-section" id="shape-selection">
-          <button class="shape-btn" id="shape-main-btn" title="Shape Tool (click to select)">∿</button>
+          <button class="shape-btn" id="shape-main-btn" title="Shape Tool (click to select)"><span class="icon" data-icon="curve"></span></button>
         </div>
         <!-- Shape popup menu (horizontal) -->
         <div id="shape-popup-menu" style="display: none;">
-          <button class="shape-btn shape-option" data-shape="curve" title="Curve path">∿</button>
-          <button class="shape-btn shape-option" data-shape="rectangle" title="Rectangle path">▭</button>
-          <button class="shape-btn shape-option" data-shape="circle" title="Circle path">◯</button>
-          <button class="shape-btn shape-option" data-shape="horizontal" title="Horizontal line">─</button>
-          <button class="shape-btn shape-option" data-shape="vertical" title="Vertical line">│</button>
-          <button class="shape-btn shape-option" data-shape="line" title="Straight line">／</button>
+          <button class="shape-btn shape-option" data-shape="curve" title="Curve path"><span class="icon" data-icon="curve"></span></button>
+          <button class="shape-btn shape-option" data-shape="rectangle" title="Rectangle path"><span class="icon" data-icon="rectangle"></span></button>
+          <button class="shape-btn shape-option" data-shape="circle" title="Circle path"><span class="icon" data-icon="circle"></span></button>
+          <button class="shape-btn shape-option" data-shape="horizontal" title="Horizontal line"><span class="icon" data-icon="horizontal"></span></button>
+          <button class="shape-btn shape-option" data-shape="vertical" title="Vertical line"><span class="icon" data-icon="vertical"></span></button>
+          <button class="shape-btn shape-option" data-shape="line" title="Straight line"><span class="icon" data-icon="line"></span></button>
         </div>
 
         <!-- Selection action buttons (shown when selection tool is active) -->
         <div class="tool-section sidebar-section" id="selection-actions-sidebar" style="display: none;">
-          <button class="shape-btn" id="cut-btn" title="Cut">✂️</button>
+          <button class="shape-btn" id="cut-btn" title="Cut"><span class="icon" data-icon="cut"></span></button>
         </div>
         <div class="tool-section sidebar-section" id="selection-copy-sidebar" style="display: none;">
-          <button class="shape-btn" id="copy-btn" title="Copy">📋</button>
+          <button class="shape-btn" id="copy-btn" title="Copy"><span class="icon" data-icon="copy"></span></button>
         </div>
         <div class="tool-section sidebar-section" id="selection-move-sidebar" style="display: none;">
-          <button class="shape-btn" id="move-btn" title="Move">🔄</button>
+          <button class="shape-btn" id="move-btn" title="Move"><span class="icon" data-icon="move"></span></button>
         </div>
         <div class="tool-section sidebar-section" id="selection-layer-sidebar" style="display: none;">
-          <button class="shape-btn" id="move-layer-btn" title="Move to Layer">⇅</button>
+          <button class="shape-btn" id="move-layer-btn" title="Move to Layer"><span class="icon" data-icon="move-layer"></span></button>
         </div>
         <div class="tool-section sidebar-section" id="selection-deselect-sidebar" style="display: none;">
-          <button class="shape-btn" id="deselect-toggle-btn" title="Deselect Mode">➖</button>
+          <button class="shape-btn" id="deselect-toggle-btn" title="Deselect Mode"><span class="icon" data-icon="deselect"></span></button>
         </div>
         
         <!-- Color pickers -->
@@ -1166,17 +1181,17 @@
         </div>
         
         <div class="tool-section sidebar-section" id="timer-toggle">
-          <button class="shape-btn" id="timer-btn" title="Timer">🕐</button>
+          <button class="shape-btn" id="timer-btn" title="Timer"><span class="icon" data-icon="timer"></span></button>
         </div>
         <div class="tool-section sidebar-section" id="path-mode-selection">
-          <button class="shape-btn" id="path-mode-main-btn" title="Path Mode (click to select)">∿</button>
+          <button class="shape-btn" id="path-mode-main-btn" title="Path Mode (click to select)"><span class="icon" data-icon="curve"></span></button>
         </div>
         
         <!-- Path mode popup menu (horizontal) -->
         <div id="path-mode-popup-menu" style="display: none;">
-          <button class="shape-btn path-mode-option" data-loop="false" data-fill="false" title="Open path">∿</button>
-          <button class="shape-btn path-mode-option" data-loop="true" data-fill="false" title="Closed path">□</button>
-          <button class="shape-btn path-mode-option" data-loop="true" data-fill="true" title="Filled shape">■</button>
+          <button class="shape-btn path-mode-option" data-loop="false" data-fill="false" title="Open path"><span class="icon" data-icon="curve"></span></button>
+          <button class="shape-btn path-mode-option" data-loop="true" data-fill="false" title="Closed path"><span class="icon" data-icon="closed-path"></span></button>
+          <button class="shape-btn path-mode-option" data-loop="true" data-fill="true" title="Filled shape"><span class="icon" data-icon="filled-shape"></span></button>
         </div>
         
         <div class="tool-section sidebar-section" id="cap-style-selection">
@@ -1246,27 +1261,27 @@
         </div>
         
         <div class="tool-section sidebar-section" id="dash-pattern-selection">
-          <button class="shape-btn" id="dash-pattern-btn" title="Dash Pattern (click to select)">──</button>
+          <button class="shape-btn" id="dash-pattern-btn" title="Dash Pattern (click to select)"><span class="icon" data-icon="dash-solid"></span></button>
         </div>
         
         <!-- Dash pattern popup menu (horizontal) -->
         <div id="dash-pattern-popup-menu" style="display: none;">
-          <button class="shape-btn dash-pattern-option" data-dash-pattern="solid" title="Solid line">──</button>
-          <button class="shape-btn dash-pattern-option" data-dash-pattern="dashed" title="Dashed line">╌╌</button>
-          <button class="shape-btn dash-pattern-option" data-dash-pattern="dotted" title="Dotted line">⋯⋯</button>
-          <button class="shape-btn dash-pattern-option" data-dash-pattern="longdash" title="Long dash">━━</button>
-          <button class="shape-btn dash-pattern-option" data-dash-pattern="dashdot" title="Dash-dot">━╌</button>
+          <button class="shape-btn dash-pattern-option" data-dash-pattern="solid" title="Solid line"><span class="icon" data-icon="dash-solid"></span></button>
+          <button class="shape-btn dash-pattern-option" data-dash-pattern="dashed" title="Dashed line"><span class="icon" data-icon="dash-dashed"></span></button>
+          <button class="shape-btn dash-pattern-option" data-dash-pattern="dotted" title="Dotted line"><span class="icon" data-icon="dash-dotted"></span></button>
+          <button class="shape-btn dash-pattern-option" data-dash-pattern="longdash" title="Long dash"><span class="icon" data-icon="dash-longdash"></span></button>
+          <button class="shape-btn dash-pattern-option" data-dash-pattern="dashdot" title="Dash-dot"><span class="icon" data-icon="dash-dashdot"></span></button>
         </div>
 
         <!-- Paste mode selection (shown when paste tool is active) — inline buttons -->
         <div class="tool-section sidebar-section" id="paste-mode-selection" style="display: none;">
-          <button class="shape-btn paste-mode-btn" data-paste-mode="place" title="Place single copy">✚</button>
-          <button class="shape-btn paste-mode-btn" data-paste-mode="open-path" title="Evenly along open path">∿</button>
-          <button class="shape-btn paste-mode-btn" data-paste-mode="rectangle" title="Evenly in rectangle">▭</button>
-          <button class="shape-btn paste-mode-btn" data-paste-mode="circle" title="Evenly around circle">◯</button>
-          <button class="shape-btn paste-mode-btn" data-paste-mode="vertical" title="Evenly along vertical line">│</button>
-          <button class="shape-btn paste-mode-btn" data-paste-mode="horizontal" title="Evenly along horizontal line">─</button>
-          <button class="shape-btn paste-mode-btn" data-paste-mode="straight" title="Evenly along straight line">／</button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="place" title="Place single copy"><span class="icon" data-icon="place"></span></button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="open-path" title="Evenly along open path"><span class="icon" data-icon="curve"></span></button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="rectangle" title="Evenly in rectangle"><span class="icon" data-icon="rectangle"></span></button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="circle" title="Evenly around circle"><span class="icon" data-icon="circle"></span></button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="vertical" title="Evenly along vertical line"><span class="icon" data-icon="vertical"></span></button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="horizontal" title="Evenly along horizontal line"><span class="icon" data-icon="horizontal"></span></button>
+          <button class="shape-btn paste-mode-btn" data-paste-mode="straight" title="Evenly along straight line"><span class="icon" data-icon="line"></span></button>
         </div>
         <div class="tool-section sidebar-section" id="paste-copies-selection" style="display: none;">
           <input type="range" id="paste-copies-slider" min="2" max="36" step="1" value="5">
@@ -1294,16 +1309,16 @@
     <div id="page-overview">
       <div id="overview-topbar">
         <div class="overview-topbar-left">
-          <button class="overview-btn" id="overview-delete">🗑 Delete</button>
-          <button class="overview-btn" id="overview-add-page">➕ Add</button>
-          <button class="overview-btn" id="overview-move-front">⬆ Front</button>
-          <button class="overview-btn" id="overview-move-back">⬇ Back</button>
-          <button class="overview-btn" id="overview-export-selected">📄 Export Selected</button>
-          <button class="overview-btn" id="overview-export-all">📚 Export All</button>
+          <button class="overview-btn" id="overview-delete"><span class="icon" data-icon="trash"></span><span class="icon-label">Delete</span></button>
+          <button class="overview-btn" id="overview-add-page"><span class="icon" data-icon="plus"></span><span class="icon-label">Add</span></button>
+          <button class="overview-btn" id="overview-move-front"><span class="icon" data-icon="arrow-up"></span><span class="icon-label">Front</span></button>
+          <button class="overview-btn" id="overview-move-back"><span class="icon" data-icon="arrow-down"></span><span class="icon-label">Back</span></button>
+          <button class="overview-btn" id="overview-export-selected"><span class="icon" data-icon="document"></span><span class="icon-label">Export Selected</span></button>
+          <button class="overview-btn" id="overview-export-all"><span class="icon" data-icon="export-all"></span><span class="icon-label">Export All</span></button>
         </div>
         <div class="overview-topbar-right">
-          <button class="overview-btn confirm" id="overview-confirm">✓ Confirm</button>
-          <button class="overview-btn cancel" id="overview-cancel">✕ Cancel</button>
+          <button class="overview-btn confirm" id="overview-confirm"><span class="icon" data-icon="check"></span><span class="icon-label">Confirm</span></button>
+          <button class="overview-btn cancel" id="overview-cancel"><span class="icon" data-icon="cancel"></span><span class="icon-label">Cancel</span></button>
         </div>
       </div>
       <div id="overview-grid"></div>
@@ -1321,9 +1336,9 @@
         <div class="board-nav-section">
           <h3>Current Board</h3>
           <div class="board-nav-form">
-            <button type="button" class="board-nav-btn" id="copy-view-link-btn">📋 Copy View Link</button>
-            <button type="button" class="board-nav-btn" id="copy-edit-link-btn">✏️ Copy Edit Link</button>
-            <span id="copy-feedback" style="display: none; color: #4CAF50; margin-left: 10px;">✓ Copied!</span>
+            <button type="button" class="board-nav-btn" id="copy-view-link-btn"><span class="icon" data-icon="view-link"></span><span class="icon-label">Copy View Link</span></button>
+            <button type="button" class="board-nav-btn" id="copy-edit-link-btn"><span class="icon" data-icon="edit-link"></span><span class="icon-label">Copy Edit Link</span></button>
+            <span id="copy-feedback" style="display: none; color: #4CAF50; margin-left: 10px;"><span class="icon" data-icon="check"></span><span class="icon-label">Copied!</span></span>
           </div>
         </div>
         
@@ -1475,6 +1490,99 @@
 
     <script src="shared.js"></script>
     <script>
+      // Icons
+      // =====
+      // Inline SVG in the style of the selection and cap/join icons (100x100 viewBox,
+      // 18 px, drawn in currentColor), so that every button looks the same whatever
+      // fonts the viewer has. Elements with data-icon get their icon right here; the
+      // icon maps further down use these strings too.
+
+      const ICON_LINE = 'stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"';
+      const ICON_STROKE = `fill="none" ${ICON_LINE}`; // outlines; filled shapes use ICON_LINE
+
+      function svgIcon(body) {
+          return `<svg viewBox="0 0 100 100" width="18" height="18" style="pointer-events: none;" aria-hidden="true">${body}</svg>`;
+      }
+
+      function strokeIcon(d, width = 8) {
+          return svgIcon(`<path d="${d}" ${ICON_STROKE} stroke-width="${width}"/>`);
+      }
+
+      function dashIcon(dasharray) {
+          return svgIcon(`<line x1="8" y1="50" x2="92" y2="50" ${ICON_STROKE} stroke-width="10"${dasharray ? ` stroke-dasharray="${dasharray}"` : ''}/>`);
+      }
+
+      const ICONS = {
+          // shapes (pen slots, shape menu, paste modes)
+          'curve':        strokeIcon('M10,50 Q30,10 50,50 T90,50'),
+          'rectangle':    svgIcon(`<rect x="12" y="24" width="76" height="52" rx="2" ${ICON_STROKE}/>`),
+          'circle':       svgIcon(`<circle cx="50" cy="50" r="36" ${ICON_STROKE}/>`),
+          'horizontal':   strokeIcon('M10,50 H90'),
+          'vertical':     strokeIcon('M50,10 V90'),
+          'line':         strokeIcon('M16,84 L84,16'),
+          'place':        strokeIcon('M50,16 V84 M16,50 H84', 12),
+          // path modes
+          'closed-path':  svgIcon(`<rect x="18" y="18" width="64" height="64" rx="2" ${ICON_STROKE}/>`),
+          'filled-shape': svgIcon(`<rect x="18" y="18" width="64" height="64" rx="2" ${ICON_LINE} fill="currentColor"/>`),
+          // dash patterns
+          'dash-solid':    dashIcon(''),
+          'dash-dashed':   dashIcon('12,20'),
+          'dash-dotted':   dashIcon('0.1,18'),
+          'dash-longdash': dashIcon('30,20'),
+          'dash-dashdot':  dashIcon('26,18,0.1,18'),
+          // page navigation and pages
+          'first-page':   svgIcon(`<path d="M18,18 V82" ${ICON_STROKE}/><path d="M52,18 L24,50 L52,82 Z M84,18 L56,50 L84,82 Z" fill="currentColor"/>`),
+          'prev-page':    svgIcon('<path d="M70,16 L28,50 L70,84 Z" fill="currentColor"/>'),
+          'next-page':    svgIcon('<path d="M30,16 L72,50 L30,84 Z" fill="currentColor"/>'),
+          'last-page':    svgIcon(`<path d="M82,18 V82" ${ICON_STROKE}/><path d="M48,18 L76,50 L48,82 Z M16,18 L44,50 L16,82 Z" fill="currentColor"/>`),
+          'plus':         strokeIcon('M50,16 V84 M16,50 H84', 10),
+          'minus':        strokeIcon('M16,50 H84', 10),
+          // view
+          'hand':         svgIcon(`<path d="M32,56 V26 M44,50 V16 M56,50 V18 M68,54 V28" ${ICON_STROKE} stroke-width="10"/><path d="M27,48 H73 V64 Q73,88 50,88 Q30,88 24,70 L14,52" ${ICON_LINE} fill="currentColor"/>`),
+          'reset-view':   svgIcon(`<circle cx="50" cy="50" r="24" ${ICON_STROKE}/><path d="M50,8 V30 M50,70 V92 M8,50 H30 M70,50 H92" ${ICON_STROKE}/>`),
+          // history and clipboard
+          'undo':         strokeIcon('M28,40 H60 A20,20 0 0 1 60,80 H40 M44,22 L26,40 L44,58'),
+          'redo':         strokeIcon('M72,40 H40 A20,20 0 0 0 40,80 H60 M56,22 L74,40 L56,58'),
+          'paste':        svgIcon(`<rect x="20" y="18" width="60" height="72" rx="6" ${ICON_STROKE}/><rect x="36" y="10" width="28" height="16" rx="4" fill="currentColor"/><path d="M50,40 V72 M38,60 L50,72 L62,60" ${ICON_STROKE} stroke-width="7"/>`),
+          'copy':         svgIcon(`<path d="M24,66 V24 H66" ${ICON_STROKE}/><rect x="38" y="38" width="46" height="46" rx="6" ${ICON_STROKE}/>`),
+          'cut':          svgIcon(`<circle cx="28" cy="74" r="12" ${ICON_STROKE}/><circle cx="72" cy="74" r="12" ${ICON_STROKE}/><path d="M37,64 L76,14 M63,64 L24,14" ${ICON_STROKE}/>`),
+          'move':         strokeIcon('M50,12 V88 M12,50 H88 M38,24 L50,12 L62,24 M38,76 L50,88 L62,76 M24,38 L12,50 L24,62 M76,38 L88,50 L76,62'),
+          'move-layer':   strokeIcon('M32,86 V16 M18,30 L32,16 L46,30 M68,14 V84 M54,70 L68,84 L82,70'),
+          'deselect':     svgIcon(`<rect x="10" y="20" width="80" height="60" fill="none" stroke="currentColor" stroke-width="6" stroke-dasharray="10,10"/><path d="M32,50 H68" ${ICON_STROKE} stroke-width="10"/>`),
+          'cancel':       strokeIcon('M24,24 L76,76 M76,24 L24,76', 10),
+          'check':        strokeIcon('M16,52 L40,76 L84,26', 10),
+          // tools
+          'eraser':       svgIcon(`<g transform="rotate(-40 50 46)"><rect x="16" y="30" width="68" height="32" rx="6" ${ICON_STROKE}/><path d="M44,30 V62" ${ICON_STROKE}/></g><path d="M20,88 H84" ${ICON_STROKE}/>`),
+          'timer':        svgIcon(`<circle cx="50" cy="52" r="36" ${ICON_STROKE}/><path d="M50,30 V52 L66,62" ${ICON_STROKE}/>`),
+          // documents and boards
+          'folder':       strokeIcon('M10,28 V78 Q10,84 16,84 H84 Q90,84 90,78 V40 Q90,34 84,34 H50 L42,24 H14 Q10,24 10,28 Z'),
+          'document':     strokeIcon('M24,10 H58 L78,30 V90 H24 Z M58,10 V30 H78'),
+          'export-page':  svgIcon(`<path d="M24,10 H58 L78,30 V90 H24 Z M58,10 V30 H78" ${ICON_STROKE}/><path d="M36,50 H66 M36,64 H66 M36,78 H56" ${ICON_STROKE} stroke-width="6"/>`),
+          'export-all':   svgIcon(`<path d="M18,76 V12 H50" ${ICON_STROKE}/><path d="M32,24 H64 L82,42 V92 H32 Z M64,24 V42 H82" ${ICON_STROKE}/>`),
+          'trash':        svgIcon(`<path d="M16,26 H84 M40,26 V14 H60 V26 M26,26 L32,90 H68 L74,26" ${ICON_STROKE}/><path d="M44,40 V76 M56,40 V76" ${ICON_STROKE} stroke-width="6"/>`),
+          'arrow-up':     strokeIcon('M50,88 V14 M24,40 L50,14 L76,40'),
+          'arrow-down':   strokeIcon('M50,12 V86 M24,60 L50,86 L76,60'),
+          // links
+          'view-link':    svgIcon(`<path d="M8,50 C26,20 74,20 92,50 C74,80 26,80 8,50 Z" ${ICON_STROKE}/><circle cx="50" cy="50" r="12" fill="currentColor"/>`),
+          'edit-link':    svgIcon(`<path d="M20,80 L26,60 L66,20 L80,34 L40,74 Z M58,28 L72,42" ${ICON_STROKE}/>`)
+      };
+
+      // An element showing one of the icons (static markup only, never user text)
+      function iconElement(name) {
+          const icon = ICONS[name];
+          if (!icon) { throw new Error(`no icon ${name}`); }
+          const span = document.createElement('span');
+          span.className = 'icon';
+          span.innerHTML = icon;
+          return span;
+      }
+
+      for (const element of document.querySelectorAll('[data-icon]')) {
+          const icon = ICONS[element.dataset.icon];
+          if (!icon) { throw new Error(`no icon ${element.dataset.icon}`); }
+          element.innerHTML = icon;
+      }
+
       // generic LRU cache realized in sessionStorage
 
       const LRU_MAX_SIZE = 24;
@@ -1837,13 +1945,13 @@
 
       // Paste mode settings
       const pasteModeIcons = {
-          'place': '✚',
-          'open-path': '∿',
-          'rectangle': '▭',
-          'circle': '◯',
-          'vertical': '│',
-          'horizontal': '─',
-          'straight': '／'
+          'place': ICONS['place'],
+          'open-path': ICONS['curve'],
+          'rectangle': ICONS['rectangle'],
+          'circle': ICONS['circle'],
+          'vertical': ICONS['vertical'],
+          'horizontal': ICONS['horizontal'],
+          'straight': ICONS['line']
       };
       let paste_settings = {
           tool: "paste",
@@ -1885,22 +1993,22 @@
       function updatePenSlotKnobs() {
           document.getElementById('pen-slot-0').style.backgroundColor = pen1_settings.color;
           document.getElementById('pen-slot-0').style.color = getTextColor( pen1_settings.color );
-          document.getElementById('pen-slot-0').textContent = shapeIcons[pen1_settings.shape];
+          document.getElementById('pen-slot-0').innerHTML = shapeIcons[pen1_settings.shape];
           document.getElementById('pen-slot-1').style.backgroundColor = pen2_settings.color;
           document.getElementById('pen-slot-1').style.color = getTextColor( pen2_settings.color );
-          document.getElementById('pen-slot-1').textContent = shapeIcons[pen2_settings.shape];
+          document.getElementById('pen-slot-1').innerHTML = shapeIcons[pen2_settings.shape];
           document.getElementById('pen-slot-2').style.backgroundColor = pen3_settings.color;
           document.getElementById('pen-slot-2').style.color = getTextColor( pen3_settings.color );
-          document.getElementById('pen-slot-2').textContent = shapeIcons[pen3_settings.shape];
+          document.getElementById('pen-slot-2').innerHTML = shapeIcons[pen3_settings.shape];
           document.getElementById('pen-slot-3').style.backgroundColor = pen4_settings.color;
           document.getElementById('pen-slot-3').style.color = getTextColor( pen4_settings.color );
-          document.getElementById('pen-slot-3').textContent = shapeIcons[pen4_settings.shape];
+          document.getElementById('pen-slot-3').innerHTML = shapeIcons[pen4_settings.shape];
           document.getElementById('pen-slot-4').style.backgroundColor = pen5_settings.color;
           document.getElementById('pen-slot-4').style.color = getTextColor( pen5_settings.color );
-          document.getElementById('pen-slot-4').textContent = shapeIcons[pen5_settings.shape];
+          document.getElementById('pen-slot-4').innerHTML = shapeIcons[pen5_settings.shape];
           document.getElementById('pen-slot-5').style.backgroundColor = pen6_settings.color;
           document.getElementById('pen-slot-5').style.color = getTextColor( pen6_settings.color );
-          document.getElementById('pen-slot-5').textContent = shapeIcons[pen6_settings.shape];
+          document.getElementById('pen-slot-5').innerHTML = shapeIcons[pen6_settings.shape];
       }
 
       function updateKnobs () {
@@ -2981,7 +3089,7 @@
               item.className = 'board-list-item folder';
               const name = document.createElement('span');
               name.className = 'board-list-name';
-              name.textContent = '📁 ' + folder;
+              name.append(iconElement('folder'), document.createTextNode(' ' + folder));
               if (renaming && renaming.kind === 'folder' && renaming.path === folderPath) {
                   list.appendChild(renameRow(folderPath, to => renameFolder(folderPath, to)));
                   continue;
@@ -3011,7 +3119,7 @@
               item.className = 'board-list-item';
               const name = document.createElement('span');
               name.className = 'board-list-name';
-              name.textContent = '📄 ' + boardName;
+              name.append(iconElement('document'), document.createTextNode(' ' + boardName));
               name.title = entry.path;
               const date = document.createElement('span');
               date.className = 'board-list-date';
@@ -4305,19 +4413,19 @@
       
       // Shape icons mapping (used by setupShapeSelector and updateShapeButton)
       const shapeIcons = {
-          'curve': '∿',
-          'rectangle': '▭',
-          'circle': '◯',
-          'horizontal': '─',
-          'vertical': '│',
-          'line': '／'
+          'curve': ICONS['curve'],
+          'rectangle': ICONS['rectangle'],
+          'circle': ICONS['circle'],
+          'horizontal': ICONS['horizontal'],
+          'vertical': ICONS['vertical'],
+          'line': ICONS['line']
       };
 
       // Path mode icons mapping
       const pathModeIcons = {
-          'open-draw': '∿',
-          'closed-draw': '□',
-          'closed-fill': '■'
+          'open-draw': ICONS['curve'],
+          'closed-draw': ICONS['closed-path'],
+          'closed-fill': ICONS['filled-shape']
       };
 
       // Cap style icons mapping
@@ -4345,11 +4453,11 @@
 
       // Dash pattern icons mapping
       const dashPatternIcons = {
-          'solid': '──',
-          'dashed': '╌╌',
-          'dotted': '⋯⋯',
-          'longdash': '━━',
-          'dashdot': '━╌'
+          'solid': ICONS['dash-solid'],
+          'dashed': ICONS['dash-dashed'],
+          'dotted': ICONS['dash-dotted'],
+          'longdash': ICONS['dash-longdash'],
+          'dashdot': ICONS['dash-dashdot']
       };
 
       // Get path mode key from loop and fill settings
@@ -4462,7 +4570,7 @@
                   
                   // Update main button icon
                   const modeKey = getPathModeKey(loop, fill);
-                  mainBtn.textContent = pathModeIcons[modeKey];
+                  mainBtn.innerHTML = pathModeIcons[modeKey];
                   
                   // Close popup
                   popup.style.display = 'none';
@@ -4487,7 +4595,7 @@
           const mainBtn = document.getElementById('path-mode-main-btn');
           if (mainBtn) {
               const modeKey = getPathModeKey(draw_settings.loop, draw_settings.fill);
-              mainBtn.textContent = pathModeIcons[modeKey];
+              mainBtn.innerHTML = pathModeIcons[modeKey];
           }
       }
 
@@ -4640,7 +4748,7 @@
                       return;
                   }
                   draw_settings.dash_pattern = DASH_PATTERNS[patternName];
-                  mainBtn.textContent = dashPatternIcons[patternName];
+                  mainBtn.innerHTML = dashPatternIcons[patternName];
                   popup.style.display = 'none';
                   saveSettings();
               });
@@ -4660,7 +4768,7 @@
           const mainBtn = document.getElementById('dash-pattern-btn');
           if (mainBtn && draw_settings.dash_pattern !== undefined) {
               const patternName = findDashPatternName(draw_settings.dash_pattern);
-              mainBtn.textContent = dashPatternIcons[patternName];
+              mainBtn.innerHTML = dashPatternIcons[patternName];
           }
       }
 
@@ -4865,7 +4973,7 @@
                   e.stopPropagation();
                   const shape = this.getAttribute('data-shape');
                   set_shape_tool(shape);
-                  mainBtn.textContent = shapeIcons[shape];
+                  mainBtn.innerHTML = shapeIcons[shape];
                   popup.style.display = 'none';
                   saveSettings();
                   updatePenSlotKnobs();
@@ -6967,7 +7075,7 @@
       function updateShapeButton() {
           const mainBtn = document.getElementById('shape-main-btn');
           if (mainBtn && draw_settings.shape) {
-              mainBtn.textContent = shapeIcons[draw_settings.shape];
+              mainBtn.innerHTML = shapeIcons[draw_settings.shape];
           }
       }
 
@@ -8062,7 +8170,7 @@
           navigator.clipboard.writeText(boardUrl).then(() => {
               // Show feedback
               const feedback = document.getElementById('copy-feedback');
-              feedback.textContent = withPassword ? '✓ Edit link copied!' : '✓ View link copied!';
+              feedback.replaceChildren(iconElement('check'), document.createTextNode(withPassword ? ' Edit link copied!' : ' View link copied!'));
               feedback.style.display = 'inline';
               setTimeout(() => {
                   feedback.style.display = 'none';
