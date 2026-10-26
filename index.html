@@ -3857,6 +3857,8 @@
               present = matchingIndex;
               verifiedIndex = present;
               updateVisualState();
+              updateSyncStatus();
+              updateUndoRedoButtons();
           } else {
               // We are in sync with server
               verifiedIndex = matchingIndex;
