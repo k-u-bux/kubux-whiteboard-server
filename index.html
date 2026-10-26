@@ -581,6 +581,15 @@
           font-size: 13px;
       }
 
+      .current-board-path {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 10px;
+          font-size: 14px;
+          overflow-wrap: anywhere;
+      }
+
       .board-manager-user {
           font-size: 13px;
           color: #555;
@@ -1335,6 +1344,7 @@
         <!-- Copy Link Section -->
         <div class="board-nav-section">
           <h3>Current Board</h3>
+          <div class="current-board-path" id="current-board-path" style="display: none;"></div>
           <div class="board-nav-form">
             <button type="button" class="board-nav-btn" id="copy-view-link-btn"><span class="icon" data-icon="view-link"></span><span class="icon-label">Copy View Link</span></button>
             <button type="button" class="board-nav-btn" id="copy-edit-link-btn"><span class="icon" data-icon="edit-link"></span><span class="icon-label">Copy Edit Link</span></button>
@@ -3020,6 +3030,7 @@
               createdAt: entry[L.ENTRY_CREATED_AT]
           }));
           renderBoardList();
+          updateCurrentBoardPath();
           return true;
       }
 
@@ -8615,8 +8626,19 @@
           document.getElementById('board-password-input').value = '';
       }
       
+      // The current board's path, shown to its owner only: the path is no part of the
+      // board's links, and only the owner's board list carries it
+      function updateCurrentBoardPath() {
+          const element = document.getElementById('current-board-path');
+          const entry = session.loggedIn ? boardList.find(e => e.board === boardId) : undefined;
+          element.style.display = entry ? '' : 'none';
+          element.replaceChildren(...(entry ? [iconElement('document'), document.createTextNode(entry.path)] : []));
+          element.title = entry ? 'Only you see this name; the links do not contain it' : '';
+      }
+
       // Show the login form or, once logged in, the board manager
       function updateBoardManager() {
+          updateCurrentBoardPath();
           document.getElementById('login-form').style.display = session.loggedIn ? 'none' : '';
           document.getElementById('board-manager').style.display = session.loggedIn ? '' : 'none';
           document.getElementById('logged-in-as').textContent = session.login || '';
@@ -8686,6 +8708,7 @@
           window.history.replaceState(null, null, newUrl);
           // only a client that has the edit password can hand it on
           document.getElementById('copy-edit-link-btn').style.display = passwd ? '' : 'none';
+          updateCurrentBoardPath();
       }
       
       // Register Service Worker for PWA

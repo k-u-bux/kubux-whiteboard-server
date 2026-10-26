@@ -212,7 +212,7 @@ Open the board navigation (🗂️) and log in. The board manager shows your boa
 - Paths are unique per user, and a path is either a board or a folder, never both (no board named `teaching/algebra` while `teaching/algebra/week1` exists).
 - **Change credential** at the bottom of the board manager.
 
-Only the owner sees a board's path; spectators and collaborators with a link see no names.
+Only the owner sees a board's path; spectators and collaborators with a link see no names. When you are logged in and the open board is one of yours, the board navigation's "Current Board" section shows its path, which the links do not contain.
 
 **Shortcoming:** the board manager shows the list as of opening it. Changes made by the same user in another tab or on another device appear only when the board manager is opened again; actions on an outdated list are still checked by the server (e.g. "path taken").
     
