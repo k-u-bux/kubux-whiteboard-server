@@ -3126,6 +3126,18 @@
           return segments.slice(0, -1).map((_, i) => segments.slice(0, i + 1).join('/'));
       }
 
+      // After a folder move: the folder is open at its new place, so what moved is in
+      // sight, and its subfolders that were open stay open
+      function moveExpansion(from, to) {
+          for (const folder of [...expandedFolders]) {
+              if (folder === from || folder.startsWith(`${from}/`)) {
+                  expandedFolders.delete(folder);
+                  expandedFolders.add(to + folder.slice(from.length));
+              }
+          }
+          expandedFolders.add(to);
+      }
+
       const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
       // A small icon button in a tree row; its click does not reach the row
@@ -3196,7 +3208,11 @@
           for (const name of [...node.folders.keys()].sort(byName)) {
               const folder = node.folders.get(name);
               if (renaming && renaming.kind === 'folder' && renaming.path === folder.path) {
-                  tree.appendChild(pathEditRow(depth, folder.path, to => renameFolder(folder.path, to)));
+                  tree.appendChild(pathEditRow(depth, folder.path, async (to) => {
+                      if (!await renameFolder(folder.path, to)) { return false; }
+                      moveExpansion(folder.path, shared.normalizePath(to));
+                      return true;
+                  }));
               } else {
                   const isOpen = open.has(folder.path);
                   const row = treeRow(depth, 'folder');
