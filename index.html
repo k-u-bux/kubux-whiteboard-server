@@ -7598,13 +7598,18 @@
           }
       }
 
+      // The cache keeps its own copy of a page's history, given and taken: the history in
+      // use grows in place (history.push), and a cached entry sharing that array would
+      // gain the new actions without its present, i.e. come back one step behind.
       function savePageToCache(pageUuid, pageData) {
-          saveItem( pageUuid, pageData );
+          saveItem( pageUuid, { ...pageData, history: pageData.history.slice() } );
       }
       
       function loadPageFromCache( pageUuid, create_on_miss = true ) {
           const result = loadItem(pageUuid);
-          if ( result || ! create_on_miss ) {
+          if ( result ) {
+              return { ...result, history: result.history.slice() };
+          } else if ( ! create_on_miss ) {
               return result;
           } else {
               return {
