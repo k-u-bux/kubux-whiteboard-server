@@ -2478,6 +2478,7 @@
       let hashes = [];           // Hash chain for all states
       let verifiedIndex = 0;     // The server's position in history, as last confirmed
       let boardSwitch = false;   // from switchToBoard until the new board is registered
+      let invalidAddressBoard = null; // a board parameter in the address that is no board id
       // present and verifiedIndex are both positions in history: present is where this
       // client is, verifiedIndex where the server was last confirmed to be (by an accept
       // or a ping). verifiedIndex < present: edits on their way to the server, the
@@ -2778,6 +2779,14 @@
           } else {
               debugLog( 'not loading most recent board. current board:', boardId );
           }
+          // A board parameter that is no board id names no board: nothing is registered,
+          // and the boards view, the start page then, says so (as Go to Board would)
+          invalidAddressBoard = null;
+          if ( boardId && !shared.isUuid( boardId ) ) {
+              invalidAddressBoard = boardId;
+              boardId = null;
+              passwd = null;
+          }
 
           let wsUrl;
           
@@ -2820,6 +2829,9 @@
               }
               if (!boardId) {
                   openBoardsView();
+                  if (invalidAddressBoard !== null) {
+                      setFeedback('current-feedback', `Not a valid board ID in the address: ${JSON.stringify(invalidAddressBoard.slice(0, 60))}`);
+                  }
               }
           };
           
