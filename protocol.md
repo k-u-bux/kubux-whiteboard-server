@@ -247,7 +247,7 @@ Change the owner's credential.
 }
 ```
 
-The server reads `conf/users.json` again, replaces this user's hash with the hash of the new credential, and writes the file back atomically, with mode 600 (readable and writable by the server's user only). Everything else in the file stays as it is on disk, including entries the admin added or changed since startup; id and login stay.
+The server reads `conf/users.json` again, replaces this user's hash with the hash of the new credential, and writes the file back atomically, with mode 600 (readable and writable by the server's user only). Everything else in the file stays as it is on disk; id and login stay.
 
 **Response:** `credential-changed`, or `error` with message `credential could not be saved` (the user file could not be read, is invalid, no longer holds the user, or could not be written; nothing is written then, and the old credential stays valid).
 
@@ -768,7 +768,7 @@ When a draw, erase, group, undo or redo action is accepted, the server sends `ac
 
 ### Users
 
-`conf/users.json` is a list of users `{ "id": "<uuid>", "login": "<login>", "hash": "<salt>:<hash>" }`, created by the admin with `passwd_hash`. The id never changes and is what boards record as their owner; the login is what people type; the hash is the scrypt hash of the credential. The server reads the file at startup, and on `change-credential` reads it again and writes it back with the one hash replaced.
+`conf/users.json` is a list of users `{ "id": "<uuid>", "login": "<login>", "hash": "<salt>:<hash>" }`, created by the admin with `passwd_hash`. The id never changes and is what boards record as their owner; the login is what people type; the hash is the scrypt hash of the credential. The server keeps no copy: it reads the file for every credential check (and once at startup, to log a problem with it), so changes by the admin count at once. On `change-credential` it writes the file back with the one hash replaced.
 
 ### Board files
 

@@ -191,9 +191,11 @@ function verifyPassword(password, storedHash) {
 }
 
 // The user with this login if the credential matches, else null. An unknown login
-// costs one scrypt like a wrong credential, so the answer does not tell which logins exist.
+// costs one scrypt like a wrong credential, so the answer does not tell which logins exist;
+// so does a missing or invalid user file, which leaves no user to match.
 async function checkLogin(login, password) {
-  const user = usersByLogin.get(login);
+  const users = usersForCheck();
+  const user = users ? users.find(entry => entry.login === login) : undefined;
   const matches = await verifyPassword(password, user ? user.hash : DUMMY_HASH);
   return (matches && user) ? user : null;
 }
@@ -288,9 +290,8 @@ const getFilePath = (uuid,ext) => path.join(DATA_DIR, `${uuid}.${ext}`);
 // Server state structures
 
 // Users: conf/users.json is a list of { id, login, hash }. The id never changes and
-// is what boards record as their owner; the login is what people type.
-const users = [];
-const usersByLogin = new Map(); // login -> user
+// is what boards record as their owner; the login is what people type. The server
+// keeps no copy: the file is read for every credential check (see loadUsers).
 
 // Stands in for the hash of an unknown login (see checkLogin)
 const DUMMY_HASH = hashPassword(crypto.randomBytes(16).toString('hex'));
@@ -302,17 +303,45 @@ const boardInterval = 5000;
 let pingTimer;
 let boardTimer;
 
-// The user file is edited by the admin and treated like input: if it is unreadable
-// or malformed, the error is logged and no users are loaded, so nobody can log in
-// until it is fixed.
-function parseUsers(text) {
-    const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) {
+// The user file is edited by the admin and treated like input. This is the one place
+// that reads it: the entries as they are in the file (extra fields included), or an
+// error that says whether the file is missing, unreadable (permissions, mounts) or
+// invalid. The file is the only truth about users: the server keeps no copy and reads
+// it for every credential check, so a user the admin adds, changes or removes counts
+// at once. The file is small and cached by the system; a read costs far less than the
+// scrypt check that follows.
+function loadUsers() {
+    const filePath = getUsersFilePath();
+    let text;
+    try {
+        text = fs.readFileSync(filePath, 'utf8');
+    } catch (error) {
+        // a missing file and one the server may not read look alike otherwise
+        if (error.code !== 'ENOENT') {
+            throw new Error(`Cannot read user file ${filePath}: ${error.message}`);
+        }
+        const oldFilePath = getOldPasswdFilePath();
+        const hint = fs.existsSync(oldFilePath)
+            ? `${oldFilePath} is no longer read; create ${filePath} with passwd_hash (see readme.md)`
+            : 'create it with passwd_hash (see readme.md)';
+        throw new Error(`No user file ${filePath}: ${hint}`);
+    }
+    try {
+        const entries = JSON.parse(text);
+        checkUsers(entries);
+        return entries;
+    } catch (error) {
+        throw new Error(`Invalid user file ${filePath}: ${error.message}`);
+    }
+}
+
+function checkUsers(entries) {
+    if (!Array.isArray(entries)) {
         throw new Error('expected a list of { "id", "login", "hash" } entries');
     }
     const ids = new Set();
     const logins = new Set();
-    for (const entry of parsed) {
+    for (const entry of entries) {
         if (!entry || typeof entry !== 'object'
             || !isUuid(entry.id)
             || typeof entry.login !== 'string' || entry.login.length === 0
@@ -324,54 +353,39 @@ function parseUsers(text) {
         ids.add(entry.id);
         logins.add(entry.login);
     }
-    return parsed.map(entry => ({ id: entry.id, login: entry.login, hash: entry.hash }));
 }
 
-// Replace one user's hash in the user file. The file on disk is the truth, not the
-// users in memory: it is read again, so entries the admin added or changed since
-// startup stay as they are, and only this user's hash changes. Throws, and writes
-// nothing, if the file cannot be read, is invalid, no longer holds the user, or
-// cannot be written (e.g. conf/ mounted read-only); the users in memory stay
-// unchanged then.
+// The users for a credential check, or null, after logging why there are none
+function usersForCheck() {
+    try {
+        return loadUsers();
+    } catch (error) {
+        debug.error(`[SERVER] Nobody can log in: ${error.message}`);
+        return null;
+    }
+}
+
+// Replace one user's hash in the user file, as it is on disk now: entries the admin
+// added or changed stay as they are, and only this user's hash changes. Throws, and
+// writes nothing, if the file cannot be read, is invalid, no longer holds the user,
+// or cannot be written (e.g. conf/ mounted read-only).
 function saveUsersWithHash(userId, hash) {
-    const filePath = getUsersFilePath();
-    const text = fs.readFileSync(filePath, 'utf8');
-    parseUsers(text); // throws if the admin left the file invalid
-    const entries = JSON.parse(text); // written back as it is, apart from the hash
+    const entries = loadUsers();
     const entry = entries.find(candidate => candidate.id === userId);
     if (!entry) {
-        throw new Error(`user ${userId} is no longer in ${filePath}`);
+        throw new Error(`user ${userId} is no longer in ${getUsersFilePath()}`);
     }
     entry.hash = hash;
     // the hashes are for the server alone
-    writeFileAtomic(filePath, JSON.stringify(entries, null, 2) + '\n', 0o600);
+    writeFileAtomic(getUsersFilePath(), JSON.stringify(entries, null, 2) + '\n', 0o600);
 }
 
 function initializeGlobals() {
-    const filePath = getUsersFilePath();
-    let text = null;
-    try {
-        text = fs.readFileSync(filePath, 'utf8');
-    } catch (error) {
-        // a missing file and one the server may not read (permissions, mounts) look alike otherwise
-        if (error.code !== 'ENOENT') {
-            debug.error(`[SERVER] Cannot read user file ${filePath}, nobody can log in: ${error.message}`);
-        } else if (fs.existsSync(getOldPasswdFilePath())) {
-            debug.error(`[SERVER] No user file ${filePath}, nobody can log in: ${getOldPasswdFilePath()} is no longer read; create ${filePath} with passwd_hash (see readme.md)`);
-        } else {
-            debug.error(`[SERVER] No user file ${filePath}, nobody can log in: create it with passwd_hash (see readme.md)`);
-        }
-    }
-    if (text !== null) {
-        try {
-            for (const user of parseUsers(text)) {
-                users.push(user);
-                usersByLogin.set(user.login, user);
-            }
-            debug.log(`[SERVER] Loaded ${users.length} users`);
-        } catch (error) {
-            debug.error(`[SERVER] Invalid user file ${filePath}, nobody can log in: ${error.message}`);
-        }
+    // read once at startup only for the log: a problem with the file shows at once,
+    // not only at the first login
+    const users = usersForCheck();
+    if (users) {
+        debug.log(`[SERVER] ${users.length} users in ${getUsersFilePath()}`);
     }
     const removalLogPath = getRemovalLogPath();
     if (fs.existsSync(removalLogPath)) {
@@ -1659,11 +1673,10 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.TYPE] = (ws, data, r
         try {
             saveUsersWithHash(user.id, hash);
         } catch (error) {
-            debug.error(`[SERVER] Cannot save the credential of user ${user.id} in ${getUsersFilePath()}: ${error.message}`);
+            debug.error(`[SERVER] Cannot save the credential of user ${user.id}: ${error.message}`);
             rejectMessage(ws, CREDENTIAL_NOT_SAVED, requestId);
             return;
         }
-        user.hash = hash;
         debug.log(`[SERVER] User ${user.id} changed their credential`);
         if (ws.readyState === WebSocket.OPEN) {
             const response = {

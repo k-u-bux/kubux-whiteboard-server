@@ -64,7 +64,7 @@ A real-time collaborative whiteboard application designed for mathematics educat
    ```json
    [ { "id": "...", "login": "alice", "hash": "..." }, { "id": "...", "login": "bob", "hash": "..." } ]
    ```
-   The id is what boards record as their owner, so it must never change once the user owns boards. Users change their credential themselves in the board manager. The server then reads `conf/users.json` again and writes it back with only that user's hash replaced, so entries you added or changed by hand stay; for that, `conf/` has to be writable by the server. For logins, the server reads `conf/users.json` only at startup, so a user you add or a hash you replace by hand takes effect after a restart; if the file is missing, unreadable (permissions, mounts) or malformed, the log says which, and nobody can log in.
+   The id is what boards record as their owner, so it must never change once the user owns boards. The server keeps no copy of `conf/users.json`: it reads the file for every login and credential check, so a user you add, change or remove by hand counts at once, without a restart. Users change their credential themselves in the board manager; the server then writes the file back with only that user's hash replaced, so your other entries stay as they are. For that, `conf/` has to be writable by the server. If the file is missing, unreadable (permissions, mounts) or malformed, nobody can log in, and the log says which, at startup and at every login attempt.
 
    **Upgrading from `conf/passwd.json`:** that file is no longer read. Create `conf/users.json` as above. Boards created before boards had owners appear in nobody's board list; give them an owner and a path with the server stopped, in the server's working directory:
    ```bash
