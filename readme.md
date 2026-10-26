@@ -244,7 +244,7 @@ Without a board in the URL (e.g. `?login=<your_login>`), the boards view is the 
 - **Opacity** - Control transparency with the opacity slider
 - **Shape Mode** - Toggle between freeform drawing and shape modes (curve, rectangle, circle, horizontal/vertical/diagonal lines)
 - **Pressure Sensitivity** - Adjust sensitivity (0-9) for variable-width strokes based on input pressure
-- **Canvas Format** - Use the format menu (leftmost toolbar button) to constrain the page to a paper/screen format (A4, Letter, Legal, 16:9, etc.); content outside the format is shaded and excluded from PDF export
+- **Canvas Format** - Use the format menu (leftmost toolbar button) to constrain the page to a paper/screen format (A4, Letter, Legal, 16:9, etc.); "Custom…" opens width and height fields in the menu (whole pixels, checked as you type; Enter or the check button applies, Escape cancels); content outside the format is shaded and excluded from PDF export
 
 ### Advanced Drawing Controls
 
@@ -272,7 +272,7 @@ The sidebar provides access to additional stroke properties:
 ### Page Management
 
 - **Add Page** — Click the "➕" button to insert a new page after the current page
-- **Delete Page** — Click the "➖" button to delete the current page (with confirmation dialog)
+- **Delete Page** — Click the "➖" button to delete the current page; a small question at the button asks first ("Delete" or "Cancel"; Escape or a click elsewhere cancels)
 - **Page Navigation** — Use the first, previous, next, and last page buttons in the toolbar
 - **Overview** — Click the page info label ("Page X of Y") to open overview mode (see below)
 
@@ -283,7 +283,7 @@ Overview mode displays all pages as thumbnails in a grid, enabling batch operati
 - **Enter** — Click the page info label
 - **Navigate** — Click any thumbnail to jump to that page (this leaves the overview and discards an unconfirmed reordering)
 - **Reorder** — Drag and drop thumbnails to reorder pages
-- **Delete** — Select pages via checkboxes and click "Delete"; after a confirmation dialog the pages are deleted at once, independent of Confirm/Cancel
+- **Delete** — Select pages via checkboxes and click "Delete"; after the same question at the button, the pages are deleted at once, independent of Confirm/Cancel
 - **Add** — Click "Add" to insert a new page at the end
 - **Move to Front/Back** — Select pages and move them to the beginning or end of the board
 - **Export** — Export selected pages or all pages as a multi-page PDF

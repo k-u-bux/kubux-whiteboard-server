@@ -907,6 +907,95 @@
       #format-popup-menu .popup-option:hover {
           background-color: #e0e0e0;
       }
+
+      /* Custom format: width and height, checked as they are typed */
+      #custom-format-form {
+          padding: 4px 4px 2px;
+          border-top: 1px solid #ddd;
+          font-size: 13px;
+      }
+
+      .custom-format-row {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+      }
+
+      .custom-format-row input {
+          width: 56px;
+          padding: 3px 5px;
+          border: 1px solid #0078d7;
+          border-radius: 3px;
+          font-size: 13px;
+      }
+
+      #custom-format-ok {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          padding: 0;
+          border: 1px solid #ccc;
+          border-radius: 3px;
+          background: #fff;
+          cursor: pointer;
+      }
+
+      #custom-format-ok:disabled {
+          color: #bbb;
+          background: #f5f5f5;
+          cursor: not-allowed;
+      }
+
+      #custom-format-flag {
+          max-width: 180px;
+          margin-top: 4px;
+          color: #c62828;
+          font-size: 12px;
+      }
+
+      #custom-format-flag:empty {
+          display: none;
+      }
+
+      /* A question before something that cannot be undone, at the button that asked;
+         above the overview and the boards view */
+      #confirm-popup {
+          position: fixed;
+          max-width: 280px;
+          padding: 10px 12px;
+          background-color: #f0f0f0;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          z-index: 3500;
+          color: #222;
+          font-size: 13px;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      #confirm-popup .confirm-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 10px;
+      }
+
+      #confirm-popup button {
+          padding: 5px 12px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          background: #fff;
+          font-size: 13px;
+          cursor: pointer;
+      }
+
+      #confirm-popup button.danger {
+          background: #c62828;
+          border-color: #c62828;
+          color: #fff;
+      }
       
       /* Fixed widths for menu buttons to prevent layout jitter */
       #zoom-menu-btn {
@@ -1097,6 +1186,15 @@
           <button class="popup-option" data-format="3:2">3:2</button>
           <button class="popup-option" data-format="2:1">2:1</button>
           <button class="popup-option" data-format="custom">Custom…</button>
+          <div id="custom-format-form" style="display:none;">
+            <div class="custom-format-row">
+              <input type="text" inputmode="numeric" id="custom-format-w" placeholder="Width" aria-label="Width in pixels" autocomplete="off">
+              <span>×</span>
+              <input type="text" inputmode="numeric" id="custom-format-h" placeholder="Height" aria-label="Height in pixels" autocomplete="off">
+              <button type="button" id="custom-format-ok" title="Use this format"><span class="icon" data-icon="check"></span></button>
+            </div>
+            <div id="custom-format-flag"></div>
+          </div>
         </div>
       </div>
 
@@ -1403,6 +1501,15 @@
         </div>
       </div>
       <div id="overview-grid"></div>
+    </div>
+
+    <!-- A question in the page before something that cannot be undone (confirmInPage) -->
+    <div id="confirm-popup" style="display:none;" role="alertdialog" aria-labelledby="confirm-message">
+      <div id="confirm-message"></div>
+      <div class="confirm-actions">
+        <button type="button" id="confirm-cancel">Cancel</button>
+        <button type="button" id="confirm-ok" class="danger">Delete</button>
+      </div>
     </div>
 
     <!-- Boards View: the current board, login, and the owner's boards as a file tree -->
@@ -5174,6 +5281,55 @@
           const menuBtn = document.getElementById('format-menu-btn');
           const popup = document.getElementById('format-popup-menu');
           const options = document.querySelectorAll('#format-popup-menu .popup-option');
+          const customForm = document.getElementById('custom-format-form');
+          const customW = document.getElementById('custom-format-w');
+          const customH = document.getElementById('custom-format-h');
+          const customOk = document.getElementById('custom-format-ok');
+          const closePopup = () => {
+              popup.style.display = 'none';
+              customForm.style.display = 'none';
+          };
+          
+          // Apply a format (null: none) and close the menu
+          function applyFormat(format) {
+              canvasFormat = format;
+              updateFormatButton();
+              if (canvasFormat) {
+                  // Auto zoom to fit width when a format is selected
+                  zoomLevel = container.clientWidth / canvasFormat.w;
+                  zoomLevel = Math.max(0.5, Math.min(3, zoomLevel));
+                  zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+                  applyZoom();
+              }
+              backgroundValid = false;
+              requestRedraw();
+              saveSettings();
+              if (document.updateZoomMenuDisabled) document.updateZoomMenuDisabled();
+              closePopup();
+          }
+          
+          // Custom: width and height in pixels, whole numbers as typed, checked as they
+          // are typed (the check button only while both can be used)
+          const customValue = (input) => /^[1-9][0-9]{0,4}$/.test(input.value) ? Number(input.value) : null;
+          function updateCustomForm() {
+              const usable = customValue(customW) !== null && customValue(customH) !== null;
+              const typed = customW.value !== '' && customH.value !== '';
+              customOk.disabled = !usable;
+              document.getElementById('custom-format-flag').textContent =
+                  typed && !usable ? 'Width and height: whole numbers from 1 to 99999' : '';
+          }
+          function applyCustomFormat() {
+              if (customOk.disabled) return;
+              applyFormat({ w: customValue(customW), h: customValue(customH) });
+          }
+          for (const input of [customW, customH]) {
+              input.addEventListener('input', updateCustomForm);
+              input.addEventListener('keydown', (e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); applyCustomFormat(); }
+                  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePopup(); }
+              });
+          }
+          customOk.addEventListener('click', (e) => { e.stopPropagation(); applyCustomFormat(); });
           
           // Toggle popup on button click
           menuBtn.addEventListener('click', function(e) {
@@ -5181,7 +5337,7 @@
               const isVisible = popup.style.display === 'flex';
               
               if (isVisible) {
-                  popup.style.display = 'none';
+                  closePopup();
               } else {
                   const rect = menuBtn.getBoundingClientRect();
                   popup.style.left = rect.left + 'px';
@@ -5197,34 +5353,18 @@
                   const val = this.getAttribute('data-format');
                   
                   if (val === 'none') {
-                      canvasFormat = null;
+                      applyFormat(null);
                   } else if (val === 'custom') {
-                      const w = parseInt(prompt('Width (px):', '800'));
-                      const h = parseInt(prompt('Height (px):', '600'));
-                      if (w > 0 && h > 0) {
-                          canvasFormat = { w, h };
-                      } else {
-                          popup.style.display = 'none';
-                          return;
-                      }
+                      // the fields open in the menu, with the format in use (or 800 x 600)
+                      customW.value = String(canvasFormat ? canvasFormat.w : 800);
+                      customH.value = String(canvasFormat ? canvasFormat.h : 600);
+                      customForm.style.display = 'block';
+                      updateCustomForm();
+                      customW.focus();
+                      customW.select();
                   } else {
-                      canvasFormat = CANVAS_FORMATS[val];
+                      applyFormat(CANVAS_FORMATS[val]);
                   }
-                  
-                  updateFormatButton();
-                  if (canvasFormat) {
-                      // Auto zoom to fit width when a format is selected
-                      zoomLevel = container.clientWidth / canvasFormat.w;
-                      zoomLevel = Math.max(0.5, Math.min(3, zoomLevel));
-                      zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
-                      applyZoom();
-                  }
-                  backgroundValid = false;
-                  requestRedraw();
-                  saveSettings();
-                  if (document.updateZoomMenuDisabled) document.updateZoomMenuDisabled();
-                  
-                  popup.style.display = 'none';
               });
           });
           
@@ -5233,7 +5373,7 @@
               if (popup.style.display === 'flex' && 
                   !popup.contains(e.target) && 
                   e.target !== menuBtn) {
-                  popup.style.display = 'none';
+                  closePopup();
               }
           });
       }
@@ -7639,14 +7779,50 @@
       
       
      
-      // Delete current page
-      function deletePage() {    
+      // Ask in the page, at the button that asked, before something that cannot be undone
+      // (no browser dialog). Resolves to true for the action button; Cancel, Escape or a
+      // click elsewhere resolve to false. The focus starts on Cancel.
+      function confirmInPage(anchor, message, actionLabel) {
+          const popup = document.getElementById('confirm-popup');
+          const ok = document.getElementById('confirm-ok');
+          const cancel = document.getElementById('confirm-cancel');
+          document.getElementById('confirm-message').textContent = message;
+          ok.textContent = actionLabel;
+          popup.style.display = 'block';
+          // below the button, kept inside the window
+          const rect = anchor.getBoundingClientRect();
+          popup.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - popup.offsetWidth - 8))}px`;
+          popup.style.top = `${rect.bottom + 4}px`;
+          cancel.focus();
+          return new Promise((resolve) => {
+              const outside = (e) => { if (!popup.contains(e.target)) { finish(false); } };
+              const onKey = (e) => {
+                  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+              };
+              const finish = (answer) => {
+                  popup.style.display = 'none';
+                  document.removeEventListener('pointerdown', outside, true);
+                  document.removeEventListener('keydown', onKey, true);
+                  ok.onclick = null;
+                  cancel.onclick = null;
+                  resolve(answer);
+              };
+              ok.onclick = () => finish(true);
+              cancel.onclick = () => finish(false);
+              document.addEventListener('pointerdown', outside, true);
+              document.addEventListener('keydown', onKey, true);
+          });
+      }
+
+      // Delete current page: the page shown when asked, even if another one shows by the
+      // time the answer comes
+      async function deletePage() {
           if (refusedWhileOffline()) return;
-          const confirmation = window.confirm(
-              'Are you sure you want to permanently delete the current page? This action cannot be undone.'
-          );
-          if ( confirmation ) {
-              deletePageUuid( boardId, currentPageUuid );
+          const pageUuid = currentPageUuid;
+          const confirmed = await confirmInPage(document.getElementById('delete-page'),
+              'Delete this page? This cannot be undone.', 'Delete');
+          if ( confirmed && !refusedWhileOffline() ) {
+              deletePageUuid( boardId, pageUuid );
           }
       }
       
@@ -8843,21 +9019,20 @@
           }
       }
 
-      // Overview: delete selected pages
-      function overviewDeleteSelected() {
+      // Overview: delete selected pages (those selected when asked)
+      async function overviewDeleteSelected() {
           const grid = document.getElementById('overview-grid');
           const checked = grid.querySelectorAll('.overview-thumb.selected');
           if (checked.length === 0) return;
-          
-          const msg = checked.length === 1
-              ? 'Delete the selected page? This cannot be undone.'
-              : `Delete ${checked.length} selected pages? This cannot be undone.`;
-          if (!confirm(msg)) return;
           
           const uuids = [];
           checked.forEach(t => {
               if (t.dataset.pageUuid) uuids.push(t.dataset.pageUuid);
           });
+          const msg = uuids.length === 1
+              ? 'Delete the selected page? This cannot be undone.'
+              : `Delete ${uuids.length} selected pages? This cannot be undone.`;
+          if (!await confirmInPage(document.getElementById('overview-delete'), msg, 'Delete')) return;
           
           // Send one DELETE_PAGE proposal per UUID
           uuids.forEach(uuid => {
