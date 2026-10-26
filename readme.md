@@ -221,6 +221,8 @@ In the tree:
 
 Only the owner sees a board's path; spectators and collaborators with a link see no names.
 
+A logged-in owner can always edit their own boards, even when they opened one with its view link or an outdated edit password: the client takes the edit password from the board list. The address bar always shows the link that grants what the page can do, and nothing else. For a board you can edit, that is its edit link (`?board=…&passwd=…`); otherwise it is the view link. `login` and `credential` are removed from the address once the page has read them.
+
 Without a board in the URL (e.g. `?login=<your_login>`), the boards view is the start page.
 
 **Shortcoming:** the tree shows the list as of opening the view. Changes made by the same user in another tab or on another device appear only when the view is opened again; actions on an outdated list are still checked by the server (e.g. "path taken").

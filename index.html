@@ -2555,11 +2555,21 @@
           // Earlier versions remembered the credential in localStorage: forget it
           localStorage.removeItem('whiteboard_credential');
           
-          // A credential in the URL is used for this page, never stored
+          // A credential in the URL is used for this page, never stored, and taken out
+          // of the address at once
           const urlParams = new URLSearchParams(window.location.search);
           const credential = urlParams.get('credential');
           if (credential) {
               storedCredential = credential;
+          }
+          if (urlParams.has('credential')) {
+              const address = new URLSearchParams(urlParams);
+              address.delete('credential');
+              // without any parameter the server would not serve the page on a reload
+              if ([...address.keys()].length === 0) {
+                  address.set('login', '');
+              }
+              window.history.replaceState(null, null, `${window.location.pathname}?${address.toString()}`);
           }
           
           const loginParam = urlParams.get('login');
@@ -2881,13 +2891,8 @@
           console.error(`[SERVER ERROR] ${data.message}`, data.stack);
           showError(`Server error: ${data.message}`);
           if (data.message === shared.CREDENTIAL_NOT_ACCEPTED) {
-              // do not offer the rejected credential again in the new-board form
+              // do not offer the rejected credential again (the address never holds it)
               storedCredential = null;
-              // nor retry it on a reload or reconnect (the server serves the app only
-              // with a credential, board or passwd parameter, so one is kept)
-              const params = new URLSearchParams(window.location.search);
-              params.set('credential', 'YOU_NEED_A_VALID_PASSWORD');
-              window.history.replaceState(null, null, `${window.location.pathname}?${params.toString()}`);
               // the way forward: the login form, ready for another credential
               openBoardsView();
               const credentialInput = document.getElementById('new-board-credential-input');
@@ -3041,13 +3046,8 @@
           }
           session.loggedIn = false;
           if (reply.message === shared.CREDENTIAL_NOT_ACCEPTED) {
-              // do not offer the rejected credential again, nor retry it on a reload
+              // do not offer the rejected credential again (the address never holds it)
               storedCredential = null;
-              const params = new URLSearchParams(window.location.search);
-              if (params.has('credential')) {
-                  params.set('credential', 'YOU_NEED_A_VALID_PASSWORD');
-                  window.history.replaceState(null, null, `${window.location.pathname}?${params.toString()}`);
-              }
               feedback.textContent = 'Login or credential not accepted';
           } else {
               feedback.textContent = `Login failed: ${reply.message}`;
@@ -3092,6 +3092,7 @@
               passwd: entry[L.ENTRY_PASSWORD],
               createdAt: entry[L.ENTRY_CREATED_AT]
           }));
+          adoptOwnerPassword();
           renderBoardTree();
           updateCurrentBoardSection();
           return true;
@@ -3485,15 +3486,7 @@
           const firstPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.FIRST_PAGE];
           const lastPageId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.LAST_PAGE];
           const numPages = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES];
-          const urlParams = new URLSearchParams(window.location.search);
-          
-          if (urlParams.get('credential')) {
-              // If we created a board, update URL to use board ID instead
-              window.history.replaceState(null, null, `?board=${boardId}`);
-          } else if (urlParams.get('board') !== boardId) {
-              // If the board ID changed for some reason, update URL
-              window.history.replaceState(null, null, `?board=${boardId}`);
-          }
+          showShareAddress();
           
           // Load settings now that we have a boardId
           loadSettings();
@@ -8751,14 +8744,13 @@
           renaming = null;
           creatingIn = null;
           try { sessionStorage.removeItem(SESSION_LOGIN_KEY); } catch (err) { /* storage blocked */ }
-          // a reload must not log in again from the address (the login alone may stay:
-          // without any parameter the server does not serve the page)
-          const params = new URLSearchParams(window.location.search);
-          params.delete('credential');
-          if (params.has('login') && [...params.keys()].length > 1) {
-              params.delete('login');
+          // the address holds no login then: the share link of the board, or an empty
+          // login parameter (without any parameter the server does not serve the page)
+          if (boardId) {
+              showShareAddress();
+          } else {
+              window.history.replaceState(null, null, `${window.location.pathname}?login=`);
           }
-          window.history.replaceState(null, null, `${window.location.pathname}?${params.toString()}`);
           document.getElementById('login-input').value = '';
           document.getElementById('new-board-credential-input').value = '';
           document.getElementById('board-tree').textContent = '';
@@ -8846,17 +8838,34 @@
           closeBoardsView();
       }
 
+      // The address bar shows the board's share link and nothing else: the edit link if
+      // this page can edit, else the view link; login and credential never stay in it.
+      // setupWebSocket reads board and password back from it on every (re)connect.
+      function showShareAddress() {
+          let query = `?board=${encodeURIComponent(boardId)}`;
+          if (passwd) {
+              query += `&passwd=${encodeURIComponent(passwd)}`;
+          }
+          window.history.replaceState(null, null, `${window.location.pathname}${query}`);
+      }
+
+      // An owner can always edit their boards: the board list carries the edit password,
+      // so a board opened with its view link (or an outdated password) gets edit rights
+      function adoptOwnerPassword() {
+          const entry = boardList.find(e => e.board === boardId);
+          if (entry && passwd !== entry.passwd) {
+              passwd = entry.passwd;
+              showShareAddress();
+          }
+      }
+
       // Show another board in this page, without a reload: the login and the credential,
       // which live only in this page, stay
       function switchToBoard(targetBoardId, targetPassword) {
-          let newUrl = `${window.location.origin}${window.location.pathname}?board=${encodeURIComponent(targetBoardId)}`;
-          if (targetPassword) {
-              newUrl += `&passwd=${encodeURIComponent(targetPassword)}`;
-          }
           boardId = targetBoardId;
           passwd = targetPassword;
           registerBoard(boardId);
-          window.history.replaceState(null, null, newUrl);
+          showShareAddress();
           expandToCurrent = true;
           updateCurrentBoardSection();
       }
