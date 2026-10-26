@@ -719,6 +719,23 @@
           background: #f0f0f0;
       }
 
+      .tree-btn:disabled {
+          color: #bbb;
+          background: #f5f5f5;
+          cursor: not-allowed;
+      }
+
+      /* why the path in the field above cannot be used, aligned with the field */
+      .tree-flag {
+          padding: 0 8px 6px calc(32px + var(--depth, 0) * 22px);
+          color: #c62828;
+          font-size: 13px;
+      }
+
+      .tree-flag:empty {
+          display: none;
+      }
+
       .tree-edit {
           flex: 1;
           min-width: 0;
@@ -743,6 +760,9 @@
           .tree-row {
               flex-wrap: wrap;
               padding-left: calc(4px + var(--depth, 0) * 12px);
+          }
+          .tree-flag {
+              padding-left: calc(28px + var(--depth, 0) * 12px);
           }
           .tree-name {
               flex: 1 1 140px;
@@ -1443,9 +1463,10 @@
             <input type="search" id="board-filter" placeholder="Filter: show the boards whose path contains …">
           </div>
           <form class="boards-row" id="new-board-form">
-            <input type="text" id="new-board-name" placeholder="Path of a new board, e.g. teaching/algebra/week 1" required>
-            <button type="submit" class="board-nav-btn" id="new-board-btn"><span class="icon" data-icon="new-board"></span><span class="icon-label">New Board</span></button>
+            <input type="text" id="new-board-name" placeholder="Path of a new board, e.g. teaching/algebra/week 1" autocomplete="off">
+            <button type="submit" class="board-nav-btn" id="new-board-btn" disabled><span class="icon" data-icon="new-board"></span><span class="icon-label">New Board</span></button>
           </form>
+          <span class="board-nav-feedback" id="new-board-flag"></span>
           <span class="board-nav-feedback" id="manager-feedback"></span>
           <div id="board-tree"></div>
         </div>
@@ -3079,15 +3100,16 @@
               feedback.textContent = `Boards not listed: ${err.message}`;
               return;
           }
-          showBoardListReply(reply);
+          if (!showBoardListReply(reply)) {
+              feedback.textContent = `Boards not listed: ${reply.message}`;
+          }
       }
 
-      // A board-list reply (to listing or to a path change): remember and show it;
-      // anything else is a refusal, shown as feedback after what was refused
-      function showBoardListReply(reply, refused = 'Boards not listed') {
+      // A board-list reply (to listing or to a path change): remember and show it, and
+      // return true; anything else is a refusal, for the caller to show
+      function showBoardListReply(reply) {
           const L = shared.MESSAGES.SERVER_TO_CLIENT.BOARD_LIST;
           if (reply.type !== L.TYPE) {
-              document.getElementById('manager-feedback').textContent = `${refused}: ${reply.message}`;
               ownerRefused(reply);
               return false;
           }
@@ -3100,7 +3122,28 @@
           adoptOwnerPassword();
           renderBoardTree();
           updateCurrentBoardSection();
+          updateNewBoardForm(); // the path typed there may have become free or taken
           return true;
+      }
+
+      // Paths are checked as they are typed, with the server's own rules (shared.js)
+      // against the board list; the server checks again, as the list can be out of
+      // date (changes in another tab). The reasons as shown under a field:
+      const PATH_PROBLEM_TEXT = {
+          [shared.PATH_TAKEN]: 'Path taken',
+          [shared.PATH_INVALID]: 'Not a valid path',
+          [shared.NO_SUCH_FOLDER]: 'No such folder'
+      };
+      const problemText = (reason) => PATH_PROBLEM_TEXT[reason] || reason;
+      const ownPaths = () => boardList.map(entry => entry.path);
+
+      // The New Board form: the button only while the path typed can be created, the
+      // reason under the form while it cannot; an empty path just greys the button out
+      function updateNewBoardForm() {
+          const value = document.getElementById('new-board-name').value;
+          const problem = value.trim() ? shared.newBoardProblem(ownPaths(), value) : null;
+          document.getElementById('new-board-btn').disabled = !value.trim() || problem !== null;
+          setFeedback('new-board-flag', problem ? problemText(problem) : '');
       }
 
       // The board tree: folders come from the paths, each with its subfolders and boards
@@ -3208,11 +3251,13 @@
           for (const name of [...node.folders.keys()].sort(byName)) {
               const folder = node.folders.get(name);
               if (renaming && renaming.kind === 'folder' && renaming.path === folder.path) {
-                  tree.appendChild(pathEditRow(depth, folder.path, async (to) => {
-                      if (!await renameFolder(folder.path, to)) { return false; }
-                      moveExpansion(folder.path, shared.normalizePath(to));
-                      return true;
-                  }));
+                  tree.appendChild(pathEditRow(depth, folder.path,
+                      to => shared.folderMove(ownPaths(), folder.path, to).problem || null,
+                      async (to) => {
+                          const refusal = await renameFolder(folder.path, to);
+                          if (!refusal) { moveExpansion(folder.path, shared.normalizePath(to)); }
+                          return refusal;
+                      }));
               } else {
                   const isOpen = open.has(folder.path);
                   const row = treeRow(depth, 'folder');
@@ -3248,7 +3293,9 @@
           }
           for (const { name, entry } of [...node.boards].sort((a, b) => byName(a.name, b.name))) {
               if (renaming && renaming.kind === 'board' && renaming.path === entry.path) {
-                  tree.appendChild(pathEditRow(depth, entry.path, to => setBoardPath(entry.board, to)));
+                  tree.appendChild(pathEditRow(depth, entry.path,
+                      to => shared.boardMoveProblem(ownPaths(), entry.path, to),
+                      to => setBoardPath(entry.board, to)));
                   continue;
               }
               const row = treeRow(depth, entry === current ? 'current' : '');
@@ -3275,48 +3322,79 @@
       }
 
       // A tree row with a text field: Enter or the check button submits, Escape or the
-      // cancel button closes it; a refusal keeps it open with the reason above the tree.
-      // submit(value, close) gets the way to close it, too.
-      function editRow(depth, value, placeholder, submit, cancel) {
+      // cancel button closes it. check(value) gives, as the value is typed, the reason
+      // it cannot be submitted, shown right under the field with the check button
+      // greyed out; an empty field greys the button out, and Enter closes the field.
+      // submit(value, refuse) may show the server's reason under the field with refuse,
+      // keeping it open; typing on replaces it with the check of the new value.
+      function editRow(depth, value, placeholder, check, submit, cancel) {
           const row = treeRow(depth);
           const input = document.createElement('input');
           input.type = 'text';
           input.className = 'tree-edit';
           input.value = value;
           input.placeholder = placeholder;
-          // a refusal shown for this field goes with it
-          const dismiss = () => { setFeedback('manager-feedback', ''); cancel(); };
-          const ok = treeButton('check', 'Save', () => submit(input.value, dismiss));
-          const no = treeButton('cancel', 'Cancel', dismiss);
+          const flag = document.createElement('div');
+          flag.className = 'tree-flag';
+          flag.style.setProperty('--depth', depth);
+          let pending = false; // a submit waits for the server
+          const usable = () => !pending && input.value.trim() !== '' && !check(input.value);
+          const ok = treeButton('check', 'Save', () => trySubmit());
+          const update = () => {
+              const problem = input.value.trim() ? check(input.value) : null;
+              flag.textContent = problem ? problemText(problem) : '';
+              ok.disabled = !usable();
+          };
+          const refuse = (text) => { flag.textContent = text; };
+          const trySubmit = async () => {
+              if (!input.value.trim()) { cancel(); return; }
+              if (!usable()) { return; }
+              pending = true;
+              ok.disabled = true;
+              try {
+                  await submit(input.value, refuse);
+              } finally {
+                  pending = false;
+                  ok.disabled = !usable();
+              }
+          };
+          const no = treeButton('cancel', 'Cancel', cancel);
+          input.addEventListener('input', update);
           input.addEventListener('keydown', (e) => {
-              if (e.key === 'Enter') { e.preventDefault(); submit(input.value, dismiss); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dismiss(); }
+              if (e.key === 'Enter') { e.preventDefault(); trySubmit(); }
+              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); }
           });
           row.append(treeToggle(null), input, ok, no);
-          return row;
+          update();
+          const rows = document.createDocumentFragment();
+          rows.append(row, flag);
+          return rows;
       }
 
       // Edit a full path in place (a new folder in it moves the board or folder);
-      // save(newPath) resolves to whether the server accepted it
-      function pathEditRow(depth, currentPath, save) {
+      // save(newPath) resolves to null, or the reason the server refused it
+      function pathEditRow(depth, currentPath, check, save) {
           const done = () => { renaming = null; renderBoardTree(); };
-          return editRow(depth, currentPath, 'New path; folders are separated by "/"', async (value) => {
-              if (value.trim() === currentPath) { done(); return; }
-              if (await save(value)) {
-                  renaming = null;
-                  const moved = shared.normalizePath(value);
-                  if (moved) { ancestorsOf(moved).forEach(folder => expandedFolders.add(folder)); }
-                  renderBoardTree();
-              }
+          return editRow(depth, currentPath, 'New path; folders are separated by "/"', check, async (value, refuse) => {
+              if (shared.normalizePath(value) === currentPath) { done(); return; }
+              const refusal = await save(value);
+              if (refusal) { refuse(refusal); return; }
+              renaming = null;
+              ancestorsOf(shared.normalizePath(value)).forEach(folder => expandedFolders.add(folder));
+              renderBoardTree();
           }, done);
       }
 
       // A new board in a folder: the name may contain '/' to start subfolders
       function newBoardRow(depth, folderPath) {
-          return editRow(depth, '', `Name of a new board in ${folderPath}`, (name, close) => {
-              // no name, no board: the field just closes
-              if (name.trim()) { createBoard(`${folderPath}/${name}`); } else { close(); }
-          }, () => { creatingIn = null; renderBoardTree(); });
+          const pathOf = (name) => `${folderPath}/${name}`;
+          return editRow(depth, '', `Name of a new board in ${folderPath}`,
+              name => shared.newBoardProblem(ownPaths(), pathOf(name)),
+              async (name, refuse) => {
+                  const refusal = await createBoard(pathOf(name));
+                  if (refusal) { refuse(refusal); }
+              },
+              () => { creatingIn = null; renderBoardTree(); });
       }
 
       function boardLink(board, password) {
@@ -3373,39 +3451,42 @@
           changeCredential(current, replacement);
       }
 
-      // Rename or move one board; the reply is the updated board list
+      // Rename or move one board; the reply is the updated board list. Resolves to null,
+      // or the reason it was refused, for the field the path was typed in.
       async function setBoardPath(board, path) {
-          const feedback = document.getElementById('manager-feedback');
           setFeedback('manager-feedback', '');
-          try {
-              return showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH, {
-                  [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD]: board,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH]: path
-              }), 'Board not renamed');
-          } catch (err) {
-              feedback.textContent = `Board not renamed: ${err.message}`;
-              return false;
-          }
+          return pathChangeRefusal(() => ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH, {
+              [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.BOARD]: board,
+              [shared.MESSAGES.CLIENT_TO_SERVER.SET_PATH.PATH]: path
+          }));
       }
 
-      // Rename or move a folder, i.e. every board below it; the reply is the updated board list
+      // Rename or move a folder, i.e. every board below it; as setBoardPath
       async function renameFolder(from, to) {
-          const feedback = document.getElementById('manager-feedback');
           setFeedback('manager-feedback', '');
-          try {
-              return showBoardListReply(await ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, {
-                  [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM]: from,
-                  [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO]: to
-              }), 'Folder not renamed');
-          } catch (err) {
-              feedback.textContent = `Folder not renamed: ${err.message}`;
-              return false;
-          }
+          return pathChangeRefusal(() => ownerRequest(shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX, {
+              [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM]: from,
+              [shared.MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.TO]: to
+          }));
       }
 
-      // Create a new board owned by the logged-in user
+      // A path change answered with the board list: null, or the reason it was refused
+      async function pathChangeRefusal(request) {
+          let reply;
+          try {
+              reply = await request();
+          } catch (err) {
+              return err.message;
+          }
+          return showBoardListReply(reply) ? null : problemText(reply.message);
+      }
+
+      // Create a new board owned by the logged-in user. It is not opened: changing the
+      // current board is an action of its own, and several boards may be made for
+      // later. The new board shows up in the tree, with its folders open, and an open
+      // "new board in this folder" field closes. Resolves to null, or the reason it was
+      // refused, for the field the path was typed in.
       async function createBoard(path) {
-          const feedback = document.getElementById('manager-feedback');
           setFeedback('manager-feedback', '');
           let reply;
           try {
@@ -3414,34 +3495,27 @@
                   [shared.MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.CLIENT_ID]: clientId
               });
           } catch (err) {
-              feedback.textContent = `Board not created: ${err.message}`;
-              return;
+              return err.message;
           }
           if (reply.type !== shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE) {
-              feedback.textContent = `Board not created: ${reply.message}`;
               ownerRefused(reply);
-              return;
+              return problemText(reply.message);
           }
-          handleBoardCreated(reply, shared.normalizePath(path));
-      }
-      
-      // Handle board creation response: open the new board in this page and say so in
-      // the board manager, whose Current Board section now has its links
-      function handleBoardCreated(data, path = null) {
-          debugLog('Board created successfully');
-          const newBoardId = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.BOARD];
-          const newPasswd = data[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.PASSWORD];
-          switchToBoard(newBoardId, newPasswd);
-          document.getElementById('new-board-name').value = '';
+          ancestorsOf(shared.normalizePath(path)).forEach(folder => expandedFolders.add(folder));
           creatingIn = null;
-          setFeedback('manager-feedback',
-              `Created ${path ? `"${path}" ` : 'the board '}and opened it; its links are under Current Board.`, true);
+          await listBoards();
+          return null;
+      }
+
+      // A board-created that arrives after its request timed out: the board exists, so
+      // the list shows it (it is not opened, as any new board)
+      function handleBoardCreated() {
+          debugLog('Board created (late reply)');
           if (session.loggedIn) {
               listBoards();
           }
       }
-      
-          
+
       // Save most recent board to localStorage
       function saveMostRecentBoard() {
           const boardData = {
@@ -5959,6 +6033,7 @@
           // Board navigation forms
           document.getElementById('login-form').addEventListener('submit', handleLogin);
           document.getElementById('new-board-form').addEventListener('submit', handleNewBoard);
+          document.getElementById('new-board-name').addEventListener('input', updateNewBoardForm);
           document.getElementById('change-credential-form').addEventListener('submit', handleChangeCredential);
           document.getElementById('change-credential-toggle').addEventListener('click', () => {
               const section = document.getElementById('change-credential-section');
@@ -8742,7 +8817,7 @@
           document.body.classList.remove('boards-active');
           document.getElementById('boards-view').classList.remove('visible');
           resizeCanvas(); // the window may have changed while the canvas was hidden
-          for (const id of ['manager-feedback', 'credential-feedback', 'current-feedback']) {
+          for (const id of ['manager-feedback', 'new-board-flag', 'credential-feedback', 'current-feedback']) {
               setFeedback(id, '');
           }
           renaming = null;
@@ -8830,10 +8905,23 @@
           logIn(login, credential);
       }
 
-      function handleNewBoard(e) {
+      // a full path: folders separated by '/'; only a path that can be created is sent
+      async function handleNewBoard(e) {
           e.preventDefault();
-          // a full path: folders separated by '/'; the server normalizes it
-          createBoard(document.getElementById('new-board-name').value);
+          const button = document.getElementById('new-board-btn');
+          if (button.disabled) {
+              return;
+          }
+          const input = document.getElementById('new-board-name');
+          button.disabled = true; // until the server answered
+          const refusal = await createBoard(input.value);
+          if (refusal) {
+              updateNewBoardForm();
+              setFeedback('new-board-flag', refusal);
+              return;
+          }
+          input.value = '';
+          updateNewBoardForm();
       }
       
       function handleGotoBoard(e) {

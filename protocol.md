@@ -784,7 +784,7 @@ A path names a board like a file path: segments separated by `/` (`teaching/alge
 - **Unique per owner:** a path appears only once among one owner's boards.
 - **Board or folder, never both:** no board lies inside another board's path; while `teaching/algebra/week1` exists, no board may be called `teaching/algebra`, and vice versa.
 
-`findPathConflict` in `shared.js` checks the last two rules for a set of paths. The server checks every change against the owner's paths after the change.
+`findPathConflict` in `shared.js` checks the last two rules for a set of paths. The server checks every change against the owner's paths after the change, with `newBoardProblem` (`create-board`), `boardMoveProblem` (`set-path`) and `folderMove` (`rename-prefix`) in `shared.js`; they give the `error` reason (`invalid path`, `path taken`, `no such folder`). The client runs the same functions against its board list while a path is typed.
 
 ### Board index
 

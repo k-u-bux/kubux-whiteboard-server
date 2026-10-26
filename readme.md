@@ -201,7 +201,7 @@ docker-compose up -d --build
 ### Creating a New Whiteboard
     Point your browser at: "https://your-whiteboard-domain/?login=<your_login>"
 
-The boards view opens; log in with your credential (or add `&credential=<your_credential>` to the URL to log in directly). The client does not remember the credential: it is kept only while the page is open, so let your browser's password manager fill it in. "Log out" in the top bar makes the page forget login and credential at once. Type a path into "Path of a new board" and press "New Board", or use a folder's "new board" button to create a board in that folder; a name with `/` in it creates subfolders. The new board opens in the same page, and the "Current Board" section's "Copy Edit Link" and "Copy View Link" hand out its links. The URL contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
+The boards view opens; log in with your credential (or add `&credential=<your_credential>` to the URL to log in directly). The client does not remember the credential: it is kept only while the page is open, so let your browser's password manager fill it in. "Log out" in the top bar makes the page forget login and credential at once. Type a path into "Path of a new board" and press "New Board", or use a folder's "new board" button to create a board in that folder; a name with `/` in it creates subfolders. The new board appears in the tree; it is not opened, so you can create several in a row. Open it with the "Open" button in its row, or copy its links from there ("Copy Edit Link" and "Copy View Link" under Current Board hand out the links of the board you have open). The edit link contains a password. Share the URL including the password with collaborators and leave out the password when sharing with spectators (the password is needed for editing not for viewing).
 
 ### Managing Boards
 
@@ -215,8 +215,9 @@ In the tree:
 
 - **Filter** - type part of a path: only matching boards are shown, with their folders expanded; clearing the filter restores the tree.
 - **Open** a board (with its edit password), **copy** its view or edit link, or **rename** it, from the buttons in its row.
-- **Rename** a board or a folder: the row turns into a field with the full path; edit it and press Enter (or the check button), Escape cancels. A new path can move it to another folder; moving a folder moves every board in it. A refused path (e.g. "path taken") is shown above the tree and the field stays open.
-- **New board in a folder** - a folder's "new board" button opens a name field in that folder.
+- **Rename** a board or a folder: the row turns into a field with the full path; edit it and press Enter (or the check button), Escape cancels. A new path can move it to another folder; moving a folder moves every board in it.
+- **New board in a folder** - a folder's "new board" button opens a name field in that folder. Enter on an empty name just closes it.
+- **Paths are checked as you type**, in every path field: while a path cannot be used, the reason ("Path taken", "Not a valid path") shows right under the field, and its button (New Board, or the check button) is greyed out. An empty field only greys the button out. The server checks again when you submit, since the list may be out of date (changes in another tab); its reason shows under the field the same way, and the field stays open.
 - Paths are unique per user, and a path is either a board or a folder, never both (no board named `teaching/algebra` while `teaching/algebra/week1` exists).
 
 Only the owner sees a board's path; spectators and collaborators with a link see no names.
