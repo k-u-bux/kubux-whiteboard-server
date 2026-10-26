@@ -3267,11 +3267,13 @@
           input.className = 'tree-edit';
           input.value = value;
           input.placeholder = placeholder;
+          // a refusal shown for this field goes with it
+          const dismiss = () => { setFeedback('manager-feedback', ''); cancel(); };
           const ok = treeButton('check', 'Save', () => submit(input.value));
-          const no = treeButton('cancel', 'Cancel', cancel);
+          const no = treeButton('cancel', 'Cancel', dismiss);
           input.addEventListener('keydown', (e) => {
               if (e.key === 'Enter') { e.preventDefault(); submit(input.value); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); }
+              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dismiss(); }
           });
           row.append(treeToggle(null), input, ok, no);
           return row;
