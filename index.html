@@ -4038,7 +4038,9 @@
       // a ping between a mod-request and the accept/decline response shall be ignored
       // BUT: the response may get lost ==> we need a timeout.
 
-      const RESPONSE_TIMEOUT = 100; // msecs
+      // Long enough for a slow connection (busy Wi-Fi, mobile, another continent: answers
+      // can take several hundred ms), short against the 5 s between pings
+      const RESPONSE_TIMEOUT = 2000; // msecs
       let pending_actions = new Set();
       let pending_timer = Date.now();
 
