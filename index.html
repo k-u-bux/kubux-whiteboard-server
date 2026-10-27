@@ -1918,8 +1918,8 @@
       }
 
       // Settings persistence (board-specific)
-      function getSettingsStorageKey() {
-          return `whiteboard_settings_${boardId}`;
+      function getSettingsStorageKey(board = boardId) {
+          return `whiteboard_settings_${board}`;
       }
       
       function saveSettings() {
@@ -3461,7 +3461,8 @@
                       renderBoardTree();
                   }),
                   treeButton('view-link', 'Copy the view link', () => copyLink(entry.board, null, 'manager-feedback', `View link of "${entry.path}"`)),
-                  treeButton('edit-link', 'Copy the edit link', () => copyLink(entry.board, entry.passwd, 'manager-feedback', `Edit link of "${entry.path}"`)));
+                  treeButton('edit-link', 'Copy the edit link', () => copyLink(entry.board, entry.passwd, 'manager-feedback', `Edit link of "${entry.path}"`)),
+                  treeButton('export-all', 'Export this board as PDF', () => exportBoardFromTree(entry)));
               row.append(treeToggle(null), treeName('document', name), date, actions);
               tree.appendChild(row);
           }
@@ -8434,10 +8435,10 @@
 
       // Fetch a page's complete history, for when its cached copy cannot be
       // brought up to date by a replay. Throws with a readable reason on failure.
-      async function fetchFullPage(pageUuid) {
+      async function fetchFullPage(pageUuid, board = boardId) {
           const reply = await sendWithCallback({
               type: shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.TYPE,
-              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD]: boardId,
+              [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD]: board,
               [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.PAGE]: pageUuid,
               [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.DELTA]: 0,
               [shared.MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.REGISTER]: false,
@@ -8460,9 +8461,7 @@
 
       // Stand-in for a page that could not be loaded: it keeps the PDF's page
       // numbering in step with the export and says what is missing and why.
-      function addMissingPagePlaceholder(builder, position, total, reason) {
-          const pageW = canvasFormat ? canvasFormat.w : canvas.width;
-          const pageH = canvasFormat ? canvasFormat.h : canvas.height;
+      function addMissingPagePlaceholder(builder, position, total, reason, pageW, pageH) {
           const ctx = builder.new_page(pageW, pageH);
           const margin = Math.min(pageW, pageH) / 20;
           const size = Math.max(12, Math.min(pageW, pageH) / 30);
@@ -8476,22 +8475,40 @@
           ctx.fillText(`Reason: ${reason}`, 2 * margin, 2 * margin + 2.5 * size, 0.7 * size);
       }
 
-      async function exportPagesToPDF(pageUuids, filename) {
+      // What an export renders and where it reports: by default the board on screen, as
+      // it is shown (format, zoom and pan, visible layers), reporting in the banner
+      function openBoardExport() {
+          return {
+              board: boardId,
+              format: canvasFormat,
+              zoom: zoomLevel,
+              panX: panX,
+              panY: panY,
+              layers: visibleLayers,
+              progress: (text) => showError(text),
+              finished: () => hideError(),
+              problem: (text) => { hideError(); showError(text); }
+          };
+      }
+
+      async function exportPagesToPDF(pageUuids, filename, target = openBoardExport()) {
           try {
               const builder = shared.PDFBuilder();
               const skipped = []; // "position (reason)" of each page left out
-              const startPageNr = pageNr;
+              // Use format dimensions if set, else canvas size
+              const pageW = target.format ? target.format.w : canvas.width;
+              const pageH = target.format ? target.format.h : canvas.height;
 
               for (let idx = 0; idx < pageUuids.length; idx++) {
                   const pageUuid = pageUuids[idx];
-                  showError(`Exporting page ${idx + 1}/${pageUuids.length}...`);
+                  target.progress(`Exporting page ${idx + 1}/${pageUuids.length}...`);
 
                   // Request and wait for page info
                   let pageInfo;
                   try {
                       pageInfo = await sendWithCallback({
                           type: shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE,
-                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD]: boardId,
+                          [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD]: target.board,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.PAGE]: pageUuid,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.DELTA]: 0,
                           [shared.MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.REGISTER]: false,
@@ -8508,15 +8525,17 @@
                   } catch (err) {
                       console.warn(`Skipping page ${pageUuid}: ${err.message}`);
                       skipped.push(`${idx + 1} (${err.message})`);
-                      addMissingPagePlaceholder(builder, idx + 1, pageUuids.length, err.message);
+                      addMissingPagePlaceholder(builder, idx + 1, pageUuids.length, err.message, pageW, pageH);
                       continue;
                   }
 
                   if (!pageInfo) continue;
                  
                   const actualPageUuid = pageInfo['pageId'];
-                  pagesMetaData[ actualPageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
-                  pagesMetaData[ pageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
+                  if ( target.board === boardId ) { // the page numbers of the board on screen
+                      pagesMetaData[ actualPageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
+                      pagesMetaData[ pageUuid  ] = [ pageInfo['pageNr'], pageInfo['pageTotal'] ];
+                  }
                   let pageSnapshots = pageInfo['pageSnapshots'];
                   pageSnapshots.push( pageInfo['hash'] );
                   touchPageInCache( pageUuid );
@@ -8559,7 +8578,7 @@
                       try {
                           pageData = await sendWithCallback({
                               type: shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE,
-                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: boardId,
+                              [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD]: target.board,
                               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PAGE]: pageUuid,
                               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT]: initialPageData[ 'present' ],
                               [shared.MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.PRESENT_HASH]: initialPageData[ 'hash' ],
@@ -8577,26 +8596,23 @@
                   if ( !pageData ) {
                       debugLog(`Replay for page ${pageUuid} gave no data, fetching the full page`);
                       try {
-                          pageData = await fetchFullPage( pageUuid );
+                          pageData = await fetchFullPage( pageUuid, target.board );
                       } catch (err) {
                           console.warn(`Skipping page ${pageUuid}: ${err.message}`);
                           skipped.push(`${idx + 1} (${err.message})`);
-                          addMissingPagePlaceholder(builder, idx + 1, pageUuids.length, err.message);
+                          addMissingPagePlaceholder(builder, idx + 1, pageUuids.length, err.message, pageW, pageH);
                           continue;
                       }
                   }
                   
-                  // Use format dimensions if set, else canvas size
-                  const pdfBoardW = canvasFormat ? canvasFormat.w : canvas.width;
-                  const pdfBoardH = canvasFormat ? canvasFormat.h : canvas.height;
-                  const pdfCtx = builder.new_page(pdfBoardW, pdfBoardH);
+                  const pdfCtx = builder.new_page(pageW, pageH);
                   
-                   if ( !canvasFormat ) {
-                       pdfCtx.transform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+                   if ( !target.format ) {
+                       pdfCtx.transform(target.zoom, 0, 0, target.zoom, target.panX, target.panY);
                    } else {
                        pdfCtx.transform(1, 0, 0, 1, 0, 0);
                        pdfCtx.save();
-                       pdfCtx.rect(0, 0, canvasFormat.w, canvasFormat.h);
+                       pdfCtx.rect(0, 0, target.format.w, target.format.h);
                        pdfCtx.clip();
                    }
                    
@@ -8609,31 +8625,72 @@
                   
                   // Render all visible elements as vectors
                   shared.render_all_visible_elements(pageVisualState, (element) => {
-                      if (visibleLayers.has(element[shared.ELEMENT.LAYER])) {
+                      if (target.layers.has(element[shared.ELEMENT.LAYER])) {
                           renderElement(pdfCtx, element);
                       }
                   });
 
-                  if ( canvasFormat ) {
+                  if ( target.format ) {
                       pdfCtx.restore();
                   }
               }
 
                if (skipped.length === pageUuids.length) {
-                   showError(`PDF export failed, no page could be loaded: ${skipped.join(', ')}`);
+                   target.problem(`PDF export failed, no page could be loaded: ${skipped.join(', ')}`);
                    return;
                }
                builder.download_in_browser(filename);
-               hideError();
+               target.finished();
                if (skipped.length > 0) {
-                   showError(`PDF exported without page(s) ${skipped.join(', ')}`);
+                   target.problem(`PDF exported without page(s) ${skipped.join(', ')}`);
                }
 
            } catch (err) {
-               hideError();
-               showError(`PDF export failed: ${err.message}`);
+               target.problem(`PDF export failed: ${err.message}`);
                console.error('PDF export error:', err);
            }
+       }
+
+       // A board of the list as one PDF of all its pages, without opening it: the page
+       // order comes from the server, format, zoom and pan from what this browser last
+       // used on that board (its settings), all layers shown. It reports in the message
+       // line above the tree, since the banner is behind the boards view.
+       async function exportBoardFromTree(entry) {
+           const say = (text) => setFeedback('manager-feedback', text ? `PDF of "${entry.path}": ${text}` : '');
+           if (!(ws && ws.readyState === WebSocket.OPEN)) {
+               say('not connected to the server');
+               return;
+           }
+           let pageUuids;
+           try {
+               const reply = await sendWithCallback({
+                   type: shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.TYPE,
+                   [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.BOARD]: entry.board,
+                   [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REGISTER]: false,
+                   [shared.MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.REQUEST_ID]: createRequestId()
+               });
+               pageUuids = reply[shared.MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES];
+           } catch (err) {
+               say(`export failed: ${err.message}`);
+               return;
+           }
+           let settings = null;
+           try {
+               settings = JSON.parse(localStorage.getItem(getSettingsStorageKey(entry.board)) || 'null');
+           } catch (err) {
+               // storage blocked or unreadable: the defaults
+           }
+           exportPagesToPDF(pageUuids, `board_${entry.board}_all_${getTimestampForFilename()}.pdf`, {
+               board: entry.board,
+               format: (settings && settings.canvasFormat) || null,
+               zoom: (settings && settings.zoomLevel) || 1,
+               panX: (settings && settings.panX) || 0,
+               panY: (settings && settings.panY) || 0,
+               layers: new Set([0, 1, 2, 3, 4, 5, 6, 7]),
+               progress: say,
+               finished: () => say(''),
+               problem: say
+           });
        }
 
        function exportBoardToPDF() {

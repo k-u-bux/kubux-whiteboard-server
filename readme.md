@@ -19,7 +19,7 @@ A real-time collaborative whiteboard application designed for mathematics educat
 - **Interactive paste** - Paste with affine transform controls (move, rotate, scale, shear), plus multi-paste modes that place 2–36 copies evenly along an open path, a straight, horizontal, or vertical line, around a circle, or in a rectangular grid
 - **Canvas formats** - Optional page format presets (A4, Letter, Legal, each portrait or landscape; 16:9, 16:10, 4:3, 3:2, 2:1; custom) with fit-width/fit-height zoom
 - **Layer system** - Organize content across 8 separate layers with visibility control
-- **PDF export** - Export the current page from the toolbar, or selected pages or the entire board from the overview, as vector PDFs
+- **PDF export** - Export the current page from the toolbar, selected pages or the entire board from the overview, or any of your boards from the boards view, as vector PDFs
 - **Undo/redo** - Full history tracking with undo/redo capability
 - **Boards view** - A full-window page for the current board (its links, going to another board) and, after logging in, your boards
 - **Board manager** - Your boards as an expandable folder tree (from paths like `teaching/algebra/week1`), with a filter; create, open, rename and move boards and folders, copy their links, change your credential
@@ -214,7 +214,7 @@ Click the folder icon (🗂️) to open the boards view; Close or Escape returns
 In the tree:
 
 - **Filter** - type part of a path: only matching boards are shown, with their folders expanded; clearing the filter restores the tree.
-- **Open** a board (with its edit password), **copy** its view or edit link, or **rename** it, from the buttons in its row.
+- **Open** a board (with its edit password), **copy** its view or edit link, **rename** it, or **export** it as one PDF of all its pages, from the buttons in its row. The export does not open the board; it uses the format, zoom and pan this browser last used on that board, with all layers shown.
 - **Rename** a board or a folder: the row turns into a field with the full path; edit it and press Enter (or the check button), Escape cancels. A new path can move it to another folder; moving a folder moves every board in it.
 - **New board in a folder** - a folder's "new board" button opens a name field in that folder. Enter on an empty name just closes it.
 - **Paths are checked as you type**, in every path field, and taken exactly as typed: names separated by `/`, without empty names (no `//`, no `/` at the start or end) and without spaces at the start or end of a name. While a path cannot be used, the reason (for example "Path taken" or "No space at the start or end of a name") shows right under the field, and its button (New Board, or the check button) is greyed out. An empty field only greys the button out. The server checks again when you submit, since the list may be out of date (changes in another tab); its reason shows under the field the same way, and the field stays open.
