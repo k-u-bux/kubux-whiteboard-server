@@ -2036,7 +2036,9 @@ function routeMessage(ws, message) {
     const requestId = data.requestId || data['action-uuid'] || 'N/A';
     const message_type = data['type'] || 'unknown';
 
-    debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, redactSecrets(data) );
+    // the message is not validated yet: stringifying all of it can overflow the stack on deep nesting
+    // debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, redactSecrets(data) );
+    debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}'`);
 
     // own properties only: inherited ones (toString, hasOwnProperty, ...) are not handlers
     if ( ! Object.hasOwn( messageHandlers, message_type ) ) {
