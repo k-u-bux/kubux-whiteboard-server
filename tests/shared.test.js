@@ -164,9 +164,7 @@ describe('uuids', () => {
         assert.ok(!shared.isUuid(undefined));
     });
 
-    it('isUuid accepts strings only', {
-        todo: 'open: the regex test turns a list into its text, so ["<uuid>"] passes'
-    }, () => {
+    it('isUuid accepts strings only', () => {
         assert.ok(!shared.isUuid([uuid()]));
         assert.ok(!shared.isUuid({ toString: () => uuid() }));
     });

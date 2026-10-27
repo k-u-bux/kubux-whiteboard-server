@@ -132,9 +132,7 @@ describe('malformed input', () => {
         assert.equal((await client.listBoards(ANN.login, ANN.credential)).type, 'board-list');
     });
 
-    it('a uuid field that is not a string is no uuid: an id in a list is dropped', {
-        todo: 'open: isUuid accepts ["<uuid>"] (the regex test turns the list into its text), so the list passes as a board id'
-    }, async () => {
+    it('a uuid field that is not a string is no uuid: an id in a list is dropped', async () => {
         const requestId = uuid();
         client.send({ type: 'board-info-request', 'board-uuid': [board.board], requestId });
         assert.equal(await client.receives(message => message.requestId === requestId, 500), false);
@@ -164,12 +162,10 @@ describe('malformed input', () => {
     });
 });
 
-// Known open bugs, each on a server of its own: the first ends the server process, the
-// second writes a stale copy of a board over its file.
-describe('malformed input, open bugs', () => {
-    it('deeply nested JSON does not end the server', {
-        todo: 'open: routeMessage logs every message through redactSecrets, whose JSON.stringify overflows the stack at about 3000 levels (6 KB); the RangeError ends the process'
-    }, async () => {
+// Fixed bugs, each on a server of its own: the first ended the server process, the
+// second wrote a stale copy of a board over its file.
+describe('malformed input, fixed bugs', () => {
+    it('deeply nested JSON does not end the server', async () => {
         const server = await startServer();
         try {
             const client = await server.connect();
@@ -185,9 +181,7 @@ describe('malformed input, open bugs', () => {
         }
     });
 
-    it('a board id in a list does not load a second copy of the board', {
-        todo: 'open: useBoard(["<uuid>"]) misses the cache, loads the board file again and caches the copy under the list; the periodic save writes the stale copy over the board file'
-    }, async () => {
+    it('a board id in a list does not load a second copy of the board', async () => {
         const fs = require('fs');
         const path = require('path');
         const { deserialize } = require(path.join(__dirname, '..', 'shared.js'));
