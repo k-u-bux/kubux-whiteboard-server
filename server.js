@@ -2033,6 +2033,13 @@ function routeMessage(ws, message) {
         debug.error('[SERVER] Could not deserialize message: ', message);
         return;
     }
+    // these fields are used before any validator runs: one that is not a string makes the message invalid
+    for (const key of ['type', 'requestId', 'action-uuid']) {
+        if (data[key] !== undefined && typeof data[key] !== 'string') {
+            debug.log(`[SERVER] dropped invalid message from client ${ws.clientId}: ${key} is not a string`);
+            return;
+        }
+    }
     const requestId = data.requestId || data['action-uuid'] || 'N/A';
     const message_type = data['type'] || 'unknown';
 
