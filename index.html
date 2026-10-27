@@ -6410,7 +6410,9 @@
           updateUndoRedoButtons();
           updateSyncStatus();
           
-          // Send to server
+          // Send to server, pending like any edit: a ping the server sent before it got
+          // the undo still reports the old position and would take present back to it
+          pending_register_action( undoUuid );
           sendMessage(proposal);
       }
       
@@ -6445,7 +6447,8 @@
           updateUndoRedoButtons();
           updateSyncStatus();
           
-          // Send to server
+          // Send to server, pending like any edit (see handleUndo)
+          pending_register_action( redoUuid );
           sendMessage(proposal);
       }
       
