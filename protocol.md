@@ -230,8 +230,9 @@ The following messages are for owners: users with an entry in `conf/users.json`.
 - `login`: 1 to 64 characters; `passwd`: 1 to 1024 characters; `requestId`: required.
 - **Each message is checked on its own.** The server keeps no login state: the credential is checked with scrypt against the hash of that login in `conf/users.json` for every owner message. An unknown login costs one scrypt as well, and gets the same answer as a wrong credential.
 - **One check per connection at a time.** An owner message that arrives while another one's check is still running on the same connection is refused with `a credential is already being checked`; clients send owner messages one after the other.
+- **Failed checks are limited per client address.** Successful checks are not counted. An address may fail 10 checks; one failure is forgotten per minute. A check counts as failed from the moment it starts and no longer counts once the credential matches, so an address cannot have more checks running at once, over all its connections, than it may still fail. An owner message from an address with no failures left is refused at once, without a check, with `too many failed credential checks, try again later` — even if its credential is right. The address is the connection's peer; behind the proxy, the last entry of `X-Forwarded-For`. IPv6 addresses count per /64.
 - The action runs once the check has succeeded, against the boards as they are at that moment.
-- Refusals common to all owner messages: `error` with message `credential not accepted` or `a credential is already being checked`.
+- Refusals common to all owner messages: `error` with message `credential not accepted`, `a credential is already being checked` or `too many failed credential checks, try again later`.
 
 ---
 
@@ -604,7 +605,7 @@ Sent when a message is rejected before reaching a handler, when an owner message
 
 `requestId` is present for refused requests. `message` is one of:
 - the `JSON.parse` error text, or `Unhandled message type: <type>` (no `requestId`); a type longer than 20 characters, unless it is a UUID, is cut to its first 20, followed by `...` (as is every text a client chose wherever the server logs it);
-- `credential not accepted`, `a credential is already being checked`, `credential could not be saved`;
+- `credential not accepted`, `a credential is already being checked`, `too many failed credential checks, try again later`, `credential could not be saved`;
 - `invalid path`, `path taken`, `not your board`, `no such folder`, `rename cannot be written safely`;
 - `no such board` (to `register-board`).
 

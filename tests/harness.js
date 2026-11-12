@@ -167,12 +167,22 @@ function removeDir(dir) {
     fs.rmSync(dir, { recursive: true, force: true });
 }
 
+// 127.0.0.2, 127.0.0.3, ...: a fresh loopback address for every client connection
+let loopbackCount = 0;
+function nextLoopbackAddress() {
+    const n = 2 + (loopbackCount++ % 16000000);
+    return `127.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
+}
+
 // A protocol client. Every message received is kept in the inbox until a next() or
 // request() takes it, so a test can wait for a message that has already arrived.
 class Client {
+    // Each connection comes from an address of its own in 127.0.0.0/8 (all of it reaches
+    // the loopback interface on Linux), as separate clients do: the server limits failed
+    // credential checks per address, and the tests fail checks on purpose.
     static connect(wsUrl) {
         return new Promise((resolve, reject) => {
-            const ws = new WebSocket(wsUrl);
+            const ws = new WebSocket(wsUrl, { localAddress: nextLoopbackAddress() });
             ws.once('open', () => resolve(new Client(ws)));
             ws.once('error', reject);
         });

@@ -2,11 +2,12 @@
 // Owner messages: credentials, the user file read for every check, board creation,
 // the board list, and moving boards and folders (protocol.md, "Owner messages").
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it, before, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { uuid, sleep, startServer, removeDir, readUsers, writeUsers, draw } = require('./harness');
+const WebSocket = require('ws');
+const { uuid, sleep, startServer, removeDir, readUsers, writeUsers, draw, Client } = require('./harness');
 const { hashPassword } = require(path.join(__dirname, '..', 'users.js'));
 const { deserialize } = require(path.join(__dirname, '..', 'shared.js'));
 
@@ -21,6 +22,13 @@ describe('owner messages', () => {
 
     before(async () => {
         server = await startServer({ users: [ANN, BOB] });
+    });
+    // a connection of its own for every test: its own address, so the failed checks of
+    // one test do not use up the failures left to the next (protocol.md, "Owner messages")
+    beforeEach(async () => {
+        if (client) {
+            client.close();
+        }
         client = await server.connect();
     });
     after(async () => {
@@ -84,6 +92,56 @@ describe('owner messages', () => {
             client.send({ type: 'list-boards', login: ANN.login, passwd: ANN.credential });
             client.send({ type: 'create-board', login: ANN.login, passwd: ANN.credential, path: 7, requestId });
             assert.equal(await client.receives(message => message.requestId === requestId, 500), false);
+        });
+
+        // Connections from one given loopback address (harness connections each have their own)
+        const fromAddress = (localAddress) => new Promise((resolve, reject) => {
+            const ws = new WebSocket(server.wsUrl, { localAddress });
+            ws.once('open', () => resolve(new Client(ws)));
+            ws.once('error', reject);
+        });
+        const TOO_MANY = 'too many failed credential checks, try again later';
+
+        it('an address that failed 10 checks is refused at once, even with the right credential; others are not', async () => {
+            const connection = await fromAddress('127.200.0.1');
+            for (let i = 0; i < 10; ++i) {
+                assert.equal((await connection.listBoards(ANN.login, 'wrong')).message, 'credential not accepted', `failure ${i + 1}`);
+            }
+            assert.equal((await connection.listBoards(ANN.login, ANN.credential)).message, TOO_MANY);
+            assert.equal((await connection.owner('create-board', ANN.login, ANN.credential, { path: 'never' })).message, TOO_MANY);
+            // a new connection from the same address does not start afresh
+            const again = await fromAddress('127.200.0.1');
+            assert.equal((await again.listBoards(ANN.login, ANN.credential)).message, TOO_MANY);
+            // another address is not affected
+            assert.equal((await client.listBoards(ANN.login, ANN.credential)).type, 'board-list');
+            connection.close();
+            again.close();
+        });
+
+        it('successful checks are not counted', async () => {
+            const connection = await fromAddress('127.200.0.2');
+            for (let i = 0; i < 20; ++i) {
+                assert.equal((await connection.listBoards(ANN.login, ANN.credential)).type, 'board-list');
+            }
+            for (let i = 0; i < 9; ++i) {
+                assert.equal((await connection.listBoards(ANN.login, 'wrong')).message, 'credential not accepted');
+            }
+            // the last failure left: the check counts as failed while it runs, and no longer once it succeeds
+            assert.equal((await connection.listBoards(ANN.login, ANN.credential)).type, 'board-list');
+            assert.equal((await connection.listBoards(ANN.login, 'wrong')).message, 'credential not accepted');
+            assert.equal((await connection.listBoards(ANN.login, ANN.credential)).message, TOO_MANY);
+            connection.close();
+        });
+
+        it('one address cannot run more checks at once than it may fail, over many connections', async () => {
+            const connections = await Promise.all(Array.from({ length: 25 }, () => fromAddress('127.200.0.3')));
+            const answers = await Promise.all(connections.map(connection => connection.listBoards(ANN.login, 'wrong')));
+            const messages = answers.map(answer => answer.message);
+            assert.equal(messages.filter(message => message === 'credential not accepted').length, 10);
+            assert.equal(messages.filter(message => message === TOO_MANY).length, 15);
+            for (const connection of connections) {
+                connection.close();
+            }
         });
     });
 

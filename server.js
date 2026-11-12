@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
+const net = require('net');
 const path = require('path');
 const url = require('url');
 const assert = require('assert');
@@ -159,6 +160,7 @@ const {
     MESSAGES, 
     CREDENTIAL_NOT_ACCEPTED,
     CREDENTIAL_NOT_SAVED,
+    TOO_MANY_FAILED_CHECKS,
     NOT_OWNER,
     NO_SUCH_BOARD,
     RENAME_BLOCKED,
@@ -1530,9 +1532,97 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.TYPE] = (ws, data, r
 // A check costs one scrypt; one check runs per connection at a time. The action
 // runs once the check has succeeded, so it sees the board index as it is then.
 
+// Failed credential checks
+// ------------------------
+// Successful checks are not counted. Each client address may fail MAX_FAILED_CHECKS
+// checks; one failure is forgotten every FAILURE_FORGOTTEN_MS. A check counts as failed
+// from the moment it starts and no longer counts once the credential matches, so an
+// address cannot start more checks at once (over many connections) than it may fail.
+// An address with no failures left is refused at once, without a check. This is not
+// login state: it says nothing about who is logged in, only how often an address failed.
+// Addresses with all their failures left are not stored: the map holds recent failures.
+const MAX_FAILED_CHECKS = 10;
+const FAILURE_FORGOTTEN_MS = 60 * 1000;
+const failuresLeft = new Map(); // address -> { left, at }: failures left at time at
+
+function failuresLeftNow(address, now) {
+    const entry = failuresLeft.get(address);
+    if (!entry) {
+        return MAX_FAILED_CHECKS;
+    }
+    return Math.min(MAX_FAILED_CHECKS, entry.left + (now - entry.at) / FAILURE_FORGOTTEN_MS);
+}
+
+function setFailuresLeft(address, left, now) {
+    if (left >= MAX_FAILED_CHECKS) {
+        failuresLeft.delete(address);
+    } else {
+        failuresLeft.set(address, { left, at: now });
+    }
+}
+
+// Whether the address may start a check; if so, the check counts as failed until it succeeds
+function startCheck(address) {
+    const now = Date.now();
+    const left = failuresLeftNow(address, now);
+    if (left < 1) {
+        return false;
+    }
+    setFailuresLeft(address, left - 1, now);
+    return true;
+}
+
+// The check succeeded: it no longer counts as failed
+function checkSucceeded(address) {
+    const now = Date.now();
+    setFailuresLeft(address, failuresLeftNow(address, now) + 1, now);
+}
+
+// Forget addresses that have all their failures left again
+setInterval(() => {
+    const now = Date.now();
+    for (const address of [...failuresLeft.keys()]) {
+        setFailuresLeft(address, failuresLeftNow(address, now), now);
+    }
+}, FAILURE_FORGOTTEN_MS);
+
+// The address a connection's failed checks count under. Behind the proxy (proxy mode)
+// the socket's peer is nginx, and the client is the last entry of X-Forwarded-For: the
+// one nginx added (earlier entries come from the client and prove nothing). In direct
+// mode, or without a usable header, the socket's peer. IPv4-mapped IPv6 addresses count
+// as IPv4; other IPv6 addresses per /64, the block one subscriber usually gets.
+function clientAddress(req) {
+    let address = req.socket.remoteAddress || 'unknown';
+    if (!isDirectMode) {
+        const forwarded = req.headers['x-forwarded-for'];
+        const last = typeof forwarded === 'string' ? forwarded.split(',').pop().trim() : '';
+        if (net.isIP(last)) {
+            address = last;
+        }
+    }
+    if (address.startsWith('::ffff:') && net.isIPv4(address.slice(7))) {
+        return address.slice(7);
+    }
+    if (net.isIPv6(address)) {
+        const [head, tail] = address.split('%')[0].split('::');
+        const headGroups = head ? head.split(':') : [];
+        const tailGroups = tail ? tail.split(':') : [];
+        const groups = tail === undefined
+            ? headGroups
+            : [...headGroups, ...Array(8 - headGroups.length - tailGroups.length).fill('0'), ...tailGroups];
+        return `${groups.slice(0, 4).map(group => parseInt(group, 16).toString(16)).join(':')}::/64`;
+    }
+    return address;
+}
+
 function asOwner(ws, data, keys, requestId, act) {
     if ( ws.credentialCheckPending ) {
         rejectMessage(ws, 'a credential is already being checked', requestId);
+        return;
+    }
+    if ( !startCheck(ws.clientAddress) ) {
+        debug.log(`[SERVER] Client ${ws.clientId} at ${ws.clientAddress} refused: too many failed credential checks`);
+        rejectMessage(ws, TOO_MANY_FAILED_CHECKS, requestId);
         return;
     }
     ws.credentialCheckPending = true;
@@ -1544,6 +1634,7 @@ function asOwner(ws, data, keys, requestId, act) {
             rejectMessage(ws, CREDENTIAL_NOT_ACCEPTED, requestId);
             return;
         }
+        checkSucceeded(ws.clientAddress);
         // the client may have left while the check ran: nothing to do for nobody
         if ( ws.readyState !== WebSocket.OPEN ) {
             return;
@@ -2096,6 +2187,7 @@ function routeMessage(ws, message) {
 
 wss.on('connection', (ws, req) => {
     debug.log(`[SERVER] New WebSocket connection established`);
+    ws.clientAddress = clientAddress(req);
     
     if (!pingTimer) {
         pingTimer = setInterval( () => {

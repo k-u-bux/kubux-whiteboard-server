@@ -450,6 +450,7 @@ const MESSAGES = {
 // Reasons in the server's 'error' message
 const CREDENTIAL_NOT_ACCEPTED = 'credential not accepted';           // login or credential check failed
 const CREDENTIAL_NOT_SAVED = 'credential could not be saved';        // the user file could not be written
+const TOO_MANY_FAILED_CHECKS = 'too many failed credential checks, try again later'; // the address failed too many checks recently
 const PATH_INVALID = 'invalid path';                                 // no name left after normalizing, or too long
 const PATH_TAKEN = 'path taken';                                     // exists, or a board would lie inside another
 const NOT_OWNER = 'not your board';                                  // unknown board, or owned by someone else
@@ -1986,6 +1987,7 @@ if (typeof module !== 'undefined' && module.exports) {
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
         CREDENTIAL_NOT_SAVED,
+        TOO_MANY_FAILED_CHECKS,
         PATH_INVALID,
         PATH_TAKEN,
         NOT_OWNER,
@@ -2089,6 +2091,7 @@ else if (typeof window !== 'undefined') {
         MESSAGES,
         CREDENTIAL_NOT_ACCEPTED,
         CREDENTIAL_NOT_SAVED,
+        TOO_MANY_FAILED_CHECKS,
         PATH_INVALID,
         PATH_TAKEN,
         NOT_OWNER,
