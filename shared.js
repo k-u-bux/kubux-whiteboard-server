@@ -55,6 +55,19 @@ function isUuid(str) {
   return typeof str === 'string' && regex.test(str);
 }
 
+// Text a client chose, as it goes into a log line: the logs help debug an honest client,
+// but no client may make them grow beyond reason. A uuid (all an honest client sends as
+// an id) stays whole; any other text longer than LOG_TEXT_LENGTH is cut to its first
+// LOG_TEXT_LENGTH characters followed by '...'. Anything but a string passes unchanged:
+// callers hand in only strings, or values whose size the validators already bound.
+const LOG_TEXT_LENGTH = 20;
+function clip(text) {
+    if (typeof text !== 'string' || text.length <= LOG_TEXT_LENGTH || isUuid(text)) {
+        return text;
+    }
+    return `${text.slice(0, LOG_TEXT_LENGTH)}...`;
+}
+
 // serialization / deserialization
 const serialize = (data) => {
     const replacer = (key, value) => {
@@ -305,7 +318,10 @@ const MESSAGES = {
             BOARD: 'board-uuid',
             PAGE: 'page-uuid',
             PAYLOAD: 'payload',
-            BEFORE_HASH: 'before-hash'
+            BEFORE_HASH: 'before-hash',
+            // optional: the server answers page actions with the first of these as requestId
+            REQUEST_ID: 'requestId',
+            ACTION_UUID: 'action-uuid'
         },
         REPLAY_REQUEST: {
             TYPE: 'replay-requests',
@@ -604,6 +620,16 @@ function is_finite_number_list(list) {
     return Array.isArray(list) && list.every(is_finite_number);
 }
 
+// Whether the object carries a key its schema does not name. A message or action holds
+// exactly the keys of its MESSAGES or MOD_ACTIONS entry: `type` (the entry's TYPE is its
+// value, not a key), the entry's other values, and the keys in also. Anything else is
+// refused, so that no unchecked value is stored, hashed, logged or passed on. An array
+// has index keys and is refused, too.
+function has_unknown_keys(object, schema, also = []) {
+    const keys = Object.entries(schema).filter(([name]) => name !== 'TYPE').map(([, key]) => key);
+    return Object.keys(object).some(key => key !== 'type' && !keys.includes(key) && !also.includes(key));
+}
+
 // A stroke is the compact array indexed by ELEMENT. Every slot holds a number,
 // a short string, or a list of numbers (points: a list of such lists), so the
 // check walks a fixed depth, one pass over the points, and stops at the first
@@ -670,7 +696,10 @@ function is_invalid_action_payload(action, depth = 0) {
     ];
     
     if (!validTypes.includes(action[MOD_ACTIONS.TYPE])) return true;
-    
+
+    const schema = Object.values(MOD_ACTIONS).find(entry => typeof entry === 'object' && entry.TYPE === action[MOD_ACTIONS.TYPE]);
+    if (has_unknown_keys(action, schema, [MOD_ACTIONS.UUID])) return true;
+
     // Type-specific validation
     switch (action[MOD_ACTIONS.TYPE]) {
         case MOD_ACTIONS.DRAW.TYPE:
@@ -709,6 +738,7 @@ function is_invalid_action_payload(action, depth = 0) {
 
 function is_invalid_REGISTER_BOARD_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD)) return true;
     
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_BOARD.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
@@ -724,6 +754,7 @@ function is_invalid_REGISTER_BOARD_message(data) {
 
 function is_invalid_REGISTER_PAGE_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE)) return true;
     
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.REGISTER_PAGE.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
@@ -742,6 +773,7 @@ function is_invalid_REGISTER_PAGE_message(data) {
 
 function is_invalid_PAGE_INFO_REQUEST_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST)) return true;
     
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.PAGE_INFO_REQUEST.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
@@ -789,6 +821,7 @@ function is_invalid_raw_path(raw) {
 
 function is_invalid_CHANGE_CREDENTIAL_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL)) return true;
 
     if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL)) return true;
     if (is_invalid_credential_text(data[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.NEW_PASSWORD])) return true;
@@ -798,6 +831,7 @@ function is_invalid_CHANGE_CREDENTIAL_message(data) {
 
 function is_invalid_CREATE_BOARD_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD)) return true;
     
     if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD)) return true;
     if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.CREATE_BOARD.PATH])) return true;
@@ -810,6 +844,7 @@ function is_invalid_CREATE_BOARD_message(data) {
 
 function is_invalid_LIST_BOARDS_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS)) return true;
 
     if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.LIST_BOARDS)) return true;
 
@@ -818,6 +853,7 @@ function is_invalid_LIST_BOARDS_message(data) {
 
 function is_invalid_SET_PATH_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.SET_PATH)) return true;
 
     if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.SET_PATH)) return true;
 
@@ -831,6 +867,7 @@ function is_invalid_SET_PATH_message(data) {
 
 function is_invalid_RENAME_PREFIX_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX)) return true;
 
     if (is_invalid_owner_fields(data, MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX)) return true;
     if (is_invalid_raw_path(data[MESSAGES.CLIENT_TO_SERVER.RENAME_PREFIX.FROM])) return true;
@@ -841,6 +878,7 @@ function is_invalid_RENAME_PREFIX_message(data) {
 
 function is_invalid_FULL_PAGE_REQUEST_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST)) return true;
     
     // boardId can come from data or ws.boardId (checked in handler)
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.FULL_PAGE_REQUEST.BOARD];
@@ -863,6 +901,7 @@ function is_invalid_FULL_PAGE_REQUEST_message(data) {
 
 function is_invalid_MOD_ACTION_PROPOSALS_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS)) return true;
     
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
@@ -884,6 +923,7 @@ function is_invalid_MOD_ACTION_PROPOSALS_message(data) {
 
 function is_invalid_REPLAY_REQUEST_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST)) return true;
     
     // boardId can come from data or ws.boardId (checked in handler)
     const boardId =  data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
@@ -909,6 +949,7 @@ function is_invalid_REPLAY_REQUEST_message(data) {
 
 function is_invalid_BOARD_INFO_REQUEST_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST)) return true;
 
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.BOARD];
     if (!boardId || !isUuid(boardId)) return true;
@@ -924,6 +965,7 @@ function is_invalid_BOARD_INFO_REQUEST_message(data) {
 
 function is_invalid_SHUFFLE_PROPOSAL_message(data) {
     if (!data || typeof data !== 'object') return true;
+    if (has_unknown_keys(data, MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL)) return true;
 
     const password = data[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.PASSWORD];
     if (!password || typeof password !== 'string') return true;
@@ -1154,7 +1196,7 @@ function showElement ( visualState, uuid ) {
 
 function hideElement ( visualState, uuid ) {
     if ( ! visualState.visible.has( uuid ) ) {
-        console.log("element not visible:", serialize( uuid ) );
+        console.log("element not visible:", serialize( clip( uuid ) ) );
         return false;
     }
     visualState.visible.delete( uuid );
@@ -1927,6 +1969,9 @@ if (typeof module !== 'undefined' && module.exports) {
         NULL_UUID,
         generateUuid,
         isUuid,
+        // log lines
+        LOG_TEXT_LENGTH,
+        clip,
         // serialization
         serialize,
         deserialize,
@@ -2027,6 +2072,9 @@ else if (typeof window !== 'undefined') {
         NULL_UUID,
         generateUuid,
         isUuid,
+        // log lines
+        LOG_TEXT_LENGTH,
+        clip,
         // serialization
         serialize,
         deserialize,

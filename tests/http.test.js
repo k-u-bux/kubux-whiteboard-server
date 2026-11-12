@@ -63,6 +63,25 @@ describe('HTTP', () => {
         }
     });
 
+    // url.parse threw on these, which ended the server
+    it('a request target url.parse cannot take: 400, and the server keeps running', async () => {
+        const net = require('net');
+        for (const target of ['http://[zz/?board=1', 'http://[::1/']) {
+            const statusLine = await new Promise((resolve, reject) => {
+                const socket = net.connect(server.port, '127.0.0.1', () => {
+                    socket.write(`GET ${target} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n`);
+                });
+                let text = '';
+                socket.on('data', chunk => { text += chunk; });
+                socket.on('close', () => resolve(text.split('\r\n')[0]));
+                socket.on('error', reject);
+            });
+            assert.equal(statusLine, 'HTTP/1.1 400 Bad Request', target);
+        }
+        assert.ok(server.running, `server exited:\n${server.output}`);
+        assert.equal((await httpGet(`${server.url}/?board=x`)).status, 200);
+    });
+
     it('takes WebSocket connections on /ws only', async () => {
         const good = new WebSocket(server.wsUrl);
         await new Promise((resolve, reject) => { good.once('open', resolve); good.once('error', reject); });

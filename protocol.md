@@ -24,7 +24,7 @@ The server keeps no login state. Owner messages (`create-board`, `list-boards`, 
 
 - A message whose JSON cannot be parsed, or whose `type` has no handler, is answered with an `error` message.
 - An owner message that is refused (credential not accepted, invalid path, …) is answered with an `error` message carrying the request's `requestId`.
-- A message that fails its validator (`is_invalid_*` in `shared.js`) is dropped without a reply.
+- A message that fails its validator (`is_invalid_*` in `shared.js`) is dropped without a reply. A message or action (at any depth of a group) with a key its description below does not name fails its validator.
 - A request that names an unknown board is dropped without a reply, except `register-board`, which is answered with an `error` message (`no such board`).
 
 ## Client → Server Messages
@@ -159,7 +159,7 @@ Propose a modification (draw, erase, group, undo, redo, new page, delete page).
 
 - `passwd`, `board-uuid`, `page-uuid`, `payload`: required. The payload is validated recursively (see *Action Types*).
 - `before-hash`: optional string. The client sends the hash of its state before the action (`NULL_UUID` for page actions). **The server does not check it**: draw, erase and group actions are applied to whatever state the server has, and are declined only if they cannot be applied there.
-- There is no `requestId` key; the server uses `requestId`, then `action-uuid`, if present (otherwise `"N/A"`), for logging and as the `requestId` of the responses to page actions.
+- `requestId`, `action-uuid`: optional strings; the client sends neither. The server uses `requestId`, then `action-uuid`, if present (otherwise `"N/A"`), for logging and as the `requestId` of the responses to page actions.
 
 **Responses:**
 - `decline` with reason `unauthorized` if `passwd` does not match the board password;
@@ -603,7 +603,7 @@ Sent when a message is rejected before reaching a handler, when an owner message
 ```
 
 `requestId` is present for refused requests. `message` is one of:
-- the `JSON.parse` error text, or `Unhandled message type: <type>` (no `requestId`);
+- the `JSON.parse` error text, or `Unhandled message type: <type>` (no `requestId`); a type longer than 20 characters, unless it is a UUID, is cut to its first 20, followed by `...` (as is every text a client chose wherever the server logs it);
 - `credential not accepted`, `a credential is already being checked`, `credential could not be saved`;
 - `invalid path`, `path taken`, `not your board`, `no such folder`, `rename cannot be written safely`;
 - `no such board` (to `register-board`).

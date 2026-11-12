@@ -170,6 +170,25 @@ describe('uuids', () => {
     });
 });
 
+describe('log lines', () => {
+    it('clip: a uuid or a short text stays whole, a longer text is cut and gets "..."', () => {
+        const { clip, LOG_TEXT_LENGTH } = shared;
+        assert.equal(LOG_TEXT_LENGTH, 20);
+        const id = uuid();
+        assert.equal(clip(id), id);
+        assert.equal(clip(''), '');
+        assert.equal(clip('mod-action-proposals'), 'mod-action-proposals');
+        assert.equal(clip('x'.repeat(21)), `${'x'.repeat(20)}...`);
+        assert.equal(clip(`${id}x`), `${id.slice(0, 20)}...`);
+        assert.equal(clip('y'.repeat(4 * 1024 * 1024)), `${'y'.repeat(20)}...`);
+    });
+
+    it('clip: anything but a string passes unchanged', () => {
+        assert.equal(shared.clip(undefined), undefined);
+        assert.equal(shared.clip(42), 42);
+    });
+});
+
 describe('message validation', () => {
     const board = uuid();
     const page = uuid();

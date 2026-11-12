@@ -145,8 +145,9 @@ const {
     PORT,
     recent_snapshots,
     hashAny, 
-    hashNext, 
+    hashNext,
     isUuid,
+    clip,
     isEqual,
     serialize, 
     deserialize,
@@ -747,8 +748,8 @@ const serveableFiles = {
 };
 
 
-function isValidRequest(req) {
-    const urlParts = url.parse(req.url, true);
+// urlParts: the request target, as url.parse(req.url, true) gives it
+function isValidRequest(urlParts) {
     const pathname = urlParts.pathname;
     
     // 1. Strict Path Validation: Only allow the root path
@@ -776,7 +777,17 @@ function isValidRequest(req) {
 
 // const httpServer = https.createServer( serverOptions, (req, res) => {
 const httpServer = http.createServer( (req, res) => {
-    const requestUrl = url.parse(req.url).pathname;
+    // The request target is client input: one that url.parse cannot take (an absolute
+    // URL with an invalid host, say) is a bad request, not an exception.
+    let urlParts;
+    try {
+        urlParts = url.parse(req.url, true);
+    } catch (error) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('Bad Request');
+        return;
+    }
+    const requestUrl = urlParts.pathname;
     
     // Trust proxy headers - critical for HTTPS detection behind reverse proxy
     // This allows PWA/service workers to work correctly
@@ -819,7 +830,7 @@ const httpServer = http.createServer( (req, res) => {
         return;
     }
 
-    if ( ! isValidRequest( req ) ) {
+    if ( ! isValidRequest( urlParts ) ) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('File not found');
         return;
@@ -908,15 +919,18 @@ httpServer.listen(serverPort, () => {
 });
 
 
-// Never let secrets reach the logs: a copy of a payload with passwd fields masked.
-// Wire messages are plain JSON (no BigInt/Set/Map), so JSON round-trips safely here.
+// A copy of an outgoing payload for the log. Never let secrets reach the logs: passwd
+// fields are masked. Ids a client chose and the server echoes (a page action's requestId
+// or action-uuid can be any string) are clipped. Wire messages are plain JSON (no
+// BigInt/Set/Map), so JSON round-trips safely here.
 const SECRET_KEYS = new Set(['passwd', 'new-passwd']);
-function redactSecrets(value) {
-    return JSON.parse(JSON.stringify(value, (key, v) => (SECRET_KEYS.has(key) ? '[redacted]' : v)));
+const ECHOED_KEYS = new Set(['requestId', 'action-uuid']);
+function payloadForLog(value) {
+    return JSON.parse(JSON.stringify(value, (key, v) => (SECRET_KEYS.has(key) ? '[redacted]' : ECHOED_KEYS.has(key) ? clip(v) : v)));
 }
 
 function logSentMessage(type, payload, requestId = 'N/A', clientId = 'unknown' ) {
-    debug.log(`[SERVER > CLIENT] Sending message of type '${type}' to '${clientId}' in response to '${requestId}' with payload:`, redactSecrets(payload));
+    debug.log(`[SERVER > CLIENT] Sending message of type '${type}' to '${clientId}' in response to '${clip(requestId)}' with payload:`, payloadForLog(payload));
 }
 
 // Wire messages are plain JSON. serialize/deserialize, with their replacer, reviver
@@ -944,6 +958,28 @@ function messageWithActions( message, key, actions ) {
     return `${head.slice( 0, -1 )},${JSON.stringify( key )}:${actionsJson( actions )}}`;
 }
 
+// Most a connection may have queued for sending, in bytes (before compression). A client
+// that does not read its socket stops TCP from taking more, and ws keeps every further
+// message in this process: without a limit, cheap requests for large pages pile up
+// gigabytes. An honest client reaches the limit only with one burst of replies larger
+// than it, such as the full pages of every thumbnail of a huge board's page overview.
+const MAX_BUFFERED_AMOUNT = 64 * 1024 * 1024;
+
+// Every message to a client goes through here. A connection with more than
+// MAX_BUFFERED_AMOUNT queued is cut off instead, so it holds at most that plus one
+// message. terminate, not close: a close frame would queue behind the rest. Messages to
+// a connection that is already closing are discarded by ws.
+function sendText( ws, text ) {
+    if ( ws.bufferedAmount > MAX_BUFFERED_AMOUNT ) {
+        if ( ws.readyState === WebSocket.OPEN ) {
+            debug.error(`[SERVER] Closing connection of client ${ws.clientId}: ${ws.bufferedAmount} bytes not read`);
+        }
+        ws.terminate();
+        return;
+    }
+    ws.send( text );
+}
+
 // The text is the same for every recipient: serialize once, not once per client.
 function broadcastMessageToBoard( message, boardId, excludeWs = null ) {
     broadcastTextToBoard( JSON.stringify( message ), boardId, excludeWs );
@@ -952,7 +988,7 @@ function broadcastMessageToBoard( message, boardId, excludeWs = null ) {
 function broadcastTextToBoard( text, boardId, excludeWs = null ) {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && client.boardId === boardId && client !== excludeWs) {
-            client.send( text );
+            sendText(client, text );
         }
     });
 }
@@ -961,7 +997,7 @@ function broadcastMessageToPage( message, pageId, excludeWs = null ) {
     const text = JSON.stringify( message );
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN && client.pageId === pageId && client !== excludeWs) {
-            client.send( text );
+            sendText(client, text );
         }
     });
 }
@@ -1008,7 +1044,7 @@ function sendFullPage(ws, boardId, requestedPageId, do_switch, requestId) {
         }
 
         releasePage(pageId);
-        ws.send(messageWithActions(message, MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY, pageHistory));
+        sendText(ws, messageWithActions(message, MESSAGES.SERVER_TO_CLIENT.FULL_PAGE.HISTORY, pageHistory));
         logSentMessage(message.type, message, requestId, ws.clientId);
     }
     releaseBoard(boardId);
@@ -1041,7 +1077,7 @@ function sendPageInfo(ws, boardId, requestedPageId, do_switch, requestId) {
     if ( do_switch ) {
         ws.pageId = pageId;
     }
-    ws.send(JSON.stringify(message));
+    sendText(ws, JSON.stringify(message));
     logSentMessage(message.type, message, requestId, ws.clientId);
 }
 
@@ -1060,7 +1096,7 @@ function sendPageLost(ws, board, requestedPageId, pageId, do_switch, requestId) 
     if ( do_switch ) {
         ws.pageId = pageId;
     }
-    ws.send(JSON.stringify(message));
+    sendText(ws, JSON.stringify(message));
     logSentMessage(message.type, message, requestId, ws.clientId);
 }
 
@@ -1088,7 +1124,7 @@ function ping_client_with_page ( client, pageId, board ) {
     releasePage(pageId);
     releaseBoard(client.boardId);
     
-    client.send(JSON.stringify(message));
+    sendText(client, JSON.stringify(message));
     logSentMessage(message.type, message, 'N/A', client.clientId);
 }
 
@@ -1139,7 +1175,7 @@ function sendBoardInfo() {
             if ( board ) {
                 const message = boardInfo( boardId, board, NULL_UUID );
                 releaseBoard( boardId );
-                client.send( JSON.stringify( message ) );
+                sendText(client, JSON.stringify( message ) );
             }
         }
     });
@@ -1179,7 +1215,7 @@ function createNewBoard(ws, clientId, owner, path, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.FIRST_PAGE]: board.pageOrder[0],
             [MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.REQUEST_ID]: requestId
         };
-        ws.send(JSON.stringify(response));
+        sendText(ws, JSON.stringify(response));
         logSentMessage( MESSAGES.SERVER_TO_CLIENT.BOARD_CREATED.TYPE, response, requestId, clientId );
         releaseBoard(boardId);
     }
@@ -1205,7 +1241,7 @@ function registerBoard(ws, boardId, clientId, pageId, requestId) {
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_REGISTERED.REQUEST_ID]: requestId
         };
-        ws.send(JSON.stringify(response));
+        sendText(ws, JSON.stringify(response));
         releaseBoard(boardId);
     } else {
         rejectMessage(ws, NO_SUCH_BOARD, requestId);
@@ -1256,7 +1292,7 @@ function describePage(ws, boardId, pageId, delta, do_switch, requestId) {
         if ( do_switch ) {
             ws.pageId = resolvedPageId;
         }
-        ws.send(JSON.stringify(response));
+        sendText(ws, JSON.stringify(response));
         releasePage(resolvedPageId);
     }
     releaseBoard(boardId);
@@ -1298,7 +1334,7 @@ function registerPage(ws, boardId, clientId, pageId, delta, requestId) {
                 [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.TOTAL_PAGES]: board.pageOrder.length,
                 [MESSAGES.SERVER_TO_CLIENT.PAGE_REGISTERED.REQUEST_ID]: requestId
             };
-            ws.send(JSON.stringify(response));
+            sendText(ws, JSON.stringify(response));
         }
         releasePage(resolvedPageId);
     }
@@ -1343,7 +1379,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.BOARD_INFO_REQUEST.TYPE] = (ws, data, 
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
         };
-        ws.send(JSON.stringify(message));
+        sendText(ws, JSON.stringify(message));
         logSentMessage(message.type, message, requestId, ws.clientId);
     }
     releaseBoard(boardId);
@@ -1381,7 +1417,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.TYPE] = (ws, data, re
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
         };
-        ws.send(JSON.stringify(declineMessage));
+        sendText(ws, JSON.stringify(declineMessage));
         logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
         releaseBoard(boardId);
         return;
@@ -1397,7 +1433,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.TYPE] = (ws, data, re
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
         };
-        ws.send(JSON.stringify(declineMessage));
+        sendText(ws, JSON.stringify(declineMessage));
         logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
         releaseBoard(boardId);
         return;
@@ -1412,7 +1448,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.TYPE] = (ws, data, re
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
         };
-        ws.send(JSON.stringify(declineMessage));
+        sendText(ws, JSON.stringify(declineMessage));
         logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
         releaseBoard(boardId);
         return;
@@ -1428,7 +1464,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.SHUFFLE_PROPOSAL.TYPE] = (ws, data, re
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.PAGES]: board.pageOrder,
             [MESSAGES.SERVER_TO_CLIENT.BOARD_INFO.REQUEST_ID]: requestId
         };
-        ws.send(JSON.stringify(declineMessage));
+        sendText(ws, JSON.stringify(declineMessage));
         logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
         releaseBoard(boardId);
         return;
@@ -1538,7 +1574,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.CHANGE_CREDENTIAL.TYPE] = (ws, data, r
                 type: MESSAGES.SERVER_TO_CLIENT.CREDENTIAL_CHANGED.TYPE,
                 [MESSAGES.SERVER_TO_CLIENT.CREDENTIAL_CHANGED.REQUEST_ID]: requestId
             };
-            ws.send(JSON.stringify(response));
+            sendText(ws, JSON.stringify(response));
             logSentMessage(response.type, response, requestId, ws.clientId);
         }
     });
@@ -1578,7 +1614,7 @@ function boardListMessage(owner, requestId) {
 
 function sendBoardList(ws, owner, requestId) {
     const message = boardListMessage(owner, requestId);
-    ws.send(JSON.stringify(message));
+    sendText(ws, JSON.stringify(message));
     logSentMessage(message.type, message, requestId, ws.clientId);
 }
 
@@ -1765,7 +1801,8 @@ function createDeclineMessage(boardId, pageId, targetActionId, reason = "") {
 // Handler for modification actions
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_MOD_ACTION_PROPOSALS_message( data ) ) { 
-        debug.log(`[SERVER] dropped mod action proposal from '${ws.clientId}' data = `, redactSecrets(data));
+        // not the message itself: stringifying unvalidated input overflows the stack on deep nesting
+        debug.log(`[SERVER] dropped mod action proposal from `, ws.clientId);
         return;
     }
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.BOARD];
@@ -1776,7 +1813,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     const clientId = ws.clientId;
     const actionId = action[MOD_ACTIONS.UUID];
 
-    debug.log(`[SERVER]: actionId = ${actionId}`);
+    debug.log(`[SERVER]: actionId = ${clip(actionId)}`);
 
     const board = useBoard( boardId );
     if (!board) {
@@ -1788,7 +1825,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     // debug.log(`password = ${password},  board.passwd = ${board.passwd}`);
     if ( !password || !passwdMatches(password, board.passwd) ) {
         const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, "unauthorized");
-        ws.send(JSON.stringify(declineMessage));
+        sendText(ws, JSON.stringify(declineMessage));
         logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
         releaseBoard(boardId);
         return;
@@ -1800,7 +1837,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
     // - NEW_PAGE would insert at index 0 for a bogus anchor
     if ( !board.pageOrder.includes( pageUuid ) ) {
         const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, "page not on board");
-        ws.send(JSON.stringify(declineMessage));
+        sendText(ws, JSON.stringify(declineMessage));
         logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
         releaseBoard(boardId);
         return;
@@ -1894,7 +1931,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
             [MESSAGES.SERVER_TO_CLIENT.ACCEPT.PAGE_NR]: board.pageOrder.indexOf(pageUuid) + 1,
             [MESSAGES.SERVER_TO_CLIENT.ACCEPT.TOTAL_PAGES]: board.pageOrder.length
         };
-        ws.send(JSON.stringify(acceptMessage));
+        sendText(ws, JSON.stringify(acceptMessage));
         logSentMessage(acceptMessage.type, acceptMessage, requestId, ws.clientId);
         
         // Start just before the latest change: a new or redone action is the first of
@@ -1931,7 +1968,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
         broadcastTextToBoard(messageWithActions(replayMessage, MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE, replayActions), boardId, ws);
     } else {
         const declineMessage = createDeclineMessage(boardId, pageUuid, actionId, reason);
-        ws.send(JSON.stringify(declineMessage));
+        sendText(ws, JSON.stringify(declineMessage));
         logSentMessage(declineMessage.type, declineMessage, requestId, ws.clientId);
     }
     
@@ -1941,7 +1978,8 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.MOD_ACTION_PROPOSALS.TYPE] = (ws, data
 
 messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requestId) => {
     if ( is_invalid_REPLAY_REQUEST_message( data ) ) { 
-        debug.log(`[SERVER] dropped replay request from '${ws.clientId}' data = `, data); 
+        // not the message itself: it is unvalidated, its strings of any length
+        debug.log(`[SERVER] dropped replay request from `, ws.clientId);
         return;
     }
     const boardId = data[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.BOARD];
@@ -1998,7 +2036,7 @@ messageHandlers[MESSAGES.CLIENT_TO_SERVER.REPLAY_REQUEST.TYPE] = (ws, data, requ
 
     releasePage(pageId);
     releaseBoard(boardId);
-    ws.send(messageWithActions(replayMessage, MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE, replayActions));
+    sendText(ws, messageWithActions(replayMessage, MESSAGES.SERVER_TO_CLIENT.REPLAY.SEQUENCE, replayActions));
     logSentMessage(replayMessage.type, replayMessage, requestId, ws.clientId);
 };
 
@@ -2017,7 +2055,7 @@ function rejectMessage(ws, reason, requestId) {
         if (requestId !== undefined) {
             errorMessage.requestId = requestId;
         }
-        ws.send(JSON.stringify(errorMessage));
+        sendText(ws, JSON.stringify(errorMessage));
     }
 }
 
@@ -2044,12 +2082,13 @@ function routeMessage(ws, message) {
     const message_type = data['type'] || 'unknown';
 
     // the message is not validated yet: stringifying all of it can overflow the stack on deep nesting
-    // debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, redactSecrets(data) );
-    debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}'`);
+    // debug.log(`[CLIENT > SERVER] Received message of type '${message_type}' with requestId '${requestId}' from client ${ws.clientId} on board '${ws.boardId}', data = `, payloadForLog(data) );
+    debug.log(`[CLIENT > SERVER] Received message of type '${clip(message_type)}' with requestId '${clip(requestId)}'`);
 
     // own properties only: inherited ones (toString, hasOwnProperty, ...) are not handlers
     if ( ! Object.hasOwn( messageHandlers, message_type ) ) {
-        rejectMessage(ws, `Unhandled message type: ${data.type}`);
+        // the type is client input of any length: clipped where it is logged and sent back
+        rejectMessage(ws, `Unhandled message type: ${clip(data.type)}`);
         return;
     }
     messageHandlers[message_type](ws, data, requestId);

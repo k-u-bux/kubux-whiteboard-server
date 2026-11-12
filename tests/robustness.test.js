@@ -51,7 +51,11 @@ describe('malformed input', () => {
             [{}, 'Unhandled message type: undefined'],
             [[1, 2], 'Unhandled message type: undefined'],
             [42, 'Unhandled message type: undefined'],
-            ['"text"', 'Unhandled message type: undefined']
+            ['"text"', 'Unhandled message type: undefined'],
+            // client input of any length: only the first 20 characters are logged and sent back
+            [{ type: 'x'.repeat(20) }, `Unhandled message type: ${'x'.repeat(20)}`],
+            [{ type: 'x'.repeat(21) }, `Unhandled message type: ${'x'.repeat(20)}...`],
+            [{ type: 'y'.repeat(4 * 1024 * 1024) }, `Unhandled message type: ${'y'.repeat(20)}...`]
         ];
         for (const [message, answer] of cases) {
             client.send(typeof message === 'string' ? message : JSON.stringify(message));
@@ -151,6 +155,35 @@ describe('malformed input', () => {
         await stillWorks();
     });
 
+    it('a key the protocol does not name, in a message or an action: dropped without a reply', async () => {
+        const target = { 'board-uuid': board.board, 'page-uuid': board.firstPage };
+        const proposal = (payload, extra = {}) => ({ type: 'mod-action-proposals', passwd: board.passwd, ...target, payload, ...extra });
+        const withKey = (action) => ({ ...action, extra: 1 });
+        const proposals = [
+            proposal(draw(), { extra: 1 }),
+            proposal(withKey(draw())),
+            proposal(withKey({ type: 'erase', uuid: uuid(), targetActionUuid: uuid() })),
+            proposal(withKey({ type: 'group', uuid: uuid(), actions: [draw()] })),
+            proposal({ type: 'group', uuid: uuid(), actions: [withKey(draw())] }),
+            proposal({ type: 'group', uuid: uuid(), actions: [{ type: 'group', uuid: uuid(), actions: [withKey(draw())] }] }),
+            proposal(withKey({ type: 'undo', uuid: uuid(), targetActionUuid: uuid() })),
+            proposal(withKey({ type: 'new page', uuid: uuid() })),
+            proposal(withKey({ type: 'delete page', uuid: uuid() }))
+        ];
+        for (const message of proposals) {
+            client.send(message);
+        }
+        const requestId = uuid();
+        client.send({ type: 'board-info-request', 'board-uuid': board.board, register: false, requestId, extra: 1 });
+        client.send({ type: 'replay-requests', ...target, present: 0, 'present-hash': 'x', register: false, requestId, extra: 1 });
+        client.send({ type: 'list-boards', login: ANN.login, passwd: ANN.credential, requestId, extra: 1 });
+        assert.equal(await client.receives(message => ['accept', 'decline', 'error', 'fullPage', 'page-info'].includes(message.type)
+            || message.requestId === requestId, 1000), false);
+        // the same without the extra key is answered
+        assert.equal((await client.propose(board.board, board.passwd, board.firstPage, draw())).type, 'accept');
+        await stillWorks();
+    });
+
     it('many connections at once', async () => {
         const many = await Promise.all(Array.from({ length: 50 }, () => server.connect()));
         const answers = await Promise.all(many.map(connection => connection.registerBoard(board.board)));
@@ -162,8 +195,9 @@ describe('malformed input', () => {
     });
 });
 
-// Fixed bugs, each on a server of its own: the first ended the server process, the
-// second wrote a stale copy of a board over its file.
+// Fixed bugs, each on a server of its own: the first three ended the server process,
+// the fourth let one connection fill the server's memory, the last wrote a stale copy of
+// a board over its file.
 describe('malformed input, fixed bugs', () => {
     it('deeply nested JSON does not end the server', async () => {
         const server = await startServer();
@@ -175,6 +209,71 @@ describe('malformed input, fixed bugs', () => {
             // the parse succeeds: the answer is the error for the unknown type
             assert.equal((await client.next('error')).message, 'Unhandled message type: nothing');
             assert.ok(server.running);
+        } finally {
+            await server.stop();
+            removeDir(server.dir);
+        }
+    });
+
+    // The dropped proposal was stringified for the log, which overflowed the stack.
+    it('an invalid proposal with deeply nested content does not end the server', async () => {
+        const server = await startServer();
+        try {
+            const client = await server.connect();
+            const deep = '['.repeat(20000) + ']'.repeat(20000);
+            client.send(`{"type": "mod-action-proposals", "x": ${deep}}`);
+            // dropped without a reply; the next message is still answered
+            client.send({ type: 'nothing' });
+            assert.equal((await client.next('error')).message, 'Unhandled message type: nothing');
+            assert.ok(server.running);
+        } finally {
+            await server.stop();
+            removeDir(server.dir);
+        }
+    });
+
+    // The action was accepted with its extra key, whose hash overflowed the stack.
+    it('a valid action with a deeply nested extra key does not end the server', async () => {
+        const server = await startServer({ users: [ANN] });
+        try {
+            const client = await server.connect();
+            const b = await client.createBoard(ANN.login, ANN.credential, 'deep');
+            const deep = '['.repeat(20000) + ']'.repeat(20000);
+            const action = JSON.stringify(draw());
+            const payload = `${action.slice(0, -1)}, "x": ${deep}}`;
+            client.send(`{"type": "mod-action-proposals", "passwd": "${b.passwd}", "board-uuid": "${b.board}", "page-uuid": "${b.firstPage}", "payload": ${payload}}`);
+            client.send({ type: 'nothing' });
+            assert.equal((await client.next('error')).message, 'Unhandled message type: nothing');
+            assert.equal(await client.receives(message => message.type === 'accept', 500), false);
+            assert.ok(server.running);
+        } finally {
+            await server.stop();
+            removeDir(server.dir);
+        }
+    });
+
+    // Replies to a client that did not read piled up in the server without limit.
+    it('a client that does not read its replies is cut off', async () => {
+        const { stroke, sleep } = require('./harness');
+        const server = await startServer({ users: [ANN] });
+        try {
+            const owner = await server.connect();
+            const b = await owner.createBoard(ANN.login, ANN.credential, 'large');
+            // a page of about 1.5 MB on the wire
+            const points = Array.from({ length: 50000 }, (_, i) => [i, i]);
+            assert.equal((await owner.propose(b.board, b.passwd, b.firstPage, draw(stroke(points)))).type, 'accept');
+            // 100 cheap requests for it, about 150 MB of replies, and none read
+            const reader = await server.connect();
+            reader.ws._socket.pause();
+            for (let i = 0; i < 100; ++i) {
+                reader.send({ type: 'fullPage-requests', 'board-uuid': b.board, 'page-uuid': b.firstPage, delta: 0, register: false, requestId: uuid() });
+            }
+            await sleep(3000);
+            // reading now, it gets what the network held and then the end of the connection
+            reader.ws._socket.resume();
+            assert.equal(await Promise.race([reader.closed, sleep(20000).then(() => 'still open')]), 1006);
+            assert.ok(server.running);
+            assert.equal((await owner.boardInfo(b.board)).type, 'board-info');
         } finally {
             await server.stop();
             removeDir(server.dir);
