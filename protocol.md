@@ -9,6 +9,7 @@ The authoritative definitions are the `MESSAGES` and `MOD_ACTIONS` constants and
 ## Transport and Message Format
 
 - The WebSocket endpoint is `/ws` (in direct mode the client is told the full `ws://…/ws` URL; behind the proxy it derives `wss://<host>/ws`).
+- A handshake with an `Origin` header is accepted only if the host in it equals the request's `Host` header, i.e. only from the server's own page; anything else, `Origin: null` included, is refused with HTTP 403. Browsers always send `Origin` and pages cannot change it, so a page of another site cannot connect through its visitors' browsers. A handshake without `Origin` (a program, not a browser) is accepted. In direct mode, open the page at the address in `KUBUX_WHITEBOARD_URL`, since the page connects to that host; behind the proxy, nginx must pass `Host` on unchanged.
 - Every message is a plain JSON object with a `type` field. Wire messages are parsed with `JSON.parse` and written with `JSON.stringify` on both sides; Map, Set and BigInt never appear on the wire.
 - The custom `serialize` / `deserialize` pair in `shared.js` (which encodes Set, Map and BigInt as `{"__type": …}` objects and indents by 2) is used only for the files on disk and as the input of the hash function.
 - Most requests carry a `requestId` (a UUID). Responses that answer a request echo it under the same key, so the client can match them.

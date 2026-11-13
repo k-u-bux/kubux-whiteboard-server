@@ -82,6 +82,23 @@ describe('HTTP', () => {
         assert.equal((await httpGet(`${server.url}/?board=x`)).status, 200);
     });
 
+    it('takes WebSocket handshakes from its own page or without Origin, refuses other origins with 403', async () => {
+        // resolves 'open', or the HTTP status of a refused handshake
+        const handshake = (origin) => new WebSocket(server.wsUrl, origin === undefined ? {} : { origin });
+        const outcome = (ws) => new Promise((resolve) => {
+            ws.once('open', () => { ws.close(); resolve('open'); });
+            ws.once('unexpected-response', (request, response) => { resolve(response.statusCode); request.destroy(); });
+            ws.once('error', () => {});
+        });
+        assert.equal(await outcome(handshake(undefined)), 'open', 'no Origin: a program');
+        assert.equal(await outcome(handshake(server.url)), 'open', 'its own page');
+        assert.equal(await outcome(handshake(server.url.toUpperCase())), 'open', 'its own page, upper case');
+        for (const origin of ['https://evil.example', 'null', 'http://127.0.0.1', `http://127.0.0.1:${server.port + 1}`, `http://localhost:${server.port}`, 'not a url']) {
+            assert.equal(await outcome(handshake(origin)), 403, origin);
+        }
+        assert.ok(server.running);
+    });
+
     it('takes WebSocket connections on /ws only', async () => {
         const good = new WebSocket(server.wsUrl);
         await new Promise((resolve, reject) => { good.once('open', resolve); good.once('error', reject); });

@@ -894,9 +894,39 @@ const httpServer = http.createServer( (req, res) => {
     });
 });
 
+// A browser marks every WebSocket handshake with the Origin of the page that opens it,
+// and the page's scripts cannot change it. Only our own page may connect from a browser:
+// a page of another site could otherwise make its visitors' browsers connect, each from
+// its own address, around the limit on failed credential checks. Our page is served by
+// the host the browser connects to, so its Origin names the host in the Host header
+// (behind the proxy, nginx passes that header on). A handshake without Origin comes from
+// a program, not a browser, which could send any Origin anyway: it is let through.
+function originAllowed(req) {
+    const origin = req.headers.origin;
+    if (origin === undefined) {
+        return true;
+    }
+    let originHost;
+    try {
+        originHost = new URL(origin).host;
+    } catch (error) {
+        return false; // e.g. "null", from a sandboxed frame or a local file
+    }
+    return originHost !== '' && originHost === String(req.headers.host).toLowerCase();
+}
+
 const wss = new WebSocket.Server({
     server: httpServer,
     path: '/ws',
+    // refused handshakes get 403 and never become connections
+    verifyClient: ({ req }, done) => {
+        if (originAllowed(req)) {
+            done(true);
+            return;
+        }
+        debug.error(`[SERVER] Refused WebSocket handshake from origin '${clip(req.headers.origin)}' for host '${clip(String(req.headers.host))}'`);
+        done(false, 403, 'Forbidden');
+    },
     // Largest message a client may send (after decompression); ws closes the
     // connection on anything bigger. The ws default is 100 MiB.
     maxPayload: 5 * 1024 * 1024,
