@@ -6693,13 +6693,15 @@
           }
       };
 
-      // The eraser returns to the default tool once the erase is done: the timer
-      // starts on pointer up only. Started earlier, it would switch tools whenever
-      // the pointer rests for a moment, mid-gesture or before it.
+      // The eraser returns to the default tool once an erase is done: the timer
+      // starts when an erase gesture ends, and only then. Started earlier, it
+      // would switch tools whenever the pointer rests for a moment, mid-gesture
+      // or before it. Touches that are ignored (force_stylus) leave it alone: a
+      // palm lifting off the screen must not switch tools.
       const erase_path_pointer_handler = {
           down: (event) => {
-              stopResetTool();
               if ( force_stylus && event.pointerType === "touch" ) { return; }
+              stopResetTool();
               const rect = canvas.getBoundingClientRect();
               const x = (event.clientX - rect.left - panX) / zoomLevel;
               const y = (event.clientY - rect.top - panY) / zoomLevel;
@@ -6728,10 +6730,10 @@
               requestRedraw();
           },
           up: (event) => {
-              startResetTool();
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               if (isErasing) {
                   isErasing = false;
+                  startResetTool();
                   if (currentPath.length >= 1) {
                       const elementsToErase = findElementsIntersectingPath(currentStroke);
                       if (elementsToErase.length > 0) {
