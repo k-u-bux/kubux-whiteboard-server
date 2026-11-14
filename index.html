@@ -207,13 +207,65 @@
       
       .main-content {
           flex-grow: 1;
-          display: flex;
+          display: grid;
+          /* the canvas, with a scrollbar to the right and one below; hidden
+             scrollbars take no room */
+          grid-template-columns: minmax(0, 1fr) auto;
+          grid-template-rows: minmax(0, 1fr) auto;
           overflow: hidden;
       }
       
       #canvas-container {
           position: relative;
-          flex: 1;
+          grid-row: 1;
+          grid-column: 1;
+      }
+      
+      /* Scrollbars for a page with a format; 15px thick (SCROLLBAR_SIZE) */
+      .scrollbar {
+          display: none;
+          position: relative;
+          box-sizing: border-box;
+          background-color: #f0f0f0;
+          touch-action: none;
+      }
+      
+      .scrollbar.shown {
+          display: block;
+      }
+      
+      #v-scrollbar {
+          grid-row: 1;
+          grid-column: 2;
+          width: 15px;
+          border-left: 1px solid #ddd;
+      }
+      
+      #h-scrollbar {
+          grid-row: 2;
+          grid-column: 1;
+          height: 15px;
+          border-top: 1px solid #ddd;
+      }
+      
+      .scrollbar-thumb {
+          position: absolute;
+          background-color: #b8b8b8;
+          border-radius: 5px;
+      }
+      
+      #v-scrollbar .scrollbar-thumb {
+          left: 2px;
+          right: 2px;
+      }
+      
+      #h-scrollbar .scrollbar-thumb {
+          top: 2px;
+          bottom: 2px;
+      }
+      
+      .scrollbar-thumb:hover, .scrollbar-thumb.dragging {
+          background-color: #909090;
       }
       
       canvas {
@@ -1480,6 +1532,8 @@
         <div id="canvas-container">
           <canvas id="canvas"></canvas>
         </div>
+        <div class="scrollbar" id="v-scrollbar"><div class="scrollbar-thumb"></div></div>
+        <div class="scrollbar" id="h-scrollbar"><div class="scrollbar-thumb"></div></div>
       </div>
     </div>
 
@@ -1944,6 +1998,7 @@
                   panY: panY,
                   colorSwatches: [],
                   canvasFormat: canvasFormat,
+                  fitSide: fitSide,
               paste: paste_settings,
               // Page position
               currentPageUuid: currentPageUuid,
@@ -2014,6 +2069,9 @@
               if (settings.canvasFormat !== undefined) {
                   canvasFormat = settings.canvasFormat;
                   updateFormatButton();
+              }
+              if (settings.fitSide !== undefined) {
+                  fitSide = settings.fitSide;
               }
               
               // Restore zoom level
@@ -2333,6 +2391,10 @@
           '2:1': { w: 842, h: 421 },
       };
       let canvasFormat = null; // null = no format, else { w, h }
+      // 'width' or 'height' after fit width or fit height (and after choosing a
+      // format, which fits the width): the page is lined up with that side, and
+      // centering fits it again; null after any other zoom
+      let fitSide = null;
 
       // Globals for board state
       let ws = null;
@@ -2728,6 +2790,7 @@
       
       // Set up canvas size
       function setupCanvas() {
+          setupScrollbars();
           resizeCanvas();
           window.addEventListener('resize', resizeCanvas);
       }
@@ -2761,6 +2824,176 @@
           ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.setTransform(zoomLevel, 0, 0, zoomLevel, panX, panY);
+          updateScrollbars();
+      }
+
+      // Scrollbars
+      // ==========
+      // With a page format, a scrollbar appears along each side the page does
+      // not fit in at the current zoom. A scrollbar takes room from the canvas,
+      // which can make the other one necessary, never unnecessary, as the zoom
+      // stays as it is. The bar spans the page, from its first edge to its last;
+      // after a fit, it moves the page along the fitted side only, which it
+      // lines up again where the hand tool moved it out of line.
+      // Lengths are in canvas pixels, positions relative to the page's corner.
+      const SCROLLBAR_SIZE = 15; // px, as in the CSS
+      const SCROLL_SLACK = 0.5; // px a page may stick out without a scrollbar
+      const scrollAxes = {
+          vertical: {
+              bar: document.getElementById('v-scrollbar'),
+              page: () => canvasFormat.h * zoomLevel,
+              view: () => canvas.height,
+              getPan: () => panY,
+              setPan: (value) => { panY = value; },
+              track: (bar) => bar.clientHeight,
+              pointer: (event) => event.clientY,
+              origin: (rect) => rect.top,
+              place: (thumb, start, length) => { thumb.style.top = start + 'px'; thumb.style.height = length + 'px'; }
+          },
+          horizontal: {
+              bar: document.getElementById('h-scrollbar'),
+              page: () => canvasFormat.w * zoomLevel,
+              view: () => canvas.width,
+              getPan: () => panX,
+              setPan: (value) => { panX = value; },
+              track: (bar) => bar.clientWidth,
+              pointer: (event) => event.clientX,
+              origin: (rect) => rect.left,
+              place: (thumb, start, length) => { thumb.style.left = start + 'px'; thumb.style.width = length + 'px'; }
+          }
+      };
+      const MIN_THUMB = 20; // px
+
+      // Where the visible part lies on an axis: from start, of length view, on
+      // the page of length page (longer than view while the scrollbar shows).
+      // Where the hand tool moved the view off the page, start is the nearest
+      // position on it.
+      function scrollGeometry(axis) {
+          const view = axis.view();
+          const page = axis.page();
+          const start = Math.max(0, Math.min(page - view, -axis.getPan()));
+          const track = axis.track(axis.bar);
+          const thumb = Math.min(track, Math.max(MIN_THUMB, track * view / page));
+          // canvas pixels per pixel of thumb movement; 0 where the thumb fills
+          // a (tiny) track and cannot move
+          const ratio = track > thumb ? (page - view) / (track - thumb) : 0;
+          // thumb position in the track
+          const at = ratio > 0 ? start / ratio : 0;
+          return { view, page, start, thumb, ratio, at };
+      }
+      
+      // Scroll an axis to start, kept on the page; after a fit, the fitted side
+      // is lined up again
+      function scrollTo(axis, g, start) {
+          axis.setPan(-Math.max(0, Math.min(g.page - g.view, start)));
+          if ( fitSide === 'width' && axis === scrollAxes.vertical ) panX = 0;
+          if ( fitSide === 'height' && axis === scrollAxes.horizontal ) panY = 0;
+          applyZoom();
+          requestRedraw();
+      }
+
+      function updateScrollbars() {
+          // Hidden behind a full-window view, the container has no size; the
+          // view measures again when it closes
+          if (container.clientWidth === 0 || container.clientHeight === 0) {
+              return;
+          }
+          const v = scrollAxes.vertical.bar;
+          const h = scrollAxes.horizontal.bar;
+          let needV = false;
+          let needH = false;
+          if ( canvasFormat ) {
+              // the room with no scrollbar shown
+              const width = container.clientWidth + (v.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
+              const height = container.clientHeight + (h.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
+              const pageW = canvasFormat.w * zoomLevel;
+              const pageH = canvasFormat.h * zoomLevel;
+              needV = pageH > height + SCROLL_SLACK;
+              needH = pageW > width + SCROLL_SLACK;
+              if ( needV && !needH ) needH = pageW > width - SCROLLBAR_SIZE + SCROLL_SLACK;
+              if ( needH && !needV ) needV = pageH > height - SCROLLBAR_SIZE + SCROLL_SLACK;
+          }
+          if ( needV !== v.classList.contains('shown') || needH !== h.classList.contains('shown') ) {
+              v.classList.toggle('shown', needV);
+              h.classList.toggle('shown', needH);
+              resizeCanvas(); // the canvas changes size; this comes back here
+              return;
+          }
+          for (const axis of Object.values(scrollAxes)) {
+              if ( axis.bar.classList.contains('shown') ) {
+                  const g = scrollGeometry(axis);
+                  axis.place(axis.bar.firstElementChild, g.at, g.thumb);
+              }
+          }
+      }
+
+      // Dragging a thumb moves the view along; a press beside it moves the view
+      // by its length towards the press.
+      function setupScrollbars() {
+          for (const axis of Object.values(scrollAxes)) {
+              const thumb = axis.bar.firstElementChild;
+              let drag = null;
+              thumb.addEventListener('pointerdown', (event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  thumb.setPointerCapture(event.pointerId);
+                  thumb.classList.add('dragging');
+                  drag = { from: axis.pointer(event), geometry: scrollGeometry(axis) };
+              });
+              thumb.addEventListener('pointermove', (event) => {
+                  if (!drag) return;
+                  const g = drag.geometry;
+                  scrollTo(axis, g, g.start + (axis.pointer(event) - drag.from) * g.ratio);
+              });
+              const endDrag = () => {
+                  if (!drag) return;
+                  drag = null;
+                  thumb.classList.remove('dragging');
+                  saveSettings();
+              };
+              thumb.addEventListener('pointerup', endDrag);
+              thumb.addEventListener('pointercancel', endDrag);
+              axis.bar.addEventListener('pointerdown', (event) => {
+                  if (event.target !== axis.bar) return;
+                  event.preventDefault();
+                  const g = scrollGeometry(axis);
+                  const thumbStart = axis.origin(axis.bar.getBoundingClientRect()) + g.at;
+                  const step = axis.pointer(event) < thumbStart ? -g.view : g.view;
+                  scrollTo(axis, g, g.start + step);
+                  saveSettings();
+              });
+          }
+      }
+
+      // Zoom at which the page fills the width (side 'width') or the height of
+      // the room for the canvas. Where the page is then too tall (too wide), a
+      // scrollbar takes some of that width (height), so the page shrinks to fit
+      // beside it. Shrunk, it may no longer need the scrollbar; then the page
+      // fits as a whole, at the zoom that fits the other side.
+      function fitZoom(side) {
+          const width = container.clientWidth + (scrollAxes.vertical.bar.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
+          const height = container.clientHeight + (scrollAxes.horizontal.bar.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
+          const fitW = width / canvasFormat.w;
+          const fitH = height / canvasFormat.h;
+          if ( side === 'width' ) {
+              return fitW <= fitH ? fitW : Math.max(fitH, (width - SCROLLBAR_SIZE) / canvasFormat.w);
+          }
+          return fitH <= fitW ? fitH : Math.max(fitW, (height - SCROLLBAR_SIZE) / canvasFormat.h);
+      }
+      
+      // Fit width (side 'width') or fit height, with the page lined up with
+      // that side: its left (top) edge at the left (top) of the canvas
+      function fitPage(side) {
+          fitSide = side;
+          zoomLevel = Math.max(0.5, Math.min(3, fitZoom(side)));
+          zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+          if ( side === 'width' ) {
+              panX = 0;
+          } else {
+              panY = 0;
+          }
+          applyZoom();
+          requestRedraw();
       }
       
       // Show error message
@@ -5239,18 +5472,15 @@
                   const zoom = this.getAttribute('data-zoom');
                   
                   if (zoom === 'fit-width' && canvasFormat) {
-                      const containerW = container.clientWidth;
-                      zoomLevel = containerW / canvasFormat.w;
+                      fitPage('width');
                   } else if (zoom === 'fit-height' && canvasFormat) {
-                      const containerH = container.clientHeight;
-                      zoomLevel = containerH / canvasFormat.h;
+                      fitPage('height');
                   } else {
-                      zoomLevel = parseFloat(zoom);
+                      fitSide = null;
+                      zoomLevel = Math.max(0.5, Math.min(3, parseFloat(zoom)));
+                      zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+                      applyZoom();
                   }
-                  
-                  zoomLevel = Math.max(0.5, Math.min(3, zoomLevel));
-                  zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
-                  applyZoom();
                   requestRedraw();
                   saveSettings();
                   
@@ -5298,11 +5528,10 @@
               canvasFormat = format;
               updateFormatButton();
               if (canvasFormat) {
-                  // Auto zoom to fit width when a format is selected
-                  zoomLevel = container.clientWidth / canvasFormat.w;
-                  zoomLevel = Math.max(0.5, Math.min(3, zoomLevel));
-                  zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
-                  applyZoom();
+                  fitPage('width'); // Auto zoom to fit width when a format is selected
+              } else {
+                  fitSide = null;
+                  applyZoom(); // hides the scrollbars
               }
               backgroundValid = false;
               requestRedraw();
@@ -6615,6 +6844,7 @@
       
       // Adjust zoom level
       function adjustZoom(delta) {
+          fitSide = null;
           zoomLevel = Math.max(0.5, Math.min(3, zoomLevel + delta));
           zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
           applyZoom();
@@ -6622,8 +6852,16 @@
           saveSettings();
       }
       
-      // Reset view to default (center, 100% zoom)
+      // Reset view to default (center, 100% zoom); after fit width or fit
+      // height, fit the page again instead
       function resetView() {
+          if ( fitSide && canvasFormat ) {
+              panX = 0;
+              panY = 0;
+              fitPage(fitSide);
+              saveSettings();
+              return;
+          }
           zoomLevel = 1;
           panX = 0;
           panY = 0;
