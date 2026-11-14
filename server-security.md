@@ -1,8 +1,9 @@
 # Security Audit Report: kubux-whiteboard-server
 
-**Audit Date:** November 12, 2026 (v3.7); earlier rounds October 25–26, 2026
-**Auditor:** Security Review (re-audit of v3.6)
-**Version:** v3.7: static review and live tests at commit 1cb92eb; the fixes of this round, each re-tested live, are in commits f739d4b and dd1fad2 (the rate limit on failed credential checks, Finding 1), except the Origin check (Finding 5), which is in the working tree on top of them. Line numbers refer to that working tree. Earlier rounds: live tests at commit 79fc50a + working tree; text corrected against commit d414690 (see Changelog 3.2); unauthenticated board-creation search (see Changelog 3.3)
+**Audit Date:** November 12, 2026; earlier rounds October 25–26, 2026
+**Auditor:** Security Review (re-audit after report revision 3.6)
+**Report revision:** 3.7. Revision numbers count versions of this report, not of the server, which has no version numbers; the server's state is named by commit.
+**Code audited:** static review and live tests at commit 1cb92eb. The fixes of this round, each re-tested live, are in commits f739d4b (Findings 8–12, log clipping in Finding 2), dd1fad2 (rate limit on failed credential checks, Finding 1) and ba7cc0a (Origin check, Finding 5). Line numbers refer to ba7cc0a. Earlier rounds: live tests at commit 79fc50a + working tree; text corrected against commit d414690 (see Changelog 3.2); unauthenticated board-creation search (see Changelog 3.3)
 **Focus Areas:** RCE, Arbitrary File Access, DoS, Crash Vectors, Client-Side XSS
 
 ---
@@ -11,31 +12,31 @@
 
 Re-audit of `server.js`, `shared.js`, `users.js` and the deployment files. Every finding of this round was **verified against throwaway live instances** (`tests/harness.js`: fresh conf/data/logs directories, local port), and every fix was re-tested the same way.
 
-**Overall Assessment:** ⚠️ **No RCE, no file access, no deserialization issue. v3.6 said "no client-reachable crash" — that was wrong: this round found two crashes any anonymous client could trigger with one message or request, one a board member could trigger, and an unauthenticated memory exhaustion. All four are fixed (commit f739d4b). Failed credential checks are now limited per client address, and browsers can connect only from the server's own page. The remaining open issues are availability issues (floods of failed logins from many addresses, connection caps, log rotation, state caps) and hardening.**
+**Overall Assessment:** ⚠️ **No RCE, no file access, no deserialization issue. Report revision 3.6 said "no client-reachable crash" — that was wrong: this round found two crashes any anonymous client could trigger with one message or request, one a board member could trigger, and an unauthenticated memory exhaustion. All four are fixed (commit f739d4b). Failed credential checks are now limited per client address, and browsers can connect only from the server's own page. The remaining open issues are availability issues (floods of failed logins from many addresses, connection caps, log rotation, state caps) and hardening.**
 
 | # | Finding | Severity | Status |
 |---|---------|----------|--------|
-| 9 | Unauthenticated crash: deeply nested content in a dropped `mod-action-proposals` message | CRITICAL | **Fixed** in v3.7 (**new**) |
-| 10 | Unauthenticated crash: HTTP request target `url.parse` cannot take | HIGH | **Fixed** in v3.7 (**new**) |
-| 11 | Board-member crash: deeply nested extra key on a valid action | HIGH | **Fixed** in v3.7 (**new**) |
-| 12 | Unauthenticated memory exhaustion: replies to a client that does not read | HIGH | **Fixed** in v3.7 (**new**); per connection only, see Finding 1 |
-| 1 | Owner-message scrypt flood; delays all WebSocket traffic | MEDIUM (was HIGH) | Partially fixed in v3.7: failed checks limited per client address; floods from many addresses remain |
-| 2 | Unbounded error-log growth → disk-full crash | MEDIUM | Partially fixed: client text in log lines clipped (v3.7); no rotation or cap |
-| 3 | Plaintext board passwords in an old local `logs/debug.log` | — | **Won't fix** (v3.7): the file is an old local copy, not the server's log; payload logging redacts `passwd` since d414690 |
+| 9 | Unauthenticated crash: deeply nested content in a dropped `mod-action-proposals` message | CRITICAL | **Fixed** in f739d4b (**new**) |
+| 10 | Unauthenticated crash: HTTP request target `url.parse` cannot take | HIGH | **Fixed** in f739d4b (**new**) |
+| 11 | Board-member crash: deeply nested extra key on a valid action | HIGH | **Fixed** in f739d4b (**new**) |
+| 12 | Unauthenticated memory exhaustion: replies to a client that does not read | HIGH | **Fixed** in f739d4b (**new**); per connection only, see Finding 1 |
+| 1 | Owner-message scrypt flood; delays all WebSocket traffic | MEDIUM (was HIGH) | Partially fixed in dd1fad2: failed checks limited per client address; floods from many addresses remain |
+| 2 | Unbounded error-log growth → disk-full crash | MEDIUM | Partially fixed: client text in log lines clipped (f739d4b); no rotation or cap |
+| 3 | Plaintext board passwords in an old local `logs/debug.log` | — | **Won't fix** (decided in this round): the file is an old local copy, not the server's log; payload logging redacts `passwd` since d414690 |
 | 4 | Unbounded state: history, pages, deletionMap, files | MEDIUM | Open (unchanged) |
-| 5 | No Origin check on WebSocket handshake | LOW | **Fixed** in v3.7: foreign origins refused with 403 |
+| 5 | No Origin check on WebSocket handshake | LOW | **Fixed** in ba7cc0a: foreign origins refused with 403 |
 | 6 | `x-forwarded-proto` trusted unconditionally | LOW | Open (unchanged) |
 | 7 | Error details (`e.message`) sent to clients | LOW | Open (unchanged) |
-| 8 | Dockerfile runs as root; base image `node:23` out of support | MEDIUM | **Fixed** in v3.7: `node:24`, `USER node` |
+| 8 | Dockerfile runs as root; base image `node:23` out of support | MEDIUM | **Fixed** in f739d4b: `node:24`, `USER node` |
 
-Key changes vs v3.6:
+Key changes since report revision 3.6:
 - **Three crash vectors, all fixed.** Two are unauthenticated: a 74-byte compressed WebSocket frame (Finding 9) and a single HTTP request (Finding 10). The third needs a board's edit password (Finding 11). Each one threw an uncaught exception and ended the process.
 - **Strict protocol conformance.** Every client message and every action (at any depth of a group) is now refused if it carries a key its schema in `shared.js` (`MESSAGES`, `MOD_ACTIONS`) does not name. Before, no validator looked at unknown keys: extra keys on a message were ignored, extra keys on an action were stored, hashed, saved and broadcast.
 - **Send backpressure.** A connection with more than 64 MiB of unsent replies is cut off (Finding 12).
 - **Log amplification measured and fixed.** The rejection of an unknown message type wrote the whole `type` (up to 5 MiB) to the log: 82 KB on the wire produced 84 MB of `debug.log`. Every client-chosen text in a log line is now clipped; the same input writes 1.5 KB (Finding 2).
 - **Owner-message flood re-tested and limited (Finding 1).** Worse than described: since the server compresses every WebSocket message in the same worker pool as scrypt, a flood of failed logins delayed all WebSocket traffic of every client — a full page took 0.63 s with 60 flooding connections and 9.8 s with 500 (2 ms without a flood). The event loop and HTTP page loads are not affected; memory is bounded by the number of connections. **Rate limit:** failed credential checks are now limited per client address (10, then one more per minute; successful checks not counted). A flood from one address with 500 connections now delays a full page by 67 ms; a flood from many addresses still stalls the server until each address has used its 10 failures.
 - **Origin check (Finding 5).** A browser handshake is accepted only if its `Origin` names the host it connects to. This matters even without cookies: a page of another site could otherwise make its visitors' browsers send failed logins, each from its own address, around the per-address limit.
-- **Erratum (v3.6 → v3.7):** v3.6 called the `node:23` base image "a current LTS". It was not: Node 23 was never an LTS release and went end-of-life in June 2025. The Dockerfile now uses `node:24` (Finding 8).
+- **Erratum (report revision 3.6):** revision 3.6 called the `node:23` base image "a current LTS". It was not: Node 23 was never an LTS release and went end-of-life in June 2025. The Dockerfile now uses `node:24` (Finding 8).
 
 ---
 
@@ -50,33 +51,33 @@ Key changes vs v3.6:
 - WebSocket message routing and sending
 - Logging of client input
 - Denial of Service (DoS) / crash vectors via malformed input
-- Client-side (index.html) DOM injection / credential storage (v3.0–v3.6; **not re-audited in v3.7**, apart from checking which fields the client's messages carry)
+- Client-side (index.html) DOM injection / credential storage (rounds of Oct 25–26; **not re-audited in this round**, apart from checking which fields the client's messages carry)
 
 ### Methodology
 1. **Static analysis** of all handlers, validators and log calls
-2. **Live testing** on isolated instances (v3.7: throwaway instances from `tests/harness.js`; earlier: `ws://localhost:8099`):
+2. **Live testing** on isolated instances (this round: throwaway instances from `tests/harness.js`; earlier rounds: `ws://localhost:8099`):
    - HTTP layer: `/.env` → 403, `/%2e%2e%2f…etc/passwd` → 403, `/server.js` → 404, whitelist (`/manifest.json`) → 200
-   - HTTP request targets (v3.7): absolute-form, invalid host, `*`, `__proto__`/`constructor` paths, repeated and bad-escape query parameters
+   - HTTP request targets (this round): absolute-form, invalid host, `*`, `__proto__`/`constructor` paths, repeated and bad-escape query parameters
    - Unauthenticated `register-board` + `fullPage-requests` → full page history (view access, by design)
-   - `create-board` with wrong credential → rejected; sustained rate measured (~50 attempts/s from 60 connections; fullPage latency 3 ms under flood — corrected in v3.7, see Finding 1)
-   - Owner-message flood (v3.7): `list-boards` with wrong credentials from 4–500 connections; honest owner, viewer full page and HTTP page load sampled in parallel; event-loop delay from an instrumented copy of the server; viewers with and without per-message deflate compared; after the rate limit, the same flood from one address and from one address per connection, and the log growth caused by refusals
-   - Deep nesting (v3.7): in dropped messages, in extra keys of valid actions
-   - Slow reader (v3.7): full-page requests from a connection that never reads
-   - Log growth (v3.7): oversized `type` values, compressed; a copy of the server with all logging enabled and 1 MB values in every client-chosen field
+   - `create-board` with wrong credential → rejected; sustained rate measured (~50 attempts/s from 60 connections; fullPage latency 3 ms under flood — corrected in this round, see Finding 1)
+   - Owner-message flood (this round): `list-boards` with wrong credentials from 4–500 connections; honest owner, viewer full page and HTTP page load sampled in parallel; event-loop delay from an instrumented copy of the server; viewers with and without per-message deflate compared; after the rate limit, the same flood from one address and from one address per connection, and the log growth caused by refusals
+   - Deep nesting (this round): in dropped messages, in extra keys of valid actions
+   - Slow reader (this round): full-page requests from a connection that never reads
+   - Log growth (this round): oversized `type` values, compressed; a copy of the server with all logging enabled and 1 MB values in every client-chosen field
    - GROUP nesting depth 15 → dropped by validation
    - MOD_ACTION with wrong password → `decline("unauthorized")`
    - `maxPayload`: 6 MiB message → connection closed
 3. **Assert reachability re-analysis** (all `assert()` calls traced; see Resolved)
-4. **Client-side XSS sweep** (DOM sinks, credential storage; v3.0–v3.6)
+4. **Client-side XSS sweep** (DOM sinks, credential storage; rounds of Oct 25–26)
 
-**Node version (v3.7):** the live tests of this round ran under **node v18.19.1**, the only version available on the audit host. The crash mechanisms (`JSON.stringify` recursion, `url.parse` throwing `ERR_INVALID_URL`) are not version-specific, but the production image (`node:24`) was **not booted** in this round.
+**Node version:** the live tests of this round ran under **node v18.19.1**, the only version available on the audit host. The crash mechanisms (`JSON.stringify` recursion, `url.parse` throwing `ERR_INVALID_URL`) are not version-specific, but the production image (`node:24`) was **not booted** in this round.
 
 ---
 
 ## Critical Findings
 
 ### ✅ No RCE Vulnerabilities
-Unchanged: no `eval`/`Function()`/`vm`, no command execution, no user input on template-literal paths. Re-confirmed in v3.7.
+Unchanged: no `eval`/`Function()`/`vm`, no command execution, no user input on template-literal paths. Re-confirmed in this round.
 
 ### ✅ No Arbitrary File Access Vulnerabilities
 Unchanged and re-verified live:
@@ -87,7 +88,7 @@ Unchanged and re-verified live:
 ### ✅ No Deserialization Vulnerabilities
 Unchanged: `deserialize` reviver handles only `__type: BigInt|Set|Map`; no `__proto__`/`constructor` handling.
 
-### ✅ No Client-Side XSS (v3.0–v3.6, not re-verified in v3.7)
+### ✅ No Client-Side XSS (rounds of Oct 25–26, not re-verified in this round)
 - All DOM text assignment goes through `textContent` (incl. server error messages)
 - Strokes are rendered on `<canvas>`; stroke colors regex-restricted (`#RGB`/`#RRGGBB`/`[a-z]{1,20}`)
 - The only `innerHTML` assignments are static icon glyphs (cap/join style menus) and clearing the overview grid (`''`)
@@ -95,7 +96,7 @@ Unchanged: `deserialize` reviver handles only `__type: BigInt|Set|Map`; no `__pr
 
 ---
 
-## Fixed in v3.7 (found and fixed in this round, verified live)
+## Found and fixed in this round (f739d4b, verified live)
 
 ### ✅ 9. Unauthenticated crash via a dropped `mod-action-proposals` message [FIXED — NEW]
 
@@ -145,13 +146,13 @@ TCP flow control stops the kernel from sending to a client that does not read it
 
 ## Findings
 
-### ⚠️ 1. Owner-message scrypt flood [PARTIALLY FIXED in v3.7: failed checks limited per client address]
+### ⚠️ 1. Owner-message scrypt flood [PARTIALLY FIXED in dd1fad2: failed checks limited per client address]
 
 **Risk Level:** MEDIUM since the rate limit (was HIGH). Unauthenticated; a flood delays board management **and all WebSocket traffic of every client** (drawing, replays, pings, full pages). Since the rate limit, a flood from one address is stopped after 10 checks; a sustained flood needs thousands of addresses.
 
 **Since logins (development branch):** every owner message (`create-board`, `list-boards`, `set-path`, `rename-prefix`, `change-credential`) carries a login and credential and is checked on its own; the server keeps no login state. Anyone can send these messages without an account. `checkLogin` reads `conf/users.json` (the server keeps no copy, so a user the admin removes loses access at once; the small, cached file costs far less than the scrypt), looks up the login and runs **one scrypt per message** (~50 ms, 16 MiB), whatever the number of users; an unknown login is checked against a dummy hash, so it costs the same and gets the same answer as a wrong credential (no login oracle). Before, every `create-board` attempt cost one scrypt **per stored credential**, so the cost per attempt no longer grows with the number of users.
 
-**Measured live (v3.7), before the rate limit:** node v18.19.1, 16 cores, Node's default worker pool of 4 threads (`UV_THREADPOOL_SIZE` unset). Each flooding connection sends `list-boards` with a wrong credential, waits for the refusal and repeats; meanwhile an honest owner sends `list-boards` back to back, a viewer requests a full page every 100 ms and the client page is loaded over HTTP every 200 ms. The server's event-loop delay came from an instrumented copy of the server. Medians:
+**Measured live in this round, before the rate limit:** node v18.19.1, 16 cores, Node's default worker pool of 4 threads (`UV_THREADPOOL_SIZE` unset). Each flooding connection sends `list-boards` with a wrong credential, waits for the refusal and repeats; meanwhile an honest owner sends `list-boards` back to back, a viewer requests a full page every 100 ms and the client page is loaded over HTTP every 200 ms. The server's event-loop delay came from an instrumented copy of the server. Medians:
 
 | Flooding connections | Failed checks/s | Honest owner `list-boards` | Viewer full page | HTTP page load | Event-loop delay (max) | Server RSS (max) |
 |---|---|---|---|---|---|---|
@@ -169,9 +170,9 @@ TCP flow control stops the kernel from sending to a client that does not read it
 - **Not affected:** the event loop (delay at most 36 ms under every flood) and HTTP page loads (about 10 ms; the reason HTTP's file reads do not queue was not investigated).
 - **Memory is bounded by the number of connections**, not unbounded: each connection has at most one check pending, so the queue is never longer than the number of connections. 500 flooding connections raised the RSS from 126 to 311 MiB. Exhausting memory needs very many connections — which are unlimited.
 - **Recovery is immediate:** after each flood, all latencies were back at baseline.
-- Since v3.7, unlimited connections also multiply the per-connection send limit of Finding 12.
+- Since f739d4b, unlimited connections also multiply the per-connection send limit of Finding 12.
 
-**Rate limit (v3.7, uncommitted at the time of writing):** successful credential checks are not counted; only failures are.
+**Rate limit (dd1fad2):** successful credential checks are not counted; only failures are.
 - Each client address has a counter that starts at 10. Every credential check lowers it by 1 *before* its scrypt runs; a successful check raises it by 1 again. The counter grows back by 1 per minute (continuously, in fractions), up to 10.
 - While the counter is below 1, every owner message from that address is refused at once with `too many failed credential checks, try again later` — without a check, so even with the right credential.
 - Lowering the counter before the check means one address cannot have more than 10 checks running at once, over all its connections; counting failures only afterwards would let 500 connections start 500 checks before the first failure counted.
@@ -200,18 +201,18 @@ TCP flow control stops the kernel from sending to a client that does not read it
 - **WebSocket compression still shares the worker pool with scrypt** (see above), and connections remain unlimited.
 
 **Corrections of earlier text:**
-- v3.0 measured a fullPage latency of **3 ms** while 60 connections hammered `create-board`. That does not hold for clients that use per-message deflate, i.e. browsers; the v3.0 probe most likely ran without it (its script is not available).
+- The Oct 25 round (report revision 3.0) measured a fullPage latency of **3 ms** while 60 connections hammered `create-board`. That does not hold for clients that use per-message deflate, i.e. browsers; that probe most likely ran without it (its script is not available).
 - Earlier versions said pending scrypt jobs "queue without bound → memory exhaustion". Overstated: the queue is bounded by the number of connections (see above).
-- v3.7's first text said the `fs.readFile` that serves the client page queues behind the checks, too. Measured, it does not.
+- The first text of revision 3.7 said the `fs.readFile` that serves the client page queues behind the checks, too. Measured, it does not.
 
-**Old impact (v2.2):** "pins the server CPU at 100%" — no longer true since async `crypto.scrypt`.
+**Old impact (report revision 2.2):** "pins the server CPU at 100%" — no longer true since async `crypto.scrypt`.
 
-**Measurements (v3.0, before logins):** about **50 attempts/s** were sustained from 60 connections against `create-board`, each costing one scrypt per stored credential (2 credentials then). The fullPage figure of that run is corrected above.
+**Measurements (Oct 25 round, before logins):** about **50 attempts/s** were sustained from 60 connections against `create-board`, each costing one scrypt per stored credential (2 credentials then). The fullPage figure of that run is corrected above.
 
 **Location:** `server.js` rate limit (1574–1646: `MAX_FAILED_CHECKS`, `FAILURE_FORGOTTEN_MS`, `startCheck`, `checkSucceeded`, `clientAddress`), `asOwner` (1648; the two rate-limit lines at 1653 and 1667), owner handlers (1677–1805), `checkLogin` (108), connection handler storing the address (2220), per-message deflate options (933–938); `users.js` `verifyPassword` (55), `loadUsers` (86).
 
 **Recommended fix (remaining):**
-- ~~Rate limit per IP on owner messages~~ — done in v3.7, failed checks only (above)
+- ~~Rate limit per IP on owner messages~~ — done in dd1fad2, failed checks only (above)
 - Cap concurrent WebSocket connections per IP and globally
 - For floods from many addresses: a server-wide cap on credential checks running at once (refusing the rest), so that the worker pool always has free threads
 - Log refusals of an address at most once per minute (Finding 2)
@@ -219,15 +220,15 @@ TCP flow control stops the kernel from sending to a client that does not read it
 
 ---
 
-### ⚠️ 2. Unbounded error-log growth → disk-full crash chain [PARTIALLY FIXED in v3.7]
+### ⚠️ 2. Unbounded error-log growth → disk-full crash chain [PARTIALLY FIXED in f739d4b]
 
 **Risk Level:** MEDIUM (unauthenticated; slow disk fill, then process crash + data loss)
 
-Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` → `debug.error(...)`, one line per message, appended to `logs/debug.log` and copied to stdout (container logs) with **no cap and no rotation**. Measured (v3.0): a single connection sustained **~3000 lines / 3 s ≈ 87 KB/s**. Multiple connections scale linearly.
+Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` → `debug.error(...)`, one line per message, appended to `logs/debug.log` and copied to stdout (container logs) with **no cap and no rotation**. Measured (Oct 25 round): a single connection sustained **~3000 lines / 3 s ≈ 87 KB/s**. Multiple connections scale linearly.
 
-**Amplification (v3.7, fixed):** the rejection of an unknown type wrote the whole `type` into the line (`Unhandled message type: <type>`) and sent it back to the client. A `type` can be almost 5 MiB, and repetitive text compresses to almost nothing with per-message deflate: **20 messages, 82 KB on the wire, grew `debug.log` by 84 MB** (~1000×). Other client-chosen strings reached log lines unbounded, too: the `type` and `requestId` of every received message, an action's uuid, echoed `requestId`/`action-uuid` values in outgoing payloads, the whole unvalidated message of a dropped `replay-requests`, and the erase target in `hideElement` (`shared.js`, stdout).
+**Amplification (found in this round, fixed in f739d4b):** the rejection of an unknown type wrote the whole `type` into the line (`Unhandled message type: <type>`) and sent it back to the client. A `type` can be almost 5 MiB, and repetitive text compresses to almost nothing with per-message deflate: **20 messages, 82 KB on the wire, grew `debug.log` by 84 MB** (~1000×). Other client-chosen strings reached log lines unbounded, too: the `type` and `requestId` of every received message, an action's uuid, echoed `requestId`/`action-uuid` values in outgoing payloads, the whole unvalidated message of a dropped `replay-requests`, and the erase target in `hideElement` (`shared.js`, stdout).
 
-**Fixed since v3.7:** every client-chosen text in a log line goes through `clip` (`shared.js:64`): a uuid stays whole (it is all an honest client sends as an id, and at most 36 characters); any other text longer than `LOG_TEXT_LENGTH` = 20 characters becomes its first 20 followed by `...`. The unknown-type error, which is both logged and sent back, uses the same rule (protocol.md). Outgoing payloads are logged through `payloadForLog`, which clips `requestId` and `action-uuid`. A dropped `replay-requests` is logged by client id only. Verified live: the 82 KB input above now writes 1.5 KB; a copy of the server with all logging enabled, sent 1 MB values in every client-chosen field, wrote no line longer than 169 characters.
+**Fixed in f739d4b:** every client-chosen text in a log line goes through `clip` (`shared.js:64`): a uuid stays whole (it is all an honest client sends as an id, and at most 36 characters); any other text longer than `LOG_TEXT_LENGTH` = 20 characters becomes its first 20 followed by `...`. The unknown-type error, which is both logged and sent back, uses the same rule (protocol.md). Outgoing payloads are logged through `payloadForLog`, which clips `requestId` and `action-uuid`. A dropped `replay-requests` is logged by client id only. Verified live: the 82 KB input above now writes 1.5 KB; a copy of the server with all logging enabled, sent 1 MB values in every client-chosen field, wrote no line longer than 169 characters.
 
 **Remaining:** the number of lines is still unbounded (one per malformed message), and so is the file. **Crash chain:** when the disk fills, `writeFileAtomic` (`server.js:261`) throws (ENOSPC) inside `periodicallyPersist` (`server.js:2255`, 10 s timer) — unhandled → process crash, losing up to 10 s of edits.
 
@@ -239,13 +240,13 @@ Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` �
 
 ### ℹ️ 3. Plaintext board passwords in an old local `logs/debug.log` [WON'T FIX]
 
-**Decision (v3.7):** won't fix — neither the old file nor the commented-out logging configs will be changed. The `logs/debug.log` this finding was based on is **not the server's log**: it is an old copy in the author's local checkout and reflects an ancient logging configuration. Earlier versions of this report called it "the production `logs/debug.log`"; that was wrong. What protects the server's logs is the masking described below.
+**Decision (this round):** won't fix — neither the old file nor the commented-out logging configs will be changed. The `logs/debug.log` this finding was based on is **not the server's log**: it is an old copy in the author's local checkout and reflects an ancient logging configuration. Earlier versions of this report called it "the production `logs/debug.log`"; that was wrong. What protects the server's logs is the masking described below.
 
-**What the old file shows:** `logs/debug.log` (~792 KB) contains board passwords in cleartext: `passwd: 'e0k5ndiszdig'` (and others) in the `BOARD_CREATED` payload dumps and incoming `shuffle-proposal`/`mod-action-proposals` messages (28 such lines when re-checked in v3.7).
+**What the old file shows:** `logs/debug.log` (~792 KB) contains board passwords in cleartext: `passwd: 'e0k5ndiszdig'` (and others) in the `BOARD_CREATED` payload dumps and incoming `shuffle-proposal`/`mod-action-proposals` messages (28 such lines when re-checked in this round).
 
 **Why:** an earlier run used `new Console({ stdout: debugTee, stderr: debugTee })` (`server.js:72–73`, now commented out), logging every sent/received message with full payload. The **current** config (`stdout: debugNull`) sends `debug.log` to a NullStream — the entire payload-logging layer (`routeMessage`, `logSentMessage`) is dead code.
 
-**Fixed since d414690:** `logSentMessage` passes payloads through a masking function (named `payloadForLog` since v3.7, formerly `redactSecrets`), which masks every `passwd` and `new-passwd` field (the keys used for board passwords and credentials on the wire). Received messages are logged by type and requestId only (fc7870d), and a dropped `mod-action-proposals` by client id only (v3.7). Re-enabling payload logging therefore no longer writes passwords.
+**Fixed since d414690:** `logSentMessage` passes payloads through a masking function (named `payloadForLog` since f739d4b, formerly `redactSecrets`), which masks every `passwd` and `new-passwd` field (the keys used for board passwords and credentials on the wire). Received messages are logged by type and requestId only (fc7870d), and a dropped `mod-action-proposals` by client id only (f739d4b). Re-enabling payload logging therefore no longer writes passwords.
 
 ---
 
@@ -253,7 +254,7 @@ Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` �
 
 **Risk Level:** MEDIUM (disk + memory + CPU exhaustion; requires board password — shared with collaborators by design in readme.md)
 
-- Page **history grows without bound** (no cap on `handleEditAction`); each action is stored + hashed + persisted every 10 s. Since v3.7 an action can carry only the fields of its schema, but a single stroke may still have up to ~5 MB of points (`maxPayload`).
+- Page **history grows without bound** (no cap on `handleEditAction`); each action is stored + hashed + persisted every 10 s. Since f739d4b an action can carry only the fields of its schema, but a single stroke may still have up to ~5 MB of points (`maxPayload`).
 - **Page count** and **`deletionMap`** grow without bound; a deleted page's **file is never removed from disk**; `to_be_removed.json` grows without bound.
 - `existingPage` walks deletion chains — length unbounded (assert-guarded against cycles, so no hang, but O(chain) per lookup).
 - Each top-level GROUP action deep-clones the whole visual state (`structuredClone` in `commitGroup`) — an O(page-size) cost per GROUP a member can send at will.
@@ -262,9 +263,9 @@ Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` �
 
 ---
 
-### ✅ 5. No Origin check on WebSocket handshake [FIXED in v3.7]
+### ✅ 5. No Origin check on WebSocket handshake [FIXED in ba7cc0a]
 
-**Risk Level:** LOW (until v3.7)
+**Risk Level:** LOW (until ba7cc0a)
 
 **What was open:** the server never looked at the `Origin` header of a WebSocket handshake, so any web page could open a WebSocket to it from its visitors' browsers. Browsers do not apply their same-origin rules to WebSockets; the server has to check `Origin` itself.
 
@@ -289,21 +290,21 @@ Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` �
 
 ### ⚠️ 7. Error details sent to clients [OPEN, unchanged]
 
-**Risk Level:** LOW — `routeMessage` sends `JSON.parse` failure messages back to clients (`rejectMessage(ws, e.message)`, `server.js:2188`). Not a stack trace, but leaks parser internals; log full detail server-side, send a generic message. (The other client-visible rejection text, `Unhandled message type: …`, is clipped since v3.7; see Finding 2.)
+**Risk Level:** LOW — `routeMessage` sends `JSON.parse` failure messages back to clients (`rejectMessage(ws, e.message)`, `server.js:2188`). Not a stack trace, but leaks parser internals; log full detail server-side, send a generic message. (The other client-visible rejection text, `Unhandled message type: …`, is clipped since f739d4b; see Finding 2.)
 
 ---
 
 ## Deployment Findings
 
-### ✅ 8. Dockerfile: root user and out-of-support base image [FIXED in v3.7]
+### ✅ 8. Dockerfile: root user and out-of-support base image [FIXED in f739d4b]
 
-**Risk Level:** MEDIUM (until v3.7)
+**Risk Level:** MEDIUM (until f739d4b)
 
 **Root user:** the standalone `Dockerfile` had no `USER` directive, so the Node.js process ran as root inside the container: with Docker's default (no user-namespace remapping), container root is host UID 0 for bind-mounted files, ignores file permissions, and is the best starting point for a container escape. **Fixed:** `USER node`, the non-root user (UID 1000) of the official node images. The documented `docker-compose.yml` already ran the server as `user: "1000:1000"` (same UID) with the app mounted `:ro` and only `conf/`, `data/` and `logs/` writable; it is unaffected. Whoever runs the image without compose must now make those mounted directories writable by UID 1000.
 
-**Base image — Erratum (v3.6 → v3.7):** v3.6 called the `node:20` → `node:23` bump "pinning a current LTS". **Wrong:** Node 23 was never an LTS release (odd-numbered releases never are) and went end-of-life in June 2025; the image received no security fixes. **Fixed:** `node:24`, the current LTS line. Not booted in v3.7 (see Methodology); Node 24 may print a deprecation warning for `url.parse` (used in the HTTP handler), which is harmless.
+**Base image — Erratum (report revision 3.6):** revision 3.6 called the `node:20` → `node:23` bump "pinning a current LTS". **Wrong:** Node 23 was never an LTS release (odd-numbered releases never are) and went end-of-life in June 2025; the image received no security fixes. **Fixed:** `node:24`, the current LTS line. Not booted in this round (see Methodology); Node 24 may print a deprecation warning for `url.parse` (used in the HTTP handler), which is harmless.
 
-**Earlier erratum (v3.0 → v3.1), kept for the record:** v3.0 stated the `node:20` base "cannot start the server" because of `require('console')` / `fs.createWriteStream`. Retracted in v3.1 after full boot tests under node v20.18.1 and v23.11.1 (HTTP 200, WebSocket up, scrypt credential check).
+**Earlier erratum (report revision 3.0), kept for the record:** revision 3.0 stated the `node:20` base "cannot start the server" because of `require('console')` / `fs.createWriteStream`. Retracted in revision 3.1 after full boot tests under node v20.18.1 and v23.11.1 (HTTP 200, WebSocket up, scrypt credential check).
 
 ### ✅ `passwd_hash` shell-injection footgun [FIXED]
 
@@ -311,7 +312,7 @@ Every malformed message (invalid JSON, unknown `type`) reaches `rejectMessage` �
 
 ### ℹ️ Stale credential files `conf/passwd.json`, `conf/passwd.json~`
 
-`conf/` is not part of the repository, but the author's working directory still holds the legacy `conf/passwd.json` and its backup `conf/passwd.json~` (a single **salt-less** hash, one hex string, no `:`). Since logins, the server reads only `conf/users.json` (`loadUsers` in `users.js`); the old files are **never loaded** (at most mentioned in a startup hint) and **not served** (HTTP dotfile block + static whitelist). Inert; delete them for hygiene. (Still present in v3.7.)
+`conf/` is not part of the repository, but the author's working directory still holds the legacy `conf/passwd.json` and its backup `conf/passwd.json~` (a single **salt-less** hash, one hex string, no `:`). Since logins, the server reads only `conf/users.json` (`loadUsers` in `users.js`); the old files are **never loaded** (at most mentioned in a startup hint) and **not served** (HTTP dotfile block + static whitelist). Inert; delete them for hygiene. (Still present in this round.)
 
 ### ℹ️ Damaged data files end the process (by design, not fixed)
 
@@ -321,28 +322,28 @@ Earlier versions of this report listed a "corrupted-file crash" as fixed by a tr
 
 `b % 36` with `b ∈ [0,255]` makes digits 0–3 slightly more likely (8/256 vs 7/256). Negligible — the 12-char base36 keyspace (~62 bits) dominates; constant-time compare (79fc50a) prevents timing attacks.
 
-### ℹ️ Unreachable branch with an undefined variable (v3.7)
+### ℹ️ Unreachable branch with an undefined variable (found in this round)
 
 The `page-info-request` handler's fallback branch (`server.js:1554`) logs `clientId`, which is not defined in that scope; reaching it would throw a `ReferenceError`. It is unreachable: the validator already requires both ids to be UUIDs, so the branch never runs. Harmless today; a trap if the validator changes.
 
 ---
 
-## Resolved Since v2.2 (verified)
+## Resolved since report revision 2.2 (verified)
 
-### ✅ Crashes and memory exhaustion found in v3.7 [FIXED, verified live]
+### ✅ Crashes and memory exhaustion found in this round [FIXED in f739d4b, verified live]
 Findings 9–12 above, each with a regression test.
 
 ### ✅ GROUP sub-action validation (assert crash + stack overflow) [FIXED, verified live]
 `is_invalid_action_payload` recursively validates GROUP sub-actions (DRAW/ERASE/GROUP only) and enforces `MAX_GROUP_DEPTH = 10`. A depth-15 payload was dropped by validation on the live instance. `assert(false)` in `commitEdit` is no longer input-reachable.
 
 ### ✅ WebSocket message size limit [FIXED, verified live]
-`maxPayload: 5 * 1024 * 1024`; a 6 MiB message closed the connection. (v2.2 flagged the 100 MiB default.)
+`maxPayload: 5 * 1024 * 1024`; a 6 MiB message closed the connection. (Revision 2.2 flagged the 100 MiB default.)
 
 ### ✅ ws library CVE [FIXED]
-`ws` 8.22.0 (CVE-2026-48779, commit c9694cb). Still the installed version in v3.7.
+`ws` 8.22.0 (CVE-2026-48779, commit c9694cb). Still the installed version in this round.
 
 ### ✅ CPU-blocking scrypt [PARTIALLY FIXED]
-`scryptSync` → async `crypto.scrypt` (worker pool): event loop stays responsive under flood (re-measured in v3.7: delay at most 36 ms with up to 500 flooding connections). Residual issue: worker-pool starvation, which delays owner messages and, through per-message deflate, all WebSocket traffic (Finding 1).
+`scryptSync` → async `crypto.scrypt` (worker pool): event loop stays responsive under flood (re-measured in this round: delay at most 36 ms with up to 500 flooding connections). Residual issue: worker-pool starvation, which delays owner messages and, through per-message deflate, all WebSocket traffic (Finding 1).
 
 ### ✅ Constant-time board-password comparison [FIXED]
 SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no length leak, no timing leak.
@@ -354,17 +355,17 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 
 ## Security Controls Implemented (verified)
 
-1. **Message validation layer** — every handler validates before use; GROUP sub-actions recursively. Since v3.7 strict: a message or action with a key its schema does not name is refused.
+1. **Message validation layer** — every handler validates before use; GROUP sub-actions recursively. Since f739d4b strict: a message or action with a key its schema does not name is refused.
 2. **UUID-based access control** — `isUuid` gates all file IDs and message IDs; no traversal.
 3. **Safe deserialization** — BigInt/Set/Map only; no prototype pollution.
 4. **scrypt password auth** — N=16384/r=8/p=1, 32-byte salt, timing-safe compare (one implementation, `users.js`); one scrypt per owner message, unknown logins cost the same as wrong credentials. The user file is read for every check, so a removed user loses access at once; credential changes rewrite it from disk with mode 600.
-5. **HTTP hardening** — whitelist serving, hidden-file block, HSTS (behind proxy); an unparseable request target is answered with 400 (v3.7).
+5. **HTTP hardening** — whitelist serving, hidden-file block, HSTS (behind proxy); an unparseable request target is answered with 400 (f739d4b).
 6. **Assert safety** — all remaining asserts reachable only via disk damage/programmer error, not malformed input.
-7. **Send backpressure** (v3.7) — at most 64 MiB of unsent replies per connection.
-8. **Bounded log lines** (v3.7) — client-chosen text clipped to 20 characters (uuids whole); unvalidated messages are never stringified for the log.
-9. **Non-root container** (v3.7) — `USER node` in the Dockerfile, `user: "1000:1000"` in compose.
-10. **Failed credential checks limited per client address** (v3.7) — 10, then one more per minute; successful checks not counted; an address cannot run more checks at once than it may still fail.
-11. **Origin check on the WebSocket handshake** (v3.7) — browsers can connect only from the server's own page; other origins get 403.
+7. **Send backpressure** (f739d4b) — at most 64 MiB of unsent replies per connection.
+8. **Bounded log lines** (f739d4b) — client-chosen text clipped to 20 characters (uuids whole); unvalidated messages are never stringified for the log.
+9. **Non-root container** (f739d4b) — `USER node` in the Dockerfile, `user: "1000:1000"` in compose.
+10. **Failed credential checks limited per client address** (dd1fad2) — 10, then one more per minute; successful checks not counted; an address cannot run more checks at once than it may still fail.
+11. **Origin check on the WebSocket handshake** (ba7cc0a) — browsers can connect only from the server's own page; other origins get 403.
 
 ---
 
@@ -374,7 +375,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 2. **Log rotation + size cap + malformed-input logging rate limit**; decide how a full disk should end (Finding 2).
 3. ~~Rotate/truncate existing `debug.log`; remove the commented-out logging configs~~ — won't fix (Finding 3: an old local file, not the server's log; payload redaction is done).
 4. **State caps + GC:** history per page, page count, `deletionMap`, delete page files (Finding 4).
-5. ~~Verify `Origin` on the WS handshake~~ — done in v3.7 (Finding 5); after deploying, check once that the proxy passes `Host` on unchanged.
+5. ~~Verify `Origin` on the WS handshake~~ — done in ba7cc0a (Finding 5); after deploying, check once that the proxy passes `Host` on unchanged.
 6. **Configurable proxy trust** for `x-forwarded-proto` (Finding 6); generic client error messages (Finding 7).
 7. **Storage note:** no credential is stored in the browser any more (memory only; see the storage audit). Board edit passwords are part of edit links by design, so whoever has a link can edit. A CSP remains useful as defense-in-depth against XSS, which could read the credential from the page's memory while it is open.
 8. **Boot the `node:24` image once** and load a board, to confirm the base-image change (Finding 8).
@@ -383,7 +384,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 
 ## Test Cases
 
-### Live, Nov 12, 2026 (v3.7; node v18.19.1, throwaway instances)
+### Live, Nov 12, 2026 (node v18.19.1, throwaway instances)
 
 | Test | Before the fixes | After the fixes |
 |------|------------------|-----------------|
@@ -405,7 +406,7 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 | real browser (built-in Chromium): edit link at the server's own address; the same page opened as `localhost` | both connect | connects and syncs; refused for `127.0.0.1`, connects to `localhost`; refusals logged |
 | test suite (`node --test tests/`) | 134 tests | 141 tests, all pass |
 
-### Live, Oct 25, 2026 (v3.0–v3.3)
+### Live, Oct 25, 2026
 
 | Test | Result |
 |------|--------|
@@ -427,19 +428,19 @@ SHA-256 digests compared with `crypto.timingSafeEqual` (commit 79fc50a): no leng
 
 ## Conclusion
 
-The kubux-whiteboard-server remains solid against RCE, file access, deserialization and — verified live in v3.3 — **unauthorized board creation**. v3.6's claim that the crash-on-malformed-input class was closed did not hold: v3.7 found three client-triggerable crashes (two of them anonymous, one message or request each) and an anonymous memory exhaustion. All four are fixed, with regression tests, and the protocol is now enforced strictly: a message or action with a key its schema does not name is refused. Log lines no longer grow with client input, the container runs as a non-root user on a supported Node, failed credential checks are limited per client address, and browsers can open WebSockets only from the server's own page.
+The kubux-whiteboard-server remains solid against RCE, file access, deserialization and — verified live on Oct 25 — **unauthorized board creation**. Report revision 3.6's claim that the crash-on-malformed-input class was closed did not hold: this round found three client-triggerable crashes (two of them anonymous, one message or request each) and an anonymous memory exhaustion. All four are fixed, with regression tests, and the protocol is now enforced strictly: a message or action with a key its schema does not name is refused. Log lines no longer grow with client input, the container runs as a non-root user on a supported Node, failed credential checks are limited per client address, and browsers can open WebSockets only from the server's own page.
 
-The open issues are availability issues: **floods of failed logins from many addresses, and unlimited connections** (MEDIUM; verified live in v3.7 to delay all WebSocket traffic, since compression shares the worker pool with scrypt; a single address is stopped after 10 failures), **log-growth disk fill** without rotation (MEDIUM, amplification removed; refusals still log one line each) and **unbounded state growth by board members** (MEDIUM).
+The open issues are availability issues: **floods of failed logins from many addresses, and unlimited connections** (MEDIUM; verified live in this round to delay all WebSocket traffic, since compression shares the worker pool with scrypt; a single address is stopped after 10 failures), **log-growth disk fill** without rotation (MEDIUM, amplification removed; refusals still log one line each) and **unbounded state growth by board members** (MEDIUM).
 
 **Action required:** commit the Origin check and check once in production that the proxy passes `Host` on unchanged; then Findings 1, 2 and 4 (connection caps and compression, log management, state caps) before Findings 6 and 7.
 
 ---
 
-**Document Version:** 3.7
+**Report revision:** 3.7
 **Last Updated:** November 12, 2026
 **Next Review:** after Findings 1–4 are addressed
 
-**Changelog 3.7 (Nov 12, 2026):** Re-audit at commit 1cb92eb with live verification (node v18.19.1, throwaway instances). New Findings 9 (unauthenticated crash: dropped `mod-action-proposals` stringified for the log), 10 (unauthenticated crash: `url.parse` on an invalid absolute-form request target), 11 (board-member crash: deeply nested extra key on a valid action) and 12 (unauthenticated memory exhaustion: no send backpressure) — all fixed in the working tree and re-tested: dropped messages are logged by client id only; the request target is parsed once and an unparseable one answered with 400; every message and action is refused if it carries a key its schema does not name (protocol.md documents the rule and the optional `requestId`/`action-uuid` of `mod-action-proposals`); every send goes through `sendText`, which cuts off a connection with more than 64 MiB unsent. Finding 2: amplification via the echoed `type` measured (82 KB → 84 MB) and fixed by clipping every client-chosen text in log lines (`clip`, 20 characters, uuids whole); rotation and cap remain open. Finding 3: masking function renamed `payloadForLog`; 28 password lines remain in the old log. Finding 8 fixed: `node:24`, `USER node`; erratum: v3.6 wrongly called `node:23` an LTS (end-of-life June 2025). v3.6's "no client-reachable crash" corrected. New informational note on an unreachable branch with an undefined variable. Finding 1 re-tested live (4–500 flooding connections): still unlimited (70–90 failed checks/s, the 4-thread pool's cap); honest owner messages and, because the server compresses every WebSocket message in the same pool, all WebSocket traffic queue behind the checks (viewer full page 9.8 s at 500 connections; 1–2 ms over an uncompressed connection); event loop and HTTP unaffected; memory bounded by the number of connections. Corrected: v3.0's 3 ms fullPage latency under flood, the "unbounded queue" wording, and v3.7's first claim that HTTP page loads queue too. New recommendation: keep compression out of the scrypt queue. Then a rate limit on failed credential checks per client address (10, one more per minute, successes not counted; in `asOwner` only), re-tested live from one address and from one address per connection: Finding 1 lowered to MEDIUM and marked partially fixed; remaining gaps (many addresses, shared addresses, refusals logged one line each, proxy header assumption) recorded; recommendations, controls, tests and conclusion updated; header notes the fixes are in f739d4b and the rate limit in the working tree. Finding 3 marked won't fix: the log it was based on is an old local copy, not the server's log (earlier text wrongly called it the production log); its recommendation struck. Finding 5 fixed: WebSocket handshakes whose `Origin` does not name the `Host` they connect to are refused with 403 (handshakes without `Origin` accepted); verified by an automated test and in a real browser; the reason it mattered without cookies (other sites borrowing their visitors' addresses around the per-address limit) recorded; header notes the rate limit is in dd1fad2 and the Origin check in the working tree. Client-side XSS not re-audited. Line numbers refer to the working tree with the fixes.
+**Changelog 3.7 (Nov 12, 2026):** Re-audit at commit 1cb92eb with live verification (node v18.19.1, throwaway instances). New Findings 9 (unauthenticated crash: dropped `mod-action-proposals` stringified for the log), 10 (unauthenticated crash: `url.parse` on an invalid absolute-form request target), 11 (board-member crash: deeply nested extra key on a valid action) and 12 (unauthenticated memory exhaustion: no send backpressure) — all fixed in the working tree and re-tested: dropped messages are logged by client id only; the request target is parsed once and an unparseable one answered with 400; every message and action is refused if it carries a key its schema does not name (protocol.md documents the rule and the optional `requestId`/`action-uuid` of `mod-action-proposals`); every send goes through `sendText`, which cuts off a connection with more than 64 MiB unsent. Finding 2: amplification via the echoed `type` measured (82 KB → 84 MB) and fixed by clipping every client-chosen text in log lines (`clip`, 20 characters, uuids whole); rotation and cap remain open. Finding 3: masking function renamed `payloadForLog`; 28 password lines remain in the old log. Finding 8 fixed: `node:24`, `USER node`; erratum: v3.6 wrongly called `node:23` an LTS (end-of-life June 2025). v3.6's "no client-reachable crash" corrected. New informational note on an unreachable branch with an undefined variable. Finding 1 re-tested live (4–500 flooding connections): still unlimited (70–90 failed checks/s, the 4-thread pool's cap); honest owner messages and, because the server compresses every WebSocket message in the same pool, all WebSocket traffic queue behind the checks (viewer full page 9.8 s at 500 connections; 1–2 ms over an uncompressed connection); event loop and HTTP unaffected; memory bounded by the number of connections. Corrected: v3.0's 3 ms fullPage latency under flood, the "unbounded queue" wording, and v3.7's first claim that HTTP page loads queue too. New recommendation: keep compression out of the scrypt queue. Then a rate limit on failed credential checks per client address (10, one more per minute, successes not counted; in `asOwner` only), re-tested live from one address and from one address per connection: Finding 1 lowered to MEDIUM and marked partially fixed; remaining gaps (many addresses, shared addresses, refusals logged one line each, proxy header assumption) recorded; recommendations, controls, tests and conclusion updated; header notes the fixes are in f739d4b and the rate limit in the working tree. Finding 3 marked won't fix: the log it was based on is an old local copy, not the server's log (earlier text wrongly called it the production log); its recommendation struck. Finding 5 fixed: WebSocket handshakes whose `Origin` does not name the `Host` they connect to are refused with 403 (handshakes without `Origin` accepted); verified by an automated test and in a real browser; the reason it mattered without cookies (other sites borrowing their visitors' addresses around the per-address limit) recorded; header notes the rate limit is in dd1fad2 and the Origin check in the working tree. Client-side XSS not re-audited. Line numbers refer to the working tree with the fixes. Then the release-style wording ("Fixed in v3.7") replaced: fixes are named by the commit that holds them (f739d4b, dd1fad2, ba7cc0a), the audit itself by "this round"; the header states that revision numbers count versions of this report, not of the server; the Origin check, meanwhile committed in ba7cc0a, is no longer described as being in the working tree, and line numbers refer to ba7cc0a.
 
 **Changelog 3.6 (Oct 26, 2026):** Text brought in line with the code (development branch, up to 3f20cc7); no new live tests, findings unchanged. Storage audit and Recommendation 8: the credential is no longer persisted in `localStorage`, it is kept in the page's memory only. Finding 5: credentials live in the URL and page memory. Finding 8: the compose file also mounts `conf/` writable. `passwd_hash` footgun marked fixed (environment variables; shared `users.js`). Stale credential note: `conf/` is not in the repository; the server reads only `conf/users.json`. Control 4: one scrypt implementation, user file read per check, written with mode 600. Line numbers updated (Findings 1, 2, 5, 6; damaged-files note).
 

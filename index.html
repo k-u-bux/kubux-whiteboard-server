@@ -6693,9 +6693,12 @@
           }
       };
 
+      // The eraser returns to the default tool once the erase is done: the timer
+      // starts on pointer up only. Started earlier, it would switch tools whenever
+      // the pointer rests for a moment, mid-gesture or before it.
       const erase_path_pointer_handler = {
           down: (event) => {
-              startResetTool();
+              stopResetTool();
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               const rect = canvas.getBoundingClientRect();
               const x = (event.clientX - rect.left - panX) / zoomLevel;
@@ -6713,7 +6716,6 @@
               currentStroke[shared.ELEMENT.POINTS] = currentPath;
           },
           move: (event) => {
-              startResetTool();
               if ( force_stylus && event.pointerType === "touch" ) { return; }
               if (!isErasing) return;
               const rect = canvas.getBoundingClientRect();
@@ -6956,7 +6958,7 @@
           return points;
       }
 
-      function draw_shape_pointer_handler ( make_path ) {
+      function draw_shape_pointer_handler ( make_path, path_type ) {
           const result = {
               down: (event) => {
                   if ( force_stylus && event.pointerType === "touch" ) { return; }
@@ -6969,7 +6971,7 @@
                   currentPath.push(point);
                   isDrawing = true;
                   currentStroke = createStroke( draw_settings );
-                  currentStroke[shared.ELEMENT.PATH] = shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR;
+                  currentStroke[shared.ELEMENT.PATH] = path_type;
                   if ( draw_settings.fill ) {
                       currentStroke[shared.ELEMENT.TYPE] = shared.DRAWABLE.TYPE.FILL;
                   } else {
@@ -7012,11 +7014,13 @@
           return result;
       }
 
-      const draw_rectangle_pointer_handler = draw_shape_pointer_handler( bbox_path );
-      const draw_circle_pointer_handler = draw_shape_pointer_handler( circle_path );
-      const draw_horizontal_pointer_handler = draw_shape_pointer_handler( horizontal_path );
-      const draw_vertical_pointer_handler = draw_shape_pointer_handler( vertical_path );
-      const draw_line_pointer_handler = draw_shape_pointer_handler( straight_path );
+      // Rectangles and circles are closed paths; the three lines are open, so
+      // they get their caps and are not drawn there and back again.
+      const draw_rectangle_pointer_handler = draw_shape_pointer_handler( bbox_path, shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR );
+      const draw_circle_pointer_handler = draw_shape_pointer_handler( circle_path, shared.DRAWABLE.PATH.CLOSED_PIECEWISE_LINEAR );
+      const draw_horizontal_pointer_handler = draw_shape_pointer_handler( horizontal_path, shared.DRAWABLE.PATH.OPEN_PIECEWISE_LINEAR );
+      const draw_vertical_pointer_handler = draw_shape_pointer_handler( vertical_path, shared.DRAWABLE.PATH.OPEN_PIECEWISE_LINEAR );
+      const draw_line_pointer_handler = draw_shape_pointer_handler( straight_path, shared.DRAWABLE.PATH.OPEN_PIECEWISE_LINEAR );
 
       // Paste mode pointer handler with affine controls
       const paste_pointer_handler = {
@@ -8072,22 +8076,123 @@
                   context.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
               }
               context.stroke();
+          } else if ( element[shared.ELEMENT.OPACITY] < 1 || is_dashed(element) ) {
+              fill_pressure_stroke(context, element);
           } else {
+              // Opaque and solid: overlapping segments do not show, and stroking
+              // them one by one is faster than fill_pressure_stroke.
               for (let i = 1; i < points.length; i++) {
                   context.beginPath();
                   context.moveTo(points[i-1][shared.POINT.X], points[i-1][shared.POINT.Y]);
                   const point = points[i];
-                  const pressure = point[shared.POINT.PRESSURE];
-                  
-                  const minPressure = 0.5;
-                  const normalizedPressure = Math.max(0, (pressure - minPressure) / (1 - minPressure));
-                  const pressureEffect = (1 + normalizedPressure * element[shared.ELEMENT.SENSITIVITY]);
-                  
-                  context.lineWidth = element[shared.ELEMENT.WIDTH] * pressureEffect;
+                  context.lineWidth = pressure_width(element, point);
                   context.lineTo(point[shared.POINT.X], point[shared.POINT.Y]);
                   context.stroke();
               }
           }
+      }
+
+      // Width of a pressure stroke on the segment that ends in point.
+      function pressure_width(element, point) {
+          const pressure = point[shared.POINT.PRESSURE];
+          const minPressure = 0.5;
+          const normalizedPressure = Math.max(0, (pressure - minPressure) / (1 - minPressure));
+          const pressureEffect = (1 + normalizedPressure * element[shared.ELEMENT.SENSITIVITY]);
+          return element[shared.ELEMENT.WIDTH] * pressureEffect;
+      }
+
+      // A dash pattern whose lengths are all zero draws a solid line.
+      function is_dashed(element) {
+          return element[shared.ELEMENT.DASH_PATTERN].some(length => length > 0);
+      }
+
+      // A pressure stroke changes width from segment to segment, which a single
+      // stroke() cannot do. Stroking the segments one by one paints the overlaps
+      // twice, so a translucent stroke shows beads at every joint, and the dash
+      // pattern starts afresh in every segment. Instead, the outline of every
+      // segment, or of every dash in it, goes into one path, filled once: the
+      // nonzero rule paints the union, each spot once. The dash pattern runs on
+      // across the segments. All outlines are polygons with the same orientation
+      // (the nonzero rule needs that), and polygons only, as the PDF context has
+      // no arc().
+      function fill_pressure_stroke(context, element) {
+          const points = element[shared.ELEMENT.POINTS];
+          const cap = shared.CAP_STYLE_STRINGS[element[shared.ELEMENT.CAP_STYLE]];
+          let pattern = element[shared.ELEMENT.DASH_PATTERN];
+          if ( pattern.length % 2 == 1 ) {
+              pattern = pattern.concat(pattern); // as setLineDash() does
+          }
+          // pattern[k] is the current dash (k even) or gap (k odd), and
+          // remaining is what is left of it. Solid: one endless dash.
+          let k = 0;
+          let remaining = is_dashed(element) ? pattern[0] : Infinity;
+          context.beginPath();
+          for (let i = 1; i < points.length; i++) {
+              const x0 = points[i-1][shared.POINT.X];
+              const y0 = points[i-1][shared.POINT.Y];
+              const dx = points[i][shared.POINT.X] - x0;
+              const dy = points[i][shared.POINT.Y] - y0;
+              const length = Math.hypot(dx, dy);
+              const width = pressure_width(element, points[i]);
+              let t = 0; // distance from (x0, y0) covered so far
+              while ( true ) {
+                  const step = Math.min(remaining, length - t);
+                  if ( k % 2 == 0 ) {
+                      const s0 = length > 0 ? t / length : 0;
+                      const s1 = length > 0 ? (t + step) / length : 0;
+                      lay_capped_segment(context,
+                                         x0 + s0 * dx, y0 + s0 * dy,
+                                         x0 + s1 * dx, y0 + s1 * dy,
+                                         dx, dy, width, cap);
+                  }
+                  t += step;
+                  remaining -= step;
+                  if ( remaining > 0 ) break; // the segment is used up
+                  k = (k + 1) % pattern.length;
+                  remaining = pattern[k];
+              }
+          }
+          context.fill();
+      }
+
+      // Outline of a straight piece from (x0, y0) to (x1, y1) with the given
+      // width and cap at both ends, as stroke() would draw it. (dx, dy) is its
+      // direction, which a piece of length zero (a dot) needs for square caps.
+      function lay_capped_segment(context, x0, y0, x1, y1, dx, dy, width, cap) {
+          const h = width / 2;
+          const length = Math.hypot(dx, dy);
+          const ux = length > 0 ? dx / length : 1;
+          const uy = length > 0 ? dy / length : 0;
+          if ( cap === 'round' ) {
+              lay_disc(context, x0, y0, h);
+              lay_disc(context, x1, y1, h);
+          }
+          const e = ( cap === 'square' ) ? h : 0;
+          const ax = x0 - ux * e;
+          const ay = y0 - uy * e;
+          const bx = x1 + ux * e;
+          const by = y1 + uy * e;
+          if ( ax == bx && ay == by ) return; // a dot with butt caps: nothing
+          const nx = -uy * h;
+          const ny = ux * h;
+          context.moveTo(ax - nx, ay - ny);
+          context.lineTo(bx - nx, by - ny);
+          context.lineTo(bx + nx, by + ny);
+          context.lineTo(ax + nx, ay + ny);
+          context.closePath();
+      }
+
+      // A polygon for the disc of radius r around (x, y), with sides that stray
+      // at most 0.05 units from the circle; same orientation as the outlines
+      // of lay_capped_segment.
+      function lay_disc(context, x, y, r) {
+          const corners = Math.min(64, Math.max(8, Math.ceil(Math.PI / Math.acos(Math.max(-1, 1 - 0.05 / r)))));
+          context.moveTo(x + r, y);
+          for (let j = 1; j < corners; j++) {
+              const angle = 2 * Math.PI * j / corners;
+              context.lineTo(x + r * Math.cos(angle), y + r * Math.sin(angle));
+          }
+          context.closePath();
       }
 
       function draw_closed(context, element) {
