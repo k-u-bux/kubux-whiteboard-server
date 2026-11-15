@@ -1265,7 +1265,7 @@
         <button class="tool-btn" id="zoom-menu-btn">100%</button>
         <button class="tool-btn" id="zoom-in">+</button>
         <button class="tool-btn" id="hand-tool" title="Pan (Hand Tool)"><span class="icon" data-icon="hand"></span></button>
-        <button class="tool-btn" id="reset-view" title="Reset View (Center, 100%)"><span class="icon" data-icon="reset-view"></span></button>
+        <button class="tool-btn" id="reset-view" title="Reset View (fit again after fit width/height, else center at 100%)"><span class="icon" data-icon="reset-view"></span></button>
         <div id="zoom-popup-menu" style="display:none;">
           <button class="popup-option" data-zoom="fit-width">fit width</button>
           <button class="popup-option" data-zoom="fit-height">fit height</button>
@@ -2830,9 +2830,12 @@
       // Scrollbars
       // ==========
       // With a page format, a scrollbar appears along each side the page does
-      // not fit in at the current zoom. A scrollbar takes room from the canvas,
-      // which can make the other one necessary, never unnecessary, as the zoom
-      // stays as it is. The bar spans the page, from its first edge to its last;
+      // not fit in at the current zoom. After fit width, the vertical one shows
+      // in any case, after fit height the horizontal one: they show the fit.
+      // A scrollbar takes room from the canvas, which can make the other one
+      // necessary, never unnecessary, as the zoom stays as it is (and a fit
+      // leaves room for its scrollbar). The bar spans the page, from its first
+      // edge to its last (all of the track where the page fits);
       // after a fit, it moves the page along the fitted side only, which it
       // lines up again where the hand tool moved it out of line.
       // Lengths are in canvas pixels, positions relative to the page's corner.
@@ -2908,8 +2911,8 @@
               const height = container.clientHeight + (h.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
               const pageW = canvasFormat.w * zoomLevel;
               const pageH = canvasFormat.h * zoomLevel;
-              needV = pageH > height + SCROLL_SLACK;
-              needH = pageW > width + SCROLL_SLACK;
+              needV = fitSide === 'width' || pageH > height + SCROLL_SLACK;
+              needH = fitSide === 'height' || pageW > width + SCROLL_SLACK;
               if ( needV && !needH ) needH = pageW > width - SCROLLBAR_SIZE + SCROLL_SLACK;
               if ( needH && !needV ) needV = pageH > height - SCROLLBAR_SIZE + SCROLL_SLACK;
           }
@@ -2966,19 +2969,15 @@
       }
 
       // Zoom at which the page fills the width (side 'width') or the height of
-      // the room for the canvas. Where the page is then too tall (too wide), a
-      // scrollbar takes some of that width (height), so the page shrinks to fit
-      // beside it. Shrunk, it may no longer need the scrollbar; then the page
-      // fits as a whole, at the zoom that fits the other side.
+      // the room for the canvas, less the scrollbar that shows along that side
+      // after the fit
       function fitZoom(side) {
-          const width = container.clientWidth + (scrollAxes.vertical.bar.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
-          const height = container.clientHeight + (scrollAxes.horizontal.bar.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
-          const fitW = width / canvasFormat.w;
-          const fitH = height / canvasFormat.h;
           if ( side === 'width' ) {
-              return fitW <= fitH ? fitW : Math.max(fitH, (width - SCROLLBAR_SIZE) / canvasFormat.w);
+              const width = container.clientWidth + (scrollAxes.vertical.bar.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
+              return (width - SCROLLBAR_SIZE) / canvasFormat.w;
           }
-          return fitH <= fitW ? fitH : Math.max(fitW, (height - SCROLLBAR_SIZE) / canvasFormat.h);
+          const height = container.clientHeight + (scrollAxes.horizontal.bar.classList.contains('shown') ? SCROLLBAR_SIZE : 0);
+          return (height - SCROLLBAR_SIZE) / canvasFormat.h;
       }
       
       // Fit width (side 'width') or fit height, with the page lined up with
