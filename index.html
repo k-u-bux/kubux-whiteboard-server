@@ -3474,7 +3474,6 @@
               passwd: entry[L.ENTRY_PASSWORD],
               createdAt: entry[L.ENTRY_CREATED_AT]
           }));
-          adoptOwnerPassword();
           renderBoardTree();
           updateCurrentBoardSection();
           updateNewBoardForm(); // the path typed there may have become free or taken
@@ -9672,16 +9671,6 @@
           window.history.replaceState(null, null, `${window.location.pathname}${query}`);
       }
 
-      // An owner can always edit their boards: the board list carries the edit password,
-      // so a board opened with its view link (or an outdated password) gets edit rights
-      function adoptOwnerPassword() {
-          const entry = boardList.find(e => e.board === boardId);
-          if (entry && passwd !== entry.passwd) {
-              passwd = entry.passwd;
-              showShareAddress();
-          }
-      }
-
       // Show another board in this page, without a reload: the login and the credential,
       // which live only in this page, stay
       // Offline it is refused, and says so in the given feedback line of the boards view:
@@ -9701,7 +9690,6 @@
           boardSwitch = true;
           boardId = targetBoardId;
           passwd = targetPassword;
-          adoptOwnerPassword();
           registerBoard(boardId);
           showShareAddress();
           expandToCurrent = true;
