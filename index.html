@@ -3126,6 +3126,14 @@
               boardId = null;
               passwd = null;
           }
+          // A password in the address is the newest; without one, the tab's own is used
+          // (see showShareAddress), which takes the password out of the address at once
+          if ( boardId ) {
+              if ( !passwd ) {
+                  passwd = keptEditPassword( boardId );
+              }
+              showShareAddress();
+          }
 
           let wsUrl;
           
@@ -9660,15 +9668,43 @@
           }
       }
 
-      // The address bar shows the board's share link and nothing else: the edit link if
-      // this page can edit, else the view link; login and credential never stay in it.
-      // setupWebSocket reads board and password back from it on every (re)connect.
+      // The address bar shows the board's view link and nothing else: the edit password,
+      // login and credential never stay in it. Edit links are shared from the Current
+      // Board section. The tab keeps the edit password of the board it shows in
+      // sessionStorage, which survives reloads and goes with the tab: one pair, so the
+      // link the board was last opened with decides. setupWebSocket reads the board from
+      // the address and the password from that pair on every (re)connect. Where storage
+      // is blocked, the password stays in the address, so a reload keeps edit rights.
+      const EDIT_PASSWORD_KEY = 'whiteboard_edit_password';
+
       function showShareAddress() {
           let query = `?board=${encodeURIComponent(boardId)}`;
-          if (passwd) {
-              query += `&passwd=${encodeURIComponent(passwd)}`;
+          try {
+              if (passwd) {
+                  sessionStorage.setItem(EDIT_PASSWORD_KEY, JSON.stringify({ board: boardId, passwd }));
+              } else {
+                  sessionStorage.removeItem(EDIT_PASSWORD_KEY);
+              }
+          } catch (err) {
+              // storage full or blocked
+              if (passwd) {
+                  query += `&passwd=${encodeURIComponent(passwd)}`;
+              }
           }
           window.history.replaceState(null, null, `${window.location.pathname}${query}`);
+      }
+
+      // The edit password the tab keeps for this board, or null
+      function keptEditPassword(board) {
+          try {
+              const entry = JSON.parse(sessionStorage.getItem(EDIT_PASSWORD_KEY));
+              if (entry && entry.board === board && typeof entry.passwd === 'string') {
+                  return entry.passwd;
+              }
+          } catch (err) {
+              // storage blocked or entry unreadable
+          }
+          return null;
       }
 
       // Show another board in this page, without a reload: the login and the credential,

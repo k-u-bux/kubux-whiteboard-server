@@ -222,7 +222,7 @@ In the tree:
 
 Only the owner sees a board's path; spectators and collaborators with a link see no names.
 
-A board opened from the tree of your boards opens with its edit link. Anywhere else, the link decides: a board opened with its view link stays view-only, also for its owner. The address bar always shows the link that grants what the page can do, and nothing else. For a board you can edit, that is its edit link (`?board=…&passwd=…`); otherwise it is the view link. `login` and `credential` are removed from the address once the page has read them.
+A board opened from the tree of your boards opens with its edit link. Anywhere else, the link decides: a board opened with its view link stays view-only, also for its owner. The address bar shows the board's view link (`?board=…`) and nothing else, so it can be projected. The edit password, `login` and `credential` are removed from the address once the page has read them. The tab keeps the edit password of the board it shows in sessionStorage, so a reload keeps edit rights; it is one pair (board, password), so the link a board was last opened with decides, and it goes with the tab. Edit links are shared with "Copy Edit Link" under Current Board; a bookmark of the address is a view link. Where the browser blocks storage, the password stays in the address instead.
 
 Without a board in the URL (e.g. `?login=<your_login>`), the boards view is the start page. So it is with a `board` parameter that is not a board ID (a typo, a cut-off link); Current Board then says so.
 
